@@ -1774,55 +1774,40 @@ function statusBadge(s){
 }
 // Point 1: Step-by-step status — cannot skip
 function getAllowedStatuses(current,role,serviceType){
-  // ===== STRICT STATUS FLOW =====
-  // TERMINAL STATES - only admin can reopen with reason
+  // TERMINAL STATES
   if(['Closed','Customer Reject','Call Cancel'].includes(current)){
-    if(role==='admin') return['Assigned']; // Admin can reopen only to Assigned
-    return[]; // No one else can change
+    if(role==='admin') return['Assigned'];
+    return[];
   }
 
-  // ===== ADMIN / WORK CONTROLLER =====
+  // ADMIN / WC
   if(role==='admin'||role==='work_controller'){
     switch(current){
-      case 'Pending Allocation':
-        return['Assigned']; // Only assign engineer
-      case 'Assigned':
-        return['Call Cancel']; // Admin can cancel, engineer does the rest
-      case 'In Progress':
-        return['Call Cancel']; // Admin can only cancel, not skip steps
-      case 'Pending Customer Approval':
-        return['Customer Approved','Customer Reject','Call Cancel'];
+      case 'Pending Allocation': return['Assigned'];
+      case 'Assigned': return['Call Cancel'];
+      case 'In Progress': return['Call Cancel'];
+      case 'Pending Customer Approval': return['Customer Approved','Customer Reject','Call Cancel'];
       case 'Customer Approved':
-        const rs=serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-        return[rs]; // Must go to repair
-      case 'Pending Parts':
-        return['Call Cancel']; // Wait for parts, can cancel
+        const rs2=serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+        return[rs2,'Pending Parts'];
+      case 'Pending Parts': return['Pending Repair Carry In','Pending Repair On Site','Call Cancel'];
       case 'Pending Repair Carry In':
-      case 'Pending Repair On Site':
-        return['Closed','Call Cancel']; // Admin can close or cancel
-      default:
-        return['Call Cancel'];
+      case 'Pending Repair On Site': return['Closed','Call Cancel'];
+      default: return['Call Cancel'];
     }
   }
 
-  // ===== ENGINEER =====
+  // ENGINEER
   if(role==='engineer'){
     switch(current){
-      case 'Assigned':
-        return['In Progress']; // Must start work first
-      case 'In Progress':
-        return['Closed']; // Close directly (no parts) OR use Part Request button
-      case 'Customer Approved':
-        return['Closed']; // Direct close if no parts needed
+      case 'Assigned': return['In Progress'];
+      case 'In Progress': return['Closed','Pending Customer Approval'];
+      case 'Customer Approved': return['Closed'];
       case 'Pending Repair Carry In':
-      case 'Pending Repair On Site':
-        return['Closed']; // Parts received, do repair and close
-      case 'Pending Customer Approval':
-        return[]; // Engineer can only VIEW, not change
-      case 'Pending Parts':
-        return[]; // Engineer can only VIEW
-      default:
-        return[];
+      case 'Pending Repair On Site': return['Closed'];
+      case 'Pending Customer Approval': return[];
+      case 'Pending Parts': return[];
+      default: return[];
     }
   }
   return[];
@@ -2471,7 +2456,9 @@ async function viewTicket(id,autoPrint=false){
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
       <tbody>${spares.map(s=>`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${s.price}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${(s.qty*s.price).toFixed(2)}</td></tr>`).join('')}</tbody>
     </table>
-    <div style="font-size:13px;text-align:right;">Parts: ₹${total.toFixed(2)} | Labor: ₹${t.labor||0} | Other: ₹${t.other_charge||0} | <b>Total: ₹${grand.toFixed(2)}</b></div>`:''}
+    <div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;">
+    ${serviceCharge>0?`Service: ₹${serviceCharge} | `:''}Parts: ₹${total.toFixed(2)} | Labor: ₹${t.labor||0} | Other: ₹${t.other_charge||0} | <b style="color:#065f46;font-size:14px;">Total: ₹${grand.toFixed(2)}</b></div>`:''}
+    ${(parseFloat(t.service_charges)||0)>0&&!spares.length?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${t.service_charges}</b>${t.final_charges?' | Final: ₹'+t.final_charges:''}</div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
@@ -2772,21 +2759,27 @@ async function savePartRequest(){
   const isW=t.call_type&&t.call_type.includes('Warranty');
   const isOOC=t.warranty_coverage==='Out of Coverage';
 
-  // Point 6 logic: auto status based on stock and warranty
+  // Status based on call type + stock
   let newStatus;
-  if(isOOC||!isW){
-    // Non-warranty or OOC → Pending Customer Approval
-    newStatus='Pending Customer Approval';
-  }else{
-    // Warranty
+  if(isW&&!isOOC){
+    // WARRANTY: No charges - check stock
     if(hasStock){
       newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
     }else{
       newStatus='Pending Parts';
     }
+  }else{
+    // NON-WARRANTY or OUT-OF-COVERAGE: Need customer approval for parts
+    newStatus='Pending Customer Approval';
   }
 
-  const spares=[...(t.spares||[]),{code,name,qty,price:0,requested:true}];
+  // Fetch price from inventory
+  let partPrice=0;
+  try{
+    const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`);
+    if(inv.length)partPrice=parseFloat(inv[0].unit_price)||0;
+  }catch(e){}
+  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,requested:true}];
   const tl=[...(t.timeline||[]),{action:'Part Requested — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:`Part: ${code} ${name} × ${qty} | ${note}`}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
   closeModal('modal-part-req');closeModal('modal-eng-update');
@@ -2857,7 +2850,20 @@ async function saveEngUpdate(){
     }
   }
 
-  // Customer/Engineer signature required on close
+  // For Non-Warranty closing - auto calculate final charges
+  if(status==='Closed'){
+    const isNW=t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other');
+    const isOOC=t.out_of_coverage===true;
+    if(isNW||isOOC){
+      const sc=parseFloat(t.service_charges)||0;
+      const partsCost=(currentSpares||[]).reduce(function(s,p){return s+(parseFloat(p.price||0)*parseInt(p.qty||1));},0);
+      const final=sc+partsCost;
+      data.final_charges=final;
+      data.charges_note='Service: Rs'+sc+' + Parts: Rs'+partsCost.toFixed(0)+' = Total: Rs'+final.toFixed(0);
+    }
+  }
+
+  // Signature required on close
   if(status==='Closed'&&!t.customer_signature){
     closeModal('modal-eng-update');
     await sb('tickets','PATCH',data,`?id=eq.${id}`);
