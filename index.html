@@ -1844,11 +1844,6 @@ async function renderDashboard(){
   await new Promise(r=>setTimeout(r,100));
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
-    if(currentUser.role_type==='work_controller'){
-      const wcName=(currentUser.name||'').toUpperCase();
-      const wcType=wcName.includes('ICP')?'ICP':'CSP';
-      q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';
-    }
     allTickets=await sb('tickets','GET',null,q);
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
@@ -4447,6 +4442,14 @@ async function saveDailyReport(){
       payments.push({customer:name,amount:amt,mode:mode});
       totalAmt+=amt;
     }
+  });
+
+  // Collect Google Reviews
+  var googleReviews=[];
+  document.querySelectorAll('#dr-reviews-container .dr-review-row').forEach(function(row){
+    var cname=row.querySelector('input[type="text"]')?.value?.trim()||'';
+    var stars=row.querySelector('select')?.value||'';
+    if(cname&&stars)googleReviews.push({customer:cname,stars:parseInt(stars)});
   });
 
   try{
