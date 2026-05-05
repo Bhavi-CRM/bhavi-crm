@@ -433,7 +433,8 @@ tr:hover td{background:#f8fafc;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-part-req')">Cancel</button>
-      <button class="btn btn-primary" onclick="savePartRequest()">📦 Request Part</button>
+      <button class="btn btn-success" onclick="savePartRequest(true)">➕ Save & Add Another</button>
+      <button class="btn btn-primary" onclick="savePartRequest(false)">📦 Done</button>
     </div>
   </div>
 </div>
@@ -445,57 +446,36 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-body">
       <div id="approval-info" style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
       
-      <!-- Estimate Breakdown -->
-      <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">💰 Estimate Breakdown</h3>
-      <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px;">
-        <div id="estimate-parts-list" style="margin-bottom:10px;font-size:13px;"></div>
-        <div class="form-grid" style="margin-bottom:10px;">
-          <div class="form-group">
-            <label>Parts Total ₹</label>
-            <input type="number" id="est-parts" readonly style="background:#f0f4ff;font-weight:700;">
-          </div>
-          <div class="form-group">
-            <label>Labour ₹</label>
-            <input type="number" id="est-labour" value="0" oninput="recalcEstimate()">
-          </div>
+      <div id="estimate-parts-list" style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;"></div>
+      
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Parts Total ₹</label>
+          <input type="number" id="est-parts" readonly style="background:#f0f9ff;">
         </div>
-        <hr class="divider">
-        <h4 style="font-size:13px;font-weight:700;margin-bottom:8px;">🏷️ Discount (Optional)</h4>
-        <div class="form-grid" style="margin-bottom:10px;">
-          <div class="form-group">
-            <label>Parts Discount %</label>
-            <input type="number" id="est-parts-disc" value="0" min="0" max="100" placeholder="0" oninput="recalcEstimate()">
-          </div>
-          <div class="form-group">
-            <label>Labour Discount %</label>
-            <input type="number" id="est-labour-disc" value="0" min="0" max="100" placeholder="0" oninput="recalcEstimate()">
-          </div>
+        <div class="form-group">
+          <label>Service Charges ₹</label>
+          <input type="number" id="est-labour" min="0" step="50" oninput="calcApprovalTotal()">
         </div>
-        <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
-            <span>Parts after discount:</span><span id="est-parts-final" style="font-weight:600;">₹0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
-            <span>Labour after discount:</span><span id="est-labour-final" style="font-weight:600;">₹0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--primary);border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">
-            <span>Final Estimate:</span><span id="est-total">₹0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--success);margin-top:4px;">
-            <span>Total Discount:</span><span id="est-discount-total">₹0</span>
-          </div>
+        <div class="form-group">
+          <label>Discount ₹</label>
+          <input type="number" id="est-discount" min="0" value="0" oninput="calcApprovalTotal()">
+        </div>
+        <div class="form-group">
+          <label><b>Total ₹</b></label>
+          <input type="number" id="est-total" readonly style="background:#f0fdf4;font-weight:700;color:#065f46;">
         </div>
       </div>
       
-      <div class="form-group" style="margin-bottom:10px;">
-        <label>Remark / Note to Customer <span class="req">*</span></label>
-        <textarea id="approval-note" rows="3" placeholder="e.g. LCD damaged, replacement needed. Estimate includes parts + labour..."></textarea>
+      <div class="form-group">
+        <label>Remark / Note <span class="req">*</span></label>
+        <textarea id="est-note" rows="2" placeholder="Approval or rejection reason..."></textarea>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-approval')">Cancel</button>
-      <button class="btn btn-danger" onclick="processApproval('reject')">❌ Customer Reject</button>
-      <button class="btn btn-success" onclick="processApproval('approve')">✅ Customer Approved</button>
+      <button class="btn btn-danger" onclick="processApproval('reject')">❌ Reject</button>
+      <button class="btn btn-success" onclick="processApproval('approve')">✅ Approve</button>
     </div>
   </div>
 </div>
@@ -2428,7 +2408,7 @@ async function viewTicket(id,autoPrint=false){
     t=allTickets.find(x=>x.id===id);
   }
   if(!t)return;
-  const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type.includes('Warranty'));
+  const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   const spares=t.spares||[];const total=spares.reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
@@ -2449,17 +2429,19 @@ async function viewTicket(id,autoPrint=false){
 
   // Admin actions
   let adminActions='';
-  if(currentUser.role==='admin'){
+  if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){
     // Point 1: Step-by-step status — no skipping
     const allowed=getAllowedStatuses(t.status,'admin',t.service_type);
     const pendingApproval=t.status==='Pending Customer Approval';
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;">
-      ${pendingApproval?`<button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Process Approval</button>`:''}
+      ${pendingApproval?`
+        <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject</button>
+      `:''}
       ${allowed.length&&!pendingApproval?`<select onchange="quickStatusChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
         <option value="">Change Status (${allowed.length} options)...</option>${allowed.map(s=>`<option>${s}</option>`).join('')}
       </select>`:`<span style="font-size:12px;color:var(--text-muted);padding:6px;">Status: ${t.status} — ${getAllowedStatuses(t.status,currentUser.role,t.service_type).length===0?'No changes allowed at this stage':'Use buttons above'}</span>`}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-        <option value="">Reassign Engineer...</option>${allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
+        <option value="">Reassign Engineer...</option>${(allEngineers||[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
@@ -2490,8 +2472,9 @@ async function viewTicket(id,autoPrint=false){
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
       <tbody>${spares.map(s=>`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${s.price}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${(s.qty*s.price).toFixed(2)}</td></tr>`).join('')}</tbody>
     </table>
-    <div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;">
-    ${serviceCharge>0?`Service: ₹${serviceCharge} | `:''}Parts: ₹${total.toFixed(2)} | Labor: ₹${t.labor||0} | Other: ₹${t.other_charge||0} | <b style="color:#065f46;font-size:14px;">Total: ₹${grand.toFixed(2)}</b></div>`:''}
+    <div style="font-size:13px;background:#f0fdf4;padding:10px;border-radius:8px;">
+    ${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}
+    </div>`:''}
     ${svcCharge>0&&!spares.length?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
@@ -2511,7 +2494,8 @@ async function voidWarranty(id){
 }
 async function quickStatusChange(id,status){
   if(!status)return;
-  const t=allTickets.find(x=>x.id===id)||(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
   // Strict validation
   const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type);
@@ -2530,78 +2514,108 @@ async function quickStatusChange(id,status){
 }
 async function quickEngChange(id,val){
   if(!val)return;const[eId,eName]=val.split('|');
-  const t=allTickets.find(x=>x.id===id)||(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   const tl=[...(t?.timeline||[]),{action:'Assigned to '+eName,by:currentUser.name,at:new Date().toISOString()}];
   await sb('tickets','PATCH',{assigned_to:eId,assigned_name:eName,status:'Assigned',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
 
 // Point 2: Customer Approval flow
+
+async function removeApprovalPart(idx){
+  if(!confirm('Remove this part?'))return;
+  const t=await sb('tickets','GET',null,`?id=eq.${approvalTicketId}`);
+  const ticket=t[0];if(!ticket)return;
+  const spares=[...(ticket.spares||[])];
+  spares.splice(idx,1);
+  // If no parts left, revert to In Progress for engineer to close
+  const updateData={spares,updated_at:new Date().toISOString()};
+  if(spares.length===0){
+    updateData.status='In Progress';
+    const tl=[...(ticket.timeline||[]),{action:'Parts Removed — Back to In Progress',by:currentUser.name,at:new Date().toISOString(),note:'All parts removed. Engineer to close.'}];
+    updateData.timeline=tl;
+  }
+  await sb('tickets','PATCH',updateData,`?id=eq.${approvalTicketId}`);
+  if(spares.length===0){
+    alert('✅ All parts removed. Call is back to In Progress — Engineer will close it.');
+    closeModal('modal-approval');
+    if(currentPage==='tickets')renderTickets();else renderDashboard();
+  }else{
+    openApproval(approvalTicketId);
+  }
+}
+
+function calcApprovalTotal(){
+  var parts=parseFloat(document.getElementById('est-parts')?.value)||0;
+  var service=parseFloat(document.getElementById('est-labour')?.value)||0;
+  var discount=parseFloat(document.getElementById('est-discount')?.value)||0;
+  var total=parts+service-discount;
+  var el=document.getElementById('est-total');
+  if(el)el.value=Math.max(0,total).toFixed(0);
+}
 async function openApproval(id){
   approvalTicketId=id;
-  const t=allTickets.find(x=>x.id===id)||(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const res=await sb('tickets','GET',null,`?id=eq.${id}`);t=res[0];}
   if(!t)return;
   
   // Show ticket info
   document.getElementById('approval-info').innerHTML=`<b>${t.id}</b> | ${t.cname} | ${t.model} | ${t.call_type}<br>Problem: ${t.problem}`;
   
   // Calculate parts from spares
-  const spares=(t.spares||[]).filter(s=>!s.requested);
+  const spares=(t.spares||[]);
   const partsTotal=spares.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
   
   // Show parts breakdown
   const partsListEl=document.getElementById('estimate-parts-list');
   if(spares.length){
-    partsListEl.innerHTML='<b>Parts:</b><br>'+spares.map(s=>`${s.code||''} ${s.name} × ${s.qty} = ₹${((s.qty||0)*(s.price||0)).toFixed(0)}`).join('<br>');
+    partsListEl.innerHTML='<b>Parts:</b>'+spares.map(function(s,i){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">'
+        +'<span>• '+(s.code||'')+' '+s.name+' × '+s.qty+' = <b>₹'+((s.qty||0)*(s.price||0)).toFixed(0)+'</b></span>'
+        +'<button data-idx="'+i+'" class="rm-approval-part" style="background:var(--danger);color:#fff;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;">✕ Remove</button>'
+        +'</div>';
+    }).join('');
+    // Add click listeners for remove buttons
+    partsListEl.querySelectorAll('.rm-approval-part').forEach(function(btn){
+      btn.addEventListener('click',function(){removeApprovalPart(parseInt(this.dataset.idx));});
+    });
   }else{
     partsListEl.innerHTML='<span style="color:var(--text-muted);">No parts added yet</span>';
   }
   
-  // Set values
-  document.getElementById('est-parts').value=partsTotal.toFixed(0);
-  document.getElementById('est-labour').value=t.labor||0;
-  document.getElementById('est-parts-disc').value=0;
-  document.getElementById('est-labour-disc').value=0;
-  document.getElementById('approval-note').value='';
-  
-  recalcEstimate();
+  // Set values - new simplified modal
+  var ep=document.getElementById('est-parts');if(ep)ep.value=partsTotal.toFixed(0);
+  var el=document.getElementById('est-labour');if(el)el.value=t.service_charges||t.labor||0;
+  var ed=document.getElementById('est-discount');if(ed)ed.value='0';
+  var en=document.getElementById('est-note');if(en)en.value='';
+  calcApprovalTotal();
   openModal('modal-approval');
 }
 
 function recalcEstimate(){
-  const parts=parseFloat(document.getElementById('est-parts')?.value)||0;
-  const labour=parseFloat(document.getElementById('est-labour')?.value)||0;
-  const partsDisc=parseFloat(document.getElementById('est-parts-disc')?.value)||0;
-  const labourDisc=parseFloat(document.getElementById('est-labour-disc')?.value)||0;
-  
-  const partsFinal=parts*(1-partsDisc/100);
-  const labourFinal=labour*(1-labourDisc/100);
-  const total=partsFinal+labourFinal;
-  const discount=(parts-partsFinal)+(labour-labourFinal);
-  
-  document.getElementById('est-parts-final').textContent='₹'+partsFinal.toFixed(0);
-  document.getElementById('est-labour-final').textContent='₹'+labourFinal.toFixed(0);
-  document.getElementById('est-total').textContent='₹'+total.toFixed(0);
-  document.getElementById('est-discount-total').textContent='₹'+discount.toFixed(0)+' saved';
+  calcApprovalTotal();
 }
 async function processApproval(decision){
-  const note=document.getElementById('approval-note').value.trim();
-  if(!note){alert('Remark/Note required — please add a note for customer');return;}
+  const note=document.getElementById('est-note')?.value?.trim()||'';
   
   const t=allTickets.find(x=>x.id===approvalTicketId)||(await sb('tickets','GET',null,`?id=eq.${approvalTicketId}`))[0];
   
   // Get estimate details
   const parts=parseFloat(document.getElementById('est-parts')?.value)||0;
   const labour=parseFloat(document.getElementById('est-labour')?.value)||0;
-  const partsDisc=parseFloat(document.getElementById('est-parts-disc')?.value)||0;
-  const labourDisc=parseFloat(document.getElementById('est-labour-disc')?.value)||0;
+  const partsDisc=0;
+  const labourDisc=0;
   const partsFinal=parts*(1-partsDisc/100);
   const labourFinal=labour*(1-labourDisc/100);
   const finalAmount=partsFinal+labourFinal;
   const totalDiscount=(parts-partsFinal)+(labour-labourFinal);
   
   let newStatus,action;
-  if(decision==='approve'){newStatus='Customer Approved';action='Customer Approved Estimate';}
+  if(decision==='approve'){
+    newStatus='Customer Approved';
+    action='Customer Approved Estimate';
+  }
   else{
     newStatus='Customer Reject';action='Customer Rejected Estimate';
     // Ask inspection charges for rejection
@@ -2612,7 +2626,7 @@ async function processApproval(decision){
     window._pendingInspCharges=inspCharges;
   }
   
-  const estimateNote=`Estimate: ₹${finalAmount.toFixed(0)} | Parts: ₹${partsFinal.toFixed(0)} (${partsDisc}% disc) | Labour: ₹${labourFinal.toFixed(0)} (${labourDisc}% disc) | Discount: ₹${totalDiscount.toFixed(0)} | Note: ${note}`;
+  const estimateNote='Estimate: Rs'+finalAmount.toFixed(0)+' | Parts: Rs'+partsFinal.toFixed(0)+' | Service: Rs'+labourFinal.toFixed(0)+(note?' | Note: '+note:'');
   
   const tl=[...(t?.timeline||[]),{action,by:currentUser.name,at:new Date().toISOString(),note:estimateNote}];
   
@@ -2660,8 +2674,7 @@ async function processApproval(decision){
       
       closeModal('modal-approval');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
-      alert(`✅ Approved! Final: ₹${finalAmount.toFixed(0)}
-Auto Status → ${autoStatus}`);
+      alert('✅ Approved! Final: Rs'+finalAmount.toFixed(0)+' | Status: '+autoStatus);
     }else{
       closeModal('modal-approval');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
@@ -2782,7 +2795,7 @@ function selectReqPart(code,name,stock,price){
   document.getElementById('req-part-stock').value=`${stock} in stock`;
   document.getElementById('req-parts-ac').classList.remove('open');
 }
-async function savePartRequest(){
+async function savePartRequest(addAnother){
   const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const code=document.getElementById('req-part-code').value;
   const name=document.getElementById('req-part-name').value;
@@ -2816,9 +2829,25 @@ async function savePartRequest(){
   const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,requested:true}];
   const tl=[...(t.timeline||[]),{action:'Part Requested — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:`Part: ${code} ${name} × ${qty} | ${note}`}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
-  closeModal('modal-part-req');closeModal('modal-eng-update');
-  if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
-  alert(`Part requested! Status → ${newStatus}`);
+  
+  if(addAnother){
+    // Keep modal open, reset fields, show part added
+    document.getElementById('req-part-code').value='';
+    document.getElementById('req-part-name').value='';
+    document.getElementById('req-part-qty').value='1';
+    document.getElementById('req-part-note').value='';
+    document.getElementById('req-part-stock').value='';
+    // Show added parts count
+    const t2=await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`);
+    const addedCount=(t2[0]?.spares||[]).length;
+    const header=document.querySelector('#modal-part-req .modal-header h2');
+    if(header)header.textContent='Request Part ('+addedCount+' added)';
+    alert('✅ Part added! Add another or click Done.');
+  }else{
+    closeModal('modal-part-req');closeModal('modal-eng-update');
+    if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+    alert('Parts requested! Status → '+newStatus);
+  }
 }
 
 function spareRow(s,i){return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:1;text-align:right;"><b>₹${(s.qty*(s.price||0)).toFixed(2)}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
