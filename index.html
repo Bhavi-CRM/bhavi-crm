@@ -1843,7 +1843,12 @@ async function renderDashboard(){
   // Small delay for mobile to ensure DOM is ready
   await new Promise(r=>setTimeout(r,100));
   try{
-    const q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    if(currentUser.role_type==='work_controller'){
+      const wcName=(currentUser.name||'').toUpperCase();
+      const wcType=wcName.includes('ICP')?'ICP':'CSP';
+      q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';
+    }
     allTickets=await sb('tickets','GET',null,q);
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
@@ -2138,7 +2143,17 @@ async function savePunchOut(key){
 // TICKETS
 async function renderTickets(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
-  try{allTickets=await sb('tickets','GET',null,'?order=created_at.desc');renderTicketTable();}
+  try{
+    let q='?order=created_at.desc';
+    // WC filter: ICP WC sees ICP calls only, CSP WC sees CSP calls only
+    if(currentUser.role_type==='work_controller'){
+      const wcName=(currentUser.name||'').toUpperCase();
+      const wcType=wcName.includes('ICP')?'ICP':'CSP';
+      q+='&wc_type=eq.'+wcType;
+    }
+    allTickets=await sb('tickets','GET',null,q);
+    renderTicketTable();
+  }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 function renderTicketTable(filtered){
