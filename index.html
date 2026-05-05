@@ -327,7 +327,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>SE Call ID</label><input type="text" id="call-se-id"></div>
         <div class="form-group"><label>Priority</label><select id="call-priority"><option>Normal</option><option>High</option><option>Low</option></select></div>
         <div class="form-group" id="call-service-charges-row" style="display:none;">
-          <label>💰 Service Charges (₹)</label>
+          <label>💰 Service / Labour Charges (₹)</label>
           <input type="number" id="call-service-charges" min="0" step="50" value="300" placeholder="300">
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts add thashhe to ae upar add thashe</div>
         </div>
@@ -1553,10 +1553,19 @@ function onCityChange(){
   const pinEl=document.getElementById('call-pin');
   if(!pinEl)return;
   const pins=getPins(state,city);
-  pinEl.innerHTML='<option value="">-- Select Pin --</option>'+pins.map(p=>{
-    const area=PIN_AREAS[p]||'';
-    return '<option value="'+p+'">'+(area?area+' - ':'')+p+'</option>';
-  }).join('');
+  // Update datalist for searchable PIN - show all pins
+  const dl=document.getElementById('pin-datalist');
+  if(dl){
+    dl.innerHTML=pins.map(function(p){
+      const area=PIN_AREAS[p]||'';
+      // Show as "Area Name - PIN" or just "PIN"
+      return '<option value="'+p+'">'+(area?area+' - '+p:p)+'</option>';
+    }).join('');
+  }
+  // Store pins for filtering
+  pinEl._allPins=pins;
+  pinEl._state=state;
+  pinEl._city=city;
 }
 function setAddressDropdowns(state,city,pin){
   const stateEl=document.getElementById('call-state');
@@ -1570,6 +1579,21 @@ function setAddressDropdowns(state,city,pin){
       if(pinEl&&pin)pinEl.value=pin;
     },100);
   },100);
+}
+
+function filterPinList(val){
+  var pinEl=document.getElementById('call-pin');
+  var dl=document.getElementById('pin-datalist');
+  if(!pinEl||!dl)return;
+  var pins=pinEl._allPins||[];
+  var filtered=val?pins.filter(function(p){
+    var area=(PIN_AREAS[p]||'').toLowerCase();
+    return p.startsWith(val)||area.includes(val.toLowerCase());
+  }):pins;
+  dl.innerHTML=filtered.map(function(p){
+    var area=PIN_AREAS[p]||'';
+    return '<option value="'+p+'">'+(area?area+' - '+p:p)+'</option>';
+  }).join('');
 }
 
 // LOGIN
@@ -2270,7 +2294,7 @@ async function openNewCall(){
   ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
-  const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.innerHTML='<option value="">-- Select Pin --</option>';
+  const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value='';
   document.getElementById('call-type').value='Warranty';document.getElementById('call-service-type').value='On Site';
   document.getElementById('call-priority').value='Normal';document.getElementById('call-rerepair').value='No';
   document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
@@ -2322,7 +2346,7 @@ function selectCustomerForCall(serial,cname,mobile,address,model,alt,pin,city,ar
   if(state) setAddressDropdowns(state, city, pin);
   else {
     // fallback: set city/pin as text if no state
-    const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.innerHTML=`<option value="${pin}">${pin}</option>`;if(pinEl)pinEl.value=pin;
+    const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value=pin;
   }
   document.getElementById('customer-search-results').innerHTML=`<div style="color:var(--success);font-size:13px;margin-top:6px;">✅ Selected: <b>${cname}</b> | ${mobile}</div>`;
 }
@@ -2395,11 +2419,21 @@ function openAdminEdit(id){
 // VIEW TICKET
 async function viewTicket(id,autoPrint=false){
   viewingTicketId=id;
-  let t=allTickets.find(x=>x.id===id)||(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  // Always fetch fresh from DB for accurate data
+  let t;
+  try{
+    const res=await sb('tickets','GET',null,`?id=eq.${id}`);
+    t=res[0]||allTickets.find(x=>x.id===id);
+  }catch(e){
+    t=allTickets.find(x=>x.id===id);
+  }
   if(!t)return;
   const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type.includes('Warranty'));
-  const spares=t.spares||[];const total=spares.reduce((a,s)=>a+s.qty*s.price,0);
-  const grand=total+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
+  const spares=t.spares||[];const total=spares.reduce((a,s)=>a+s.qty*(s.price||0),0);
+  const finalCharge=parseFloat(t.final_charges)||0;
+  const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
+  const svcCharge=labCharge;
+  const grand=finalCharge>0?finalCharge:(labCharge+total+(parseFloat(t.other_charge)||0));
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
   const timeline=t.timeline||[];
 
@@ -2458,7 +2492,7 @@ async function viewTicket(id,autoPrint=false){
     </table>
     <div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;">
     ${serviceCharge>0?`Service: ₹${serviceCharge} | `:''}Parts: ₹${total.toFixed(2)} | Labor: ₹${t.labor||0} | Other: ₹${t.other_charge||0} | <b style="color:#065f46;font-size:14px;">Total: ₹${grand.toFixed(2)}</b></div>`:''}
-    ${(parseFloat(t.service_charges)||0)>0&&!spares.length?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${t.service_charges}</b>${t.final_charges?' | Final: ₹'+t.final_charges:''}</div>`:''}
+    ${svcCharge>0&&!spares.length?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
@@ -2643,7 +2677,7 @@ async function openEngUpdate(id){
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
   // Point 3: Closed calls — no update for engineer
   if(isClosed){viewTicket(id);return;}
-  const isW=t.call_type&&t.call_type.includes('Warranty');
+  const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   const isOOC=t.warranty_coverage==='Out of Coverage';
   const showCharges=!isW||isOOC;
   document.getElementById('eng-update-title').textContent='Update: '+t.id;
@@ -2698,7 +2732,7 @@ async function openEngUpdate(id){
       <button class="btn btn-outline btn-sm" onclick="openPartRequest('${t.id}','${t.call_type}','${t.service_type}')">📦 Request Part</button>
     </div>
     ${showCharges?`<div class="form-grid">
-      <div class="form-group"><label>Labor ₹</label><input type="number" id="upd-labor" value="${t.labor||0}"></div>
+      <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
     <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea></div>`;
@@ -2756,7 +2790,7 @@ async function savePartRequest(){
   const note=document.getElementById('req-part-note').value;
   const stockText=document.getElementById('req-part-stock').value;
   const hasStock=stockText&&!stockText.startsWith('0');
-  const isW=t.call_type&&t.call_type.includes('Warranty');
+  const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   const isOOC=t.warranty_coverage==='Out of Coverage';
 
   // Status based on call type + stock
@@ -3176,7 +3210,10 @@ async function renderReportOverview(c){
       if(t.status==='Closed')byEng[k].closed++;
       if(t.status==='Call Cancel')byEng[k].cancel++;
       const sp=(t.spares||[]).filter(s=>!s.requested).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
-      byEng[k].rev+=sp+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
+      const svcE=parseFloat(t.service_charges)||0;
+      const finE=parseFloat(t.final_charges)||0;
+      const tRevE=finE>0?finE:(svcE+sp+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0));
+      byEng[k].rev+=tRevE;
     });
 
     // By month
@@ -3281,12 +3318,12 @@ async function renderReportOverview(c){
       <div class="card">
         <div class="section-header"><h2>Engineer Details</h2><button class="btn btn-outline btn-sm" onclick="openModal('modal-report')">📥 Download</button></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Engineer</th><th>Total</th><th>Closed</th><th>Active</th><th>Cancel</th><th>Resolution%</th><th>Revenue</th></tr></thead>
+          <thead><tr><th>Engineer</th><th>Calls</th><th>Closed</th><th>Parts ₹</th><th>Service/Labour ₹</th><th>Total ₹</th></tr></thead>
           <tbody>${Object.entries(byEng).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>`<tr>
-            <td><b>${name}</b></td><td>${d.total}</td>
-            <td style="color:var(--success);font-weight:700;">${d.closed}</td>
-            <td style="color:var(--warning);">${d.total-d.closed-d.cancel}</td>
-            <td style="color:var(--danger);">${d.cancel}</td>
+            <td><b>${name}</b></td><td>${d.count}</td>
+            <td style="color:var(--success);font-weight:700;">${d.closed||0}</td>
+            <td>₹${(d.parts||0).toFixed(0)}</td>
+            <td>₹${((d.service||0)+(d.labor||0)).toFixed(0)}</td>
             <td style="font-weight:700;">${d.total?Math.round(d.closed/d.total*100):0}%</td>
             <td>₹${d.rev.toFixed(0)}</td>
           </tr>`).join('')}</tbody>
@@ -3486,7 +3523,11 @@ async function renderReportRevenue(c){
       const sp=(t.spares||[]).filter(s=>!s.requested).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const lab=parseFloat(t.labor)||0;
       const oth=parseFloat(t.other_charge)||0;
-      byMonth[m].parts+=sp;byMonth[m].labor+=lab;byMonth[m].total+=sp+lab+oth;byMonth[m].count++;
+      const svc=parseFloat(t.service_charges)||0;
+      const fin=parseFloat(t.final_charges)||0;
+      const ticketTotal=fin>0?fin:(svc+sp+lab+oth);
+      if(!byMonth[m].service)byMonth[m].service=0;
+      byMonth[m].parts+=sp;byMonth[m].labor+=lab;byMonth[m].service+=svc;byMonth[m].total+=ticketTotal;byMonth[m].count++;
     });
     
     // Engineer revenue
@@ -3548,10 +3589,10 @@ async function renderReportRevenue(c){
         <div class="card">
           <h3 style="font-weight:700;font-size:14px;margin-bottom:12px;">📊 Monthly Revenue Table</h3>
           <div class="table-wrap"><table>
-            <thead><tr><th>Month</th><th>Calls</th><th>Parts ₹</th><th>Labor ₹</th><th>Total ₹</th></tr></thead>
+            <thead><tr><th>Month</th><th>Calls</th><th>Parts ₹</th><th>Service/Labour ₹</th><th>Total ₹</th></tr></thead>
             <tbody>${Object.entries(byMonth).slice(-6).map(([m,d])=>`<tr>
               <td>${m}</td><td>${d.count}</td>
-              <td>₹${d.parts.toFixed(0)}</td><td>₹${d.labor.toFixed(0)}</td>
+              <td>₹${(d.parts||0).toFixed(0)}</td><td>₹${((d.service||0)+(d.labor||0)).toFixed(0)}</td>
               <td><b>₹${d.total.toFixed(0)}</b></td>
             </tr>`).join('')}</tbody>
           </table></div>
@@ -4054,7 +4095,7 @@ async function printJobSheet(){
   if(!t)return;
   const sp=t.spares||[];const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
   const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
-  const isW=t.call_type&&t.call_type.includes('Warranty');const isOOC=t.warranty_coverage==='Out of Coverage';
+  const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');const isOOC=t.warranty_coverage==='Out of Coverage';
   const logoHtml=logoData?`<img src="${logoData}" style="max-height:50px;max-width:140px;object-fit:contain;">`:'';
   const win=window.open('','_blank','width=820,height=1000');
   win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>
