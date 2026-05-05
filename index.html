@@ -355,9 +355,10 @@ tr:hover td{background:#f8fafc;}
         </div>
         <div class="form-group">
           <label>Pin Code <span class="req">*</span></label>
-          <select id="call-pin" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
-            <option value="">-- Select Pin --</option>
-          </select>
+          <input type="text" id="call-pin" list="pin-datalist" placeholder="City select karo pachhi type karo..." autocomplete="off"
+            style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"
+            oninput="filterPinList(this.value)">
+          <datalist id="pin-datalist"></datalist>
         </div>
         <div class="form-group"><label>Area</label><input type="text" id="call-area" placeholder="Society / Landmark"></div>
         <div class="form-group form-full"><label>Address <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street..."></div>
