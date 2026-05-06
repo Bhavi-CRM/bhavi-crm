@@ -110,7 +110,7 @@ tr:hover td{background:#f8fafc;}
 /* CHART */
 .chart-bar-wrap{display:flex;flex-direction:column;gap:6px;}
 .chart-bar-row{display:flex;align-items:center;gap:8px;font-size:12px;}
-.chart-bar-label{width:90px;text-align:right;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chart-bar-label{width:130px;text-align:right;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;}
 .chart-bar-bg{flex:1;background:#f1f5f9;border-radius:4px;height:20px;overflow:hidden;}
 .chart-bar-fill{height:100%;border-radius:4px;background:var(--primary);display:flex;align-items:center;padding:0 6px;color:#fff;font-size:11px;font-weight:600;min-width:24px;transition:width 0.5s;}
 .chart-bar-fill.success{background:var(--success);}
@@ -1613,12 +1613,13 @@ async function doLogin(){
     document.getElementById('topbar-user').textContent=currentUser.name;
     // Clear page content first
     currentPage='';
+    allTickets=[];
     const pc=document.getElementById('page-content');
     if(pc)pc.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
     setupNav();
-    await new Promise(r=>setTimeout(r,200));
+    await new Promise(r=>setTimeout(r,300));
     await navigate('dashboard');
     // Run setupNav again after render to ensure correct state
     setTimeout(setupNav, 100);
@@ -1650,6 +1651,7 @@ async function tryAutoLogin(){
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
     const users=await res.json();
     if(!users||!users.length){localStorage.removeItem('bhavi_session');return;}
+    currentUser=null;
     currentUser=users[0];
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
@@ -1657,12 +1659,13 @@ async function tryAutoLogin(){
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
     currentPage='';
+    allTickets=[];
     const pc2=document.getElementById('page-content');
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     setupNav();
     await loadLogoFromDB();
-    await new Promise(r=>setTimeout(r,100));
+    await new Promise(r=>setTimeout(r,300));
     setupNav();
     await navigate('dashboard');
     setTimeout(setupNav,200);
@@ -1791,41 +1794,68 @@ function statusBadge(s){
   const m={'Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
-// Point 1: Step-by-step status — cannot skip
-function getAllowedStatuses(current,role,serviceType){
-  // TERMINAL STATES
-  if(['Closed','Customer Reject','Call Cancel'].includes(current)){
-    if(role==='admin') return['Assigned'];
+// Workflow-based status transitions
+function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus){
+  const isEng = role==='engineer';
+  const isAdminOrWC = role==='admin' || role==='work_controller';
+  const isW = callType && (callType==='Warranty'||callType==='Warranty Repeat'||callType==='AMC');
+  const isOOC = warrantyStatus==='Out of Coverage';
+  const repairStatus = serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+
+  // Terminal states — only admin can reopen
+  if(['Closed','Customer Reject','Call Cancel','Delivered Not Approved'].includes(current)){
+    if(isAdminOrWC) return['Assigned'];
     return[];
   }
 
-  // ADMIN / WC
-  if(role==='admin'||role==='work_controller'){
+  // ADMIN / WC — only handle approvals and allocation
+  if(isAdminOrWC){
     switch(current){
-      case 'Pending Allocation': return['Assigned'];
-      case 'Assigned': return['Call Cancel'];
-      case 'In Progress': return['Call Cancel'];
-      case 'Pending Customer Approval': return['Customer Approved','Customer Reject','Call Cancel'];
-      case 'Customer Approved':
-        const rs2=serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-        return[rs2,'Pending Parts'];
-      case 'Pending Parts': return['Pending Repair Carry In','Pending Repair On Site','Call Cancel'];
-      case 'Pending Repair Carry In':
-      case 'Pending Repair On Site': return['Closed','Call Cancel'];
-      default: return['Call Cancel'];
+      case 'Pending Allocation': return['Assigned','Call Cancel'];
+      case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
+      default: return[];
     }
   }
 
-  // ENGINEER
-  if(role==='engineer'){
+  // ENGINEER workflow
+  if(isEng){
     switch(current){
-      case 'Assigned': return['In Progress'];
-      case 'In Progress': return['Closed','Pending Customer Approval'];
-      case 'Customer Approved': return['Closed'];
+      case 'Assigned':
+        // Engineer starts work
+        return['In Progress'];
+
+      case 'In Progress':
+        if(isW && !isOOC){
+          // Warranty: 3 options
+          // 1. Out of coverage → handled by separate button (engVoidWarranty)
+          // 2. Request Part → handled by Part Request button
+          // 3. No part needed → Closed directly
+          return['Closed'];
+          // Note: Request Part and Out of Coverage handled by buttons
+        } else {
+          // OW: no part → Closed directly
+          return['Closed'];
+          // Note: Request Part button handles part flow → Pending Customer Approval auto
+        }
+
+      case 'Pending Parts':
+        // Waiting for parts — engineer cannot change, auto-moves when stock added
+        return[];
+
       case 'Pending Repair Carry In':
-      case 'Pending Repair On Site': return['Closed'];
-      case 'Pending Customer Approval': return[];
-      case 'Pending Parts': return[];
+      case 'Pending Repair On Site':
+        // After repair — close
+        return['Closed'];
+
+      case 'Customer Approved':
+        // OW approved — check parts
+        return[];
+        // Handled by system after approval
+
+      case 'Pending Customer Approval':
+        // Waiting for admin/WC approval — engineer waits
+        return[];
+
       default: return[];
     }
   }
@@ -1867,15 +1897,71 @@ async function renderDashboard(){
 
     // Point 11: Admin column charts
     let chartHtml='';
-    if(currentUser.role==='admin'){
+    if(currentUser.role==='admin'||currentUser.role_type==='work_controller'||currentUser.role_type==='admin'){
+      // Engineer wise
       const byEng={};allTickets.forEach(t=>{const k=t.assigned_name||'Unassigned';if(!byEng[k])byEng[k]=0;byEng[k]++;});
       const maxE=Math.max(...Object.values(byEng),1);
-      chartHtml=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">Engineer-wise Calls</h3>
-          <div class="chart-bar-wrap">${Object.entries(byEng).map(([name,c])=>`<div class="chart-bar-row"><div class="chart-bar-label">${name.split(' ')[0]}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(c/maxE*100)}%">${c}</div></div></div>`).join('')}</div>
+      // Monthly breakdown
+      const byMonth={};allTickets.forEach(t=>{if(!t.created_at)return;const d=new Date(t.created_at);const k=d.toLocaleString('en-IN',{month:'short',year:'numeric'});if(!byMonth[k])byMonth[k]=0;byMonth[k]++;});
+      const monthEntries=Object.entries(byMonth).slice(-5);const maxM=Math.max(...monthEntries.map(([,v])=>v),1);
+      // Status counts
+      const inProgress=allTickets.filter(t=>t.status==='In Progress').length;
+      const pendParts=allTickets.filter(t=>t.status==='Pending Parts').length;
+      const pendRepair=allTickets.filter(t=>['Pending Repair Carry In','Pending Repair On Site'].includes(t.status)).length;
+      const cancelled=allTickets.filter(t=>['Call Cancel','Customer Reject'].includes(t.status)).length;
+      // Call type breakdown
+      const warranty=allTickets.filter(t=>t.call_type==='Warranty'||t.call_type==='Warranty Repeat').length;
+      const nonWarranty=allTickets.filter(t=>t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat').length;
+      const amc=allTickets.filter(t=>t.call_type==='AMC').length;
+
+      chartHtml=`
+      <!-- ROW 1: KPI summary extra -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+        <div class="kpi-card" style="border-color:#7c3aed;padding:12px;"><div class="kpi-label">In Progress</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">${inProgress}</div></div>
+        <div class="kpi-card" style="border-color:#d97706;padding:12px;"><div class="kpi-label">Pending Parts</div><div class="kpi-value" style="font-size:22px;color:#d97706;">${pendParts}</div></div>
+        <div class="kpi-card" style="border-color:#0891b2;padding:12px;"><div class="kpi-label">Pending Repair</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${pendRepair}</div></div>
+        <div class="kpi-card" style="border-color:#64748b;padding:12px;"><div class="kpi-label">Cancelled</div><div class="kpi-value" style="font-size:22px;color:#64748b;">${cancelled}</div></div>
+      </div>
+      <!-- ROW 2: Eng chart + Status -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">👷 Engineer-wise Calls</h3>
+          <div class="chart-bar-wrap">${Object.entries(byEng).map(([name,c])=>`<div class="chart-bar-row"><div class="chart-bar-label" title="${name}">${name.split(' ')[0]}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(c/maxE*100)}%">${c}</div></div></div>`).join('')}</div>
         </div>
-        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">Status Breakdown</h3>
-          <div class="chart-bar-wrap">${[['Active',active,''],['Closed',closed,'success'],['Pending Approval',pendingApproval,'warning'],['Unallocated',unalloc,'danger']].map(([l,v,c])=>`<div class="chart-bar-row"><div class="chart-bar-label">${l}</div><div class="chart-bar-bg"><div class="chart-bar-fill ${c}" style="width:${total?Math.round(v/total*100):0}%">${v}</div></div></div>`).join('')}
+        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📊 Status Breakdown</h3>
+          <div class="chart-bar-wrap">
+            ${(()=>{
+              const assigned=allTickets.filter(t=>t.status==='Assigned').length;
+              const pendCustApproval=allTickets.filter(t=>t.status==='Pending Customer Approval').length;
+              const custApproved=allTickets.filter(t=>t.status==='Customer Approved').length;
+              const pendRepairCI=allTickets.filter(t=>t.status==='Pending Repair Carry In').length;
+              const pendRepairOS=allTickets.filter(t=>t.status==='Pending Repair On Site').length;
+              const custRejectCount=allTickets.filter(t=>t.status==='Customer Reject').length;
+              const cancelCount=allTickets.filter(t=>t.status==='Call Cancel').length;
+              return [
+                ['Pending Alloc.',unalloc,'danger'],
+                ['Assigned',assigned,''],
+                ['In Progress',inProgress,''],
+                ['Pend.Cust.Appr.',pendCustApproval,'warning'],
+                ['Cust.Approved',custApproved,''],
+                ['Pending Parts',pendParts,'warning'],
+                ['Repair Carry In',pendRepairCI,''],
+                ['Repair On Site',pendRepairOS,''],
+                ['Closed',closed,'success'],
+                ['Call Cancel',cancelCount,'danger'],
+                ['Cust.Reject',custRejectCount,'danger']
+              ].filter(([,v])=>v>=0).map(([l,v,c])=>`<div class="chart-bar-row"><div class="chart-bar-label" title="${l}" style="font-size:11px;width:120px;">${l}</div><div class="chart-bar-bg"><div class="chart-bar-fill ${c}" style="width:${total?Math.round(v/total*100):0}%">${v}</div></div></div>`).join('');
+            })()}
+          </div>
+        </div>
+      </div>
+      <!-- ROW 3: Monthly trend + Call type -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📅 Monthly Call Trend</h3>
+          <div class="chart-bar-wrap">${monthEntries.map(([m,v])=>`<div class="chart-bar-row"><div class="chart-bar-label">${m}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(v/maxM*100)}%">${v}</div></div></div>`).join('')}</div>
+        </div>
+        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">🏷️ Call Type Breakdown</h3>
+          <div class="chart-bar-wrap">
+            ${[['Warranty',warranty,'success'],['Non-Warranty',nonWarranty,'warning'],['AMC',amc,'']].map(([l,v,c])=>`<div class="chart-bar-row"><div class="chart-bar-label">${l}</div><div class="chart-bar-bg"><div class="chart-bar-fill ${c}" style="width:${total?Math.round(v/total*100):0}%">${v}</div></div></div>`).join('')}
           </div>
         </div>
       </div>`;
@@ -2455,18 +2541,22 @@ async function viewTicket(id,autoPrint=false){
   // Admin actions
   let adminActions='';
   if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){
-    // Point 1: Step-by-step status — no skipping
-    const allowed=getAllowedStatuses(t.status,'admin',t.service_type);
-    const pendingApproval=t.status==='Pending Customer Approval';
-    adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;">
-      ${pendingApproval?`
-        <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject</button>
+    const isPendingAlloc = t.status==='Pending Allocation';
+    const isPendingApproval = t.status==='Pending Customer Approval';
+    const isCancelable = ['Pending Allocation','Assigned'].includes(t.status);
+    adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${isPendingAlloc?`
+        <select onchange="quickStatusChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
+          <option value="">Allocate Engineer via Assign...</option>
+        </select>
       `:''}
-      ${allowed.length&&!pendingApproval?`<select onchange="quickStatusChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-        <option value="">Change Status (${allowed.length} options)...</option>${allowed.map(s=>`<option>${s}</option>`).join('')}
-      </select>`:`<span style="font-size:12px;color:var(--text-muted);padding:6px;">Status: ${t.status} — ${getAllowedStatuses(t.status,currentUser.role,t.service_type).length===0?'No changes allowed at this stage':'Use buttons above'}</span>`}
+      ${isPendingApproval?`
+        <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>
+      `:''}
+      ${!isPendingAlloc&&!isPendingApproval&&!isClosed?`<span style="font-size:12px;color:var(--text-muted);padding:6px 0;">Status managed by Engineer</span>`:''}
+      ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-        <option value="">Reassign Engineer...</option>${(allEngineers||[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
+        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers||[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
@@ -2739,10 +2829,10 @@ async function openEngUpdate(id){
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group"><label>Status *</label>
         <select id="upd-status">
-          <option value="In Progress" ${t.status==='In Progress'?'selected':''}>In Progress</option>
-          <option value="Pending Customer Approval" ${t.status==='Pending Customer Approval'?'selected':''}>Pending Customer Approval</option>
-          <option value="Closed" ${t.status==='Closed'?'selected':''}>Closed</option>
+          ${getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}" selected>${t.status} (no change)</option>`}
         </select>
+        ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
+        ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
       <div class="form-group"><label>Cause</label><input type="text" id="upd-cause" value="${t.cause||''}"></div>
