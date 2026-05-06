@@ -662,15 +662,15 @@ tr:hover td{background:#f8fafc;}
         <div class="form-grid">
           <div class="form-group">
             <label>Warranty <span class="req">*</span></label>
-            <input type="number" id="wc-in-warranty" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-in-warranty" min="0" value="" oninput="wcAutoSum()">
           </div>
           <div class="form-group">
             <label>Non-Warranty <span class="req">*</span></label>
-            <input type="number" id="wc-in-nonwarranty" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-in-nonwarranty" min="0" value="" oninput="wcAutoSum()">
           </div>
           <div class="form-group">
             <label>Other <span class="req">*</span></label>
-            <input type="number" id="wc-in-other" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-in-other" min="0" value="" oninput="wcAutoSum()">
           </div>
         </div>
         <div style="background:#fff;border-radius:8px;padding:8px 12px;margin-top:6px;display:flex;justify-content:space-between;">
@@ -685,15 +685,15 @@ tr:hover td{background:#f8fafc;}
         <div class="form-grid">
           <div class="form-group">
             <label>Warranty <span class="req">*</span></label>
-            <input type="number" id="wc-out-warranty" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-out-warranty" min="0" value="" oninput="wcAutoSum()">
           </div>
           <div class="form-group">
             <label>Non-Warranty <span class="req">*</span></label>
-            <input type="number" id="wc-out-nonwarranty" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-out-nonwarranty" min="0" value="" oninput="wcAutoSum()">
           </div>
           <div class="form-group">
             <label>Other <span class="req">*</span></label>
-            <input type="number" id="wc-out-other" min="0" value="0" oninput="wcAutoSum()">
+            <input type="number" id="wc-out-other" min="0" value="" oninput="wcAutoSum()">
           </div>
         </div>
         <div style="background:#fff;border-radius:8px;padding:8px 12px;margin-top:6px;display:flex;justify-content:space-between;">
@@ -752,11 +752,11 @@ tr:hover td{background:#f8fafc;}
         <div class="form-grid">
           <div class="form-group">
             <label>* Installation Call <span class="req">*</span></label>
-            <input type="number" id="dr-w-install" min="0" value="0" placeholder="0" oninput="autoSumCalls()">
+            <input type="number" id="dr-w-install" min="0" value="" placeholder="0" oninput="autoSumCalls()">
           </div>
           <div class="form-group">
             <label>* Breakdown Call <span class="req">*</span></label>
-            <input type="number" id="dr-w-breakdown" min="0" value="0" placeholder="0" oninput="autoSumCalls()">
+            <input type="number" id="dr-w-breakdown" min="0" value="" placeholder="0" oninput="autoSumCalls()">
           </div>
         </div>
       </div>
@@ -767,11 +767,11 @@ tr:hover td{background:#f8fafc;}
         <div class="form-grid">
           <div class="form-group">
             <label>* Breakdown Call <span class="req">*</span></label>
-            <input type="number" id="dr-ow-breakdown" min="0" value="0" placeholder="0" oninput="autoSumCalls()">
+            <input type="number" id="dr-ow-breakdown" min="0" value="" placeholder="0" oninput="autoSumCalls()">
           </div>
           <div class="form-group">
             <label>* Other Calls <span class="req">*</span></label>
-            <input type="number" id="dr-ow-other" min="0" value="0" placeholder="0" oninput="autoSumCalls()">
+            <input type="number" id="dr-ow-other" min="0" value="" placeholder="0" oninput="autoSumCalls()">
           </div>
         </div>
       </div>
@@ -795,16 +795,26 @@ tr:hover td{background:#f8fafc;}
           <h3 style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:10px;">4. Total Calls</h3>
           <div class="form-group" style="margin-bottom:0;">
             <label>Total Calls Today (Auto)</label>
-            <input type="number" id="dr-total-calls" min="0" value="0" placeholder="0" readonly style="background:#f0f4ff;font-weight:700;">
+            <input type="number" id="dr-total-calls" min="0" value="" placeholder="0" readonly style="background:#f0f4ff;font-weight:700;">
           </div>
         </div>
         <div style="background:#fff0f0;border-radius:10px;padding:14px;border-left:4px solid #f05252;">
           <h3 style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px;">5. Travel Details</h3>
           <div class="form-group" style="margin-bottom:0;">
             <label>Petrol / KM <span class="req">*</span></label>
-            <input type="number" id="dr-petrol-km" min="0" step="0.1" value="0" placeholder="0.0 KM">
+            <input type="number" id="dr-petrol-km" min="0" step="0.1" value="" placeholder="0.0 KM">
           </div>
         </div>
+      </div>
+
+      <!-- Section 6: Google Reviews -->
+      <div style="background:#fff8e1;border-radius:10px;padding:14px;margin-top:12px;border-left:4px solid #f59e0b;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <h3 style="font-size:14px;font-weight:700;color:#92400e;">6. ⭐ Google Reviews</h3>
+          <span style="font-size:12px;color:#92400e;font-weight:600;">Total: <span id="dr-total-reviews">0</span></span>
+        </div>
+        <div id="dr-reviews-container"></div>
+        <button class="btn btn-outline btn-sm" onclick="addDRReviewRow()" style="margin-top:4px;">+ Add Review</button>
       </div>
 
       <div class="form-group" style="margin-top:12px;">
@@ -1602,11 +1612,13 @@ async function doLogin(){
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
     // Clear page content first
+    currentPage='';
     const pc=document.getElementById('page-content');
     if(pc)pc.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
     setupNav();
+    await new Promise(r=>setTimeout(r,200));
     await navigate('dashboard');
     // Run setupNav again after render to ensure correct state
     setTimeout(setupNav, 100);
@@ -1614,6 +1626,7 @@ async function doLogin(){
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 function doLogout(){
+  currentPage='dashboard';
   currentUser=null;
   localStorage.removeItem('bhavi_session');
   localStorage.removeItem('bhavi_user');
@@ -1643,6 +1656,7 @@ async function tryAutoLogin(){
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
+    currentPage='';
     const pc2=document.getElementById('page-content');
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
@@ -1840,8 +1854,8 @@ async function renderDashboard(){
   const pc=document.getElementById('page-content');
   if(!pc)return;
   pc.innerHTML='<div class="loading">Loading...</div>';
-  // Small delay for mobile to ensure DOM is ready
-  await new Promise(r=>setTimeout(r,100));
+  await new Promise(r=>setTimeout(r,300));
+  if(!currentUser){pc.innerHTML='';return;}
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
     allTickets=await sb('tickets','GET',null,q);
@@ -2362,7 +2376,6 @@ async function saveCall(){
     call_type:ct,service_type:document.getElementById('call-service-type').value,
     service_charges:serviceCharges,
     brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name').value||'');})(),
-    wc_type:(()=>{const scEl=document.getElementById('call-subcat-input');const sc=(scEl?.options[scEl?.selectedIndex]?.text||'').trim();if(sc==='ICP')return 'ICP';if(sc==='CSP')return 'CSP';const bn=(document.getElementById('call-brand-input')?.options[document.getElementById('call-brand-input')?.selectedIndex]?.text||'').toLowerCase();if(bn.includes('panasonic'))return 'ICP';if(bn.includes('fujifilm'))return 'CSP';return 'ICP';})(),
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
@@ -4269,19 +4282,48 @@ function refreshPage(){
 function openDailyReport(){
   document.getElementById('dr-eng-name').textContent=currentUser.name;
   document.getElementById('dr-date').value=new Date().toLocaleDateString('en-CA');
-  document.getElementById('dr-w-install').value='0';
-  document.getElementById('dr-w-breakdown').value='0';
-  document.getElementById('dr-ow-breakdown').value='0';
-  document.getElementById('dr-ow-other').value='0';
-  document.getElementById('dr-total-calls').value='0';
-  document.getElementById('dr-petrol-km').value='0';
+  document.getElementById('dr-w-install').value='';
+  document.getElementById('dr-w-breakdown').value='';
+  document.getElementById('dr-ow-breakdown').value='';
+  document.getElementById('dr-ow-other').value='';
+  document.getElementById('dr-total-calls').value='';
+  document.getElementById('dr-petrol-km').value='';
   document.getElementById('dr-remarks').value='';
   // Init payment rows
   var pr=document.getElementById('payment-rows');
   pr.innerHTML='';
   for(var i=0;i<3;i++)addPaymentRow();
   updatePaymentTotal();
+  var rc=document.getElementById('dr-reviews-container');
+  if(rc)rc.innerHTML='';
+  updateDRReviewTotal();
   openModal('modal-daily-report');
+}
+
+function addDRReviewRow(){
+  var rows=document.getElementById('dr-reviews-container');
+  if(!rows)return;
+  if(rows.querySelectorAll('.dr-review-row').length>=10)return;
+  var div=document.createElement('div');
+  div.className='dr-review-row';
+  div.style.cssText='display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+  div.innerHTML='<input type="text" placeholder="Customer Name" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;">'
+    +'<select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;">'
+    +'<option value="5">⭐⭐⭐⭐⭐ 5 Star</option>'
+    +'<option value="4">⭐⭐⭐⭐ 4 Star</option>'
+    +'<option value="3">⭐⭐⭐ 3 Star</option>'
+    +'<option value="2">⭐⭐ 2 Star</option>'
+    +'<option value="1">⭐ 1 Star</option>'
+    +'</select>'
+    +'<button onclick="this.parentElement.remove();updateDRReviewTotal();" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;">✕</button>';
+  rows.appendChild(div);
+  updateDRReviewTotal();
+}
+
+function updateDRReviewTotal(){
+  var count=document.querySelectorAll('#dr-reviews-container .dr-review-row').length;
+  var el=document.getElementById('dr-total-reviews');
+  if(el)el.textContent=count;
 }
 
 function wcAutoSum(){
@@ -4330,7 +4372,7 @@ function openWCDailyReport(){
   document.getElementById('wc-dr-date').value=new Date().toLocaleDateString('en-CA');
   ['wc-in-warranty','wc-in-nonwarranty','wc-in-other',
    'wc-out-warranty','wc-out-nonwarranty','wc-out-other'].forEach(function(id){
-    var el=document.getElementById(id);if(el)el.value='0';
+    var el=document.getElementById(id);if(el)el.value='';
   });
   var t=document.getElementById('wc-dr-total');if(t)t.textContent='0';
   var ti=document.getElementById('wc-in-total');if(ti)ti.textContent='0';
