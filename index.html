@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-title" content="Bhavi CRM">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e2a3a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -833,19 +836,82 @@ tr:hover td{background:#f8fafc;}
 
 <!-- REPORT MODAL -->
 <div class="modal-overlay hidden" id="modal-report" onclick="closeModal('modal-report')">
-  <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2>Download Report</h2><button class="close-btn" onclick="closeModal('modal-report')">✕</button></div>
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
+    <div class="modal-header"><h2>📥 Export Report</h2><button class="close-btn" onclick="closeModal('modal-report')">✕</button></div>
     <div class="modal-body">
-      <div class="form-group" style="margin-bottom:10px;"><label>Period</label>
-        <select id="rpt-period" onchange="toggleCustomDates()"><option value="week">This Week</option><option value="month">This Month</option><option value="year">This Year</option><option value="custom">Custom</option></select>
+      <!-- Period -->
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Period</label>
+        <select id="rpt-period" onchange="toggleCustomDates()">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month" selected>This Month</option>
+          <option value="year">This Year</option>
+          <option value="custom">Custom Range</option>
+          <option value="all">All Time</option>
+        </select>
       </div>
       <div id="custom-dates" class="form-grid hidden" style="margin-bottom:10px;">
         <div class="form-group"><label>From</label><input type="date" id="rpt-from"></div>
         <div class="form-group"><label>To</label><input type="date" id="rpt-to"></div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:14px;">
+      <hr class="divider">
+      <!-- Filters -->
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Filters (optional)</div>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>Status</label>
+          <select id="rpt-status">
+            <option value="">All Status</option>
+            <option>Pending Allocation</option>
+            <option>Assigned</option>
+            <option>In Progress</option>
+            <option>Pending Customer Approval</option>
+            <option>Customer Approved</option>
+            <option>Pending Parts</option>
+            <option>Pending Repair Carry In</option>
+            <option>Pending Repair On Site</option>
+            <option>Closed</option>
+            <option>Call Cancel</option>
+            <option>Customer Reject</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Service Type</label>
+          <select id="rpt-service">
+            <option value="">All</option>
+            <option value="Carry In">Carry In</option>
+            <option value="On Site">On Site</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Call Type</label>
+          <select id="rpt-calltype">
+            <option value="">All</option>
+            <option value="Warranty">Warranty</option>
+            <option value="Non-Warranty">Non-Warranty</option>
+            <option value="AMC">AMC</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Engineer</label>
+          <select id="rpt-engineer">
+            <option value="">All Engineers</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>City</label>
+        <input type="text" id="rpt-city" placeholder="e.g. Ahmedabad (optional)">
+      </div>
+      <!-- Preview count -->
+      <div id="rpt-preview" style="background:var(--bg);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px;color:var(--text-muted);">
+        Click preview to see count
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline" style="flex:1" onclick="previewReportCount()">👁️ Preview Count</button>
         <button class="btn btn-success" style="flex:1" onclick="downloadReport('excel')">📊 Excel</button>
-        <button class="btn btn-primary" style="flex:1" onclick="downloadReport('pdf')">📄 Print</button>
+        <button class="btn btn-primary" style="flex:1" onclick="downloadReport('print')">🖨️ Print</button>
       </div>
     </div>
   </div>
@@ -1268,6 +1334,117 @@ async function downloadDailyExcel(){
 }
 
 function toggleCustomDates(){document.getElementById('custom-dates').classList.toggle('hidden',document.getElementById('rpt-period').value!=='custom');}
+
+function getReportDates(){
+  const period=document.getElementById('rpt-period').value;
+  const now=new Date();
+  let from,to=new Date(now);to.setHours(23,59,59,999);
+  if(period==='today'){from=new Date(now);from.setHours(0,0,0,0);}
+  else if(period==='week'){from=new Date(now);from.setDate(now.getDate()-now.getDay());from.setHours(0,0,0,0);}
+  else if(period==='month'){from=new Date(now.getFullYear(),now.getMonth(),1);}
+  else if(period==='year'){from=new Date(now.getFullYear(),0,1);}
+  else if(period==='all'){from=new Date('2020-01-01');}
+  else{from=new Date(document.getElementById('rpt-from').value||'2020-01-01');to=new Date(document.getElementById('rpt-to').value||to.toLocaleDateString('en-CA'));to.setHours(23,59,59,999);}
+  return{from,to};
+}
+
+function applyReportFilters(tickets){
+  const {from,to}=getReportDates();
+  const status=document.getElementById('rpt-status')?.value||'';
+  const service=document.getElementById('rpt-service')?.value||'';
+  const calltype=document.getElementById('rpt-calltype')?.value||'';
+  const engineer=document.getElementById('rpt-engineer')?.value||'';
+  const city=(document.getElementById('rpt-city')?.value||'').toLowerCase().trim();
+  return tickets.filter(t=>{
+    const d=t.created_at?new Date(t.created_at):null;
+    if(d&&(d<from||d>to))return false;
+    if(status&&t.status!==status)return false;
+    if(service&&t.service_type!==service)return false;
+    if(calltype&&t.call_type!==calltype)return false;
+    if(engineer&&t.assigned_name!==engineer)return false;
+    if(city&&!(t.city||'').toLowerCase().includes(city))return false;
+    return true;
+  });
+}
+
+function openModal_report_init(){
+  // Populate engineer dropdown
+  const sel=document.getElementById('rpt-engineer');
+  if(sel&&allEngineers.length){
+    sel.innerHTML='<option value="">All Engineers</option>'+allEngineers.map(e=>`<option value="${e.name}">${e.name}</option>`).join('');
+  }
+  document.getElementById('rpt-preview').textContent='Click preview to see count';
+}
+
+function previewReportCount(){
+  const filtered=applyReportFilters(allTickets);
+  const closed=filtered.filter(t=>t.status==='Closed').length;
+  const active=filtered.filter(t=>!['Closed','Call Cancel','Customer Reject'].includes(t.status)).length;
+  const ci=filtered.filter(t=>t.service_type==='Carry In').length;
+  const os=filtered.filter(t=>t.service_type==='On Site').length;
+  document.getElementById('rpt-preview').innerHTML=
+    `<b style="color:var(--primary);">${filtered.length} records</b> malshe &nbsp;|&nbsp; `+
+    `Active: <b>${active}</b> &nbsp;|&nbsp; Closed: <b style="color:var(--success);">${closed}</b> &nbsp;|&nbsp; `+
+    `Carry In: <b>${ci}</b> &nbsp;|&nbsp; On Site: <b>${os}</b>`;
+}
+
+function downloadReport(type){
+  const filtered=applyReportFilters(allTickets);
+  if(!filtered.length){alert('Koi data nathi selected filters ma');return;}
+  if(type==='excel'){
+    const data=filtered.map(t=>({
+      'Ticket ID':t.id||'',
+      'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
+      'Customer':t.cname||'',
+      'Mobile':t.mobile||'',
+      'City':t.city||'',
+      'State':t.state||'',
+      'Model':t.model||'',
+      'Serial':t.serial||'',
+      'Brand':t.brand_name||'',
+      'Call Type':t.call_type||'',
+      'Service Type':t.service_type||'',
+      'Problem':t.problem||'',
+      'Engineer':t.assigned_name||'Unassigned',
+      'Status':t.status||'',
+      'Service Charges':t.service_charges||t.labor||0,
+      'Final Charges':t.final_charges||0,
+      'SE Call ID':t.se_call_id||'',
+      'Remarks':t.remarks||''
+    }));
+    const ws=XLSX.utils.json_to_sheet(data);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Report');
+    const period=document.getElementById('rpt-period').value;
+    XLSX.writeFile(wb,`BhaviCRM_Report_${period}_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+    closeModal('modal-report');
+  } else {
+    // Print view
+    const rows=filtered.map(t=>`<tr>
+      <td>${t.id||''}</td>
+      <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):''}</td>
+      <td>${t.cname||''}</td>
+      <td>${t.mobile||''}</td>
+      <td>${t.city||''}</td>
+      <td>${t.model||''}</td>
+      <td>${t.call_type||''}</td>
+      <td>${t.service_type||''}</td>
+      <td>${t.assigned_name||'Unassigned'}</td>
+      <td>${t.status||''}</td>
+      <td>₹${t.final_charges||t.service_charges||t.labor||0}</td>
+    </tr>`).join('');
+    const win=window.open('','_blank');
+    win.document.write(`<!DOCTYPE html><html><head><title>Bhavi CRM Report</title>
+      <style>body{font-family:Arial,sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;}th{background:#f0f4ff;font-weight:700;}h2{margin-bottom:4px;}p{margin:2px 0 10px;color:#666;font-size:11px;}</style>
+      </head><body>
+      <h2>Bhavi Electronics — Service Report</h2>
+      <p>Generated: ${new Date().toLocaleString('en-IN')} | Total: ${filtered.length} records</p>
+      <table><thead><tr><th>Ticket</th><th>Date</th><th>Customer</th><th>Mobile</th><th>City</th><th>Model</th><th>Call Type</th><th>Service</th><th>Engineer</th><th>Status</th><th>Charges</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <script>window.print();<\/script></body></html>`);
+    win.document.close();
+  }
+}
 
 
 applyLogo();
@@ -1982,7 +2159,47 @@ async function renderDashboard(){
             ${[['Warranty',warranty,'success'],['Non-Warranty',nonWarranty,'warning'],['AMC',amc,'']].map(([l,v,c])=>`<div class="chart-bar-row"><div class="chart-bar-label">${l}</div><div class="chart-bar-bg"><div class="chart-bar-fill ${c}" style="width:${total?Math.round(v/total*100):0}%">${v}</div></div></div>`).join('')}
           </div>
         </div>
-      </div>`;
+      </div>
+      <!-- ROW 4: Carry In vs On Site breakdown -->
+      ${(()=>{
+        const activeStatuses=['Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
+        const activeTickets=allTickets.filter(t=>activeStatuses.includes(t.status));
+        const ciTotal=allTickets.filter(t=>t.service_type==='Carry In').length;
+        const osTotal=allTickets.filter(t=>t.service_type==='On Site').length;
+        const ciActive=activeTickets.filter(t=>t.service_type==='Carry In').length;
+        const osActive=activeTickets.filter(t=>t.service_type==='On Site').length;
+        const ciPendRep=allTickets.filter(t=>t.status==='Pending Repair Carry In').length;
+        const osPendRep=allTickets.filter(t=>t.status==='Pending Repair On Site').length;
+        const ciPendParts=activeTickets.filter(t=>t.service_type==='Carry In'&&t.status==='Pending Parts').length;
+        const osPendParts=activeTickets.filter(t=>t.service_type==='On Site'&&t.status==='Pending Parts').length;
+        const ciClosed=allTickets.filter(t=>t.service_type==='Carry In'&&t.status==='Closed').length;
+        const osClosed=allTickets.filter(t=>t.service_type==='On Site'&&t.status==='Closed').length;
+        const ciMax=Math.max(ciTotal,osTotal,1);
+        return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:4px;font-size:14px;">🏠 Carry In Summary</h3>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Customer products jo shop par aavya chhe</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+              <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1a56db;">${ciTotal}</div><div style="font-size:11px;color:#1e40af;">Total</div></div>
+              <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#d97706;">${ciActive}</div><div style="font-size:11px;color:#92400e;">Active</div></div>
+              <div style="background:#faf5ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#7c3aed;">${ciPendRep}</div><div style="font-size:11px;color:#6d28d9;">Pending Repair</div></div>
+              <div style="background:#fef2f2;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">${ciPendParts}</div><div style="font-size:11px;color:#991b1b;">Pending Parts</div></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);">✅ Closed: <b style="color:var(--success);">${ciClosed}</b></div>
+          </div>
+          <div class="card">
+            <h3 style="font-weight:700;margin-bottom:4px;font-size:14px;">🚗 On Site Summary</h3>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Engineer customer na tyaan jay chhe</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+              <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1a56db;">${osTotal}</div><div style="font-size:11px;color:#1e40af;">Total</div></div>
+              <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#d97706;">${osActive}</div><div style="font-size:11px;color:#92400e;">Active</div></div>
+              <div style="background:#faf5ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#7c3aed;">${osPendRep}</div><div style="font-size:11px;color:#6d28d9;">Pending Repair</div></div>
+              <div style="background:#fef2f2;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">${osPendParts}</div><div style="font-size:11px;color:#991b1b;">Pending Parts</div></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);">✅ Closed: <b style="color:var(--success);">${osClosed}</b></div>
+          </div>
+        </div>`;
+      })()}`;
     }
 
     // Point 10: Engineer dashboard with chart
@@ -2349,7 +2566,7 @@ function renderTicketTable(filtered){
     <div class="card">
       <div class="section-header"><h2>All Tickets (${tickets.length})</h2>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="openModal('modal-report')">📥 Export</button>
+          <button class="btn btn-outline btn-sm" onclick="openModal('modal-report');openModal_report_init()">📥 Export</button>
           <button class="btn btn-primary btn-sm" onclick="openNewCall()">+ New Call</button>
         </div>
       </div>
@@ -5123,6 +5340,17 @@ async function saveEE(){
     await loadMasterData();renderSettings();
     alert('✅ Saved!');
   }catch(e){alert('Error: '+e.message);}
+}
+
+// PWA Service Worker Registration
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      console.log('SW registered');
+    }).catch(function(e){
+      console.log('SW error:',e);
+    });
+  });
 }
 </script>
 </body>
