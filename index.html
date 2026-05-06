@@ -15,7 +15,8 @@
 :root{--primary:#1a56db;--primary-dark:#1240a8;--primary-light:#e8efff;--success:#0e9f6e;--danger:#f05252;--warning:#ff9800;--sidebar-bg:#1e2a3a;--sidebar-text:#b0bec5;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1a202c;--text-muted:#64748b;--shadow:0 2px 8px rgba(0,0,0,0.08);--radius:10px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;}
-#sidebar{width:220px;min-width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100;}
+#sidebar{width:220px;min-width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100;overflow-y:auto;}
+#sidebar-user{position:sticky;bottom:0;background:var(--sidebar-bg);padding-bottom:8px;}
 #sidebar-logo{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);background:#fff;display:flex;align-items:center;justify-content:center;min-height:70px;}
 #sidebar-logo img{max-width:160px;max-height:52px;object-fit:contain;}
 .nav-section{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);}
@@ -166,6 +167,7 @@ tr:hover td{background:#f8fafc;}
     transform:translateX(-100%);
     transition:transform 0.3s ease;
     z-index:200;
+    overflow-y:auto;
   }
   #sidebar.mobile-open{transform:translateX(0);}
   #main{margin-left:0!important;width:100%;}
@@ -961,14 +963,19 @@ async function renderReportPunch(c){
       +'<select id="punch-filter-eng" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" onchange="filterPunchLogs()"><option value="">All Engineers</option>'
       +[...new Set(logs.map(function(l){return l.eng_name;}).filter(Boolean))].map(function(n){return '<option>'+n+'</option>';}).join('')
       +'</select></div>'
-      +'<div class="table-wrap"><table id="punch-table"><thead><tr><th>Engineer</th><th>Date</th><th>In</th><th>Out</th><th>Meter Start</th><th>Meter End</th><th>Status</th><th>Action</th></tr></thead><tbody>'
+      +'<div class="table-wrap"><table id="punch-table"><thead><tr><th>Engineer</th><th>Punch In</th><th>Punch Out</th><th>Meter</th><th>Status</th><th>Reason</th><th>Action</th></tr></thead><tbody>'
       +logs.map(function(l){
-        return '<tr style="'+(l.status==="late_pending"?"background:#fff7ed;":"")+'">'
-        +'<td><b>'+(l.eng_name||'-')+'</b></td><td>'+(l.punch_in_date||'-')+'</td>'
-        +'<td>'+(l.punch_in_time||'-')+'</td><td>'+(l.punch_out_time||'<span style="color:var(--danger);">Not Out</span>')+'</td>'
-        +'<td>'+(l.start_meter||'-')+'</td><td>'+(l.end_meter||'-')+'</td>'
-        +'<td>'+(l.status==='late_pending'?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>')+'</td>'
-        +'<td>'+(l.status==='late_pending'?'<button class="btn btn-success btn-sm" onclick="verifyPunchLog(this.dataset.id)" data-id="'+l.id+'">✅ Verify</button>':'—')+'</td>'
+        const isLate=l.status==='late_pending';
+        const isNextDay=l.is_next_day;
+        const statusBadge=isLate?(isNextDay?'<span class="badge badge-pending">⚠️ Next Day</span>':'<span class="badge badge-pending">⚠️ Late</span>'):l.status==='verified'?'<span class="badge badge-closed">✅ Verified</span>':'<span class="badge badge-open">Active</span>';
+        return '<tr style="'+(isLate?"background:#fff7ed;":"")+'">'
+        +'<td><b>'+(l.eng_name||'-')+'</b></td>'
+        +'<td>'+(l.punch_in_date||'-')+' '+(l.punch_in_time||'-')+'</td>'
+        +'<td>'+(l.punch_out_time?((l.punch_out_date&&l.punch_out_date!==l.punch_in_date?l.punch_out_date+' ':'')+l.punch_out_time):'<span style="color:var(--danger);">Not Out</span>')+'</td>'
+        +'<td>'+(l.start_meter||'-')+' → '+(l.end_meter||'-')+'</td>'
+        +'<td>'+statusBadge+'</td>'
+        +'<td style="font-size:12px;color:var(--danger);">'+(l.late_remark||'—')+'</td>'
+        +'<td>'+(isLate?'<button class="btn btn-success btn-sm" onclick="verifyPunchLog(this.dataset.id)" data-id="'+l.id+'">✅ Approve</button>':'—')+'</td>'
         +'</tr>';
       }).join('')
       +'</tbody></table></div></div>';
@@ -977,11 +984,21 @@ async function renderReportPunch(c){
   }catch(e){c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
-async function verifyPunchLog(btnOrId){var id=typeof btnOrId==='string'?btnOrId:(btnOrId&&btnOrId.dataset?btnOrId.dataset.id:btnOrId);
-  var remark=prompt('Verification remark:');
+async function verifyPunchLog(id){
   try{
-    await sb('punch_logs','PATCH',{status:'verified',admin_remark:remark||'OK',verified_by:currentUser.name,updated_at:new Date().toISOString()},'?id=eq.'+id);
-    alert('✅ Verified!');
+    const logs=await sb('punch_logs','GET',null,'?id=eq.'+id);
+    const l=logs[0];if(!l)return;
+    const info=(l.is_next_day?'⚠️ NEXT DAY PUNCH OUT\n':'⚠️ LATE PUNCH OUT\n')
+      +'Engineer: '+l.eng_name+'\n'
+      +'Punch In: '+l.punch_in_date+' '+l.punch_in_time+'\n'
+      +'Punch Out: '+(l.punch_out_date||l.punch_in_date)+' '+l.punch_out_time+'\n'
+      +'Engineer Reason: '+(l.late_remark||'—')+'\n\n'
+      +'Admin Remark (approval note):';
+    var remark=prompt(info);
+    if(remark===null)return;
+    await sb('punch_logs','PATCH',{status:'verified',admin_remark:remark||'Approved',verified_by:currentUser.name,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    alert('✅ Approved! Punch log verified.');
+    renderPunchLogs();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -1982,7 +1999,21 @@ async function renderDashboard(){
     // Point 4: Punch In/Out bar for engineers
     let punchHtml='';
     if(currentUser.role==='engineer'){
-      const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
+      // Check Supabase for today's punch status (cross-device sync)
+      const today=new Date().toLocaleDateString('en-CA');
+      let ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
+      try{
+        const sbPunch=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&punch_in_date=eq.${today}&status=eq.active&limit=1`);
+        if(sbPunch&&sbPunch.length>0){
+          // Sync localStorage with Supabase
+          ps={punched_in:true,punch_in_time:sbPunch[0].punch_in_time,punch_in_date:sbPunch[0].punch_in_date,start_meter:sbPunch[0].start_meter||''};
+          localStorage.setItem(`punch_${currentUser.user_id}`,JSON.stringify(ps));
+        }else if(ps&&ps.punched_in&&ps.punch_in_date!==today){
+          // Old localStorage data from previous day — clear it
+          ps=null;
+          localStorage.removeItem(`punch_${currentUser.user_id}`);
+        }
+      }catch(e){console.log('Punch sync error:',e);}
       if(!ps||!ps.punched_in){
         punchHtml=`<div class="punch-bar"><div><div class="punch-time">🟢 Ready to Work</div><div class="punch-info">Click to start your duty</div></div><button class="btn btn-success" onclick="doPunchIn()">▶ Punch In / Work Start</button></div>`;
       }else{
@@ -2022,10 +2053,21 @@ async function renderDashboard(){
 // PUNCH IN/OUT - Point 4
 async function doPunchIn(){
   const key=`punch_${currentUser.user_id}`;
+  const today=new Date().toLocaleDateString('en-CA');
+  try{
+    const existing=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&punch_in_date=eq.${today}&status=eq.active&limit=1`);
+    if(existing&&existing.length>0){
+      const ex=existing[0];
+      const ps={punched_in:true,punch_in_time:ex.punch_in_time,punch_in_date:ex.punch_in_date,start_meter:ex.start_meter||'',end_meter:''};
+      localStorage.setItem(key,JSON.stringify(ps));
+      alert('Already Punched In!\nTime: '+ex.punch_in_time+'\nKoi baja device par punch in thi gayo chhe.');
+      navigate('dashboard');
+      return;
+    }
+  }catch(e){console.log('Punch check error:',e);}
   const now=new Date();
-  const ps={punched_in:true,punch_in_time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),punch_in_date:now.toLocaleDateString('en-CA'),start_meter:'',end_meter:''};
+  const ps={punched_in:true,punch_in_time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),punch_in_date:today,start_meter:'',end_meter:''};
   localStorage.setItem(key,JSON.stringify(ps));
-  // Save to Supabase
   try{
     await sb('punch_logs','POST',{
       eng_id:currentUser.eng_id||currentUser.user_id,
@@ -2035,7 +2077,7 @@ async function doPunchIn(){
       status:'active'
     });
   }catch(e){console.log('Punch log save error:',e);}
-  alert(`Punch In successful! ✅\nTime: ${ps.punch_in_time}`);
+  alert('Punch In successful! ✅\nTime: '+ps.punch_in_time);
   navigate('dashboard');
 }
 function doPunchOut(){
@@ -2188,50 +2230,96 @@ async function savePunchOut(key){
   if(!meter && !photoInput?.dataset.base64){
     alert('Enter meter reading OR upload meter photo — at least one required!');return;
   }
-  const ps=JSON.parse(localStorage.getItem(key)||'null');
+
+  // Get punch data — try localStorage first, then Supabase
+  let ps=JSON.parse(localStorage.getItem(key)||'null');
   const now=new Date();
+  const today=now.toLocaleDateString('en-CA');
   const punchOutTime=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   const hour=now.getHours();
-  const isLatePunchOut=hour>=22||hour<6; // After 10PM or before 6AM
-  
+
+  // Check if this is a NEXT-DAY punch out (punched in yesterday, punching out today morning)
+  let isNextDay=false;
+  let activePunchLog=null;
+  try{
+    // Find any active punch log for this engineer
+    const logs=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&status=eq.active&order=created_at.desc&limit=1`);
+    if(logs.length){
+      activePunchLog=logs[0];
+      // If punch_in_date is not today — it's next day
+      if(activePunchLog.punch_in_date && activePunchLog.punch_in_date !== today){
+        isNextDay=true;
+        // Use the Supabase punch data
+        if(!ps||ps.punch_in_date!==activePunchLog.punch_in_date){
+          ps={punched_in:true,punch_in_time:activePunchLog.punch_in_time,punch_in_date:activePunchLog.punch_in_date,start_meter:activePunchLog.start_meter||''};
+        }
+      }
+    }
+  }catch(e){console.log('Punch log fetch error:',e);}
+
+  if(!ps){alert('Punch In data nathi mili. Pehela Punch In karo.');return;}
+
+  // Determine if late: after 10PM OR next day morning
+  const isLatePunchOut = hour>=22 || hour<6 || isNextDay;
+
+  // If next day — mandatory remark
+  let lateRemark='';
+  if(isNextDay || isLatePunchOut){
+    const msg = isNextDay
+      ? '⚠️ Next Day Punch Out!\nKal Punch Out karyu nohtu.\n\nReason mandatory chhe (Admin approval jaashe):'
+      : '⚠️ Late Punch Out (10 PM pachhi)!\n\nReason mandatory chhe (Admin approval jaashe):';
+    lateRemark=prompt(msg);
+    if(lateRemark===null)return; // User cancelled
+    if(!lateRemark.trim()){alert('Reason mandatory chhe!');return;}
+  }
+
   ps.punched_in=false;
   ps.end_meter=meter||'';
-  ps.end_photo=photoInput?.dataset.base64||'';
   ps.punch_out_time=punchOutTime;
   ps.is_late=isLatePunchOut;
   localStorage.setItem(key,JSON.stringify(ps));
-  
-  // Save to Supabase punch_logs
+
+  // Save to Supabase
   try{
-    // Find today's active punch log
-    const logs=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&punch_in_date=eq.${ps.punch_in_date}&status=eq.active&order=created_at.desc&limit=1`);
     const updateData={
       punch_out_time:punchOutTime,
+      punch_out_date:today,
       end_meter:meter||'',
       start_meter:ps.start_meter||'',
       status:isLatePunchOut?'late_pending':'verified',
       is_late:isLatePunchOut,
+      late_remark:lateRemark||'',
+      is_next_day:isNextDay,
       updated_at:new Date().toISOString()
     };
-    if(logs.length){
-      await sb('punch_logs','PATCH',updateData,`?id=eq.${logs[0].id}`);
+    if(activePunchLog){
+      await sb('punch_logs','PATCH',updateData,`?id=eq.${activePunchLog.id}`);
     }else{
-      await sb('punch_logs','POST',{
-        eng_id:currentUser.eng_id||currentUser.user_id,
-        eng_name:currentUser.name,
-        punch_in_time:ps.punch_in_time,
-        punch_in_date:ps.punch_in_date,
-        ...updateData
-      });
+      const logs=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&punch_in_date=eq.${ps.punch_in_date}&order=created_at.desc&limit=1`);
+      if(logs.length){
+        await sb('punch_logs','PATCH',updateData,`?id=eq.${logs[0].id}`);
+      }else{
+        await sb('punch_logs','POST',{
+          eng_id:currentUser.eng_id||currentUser.user_id,
+          eng_name:currentUser.name,
+          punch_in_time:ps.punch_in_time,
+          punch_in_date:ps.punch_in_date,
+          ...updateData
+        });
+      }
     }
+    // Clear localStorage
+    localStorage.removeItem(key);
   }catch(e){console.log('Punch out save error:',e);}
-  
+
   var pm=document.getElementById('punch-out-modal');if(pm)pm.remove();
-  
-  if(isLatePunchOut){
-    alert(`⚠️ Late Punch Out recorded!\nTime: ${punchOutTime}\nAdmin ko review karna padega.`);
+
+  if(isNextDay){
+    alert('⚠️ Next Day Punch Out recorded!\nPunch In: '+ps.punch_in_date+' '+ps.punch_in_time+'\nPunch Out: '+today+' '+punchOutTime+'\n\nAdmin approval pending...');
+  }else if(isLatePunchOut){
+    alert('⚠️ Late Punch Out recorded!\nTime: '+punchOutTime+'\nAdmin approval pending...');
   }else{
-    alert(`Work Over! ✅\nPunch Out: ${punchOutTime}\nMeter: ${ps.start_meter||'—'} → ${meter||'—'}`);
+    alert('Work Over! ✅\nPunch Out: '+punchOutTime+'\nMeter: '+(ps.start_meter||'—')+' → '+(meter||'—'));
   }
   navigate('dashboard');
 }
