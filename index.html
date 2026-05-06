@@ -3188,7 +3188,26 @@ async function saveEngUpdate(){
   }
   try{
     await sb('tickets','PATCH',data,`?id=eq.${id}`);
-    for(const s of currentSpares){if(s.code&&!s.requested){try{const inv=await sb('inventory','GET',null,`?part_code=eq.${s.code}`);if(inv.length&&inv[0].qty_in_stock>0)await sb('inventory','PATCH',{qty_in_stock:inv[0].qty_in_stock-s.qty,updated_at:new Date().toISOString()},`?part_code=eq.${s.code}`);}catch(e){}}}
+    // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
+    if(status==='Closed'){
+      const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+      const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
+      for(const s of sparesToDeduct){
+        try{
+          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
+          if(inv.length&&inv[0].qty_in_stock>0){
+            const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
+            await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?part_code=eq.${encodeURIComponent(s.code)}`);
+            await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id,done_by:currentUser.name}).catch(()=>{});
+          }
+        }catch(e){console.log('Inv deduct error:',e);}
+      }
+      // Mark parts as deducted
+      if(sparesToDeduct.length>0){
+        const updatedSpares=(freshT?.spares||[]).map(s=>({...s,stock_deducted:true}));
+        await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
+      }
+    }
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
