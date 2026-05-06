@@ -2362,6 +2362,7 @@ async function saveCall(){
     call_type:ct,service_type:document.getElementById('call-service-type').value,
     service_charges:serviceCharges,
     brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name').value||'');})(),
+    wc_type:(()=>{const scEl=document.getElementById('call-subcat-input');const sc=(scEl?.options[scEl?.selectedIndex]?.text||'').trim();if(sc==='ICP')return 'ICP';if(sc==='CSP')return 'CSP';const bn=(document.getElementById('call-brand-input')?.options[document.getElementById('call-brand-input')?.selectedIndex]?.text||'').toLowerCase();if(bn.includes('panasonic'))return 'ICP';if(bn.includes('fujifilm'))return 'CSP';return 'ICP';})(),
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
