@@ -3199,6 +3199,18 @@ async function saveEngUpdate(){
             const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
             await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?part_code=eq.${encodeURIComponent(s.code)}`);
             await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id,done_by:currentUser.name}).catch(()=>{});
+          // Also save to inventory_sales for tracking
+          await sb('inventory_sales','POST',{
+            sale_date:new Date().toLocaleDateString('en-CA'),
+            part_code:s.code,part_name:s.name||'',
+            sale_type:'call',reference:id,
+            customer_name:freshT?.cname||'',
+            qty:s.qty||1,unit_price:s.price||0,
+            total_amount:(s.qty||1)*(s.price||0),
+            note:'Auto - Ticket '+id,
+            added_by:currentUser.name,
+            created_at:new Date().toISOString()
+          }).catch(()=>{});
           }
         }catch(e){console.log('Inv deduct error:',e);}
       }
@@ -3214,45 +3226,282 @@ async function saveEngUpdate(){
 }
 
 // INVENTORY
-async function renderInventory(){
+async function renderInventory(tab){
+  tab=tab||'stock';
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     allInventory=await sb('inventory','GET',null,'?order=item_name');
+    // Fetch purchase and sales logs
+    let purchases=[],salesLogs=[];
+    try{purchases=await sb('inventory_purchases','GET',null,'?order=purchase_date.desc&limit=500');}catch(e){}
+    try{salesLogs=await sb('inventory_sales','GET',null,'?order=sale_date.desc&limit=500');}catch(e){}
+
     const low=allInventory.filter(i=>i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock).length;
     const out=allInventory.filter(i=>i.qty_in_stock<=0).length;
-    const val=allInventory.reduce((a,i)=>a+(i.qty_in_stock||0)*(i.unit_price||0),0);
+    const totalPurchaseVal=purchases.reduce((a,p)=>a+(p.qty||0)*(p.unit_cost||0),0);
+    const totalSaleVal=salesLogs.reduce((a,s)=>a+(s.qty||0)*(s.unit_price||0),0);
+    const stockVal=allInventory.reduce((a,i)=>a+(i.qty_in_stock||0)*(i.unit_price||0),0);
+
+    const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderInventory('${t}')">${label}</button>`;
+
     document.getElementById('page-content').innerHTML=`
-      <div class="inv-grid">
-        <div class="inv-stat"><div class="val">${allInventory.length}</div><div class="lbl">Total Parts</div></div>
-        <div class="inv-stat" style="border-left:3px solid var(--warning);" onclick="filterInventoryBy('low')"><div class="val" style="color:var(--warning);">${low}</div><div class="lbl">⚠️ Low Stock</div></div>
-        <div class="inv-stat" style="border-left:3px solid var(--danger);" onclick="filterInventoryBy('out')"><div class="val" style="color:var(--danger);">${out}</div><div class="lbl">⛔ Out of Stock</div></div>
-        <div class="inv-stat" style="border-left:3px solid var(--success);"><div class="val" style="font-size:18px;">₹${val.toFixed(0)}</div><div class="lbl">Value</div></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;">
+        <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Parts</div><div class="kpi-value" style="font-size:20px;">${allInventory.length}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Stock Value</div><div class="kpi-value" style="font-size:16px;color:var(--success);">₹${stockVal.toFixed(0)}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:#1a56db;"><div class="kpi-label">Total Purchase</div><div class="kpi-value" style="font-size:16px;color:#1a56db;">₹${totalPurchaseVal.toFixed(0)}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Sales</div><div class="kpi-value" style="font-size:16px;color:#7c3aed;">₹${totalSaleVal.toFixed(0)}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:var(--warning);"><div class="kpi-label">Low / Out</div><div class="kpi-value" style="font-size:20px;color:var(--warning);">${low} / ${out}</div></div>
       </div>
-      <div class="card">
-        <div class="section-header"><h2>Inventory</h2>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-outline btn-sm" onclick="downloadInvTemplate()">📄 Template</button>
-            <button class="btn btn-outline btn-sm" onclick="importInv()">📥 Import</button>
-            <button class="btn btn-outline btn-sm" onclick="downloadStockOutTemplate()">📤 Stock Out Template</button>
-            <button class="btn btn-warning btn-sm" onclick="bulkStockOut()">📦 Bulk Stock Out</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteSelectedInv()">🗑️ Delete Selected</button>
-            <button class="btn btn-primary btn-sm" onclick="openAddInv()">+ Add Part</button>
-          </div>
-        </div>
-        <div class="filter-bar">
-          <input type="text" id="inv-search" placeholder="Code, name, model..." oninput="filterInv()" style="flex:1;">
-          <select id="inv-stock-f" onchange="filterInv()"><option value="">All Stock</option><option value="low">Low</option><option value="out">Out</option></select>
-        </div>
-        <div class="table-wrap"><table>
-          <thead><tr>
-  <th><input type="checkbox" id="inv-select-all" onchange="toggleAllInv(this)" title="Select All"></th>
-  <th>Code</th><th>Name</th><th>Brand</th><th>Model</th><th>Stock</th><th>Min</th><th>Price</th><th>Value</th><th>Actions</th></tr></thead>
-          <tbody id="inv-tbody">${renderInvRows(allInventory)}</tbody>
-        </table></div>
-      </div>`;
-    // Check if any tickets have pending parts and stock now available
+      <div class="tabs">${tabHtml('stock','📦 Stock')}${tabHtml('purchase','🛒 Purchase')}${tabHtml('sales','💰 Sales')}</div>
+      <div id="inv-tab-content"></div>`;
+
+    if(tab==='stock') renderInvStockTab();
+    else if(tab==='purchase') renderInvPurchaseTab(purchases);
+    else if(tab==='sales') renderInvSalesTab(salesLogs);
+
     checkPendingPartsAuto();
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
+}
+
+function renderInvStockTab(){
+  const c=document.getElementById('inv-tab-content');
+  if(!c)return;
+  c.innerHTML=`<div class="card">
+    <div class="section-header"><h2>Stock List</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="downloadInvTemplate()">📄 Template</button>
+        <button class="btn btn-outline btn-sm" onclick="importInv()">📥 Import</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSelectedInv()">🗑️ Delete</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddInv()">+ Add Part</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="inv-search" placeholder="Code, name, model..." oninput="filterInv()" style="flex:1;">
+      <select id="inv-stock-f" onchange="filterInv()"><option value="">All Stock</option><option value="low">Low</option><option value="out">Out</option></select>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th><input type="checkbox" id="inv-select-all" onchange="toggleAllInv(this)"></th>
+      <th>Code</th><th>Name</th><th>Brand</th><th>Model</th><th>Stock</th><th>Min</th><th>Buy Price</th><th>Sell Price</th><th>Value</th><th>Actions</th></tr></thead>
+      <tbody id="inv-tbody">${renderInvRows(allInventory)}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderInvPurchaseTab(purchases){
+  const c=document.getElementById('inv-tab-content');
+  if(!c)return;
+  const rows=(purchases||[]).map(p=>`<tr>
+    <td>${p.purchase_date||'-'}</td>
+    <td><b>${p.part_code||'-'}</b></td>
+    <td>${p.part_name||'-'}</td>
+    <td>${p.supplier||'-'}</td>
+    <td style="text-align:center;">${p.qty||0}</td>
+    <td style="text-align:right;">₹${p.unit_cost||0}</td>
+    <td style="text-align:right;font-weight:700;">₹${((p.qty||0)*(p.unit_cost||0)).toFixed(0)}</td>
+    <td>${p.invoice_no||'-'}</td>
+    <td>${p.added_by||'-'}</td>
+  </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
+  c.innerHTML=`<div class="card">
+    <div class="section-header"><h2>Purchase History</h2>
+      <button class="btn btn-primary btn-sm" onclick="openPurchaseEntry()">+ New Purchase</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Supplier</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Invoice No</th><th>By</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function renderInvSalesTab(salesLogs){
+  const c=document.getElementById('inv-tab-content');
+  if(!c)return;
+  const rows=(salesLogs||[]).map(s=>{
+    const typeLabel=s.sale_type==='call'?`Call: ${s.reference||''}`:(s.sale_type==='dealer'?`Dealer: ${s.customer_name||''}`:`Customer: ${s.customer_name||''}`);
+    return `<tr>
+      <td>${s.sale_date||'-'}</td>
+      <td><b>${s.part_code||'-'}</b></td>
+      <td>${s.part_name||'-'}</td>
+      <td><span class="badge ${s.sale_type==='call'?'badge-open':s.sale_type==='dealer'?'badge-warranty':'badge-closed'}">${s.sale_type||'-'}</span></td>
+      <td>${typeLabel}</td>
+      <td style="text-align:center;">${s.qty||0}</td>
+      <td style="text-align:right;">₹${s.unit_price||0}</td>
+      <td style="text-align:right;font-weight:700;">₹${((s.qty||0)*(s.unit_price||0)).toFixed(0)}</td>
+      <td>${s.added_by||'-'}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
+  c.innerHTML=`<div class="card">
+    <div class="section-header"><h2>Sales History</h2>
+      <button class="btn btn-primary btn-sm" onclick="openManualSale()">+ Manual Sale</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+async function openPurchaseEntry(){
+  var ex=document.getElementById('purchase-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='purchase-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const partOpts=allInventory.map(i=>`<option value="${i.part_code||''}" data-name="${i.item_name}" data-price="${i.unit_price||0}">${i.part_code||''} — ${i.item_name}</option>`).join('');
+  overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>🛒 New Purchase Entry</h2><button class="close-btn" onclick="document.getElementById('purchase-modal').remove()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Date <span class="req">*</span></label><input type="date" id="pur-date" value="${new Date().toLocaleDateString('en-CA')}"></div>
+        <div class="form-group"><label>Invoice No</label><input type="text" id="pur-invoice" placeholder="INV-001"></div>
+        <div class="form-group"><label>Supplier / Dealer <span class="req">*</span></label><input type="text" id="pur-supplier" placeholder="Supplier name"></div>
+        <div class="form-group"><label>Part <span class="req">*</span></label>
+          <select id="pur-part" onchange="onPurPartChange(this)">
+            <option value="">-- Select Part --</option>${partOpts}
+          </select>
+        </div>
+        <div class="form-group"><label>Qty <span class="req">*</span></label><input type="number" id="pur-qty" min="1" value="1"></div>
+        <div class="form-group"><label>Unit Cost ₹ <span class="req">*</span></label><input type="number" id="pur-cost" min="0" value="0"></div>
+      </div>
+      <div class="form-group" style="margin-top:10px;"><label>Note</label><input type="text" id="pur-note" placeholder="Optional note"></div>
+      <div style="margin-top:12px;background:var(--bg);border-radius:8px;padding:10px;font-size:13px;">
+        Total: <b id="pur-total">₹0</b>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('purchase-modal').remove()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePurchaseEntry()">💾 Save Purchase</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('pur-qty').oninput=document.getElementById('pur-cost').oninput=function(){
+    const q=parseInt(document.getElementById('pur-qty').value)||0;
+    const c=parseFloat(document.getElementById('pur-cost').value)||0;
+    document.getElementById('pur-total').textContent='₹'+(q*c).toFixed(0);
+  };
+}
+
+function onPurPartChange(sel){
+  const opt=sel.options[sel.selectedIndex];
+  if(opt&&opt.dataset.price) document.getElementById('pur-cost').value=opt.dataset.price;
+  const q=parseInt(document.getElementById('pur-qty').value)||0;
+  const c=parseFloat(document.getElementById('pur-cost').value)||0;
+  document.getElementById('pur-total').textContent='₹'+(q*c).toFixed(0);
+}
+
+async function savePurchaseEntry(){
+  const date=document.getElementById('pur-date').value;
+  const supplier=document.getElementById('pur-supplier').value.trim();
+  const partSel=document.getElementById('pur-part');
+  const partCode=partSel.value;
+  const partName=partSel.options[partSel.selectedIndex]?.dataset.name||'';
+  const qty=parseInt(document.getElementById('pur-qty').value)||0;
+  const cost=parseFloat(document.getElementById('pur-cost').value)||0;
+  const invoice=document.getElementById('pur-invoice').value.trim();
+  const note=document.getElementById('pur-note').value.trim();
+  if(!date||!supplier||!partCode||!qty||!cost){alert('Badha mandatory fields bharo');return;}
+  try{
+    // Save purchase record
+    await sb('inventory_purchases','POST',{
+      purchase_date:date,part_code:partCode,part_name:partName,
+      supplier,qty,unit_cost:cost,invoice_no:invoice||null,
+      total_cost:qty*cost,note:note||null,added_by:currentUser.name,
+      created_at:new Date().toISOString()
+    });
+    // Update stock
+    const inv=allInventory.find(i=>i.part_code===partCode);
+    if(inv){
+      await sb('inventory','PATCH',{qty_in_stock:inv.qty_in_stock+qty,updated_at:new Date().toISOString()},`?id=eq.${inv.id}`);
+      await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty,note:'Purchase from '+supplier+(invoice?' INV:'+invoice:''),done_by:currentUser.name}).catch(()=>{});
+    }
+    document.getElementById('purchase-modal').remove();
+    alert('✅ Purchase saved! Stock updated.');
+    renderInventory('purchase');
+    checkPendingPartsAuto();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function openManualSale(){
+  var ex=document.getElementById('sale-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='sale-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const partOpts=allInventory.filter(i=>i.qty_in_stock>0).map(i=>`<option value="${i.part_code||''}" data-name="${i.item_name}" data-price="${i.unit_price||0}" data-stock="${i.qty_in_stock}">${i.part_code||''} — ${i.item_name} (Stock: ${i.qty_in_stock})</option>`).join('');
+  overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>💰 Manual Sale Entry</h2><button class="close-btn" onclick="document.getElementById('sale-modal').remove()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Date <span class="req">*</span></label><input type="date" id="sale-date" value="${new Date().toLocaleDateString('en-CA')}"></div>
+        <div class="form-group"><label>Sale Type <span class="req">*</span></label>
+          <select id="sale-type">
+            <option value="dealer">Dealer</option>
+            <option value="customer">Direct Customer</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Customer / Dealer Name <span class="req">*</span></label><input type="text" id="sale-customer" placeholder="Name"></div>
+        <div class="form-group"><label>Mobile</label><input type="tel" id="sale-mobile" placeholder="Optional"></div>
+        <div class="form-group"><label>Part <span class="req">*</span></label>
+          <select id="sale-part" onchange="onSalePartChange(this)">
+            <option value="">-- Select Part --</option>${partOpts}
+          </select>
+        </div>
+        <div class="form-group"><label>Qty <span class="req">*</span></label><input type="number" id="sale-qty" min="1" value="1" oninput="updateSaleTotal()"></div>
+        <div class="form-group"><label>Unit Price ₹ <span class="req">*</span></label><input type="number" id="sale-price" min="0" value="0" oninput="updateSaleTotal()"></div>
+      </div>
+      <div class="form-group" style="margin-top:10px;"><label>Note</label><input type="text" id="sale-note" placeholder="Optional"></div>
+      <div style="margin-top:12px;background:var(--bg);border-radius:8px;padding:10px;font-size:13px;">
+        Total: <b id="sale-total">₹0</b> &nbsp;|&nbsp; Available Stock: <b id="sale-avail">-</b>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('sale-modal').remove()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveManualSale()">💾 Save Sale</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function onSalePartChange(sel){
+  const opt=sel.options[sel.selectedIndex];
+  if(opt&&opt.dataset.price){document.getElementById('sale-price').value=opt.dataset.price;}
+  if(opt&&opt.dataset.stock){document.getElementById('sale-avail').textContent=opt.dataset.stock;}
+  updateSaleTotal();
+}
+function updateSaleTotal(){
+  const q=parseInt(document.getElementById('sale-qty')?.value)||0;
+  const p=parseFloat(document.getElementById('sale-price')?.value)||0;
+  const el=document.getElementById('sale-total');if(el)el.textContent='₹'+(q*p).toFixed(0);
+}
+
+async function saveManualSale(){
+  const date=document.getElementById('sale-date').value;
+  const saleType=document.getElementById('sale-type').value;
+  const customer=document.getElementById('sale-customer').value.trim();
+  const mobile=document.getElementById('sale-mobile').value.trim();
+  const partSel=document.getElementById('sale-part');
+  const partCode=partSel.value;
+  const partName=partSel.options[partSel.selectedIndex]?.dataset.name||'';
+  const availStock=parseInt(partSel.options[partSel.selectedIndex]?.dataset.stock||0);
+  const qty=parseInt(document.getElementById('sale-qty').value)||0;
+  const price=parseFloat(document.getElementById('sale-price').value)||0;
+  const note=document.getElementById('sale-note').value.trim();
+  if(!date||!customer||!partCode||!qty||!price){alert('Badha mandatory fields bharo');return;}
+  if(qty>availStock){alert('Stock ochhu chhe! Available: '+availStock);return;}
+  try{
+    await sb('inventory_sales','POST',{
+      sale_date:date,part_code:partCode,part_name:partName,
+      sale_type:saleType,customer_name:customer,mobile:mobile||null,
+      qty,unit_price:price,total_amount:qty*price,
+      note:note||null,added_by:currentUser.name,
+      created_at:new Date().toISOString()
+    });
+    const inv=allInventory.find(i=>i.part_code===partCode);
+    if(inv){
+      await sb('inventory','PATCH',{qty_in_stock:Math.max(0,inv.qty_in_stock-qty),updated_at:new Date().toISOString()},`?id=eq.${inv.id}`);
+      await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty,note:'Manual Sale to '+customer,done_by:currentUser.name}).catch(()=>{});
+    }
+    document.getElementById('sale-modal').remove();
+    alert('✅ Sale saved! Stock updated.');
+    renderInventory('sales');
+  }catch(e){alert('Error: '+e.message);}
 }
 async function checkPendingPartsAuto(){
   try{
@@ -3274,7 +3523,7 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td>${i.item_name}</td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td>${i.item_name}</td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory(this.dataset.code,this.dataset.name)" data-code="${i.part_code||''}" data-name="${i.item_name}">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
 function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
@@ -3283,6 +3532,51 @@ async function saveInventory(){const data={part_code:document.getElementById('in
 function openStockAdjust(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;adjustingInvId=id;document.getElementById('stock-part-info').innerHTML=`<b>${inv.part_code||''}</b> — ${inv.item_name}<br>Stock: <b>${inv.qty_in_stock}</b> | Min: ${inv.min_stock} | ₹${inv.unit_price}`;document.getElementById('stock-qty').value='1';document.getElementById('stock-note').value='';openModal('modal-stock');}
 async function saveStockAdjust(){const inv=allInventory.find(i=>i.id===adjustingInvId);if(!inv)return;const type=document.getElementById('stock-type').value;const qty=parseInt(document.getElementById('stock-qty').value)||1;const newQty=type==='in'?inv.qty_in_stock+qty:Math.max(0,inv.qty_in_stock-qty);try{await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${adjustingInvId}`);await sb('inventory_log','POST',{inventory_id:adjustingInvId,type,qty,note:document.getElementById('stock-note').value,done_by:currentUser.name});closeModal('modal-stock');renderInventory();checkPendingPartsAuto();}catch(e){alert('Error: '+e.message);}}
 async function deleteInv(id){if(!confirm('Delete?'))return;try{await sb('inventory','DELETE',null,`?id=eq.${id}`);renderInventory();}catch(e){alert(e.message);}}
+
+async function openPartHistory(partCode,partName){
+  if(!partCode){alert('Part code nathi');return;}
+  var ex=document.getElementById('part-history-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='part-history-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>Part Usage History</h2><button class="close-btn" onclick="document.getElementById(\'part-history-modal\').remove()">x</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px;"><b>'+partCode+'</b> — '+partName+'</div>'
+    +'<div id="part-history-content"><div class="loading">Loading...</div></div>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+  try{
+    const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+    const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
+    if(used.length===0){
+      document.getElementById('part-history-content').innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Aa part koi call ma use nathi thayo</div>';
+      return;
+    }
+    const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
+    const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
+    const rows=used.map(t=>{
+      const spare=(t.spares||[]).find(s=>s.code===partCode);
+      const qty=spare?.qty||1;const price=spare?.price||0;
+      const deducted=spare?.stock_deducted?'<span class="badge badge-closed">Deducted</span>':'<span class="badge badge-pending">Pending</span>';
+      return '<tr><td><b>'+t.id+'</b></td><td>'+(t.cname||'-')+'</td><td>'+(t.model||'-')+'</td><td>'+(t.assigned_name||'-')+'</td>'
+        +'<td style="text-align:center;">'+qty+'</td><td style="text-align:right;">Rs'+price+'</td>'
+        +'<td style="text-align:right;font-weight:700;">Rs'+(qty*price)+'</td>'
+        +'<td>'+deducted+'</td>'
+        +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
+        +'<td>'+(t.status||'-')+'</td></tr>';
+    }).join('');
+    document.getElementById('part-history-content').innerHTML=
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Calls</div><div class="kpi-value" style="font-size:22px;">'+used.length+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Qty Used</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">'+totalQty+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Value</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">Rs'+totalAmt.toFixed(0)+'</div></div>'
+      +'</div>'
+      +'<div class="table-wrap"><table>'
+      +'<thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>Qty</th><th>Price</th><th>Total</th><th>Stock</th><th>Date</th><th>Status</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+  }catch(e){document.getElementById('part-history-content').innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
 
 function toggleAllInv(cb){
   document.querySelectorAll('.inv-checkbox').forEach(c=>c.checked=cb.checked);
