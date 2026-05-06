@@ -1888,6 +1888,7 @@ async function renderDashboard(){
   if(!currentUser){pc.innerHTML='';return;}
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}
     allTickets=await sb('tickets','GET',null,q);
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
@@ -2243,7 +2244,10 @@ async function renderTickets(){
     // WC filter: ICP WC sees ICP calls only, CSP WC sees CSP calls only
     if(currentUser.role_type==='work_controller'){
       const wcName=(currentUser.name||'').toUpperCase();
-      const wcType=wcName.includes('ICP')?'ICP':'CSP';
+      // Check name for ICP/CSP, fallback to user_id
+      let wcType='ICP';
+      if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
+      else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
       q+='&wc_type=eq.'+wcType;
     }
     allTickets=await sb('tickets','GET',null,q);
@@ -2462,6 +2466,7 @@ async function saveCall(){
     call_type:ct,service_type:document.getElementById('call-service-type').value,
     service_charges:serviceCharges,
     brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name').value||'');})(),
+    wc_type:(()=>{const scEl=document.getElementById('call-subcat-input');const sc=(scEl?.options[scEl?.selectedIndex]?.text||'').trim();if(sc==='ICP')return 'ICP';if(sc==='CSP')return 'CSP';const bn=(document.getElementById('call-brand-input')?.options[document.getElementById('call-brand-input')?.selectedIndex]?.text||'').toLowerCase();if(bn.includes('panasonic'))return 'ICP';if(bn.includes('fujifilm'))return 'CSP';if(currentUser&&currentUser.role_type==='work_controller'){const wcn=(currentUser.name||'').toUpperCase();if(wcn.includes('CSP'))return 'CSP';if(wcn.includes('ICP'))return 'ICP';}return 'ICP';})(),
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
@@ -2509,6 +2514,10 @@ function openAdminEdit(id){
 
 // VIEW TICKET
 async function viewTicket(id,autoPrint=false){
+  // Refresh engineers if not loaded
+  if(!allEngineers||allEngineers.length===0){
+    try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
+  }
   viewingTicketId=id;
   // Always fetch fresh from DB for accurate data
   let t;
@@ -2555,8 +2564,8 @@ async function viewTicket(id,autoPrint=false){
       `:''}
       ${!isPendingAlloc&&!isPendingApproval&&!isClosed?`<span style="font-size:12px;color:var(--text-muted);padding:6px 0;">Status managed by Engineer</span>`:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
-      <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
-        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers||[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
+      <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
+        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
@@ -2612,15 +2621,24 @@ async function quickStatusChange(id,status){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
-  // Strict validation
-  const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type);
-  if(!allowed.includes(status)){
+  // FIX: pass callType and warrantyStatus too
+  const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type,t.call_type,t.warranty_coverage);
+  if(status!=='Call Cancel'&&!allowed.includes(status)){
     alert(`❌ Cannot change from "${t.status}" to "${status}"\n\nAllowed: ${allowed.length?allowed.join(', '):'No changes allowed at this stage'}`);
     return;
   }
-  // Get reason if needed
+  // Cancel Call needs mandatory remark
+  if(status==='Call Cancel'){
+    const reason=prompt('🚫 Call Cancel - Reason (mandatory):');
+    if(!reason||!reason.trim()){alert('Reason mandatory chhe!');return;}
+    const tl=[...(t.timeline||[]),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
+    await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    closeModal('modal-ticket');
+    if(currentPage==='tickets')renderTickets();else renderDashboard();
+    return;
+  }
   const reason=await validateStatusChange(id,t.status,status,currentUser.role);
-  if(reason===null)return; // User cancelled
+  if(reason===null)return;
   const note=reason?`Reason: ${reason}`:'';
   const tl=[...(t.timeline||[]),{action:'Status → '+status,by:currentUser.name,at:new Date().toISOString(),note}];
   await sb('tickets','PATCH',{status,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
@@ -2733,12 +2751,13 @@ async function processApproval(decision){
   }
   else{
     newStatus='Customer Reject';action='Customer Rejected Estimate';
-    // Ask inspection charges for rejection
-    const serviceChargesAtCreation=parseFloat(t?.service_charges)||0;
-    const inspInput=prompt('Inspection Charges - Customer ne reject karyu. Final charges enter karo (Rs):',serviceChargesAtCreation||200);
+    // Ask inspection charges for rejection - this is FINAL
+    const serviceChargesAtCreation=parseFloat(t?.service_charges)||parseFloat(t?.labor)||0;
+    const inspInput=prompt('⚠️ Customer e Reject karyu!\n\nInspection / Visit Charges (₹) enter karo — aa FINAL thashe:',serviceChargesAtCreation||300);
     if(inspInput===null){return;}
     const inspCharges=parseFloat(inspInput)||0;
     window._pendingInspCharges=inspCharges;
+    window._rejectFinalAmount=inspCharges;
   }
   
   const estimateNote='Estimate: Rs'+finalAmount.toFixed(0)+' | Parts: Rs'+partsFinal.toFixed(0)+' | Service: Rs'+labourFinal.toFixed(0)+(note?' | Note: '+note:'');
@@ -2791,9 +2810,18 @@ async function processApproval(decision){
       if(currentPage==='tickets')renderTickets();else renderDashboard();
       alert('✅ Approved! Final: Rs'+finalAmount.toFixed(0)+' | Status: '+autoStatus);
     }else{
+      // Save inspection charges as final amount
+      const inspCharges=window._rejectFinalAmount||window._pendingInspCharges||0;
+      const rejectTl=[...tl,{action:'Inspection Charges Set',by:currentUser.name,at:new Date().toISOString(),note:'Final Inspection Charges: ₹'+inspCharges}];
+      await sb('tickets','PATCH',{
+        final_charges:inspCharges,
+        labor:inspCharges,
+        timeline:rejectTl,
+        updated_at:new Date().toISOString()
+      },`?id=eq.${approvalTicketId}`);
       closeModal('modal-approval');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
-      alert(`❌ Rejected! Note saved.`);
+      alert('❌ Rejected! Inspection Charges: ₹'+inspCharges+' saved as final.');
     }
   }catch(e){alert('Error: '+e.message);}
 }
@@ -2878,11 +2906,31 @@ function setWorkEnd(){
 }
 
 async function engVoidWarranty(id){
-  const r=prompt('Reason for Out of Coverage:');if(!r)return;
+  const r=prompt('Out of Coverage - Reason (mandatory):');
+  if(!r||!r.trim()){alert('Reason mandatory chhe!');return;}
+  
+  // Ask service charges immediately
+  const svcInput=prompt('Service / Labour Charges (₹) - aa final thashe, part add thay to ae upar thashe:','300');
+  if(svcInput===null)return;
+  const svcCharges=parseFloat(svcInput)||0;
+  
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
-  const tl=[...(t?.timeline||[]),{action:'Warranty Void by Engineer',by:currentUser.name,at:new Date().toISOString(),note:r}];
-  await sb('tickets','PATCH',{warranty_coverage:'Out of Coverage',coverage_remark:r,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
-  closeModal('modal-eng-update');openEngUpdate(id);
+  const tl=[...(t?.timeline||[]),{
+    action:'Out of Coverage — Service Charges Set',
+    by:currentUser.name,
+    at:new Date().toISOString(),
+    note:'Reason: '+r+' | Service Charges: ₹'+svcCharges
+  }];
+  await sb('tickets','PATCH',{
+    warranty_coverage:'Out of Coverage',
+    coverage_remark:r,
+    service_charges:svcCharges,
+    labor:svcCharges,
+    timeline:tl,
+    updated_at:new Date().toISOString()
+  },`?id=eq.${id}`);
+  closeModal('modal-eng-update');
+  openEngUpdate(id);
 }
 
 // Point 6: Part request flow
