@@ -4013,20 +4013,33 @@ async function renderReportOverview(c){
     const amc=tickets.filter(t=>t.call_type==='AMC').length;
     const cancel=tickets.filter(t=>t.status==='Call Cancel').length;
     const reject=tickets.filter(t=>t.status==='Customer Reject').length;
-    const totalRev=tickets.reduce((a,t)=>{const sp=(t.spares||[]).filter(s=>!s.requested).reduce((s,p)=>s+(p.qty||0)*(p.price||0),0);return a+sp+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);},0);
+    const totalRev=tickets.reduce((a,t)=>{
+      const sp=(t.spares||[]).reduce((s,p)=>s+(p.qty||0)*(p.price||0),0);
+      const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+      const fin=parseFloat(t.final_charges)||0;
+      const other=parseFloat(t.other_charge)||0;
+      return a+(fin>0?fin:(svc+sp+other));
+    },0);
 
     // By engineer
     const byEng={};
     tickets.forEach(t=>{
       const k=t.assigned_name||'Unassigned';
-      if(!byEng[k])byEng[k]={total:0,closed:0,rev:0,cancel:0};
+      if(!byEng[k])byEng[k]={total:0,closed:0,rev:0,cancel:0,parts:0,service:0,labor:0,count:0};
       byEng[k].total++;
+      byEng[k].count++;
       if(t.status==='Closed')byEng[k].closed++;
       if(t.status==='Call Cancel')byEng[k].cancel++;
-      const sp=(t.spares||[]).filter(s=>!s.requested).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
-      const svcE=parseFloat(t.service_charges)||0;
+      // Parts — all spares (requested + manual)
+      const sp=(t.spares||[]).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
+      // Service/Labour
+      const svcE=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+      const otherE=parseFloat(t.other_charge)||0;
       const finE=parseFloat(t.final_charges)||0;
-      const tRevE=finE>0?finE:(svcE+sp+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0));
+      const tRevE=finE>0?finE:(svcE+sp+otherE);
+      byEng[k].parts+=sp;
+      byEng[k].service+=svcE;
+      byEng[k].labor+=svcE;
       byEng[k].rev+=tRevE;
     });
 
@@ -4133,13 +4146,14 @@ async function renderReportOverview(c){
         <div class="section-header"><h2>Engineer Details</h2><button class="btn btn-outline btn-sm" onclick="openModal('modal-report')">📥 Download</button></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Engineer</th><th>Calls</th><th>Closed</th><th>Parts ₹</th><th>Service/Labour ₹</th><th>Total ₹</th></tr></thead>
-          <tbody>${Object.entries(byEng).sort((a,b)=>b[1].total-a[1].total).map(([name,d])=>`<tr>
-            <td><b>${name}</b></td><td>${d.count}</td>
-            <td style="color:var(--success);font-weight:700;">${d.closed||0}</td>
-            <td>₹${(d.parts||0).toFixed(0)}</td>
-            <td>₹${((d.service||0)+(d.labor||0)).toFixed(0)}</td>
-            <td style="font-weight:700;">${d.total?Math.round(d.closed/d.total*100):0}%</td>
-            <td>₹${d.rev.toFixed(0)}</td>
+          <tbody>${Object.entries(byEng).sort((a,b)=>b[1].rev-a[1].rev).map(([name,d])=>`<tr>
+            <td><b>${name}</b></td>
+            <td style="text-align:center;">${d.count}</td>
+            <td style="color:var(--success);font-weight:700;text-align:center;">${d.closed||0}</td>
+            <td style="text-align:right;">₹${(d.parts||0).toFixed(0)}</td>
+            <td style="text-align:right;">₹${(d.service||0).toFixed(0)}</td>
+            <td style="text-align:center;color:var(--primary);">${d.total?Math.round(d.closed/d.total*100):0}%</td>
+            <td style="font-weight:700;text-align:right;color:var(--success);">₹${d.rev.toFixed(0)}</td>
           </tr>`).join('')}</tbody>
         </table></div>
       </div>`;
@@ -4253,7 +4267,13 @@ async function runFilteredReport(){
     
     window._filteredTickets=tickets;
     
-    const totalRev=tickets.reduce((a,t)=>{const sp=(t.spares||[]).filter(s=>!s.requested).reduce((s,p)=>s+(p.qty||0)*(p.price||0),0);return a+sp+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);},0);
+    const totalRev=tickets.reduce((a,t)=>{
+      const sp=(t.spares||[]).reduce((s,p)=>s+(p.qty||0)*(p.price||0),0);
+      const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+      const fin=parseFloat(t.final_charges)||0;
+      const other=parseFloat(t.other_charge)||0;
+      return a+(fin>0?fin:(svc+sp+other));
+    },0);
     
     document.getElementById('filter-results').innerHTML=`
       <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
