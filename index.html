@@ -4145,15 +4145,23 @@ async function renderReportOverview(c){
       <div class="card">
         <div class="section-header"><h2>Engineer Details</h2><button class="btn btn-outline btn-sm" onclick="openModal('modal-report')">📥 Download</button></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Engineer</th><th>Calls</th><th>Closed</th><th>Parts ₹</th><th>Service/Labour ₹</th><th>Total ₹</th></tr></thead>
+          <thead><tr>
+            <th style="text-align:left;">Engineer</th>
+            <th style="text-align:center;">Calls</th>
+            <th style="text-align:center;">Closed</th>
+            <th style="text-align:center;">Rate</th>
+            <th style="text-align:right;">Parts ₹</th>
+            <th style="text-align:right;">Service ₹</th>
+            <th style="text-align:right;">Total ₹</th>
+          </tr></thead>
           <tbody>${Object.entries(byEng).sort((a,b)=>b[1].rev-a[1].rev).map(([name,d])=>`<tr>
             <td><b>${name}</b></td>
             <td style="text-align:center;">${d.count}</td>
-            <td style="color:var(--success);font-weight:700;text-align:center;">${d.closed||0}</td>
+            <td style="text-align:center;color:var(--success);font-weight:700;">${d.closed||0}</td>
+            <td style="text-align:center;color:var(--primary);font-weight:600;">${d.total?Math.round(d.closed/d.total*100):0}%</td>
             <td style="text-align:right;">₹${(d.parts||0).toFixed(0)}</td>
             <td style="text-align:right;">₹${(d.service||0).toFixed(0)}</td>
-            <td style="text-align:center;color:var(--primary);">${d.total?Math.round(d.closed/d.total*100):0}%</td>
-            <td style="font-weight:700;text-align:right;color:var(--success);">₹${d.rev.toFixed(0)}</td>
+            <td style="text-align:right;font-weight:700;color:var(--success);">₹${d.rev.toFixed(0)}</td>
           </tr>`).join('')}</tbody>
         </table></div>
       </div>`;
