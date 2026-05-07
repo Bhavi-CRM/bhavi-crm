@@ -1388,60 +1388,138 @@ function previewReportCount(){
     `Carry In: <b>${ci}</b> &nbsp;|&nbsp; On Site: <b>${os}</b>`;
 }
 
+function getTicketFinancials(t){
+  const spares=t.spares||[];
+  const partsTotal=spares.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
+  const partsNames=spares.map(s=>(s.name||s.code||'')+' x'+(s.qty||1)).filter(Boolean).join(', ');
+  const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+  const other=parseFloat(t.other_charge)||0;
+  const final=parseFloat(t.final_charges)||0;
+  const grand=final>0?final:(svc+partsTotal+other);
+  return{partsTotal,partsNames,svc,other,final,grand};
+}
+
 function downloadReport(type){
   const filtered=applyReportFilters(allTickets);
   if(!filtered.length){alert('Koi data nathi selected filters ma');return;}
+  const period=document.getElementById('rpt-period')?.value||'all';
+  const dateStr=new Date().toLocaleDateString('en-CA');
+
   if(type==='excel'){
-    const data=filtered.map(t=>({
-      'Ticket ID':t.id||'',
-      'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
-      'Customer':t.cname||'',
-      'Mobile':t.mobile||'',
-      'City':t.city||'',
-      'State':t.state||'',
-      'Model':t.model||'',
-      'Serial':t.serial||'',
-      'Brand':t.brand_name||'',
-      'Call Type':t.call_type||'',
-      'Service Type':t.service_type||'',
-      'Problem':t.problem||'',
-      'Engineer':t.assigned_name||'Unassigned',
-      'Status':t.status||'',
-      'Service Charges':t.service_charges||t.labor||0,
-      'Final Charges':t.final_charges||0,
-      'SE Call ID':t.se_call_id||'',
-      'Remarks':t.remarks||''
-    }));
+    const data=filtered.map(t=>{
+      const {partsTotal,partsNames,svc,other,final,grand}=getTicketFinancials(t);
+      return{
+        'Ticket ID':t.id||'',
+        'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
+        'Customer':t.cname||'',
+        'Mobile':t.mobile||'',
+        'Alt Mobile':t.alt_mobile||'',
+        'City':t.city||'',
+        'State':t.state||'',
+        'Address':t.address||'',
+        'Brand':t.brand_name||'',
+        'Model':t.model||'',
+        'Serial No':t.serial||'',
+        'Call Type':t.call_type||'',
+        'Service Type':t.service_type||'',
+        'Coverage':t.warranty_coverage||'',
+        'Problem':t.problem||'',
+        'Action Taken':t.action||'',
+        'Fault Code':t.fault_code||'',
+        'Engineer':t.assigned_name||'Unassigned',
+        'Status':t.status||'',
+        'Visit Date':t.visit_date||'',
+        'SE Call ID':t.se_call_id||'',
+        'Parts Used':partsNames,
+        'Parts ₹':partsTotal.toFixed(2),
+        'Service/Labour ₹':svc.toFixed(2),
+        'Other ₹':other.toFixed(2),
+        'Final Charges ₹':final.toFixed(2),
+        'Grand Total ₹':grand.toFixed(2),
+        'Remarks':t.remarks||''
+      };
+    });
     const ws=XLSX.utils.json_to_sheet(data);
+    // Column widths
+    ws['!cols']=[
+      {wch:16},{wch:12},{wch:20},{wch:14},{wch:14},{wch:14},{wch:12},{wch:25},
+      {wch:10},{wch:16},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25},{wch:25},
+      {wch:12},{wch:18},{wch:18},{wch:12},{wch:14},{wch:30},
+      {wch:10},{wch:12},{wch:10},{wch:12},{wch:12},{wch:20}
+    ];
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Report');
-    const period=document.getElementById('rpt-period').value;
-    XLSX.writeFile(wb,`BhaviCRM_Report_${period}_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+    XLSX.writeFile(wb,'BhaviCRM_Report_'+period+'_'+dateStr+'.xlsx');
     closeModal('modal-report');
+
   } else {
-    // Print view
-    const rows=filtered.map(t=>`<tr>
-      <td>${t.id||''}</td>
-      <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):''}</td>
-      <td>${t.cname||''}</td>
-      <td>${t.mobile||''}</td>
-      <td>${t.city||''}</td>
-      <td>${t.model||''}</td>
-      <td>${t.call_type||''}</td>
-      <td>${t.service_type||''}</td>
-      <td>${t.assigned_name||'Unassigned'}</td>
-      <td>${t.status||''}</td>
-      <td>₹${t.final_charges||t.service_charges||t.labor||0}</td>
-    </tr>`).join('');
+    // Print / PDF view
+    const totalParts=filtered.reduce((a,t)=>a+getTicketFinancials(t).partsTotal,0);
+    const totalSvc=filtered.reduce((a,t)=>a+getTicketFinancials(t).svc,0);
+    const totalGrand=filtered.reduce((a,t)=>a+getTicketFinancials(t).grand,0);
+    const totalClosed=filtered.filter(t=>t.status==='Closed').length;
+
+    const rows=filtered.map((t,i)=>{
+      const {partsTotal,partsNames,svc,other,grand}=getTicketFinancials(t);
+      return '<tr>'
+        +'<td style="text-align:center;">'+(i+1)+'</td>'
+        +'<td>'+t.id+'</td>'
+        +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'')+'</td>'
+        +'<td>'+( t.cname||'')+'</td>'
+        +'<td>'+(t.mobile||'')+'</td>'
+        +'<td>'+(t.city||'')+'</td>'
+        +'<td>'+(t.model||'')+'</td>'
+        +'<td>'+(t.serial||'')+'</td>'
+        +'<td>'+(t.call_type||'')+'</td>'
+        +'<td>'+(t.service_type||'')+'</td>'
+        +'<td>'+(t.problem||'')+'</td>'
+        +'<td>'+(t.assigned_name||'—')+'</td>'
+        +'<td><b>'+(t.status||'')+'</b></td>'
+        +'<td style="text-align:right;">'+(partsNames||'—')+'</td>'
+        +'<td style="text-align:right;">'+partsTotal.toFixed(0)+'</td>'
+        +'<td style="text-align:right;">'+svc.toFixed(0)+'</td>'
+        +'<td style="text-align:right;font-weight:700;">'+grand.toFixed(0)+'</td>'
+        +'</tr>';
+    }).join('');
+
     const win=window.open('','_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>Bhavi CRM Report</title>
-      <style>body{font-family:Arial,sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left;}th{background:#f0f4ff;font-weight:700;}h2{margin-bottom:4px;}p{margin:2px 0 10px;color:#666;font-size:11px;}</style>
-      </head><body>
-      <h2>Bhavi Electronics — Service Report</h2>
-      <p>Generated: ${new Date().toLocaleString('en-IN')} | Total: ${filtered.length} records</p>
-      <table><thead><tr><th>Ticket</th><th>Date</th><th>Customer</th><th>Mobile</th><th>City</th><th>Model</th><th>Call Type</th><th>Service</th><th>Engineer</th><th>Status</th><th>Charges</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-      <script>window.print();<\/script></body></html>`);
+    win.document.write('<!DOCTYPE html><html><head><title>Bhavi CRM Report</title>'
+      +'<style>'
+      +'@page{size:A4 landscape;margin:10mm;}'
+      +'body{font-family:Arial,sans-serif;font-size:10px;}'
+      +'table{width:100%;border-collapse:collapse;}'
+      +'th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;}'
+      +'th{background:#e8efff;font-weight:700;font-size:10px;}'
+      +'.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:2px solid #1a56db;padding-bottom:6px;}'
+      +'.co{font-size:16px;font-weight:900;color:#1a56db;}'
+      +'.summary{display:flex;gap:20px;margin-bottom:8px;font-size:11px;}'
+      +'.sum-item{background:#f0f4ff;padding:4px 10px;border-radius:4px;}'
+      +'.tfoot td{background:#f0f4ff;font-weight:700;}'
+      +'</style></head><body>'
+      +'<div class="header">'
+      +'<div><div class="co">Bhavi Electronics & Automation</div><div style="font-size:11px;color:#555;">Service CRM Report — Generated: '+new Date().toLocaleString('en-IN')+'</div></div>'
+      +'<div style="text-align:right;font-size:11px;">Period: '+period+' | Total: '+filtered.length+' records</div>'
+      +'</div>'
+      +'<div class="summary">'
+      +'<div class="sum-item">Total Calls: <b>'+filtered.length+'</b></div>'
+      +'<div class="sum-item">Closed: <b>'+totalClosed+'</b></div>'
+      +'<div class="sum-item">Parts ₹: <b>'+totalParts.toFixed(0)+'</b></div>'
+      +'<div class="sum-item">Service ₹: <b>'+totalSvc.toFixed(0)+'</b></div>'
+      +'<div class="sum-item">Grand Total ₹: <b>'+totalGrand.toFixed(0)+'</b></div>'
+      +'</div>'
+      +'<table><thead><tr>'
+      +'<th>#</th><th>Ticket</th><th>Date</th><th>Customer</th><th>Mobile</th><th>City</th>'
+      +'<th>Model</th><th>Serial</th><th>Call Type</th><th>Service</th><th>Problem</th>'
+      +'<th>Engineer</th><th>Status</th><th>Parts Used</th><th>Parts ₹</th><th>Service ₹</th><th>Total ₹</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'<tfoot><tr><td colspan="14" style="text-align:right;font-weight:700;">TOTAL</td>'
+      +'<td style="text-align:right;">'+totalParts.toFixed(0)+'</td>'
+      +'<td style="text-align:right;">'+totalSvc.toFixed(0)+'</td>'
+      +'<td style="text-align:right;font-weight:900;color:#1a56db;">'+totalGrand.toFixed(0)+'</td>'
+      +'</tr></tfoot>'
+      +'</table>'
+      +'<script>window.print();<\/script></body></html>');
     win.document.close();
   }
 }
