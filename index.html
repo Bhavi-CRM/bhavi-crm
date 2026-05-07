@@ -2015,8 +2015,8 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   if(isEng){
     switch(current){
       case 'Assigned':
-        // Engineer starts work
-        return['In Progress'];
+        // Engineer can start work OR close directly (small repair)
+        return['In Progress','Closed'];
 
       case 'In Progress':
         if(isW && !isOOC){
@@ -3148,6 +3148,9 @@ async function openEngUpdate(id){
   const timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const dateNow=now.toLocaleDateString('en-CA');
 
+  // Auto-treat Assigned as In Progress — skip extra step
+  const effectiveStatus = t.status==='Assigned' ? 'In Progress' : t.status;
+
   document.getElementById('eng-update-body').innerHTML=`
     <div style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;">
       <b>${t.id}</b> | ${t.cname} | ${t.model} | ${t.serial}<br>
@@ -3160,9 +3163,10 @@ async function openEngUpdate(id){
       <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">▶ Work Start</button>
     </div>` : ''}
     <div class="form-grid" style="margin-bottom:12px;">
-      <div class="form-group"><label>Status *</label>
+      <div class="form-group">
+        <label>Status *</label>
         <select id="upd-status">
-          ${getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}" selected>${t.status} (no change)</option>`}
+          ${getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
         ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
@@ -3330,7 +3334,7 @@ async function saveEngUpdate(){
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
   // Validate engineer status change
-  const allowedEng=getAllowedStatuses(t.status,'engineer',t.service_type);
+  const allowedEng=getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage);
   if(!allowedEng.includes(status)){
     alert('❌ Cannot change to "'+status+'" at this stage.\nCurrent: '+t.status+'\nAllowed: '+(allowedEng.length?allowedEng.join(', '):'None — contact Admin'));
     return;
