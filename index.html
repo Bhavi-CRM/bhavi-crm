@@ -2200,32 +2200,63 @@ async function renderDashboard(){
         <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">👷 Engineer-wise Calls</h3>
           <div class="chart-bar-wrap">${Object.entries(byEng).map(([name,c])=>`<div class="chart-bar-row"><div class="chart-bar-label" title="${name}">${name.split(' ')[0]}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(c/maxE*100)}%">${c}</div></div></div>`).join('')}</div>
         </div>
-        <div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📊 Status Breakdown</h3>
-          <div class="chart-bar-wrap">
-            ${(()=>{
-              const assigned=allTickets.filter(t=>t.status==='Assigned').length;
-              const pendCustApproval=allTickets.filter(t=>t.status==='Pending Customer Approval').length;
-              const custApproved=allTickets.filter(t=>t.status==='Customer Approved').length;
-              const pendRepairCI=allTickets.filter(t=>t.status==='Pending Repair Carry In').length;
-              const pendRepairOS=allTickets.filter(t=>t.status==='Pending Repair On Site').length;
-              const custRejectCount=allTickets.filter(t=>t.status==='Customer Reject').length;
-              const cancelCount=allTickets.filter(t=>t.status==='Call Cancel').length;
-              return [
-                ['Pending Alloc.',unalloc,'danger'],
-                ['Assigned',assigned,''],
-                ['In Progress',inProgress,''],
-                ['Pend.Cust.Appr.',pendCustApproval,'warning'],
-                ['Cust.Approved',custApproved,''],
-                ['Pending Parts',pendParts,'warning'],
-                ['Repair Carry In',pendRepairCI,''],
-                ['Repair On Site',pendRepairOS,''],
-                ['Closed',closed,'success'],
-                ['Call Cancel',cancelCount,'danger'],
-                ['Cust.Reject',custRejectCount,'danger']
-              ].filter(([,v])=>v>=0).map(([l,v,c])=>`<div class="chart-bar-row"><div class="chart-bar-label" title="${l}" style="font-size:11px;width:120px;">${l}</div><div class="chart-bar-bg"><div class="chart-bar-fill ${c}" style="width:${total?Math.round(v/total*100):0}%">${v}</div></div></div>`).join('');
-            })()}
-          </div>
-        </div>
+        ${(()=>{
+          const assigned=allTickets.filter(t=>t.status==='Assigned').length;
+          const pendCustApproval=allTickets.filter(t=>t.status==='Pending Customer Approval').length;
+          const custApproved=allTickets.filter(t=>t.status==='Customer Approved').length;
+          const pendRepairCI=allTickets.filter(t=>t.status==='Pending Repair Carry In').length;
+          const pendRepairOS=allTickets.filter(t=>t.status==='Pending Repair On Site').length;
+          const custRejectCount=allTickets.filter(t=>t.status==='Customer Reject').length;
+          const cancelCount=allTickets.filter(t=>t.status==='Call Cancel').length;
+          const activeItems=[
+            {l:'Pending Alloc.',v:unalloc,clr:'#ef4444'},
+            {l:'Assigned',v:assigned,clr:'#f59e0b'},
+            {l:'In Progress',v:inProgress,clr:'#3b82f6'},
+            {l:'Pend.Approval',v:pendCustApproval,clr:'#8b5cf6'},
+            {l:'Cust.Approved',v:custApproved,clr:'#6366f1'},
+            {l:'Pending Parts',v:pendParts,clr:'#f59e0b'},
+            {l:'Repair Carry In',v:pendRepairCI,clr:'#6366f1'},
+            {l:'Repair On Site',v:pendRepairOS,clr:'#6366f1'},
+          ];
+          const totalActive=activeItems.reduce((a,i)=>a+i.v,0);
+          const maxActive=Math.max(...activeItems.map(i=>i.v),1);
+          const mclosed={};allTickets.filter(t=>t.status==='Closed'&&t.created_at).forEach(t=>{const m=new Date(t.created_at).toLocaleString('en-IN',{month:'short'});mclosed[m]=(mclosed[m]||0)+1;});
+          const mEntries=Object.entries(mclosed).slice(-5);
+          const maxMC=Math.max(...mEntries.map(([,v])=>v),1);
+          const resRate=total?Math.round(closed/total*100):0;
+          const barsHtml=activeItems.map(i=>'<div class="chart-bar-row">'
+            +'<div class="chart-bar-label" style="font-size:11px;width:110px;" title="'+i.l+'">'+i.l+'</div>'
+            +'<div class="chart-bar-bg" style="flex:1;">'
+            +'<div style="height:100%;width:'+(maxActive>0?Math.max(i.v>0?8:0,Math.round(i.v/maxActive*100)):0)+'%;background:'+i.clr+';border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:5px;">'
+            +(i.v>0?'<span style="font-size:11px;font-weight:600;color:#fff;">'+i.v+'</span>':'')
+            +'</div></div>'
+            +'<div style="width:22px;text-align:right;font-size:12px;font-weight:600;">'+i.v+'</div>'
+            +'</div>').join('');
+          const trendHtml=mEntries.map(([m,v])=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+            +'<div style="width:100%;background:#0e9f6e;border-radius:2px 2px 0 0;height:'+Math.max(4,Math.round(v/maxMC*40))+'px;"></div>'
+            +'<span style="font-size:9px;color:var(--text-muted);">'+m+'</span>'
+            +'</div>').join('');
+          return '<div class="card" style="display:flex;flex-direction:column;gap:0;">'
+            +'<h3 style="font-weight:700;font-size:14px;margin-bottom:4px;">Active Workload</h3>'
+            +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Haal ma pending calls — real workload</div>'
+            +barsHtml
+            +'<div style="margin-top:8px;padding:6px 10px;background:var(--bg-secondary);border-radius:8px;font-size:12px;display:flex;justify-content:space-between;">'
+            +'<span style="color:var(--text-muted);">Total active</span><b>'+totalActive+' calls</b></div>'
+            +'<div style="border-top:0.5px solid var(--border);margin:12px 0 10px;"></div>'
+            +'<h3 style="font-weight:700;font-size:13px;margin-bottom:8px;">Historical Summary</h3>'
+            +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">'
+            +'<div style="background:var(--bg-secondary);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:#0e9f6e;">'+closed+'</div><div style="font-size:10px;color:var(--text-muted);">Closed</div></div>'
+            +'<div style="background:var(--bg-secondary);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:#ef4444;">'+cancelCount+'</div><div style="font-size:10px;color:var(--text-muted);">Cancelled</div></div>'
+            +'<div style="background:var(--bg-secondary);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:700;color:#f59e0b;">'+custRejectCount+'</div><div style="font-size:10px;color:var(--text-muted);">Cust.Reject</div></div>'
+            +'</div>'
+            +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+            +'<div style="flex:1;height:10px;background:var(--bg-secondary);border-radius:5px;overflow:hidden;">'
+            +'<div style="height:100%;width:'+resRate+'%;background:#0e9f6e;border-radius:5px;"></div></div>'
+            +'<span style="font-size:14px;font-weight:700;color:#0e9f6e;">'+resRate+'%</span>'
+            +'<span style="font-size:11px;color:var(--text-muted);">resolution</span></div>'
+            +'<div style="display:flex;align-items:flex-end;gap:4px;height:50px;">'+trendHtml+'</div>'
+            +'</div>';
+        })()}
       </div>
       <!-- ROW 3: Monthly trend + Call type -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
