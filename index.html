@@ -1130,6 +1130,209 @@ async function renderDailyReports(c){
   }catch(e){c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
+async function renderImportCalls(c){
+  c.innerHTML=`<div class="card" style="max-width:800px;">
+    <h2 style="font-weight:700;font-size:16px;margin-bottom:4px;">📥 Import Calls</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Excel file thi multiple calls ek saath import karo — WC office nathi hota tyare na pending calls add karva mate</p>
+
+    <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;">
+      <b>Template download karo pehela:</b>
+      <button class="btn btn-primary btn-sm" style="margin-left:10px;" onclick="downloadImportTemplate()">📄 Download Template</button>
+      <div style="margin-top:8px;color:var(--text-muted);font-size:12px;">
+        Template ma dropdown options chhe — spelling mistake nai thashe. Row 4 = sample (delete karjo). Rows 5+ ma data bharo.
+      </div>
+    </div>
+
+    <div style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;" onclick="document.getElementById('import-file-input').click()" id="import-drop-zone">
+      <div style="font-size:32px;margin-bottom:8px;">📂</div>
+      <div style="font-weight:600;font-size:14px;">Excel file select karo</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">.xlsx ya .xls file — max 200 rows</div>
+      <input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleImportFile(this)">
+    </div>
+
+    <div id="import-preview"></div>
+  </div>`;
+}
+
+function downloadImportTemplate(){
+  // Build template using XLSX.js
+  const headers = ['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','labor','final_charges','warranty_coverage','wc_type','remarks','visit_date','created_at'];
+  const mandatory = ['','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','','MANDATORY','','','','','MANDATORY','','','','','','','','','','','','',''];
+  const notes = [
+    'Blank — auto generate','Warranty/Non-Warranty/AMC...','Carry In/On Site','Pending Allocation/Assigned/...','Canon/Panasonic etc','Model number','Serial number','Customer name','10 digit mobile','Optional','City','State','Address','PIN code','Area','Problem description','Detail (optional)','Action taken (closed)','Engineer full name','Engineer ID e.g. ENG001','Canon/SE call ID','Service charges ₹','Labour ₹','Final charges ₹','Under Coverage/Out of Coverage/NA','ICP or CSP','Remarks','YYYY-MM-DD','YYYY-MM-DD (blank=today)'
+  ];
+  const sample = ['','Non-Warranty','Carry In','Pending Allocation','Canon','EOS R50','SN123456','Ramesh Shah','9898989898','','Ahmedabad','Gujarat','Nr. SBI, Maninagar','380008','Maninagar','Camera not turning on','','','','','CD2026001','500','','','NA','ICP','','2026-04-15','2026-04-15'];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, mandatory, notes, sample]);
+
+  // Column widths
+  ws['!cols'] = headers.map(()=>({wch:18}));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Import Template');
+  XLSX.writeFile(wb, 'Bhavi_CRM_Import_Template.xlsx');
+}
+
+async function handleImportFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  const preview = document.getElementById('import-preview');
+  preview.innerHTML='<div class="loading">Reading file...</div>';
+
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      if(rows.length < 2){preview.innerHTML='<div class="alert alert-warning">File khali chhe</div>';return;}
+
+      // Find header row (row 1 = index 0)
+      const headers = rows[0].map(h=>String(h).trim().toLowerCase());
+
+      // Skip rows 1,2,3 (header, mandatory, notes) — data starts row 4 (index 3)
+      const dataRows = rows.slice(3).filter(r=>r.some(c=>c!==''));
+
+      if(dataRows.length === 0){preview.innerHTML='<div class="alert alert-warning">Data rows nathi mili — Row 4 thi data bharo</div>';return;}
+
+      // Parse rows
+      const parsed = dataRows.map((row,i)=>{
+        const obj = {};
+        headers.forEach((h,idx)=>{obj[h]=String(row[idx]||'').trim();});
+        return obj;
+      });
+
+      // Validate
+      const errors = [];
+      const valid = [];
+      const required = ['call_type','service_type','status','brand_name','model','serial','cname','mobile','city','problem'];
+      const validCallTypes = ['Warranty','Non-Warranty','AMC','Warranty Repeat','Non-Warranty Repeat'];
+      const validServiceTypes = ['Carry In','On Site'];
+      const validStatuses = ['Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site','Closed','Call Cancel','Customer Reject'];
+
+      parsed.forEach((row,i)=>{
+        const rowNum = i+4;
+        const rowErrors = [];
+        required.forEach(f=>{if(!row[f])rowErrors.push(f+' missing');});
+        if(row.call_type && !validCallTypes.includes(row.call_type)) rowErrors.push('call_type invalid: '+row.call_type);
+        if(row.service_type && !validServiceTypes.includes(row.service_type)) rowErrors.push('service_type invalid: '+row.service_type);
+        if(row.status && !validStatuses.includes(row.status)) rowErrors.push('status invalid: '+row.status);
+        if(rowErrors.length) errors.push({row:rowNum, errors:rowErrors});
+        else valid.push(row);
+      });
+
+      // Show preview
+      const errHtml = errors.length ? '<div style="background:#fef2f2;border-radius:8px;padding:12px;margin-bottom:12px;">'
+        +'<b style="color:#dc2626;">⚠️ '+errors.length+' rows ma errors chhe — import nahi thashe:</b><br>'
+        +errors.map(e=>'Row '+e.row+': '+e.errors.join(', ')).join('<br>')+'</div>' : '';
+
+      const previewRows = valid.slice(0,10).map(r=>`<tr>
+        <td>${r.cname||'-'}</td><td>${r.model||'-'}</td>
+        <td>${r.call_type||'-'}</td><td>${r.service_type||'-'}</td>
+        <td><span class="badge badge-pending">${r.status||'-'}</span></td>
+        <td>${r.city||'-'}</td><td>${r.assigned_name||'Unassigned'}</td>
+      </tr>`).join('');
+
+      preview.innerHTML = errHtml
+        +'<div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'
+        +'<span style="font-size:13px;"><b style="color:#0e9f6e;">'+valid.length+' valid rows</b> — import thashe</span>'
+        +(valid.length>0?'<button class="btn btn-success" onclick="processImport('+JSON.stringify(valid).replace(/"/g,"&quot;")+')" >✅ Import '+valid.length+' Calls</button>':'')
+        +'</div>'
+        +(valid.length>0?'<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Model</th><th>Call Type</th><th>Service</th><th>Status</th><th>City</th><th>Engineer</th></tr></thead>'
+        +'<tbody>'+previewRows+'</tbody></table></div>'
+        +(valid.length>10?'<div style="font-size:12px;color:var(--text-muted);padding:6px;">...ane '+( valid.length-10)+' vadhu rows</div>':''):'');
+
+      // Store valid data for import
+      window._importData = valid;
+
+    }catch(err){preview.innerHTML='<div class="alert alert-warning">Error reading file: '+err.message+'</div>';}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function processImport(data){
+  const rows = data || window._importData;
+  if(!rows||!rows.length){alert('Koi data nathi');return;}
+
+  const btn = event.target;
+  btn.disabled=true; btn.textContent='Importing...';
+
+  const preview = document.getElementById('import-preview');
+  let success=0, fail=0, errors=[];
+
+  for(const row of rows){
+    try{
+      // Generate ticket ID
+      const id = await generateTicketNo();
+      const isW = ['Warranty','Warranty Repeat','AMC'].includes(row.call_type);
+      const engId = row.assigned_to||null;
+      const engName = row.assigned_name||null;
+      const createdAt = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+
+      const ticketData = {
+        id, job_sheet:id,
+        call_type:row.call_type,
+        service_type:row.service_type,
+        status:row.status||'Pending Allocation',
+        brand_name:row.brand_name,
+        model:row.model,
+        serial:row.serial,
+        cname:row.cname,
+        mobile:row.mobile,
+        alt_mobile:row.alt_mobile||'',
+        city:row.city,
+        state:row.state||'',
+        address:row.address||'',
+        pin:row.pin||'',
+        area:row.area||'',
+        problem:row.problem,
+        description:row.description||'',
+        action:row.action||'',
+        assigned_to:engId,
+        assigned_name:engName,
+        se_call_id:row.se_call_id||'',
+        service_charges:parseFloat(row.service_charges)||0,
+        labor:parseFloat(row.labor)||parseFloat(row.service_charges)||0,
+        final_charges:parseFloat(row.final_charges)||0,
+        warranty_coverage:row.warranty_coverage||(isW?'Under Coverage':'NA'),
+        wc_type:row.wc_type||'ICP',
+        remarks:row.remarks||'',
+        visit_date:row.visit_date||'',
+        spares:[],
+        timeline:[{action:'Call Imported',by:currentUser.name,at:new Date().toISOString(),note:'Imported via bulk import'}],
+        created_at:createdAt,
+        updated_at:new Date().toISOString()
+      };
+      await sb('tickets','POST',ticketData);
+      success++;
+      // Update progress
+      btn.textContent='Importing... '+success+'/'+rows.length;
+    }catch(err){
+      fail++;
+      errors.push(row.cname+' ('+row.model+'): '+err.message);
+    }
+    // Small delay to avoid rate limiting
+    await new Promise(r=>setTimeout(r,100));
+  }
+
+  // Show result
+  preview.innerHTML='<div style="background:'+(fail===0?'#f0fdf4':'#fff7ed')+';border-radius:10px;padding:16px;">'
+    +'<div style="font-size:18px;font-weight:700;color:'+(fail===0?'#0e9f6e':'#d97706')+';">'
+    +(fail===0?'✅':'⚠️')+' Import Complete!</div>'
+    +'<div style="margin-top:8px;font-size:14px;">'
+    +'<b style="color:#0e9f6e;">'+success+' calls successfully imported</b>'
+    +(fail>0?'<br><b style="color:#dc2626;">'+fail+' failed</b>':'')
+    +'</div>'
+    +(errors.length?'<div style="margin-top:8px;font-size:12px;color:#dc2626;">'+errors.join('<br>')+'</div>':'')
+    +'<button class="btn btn-primary" style="margin-top:12px;" onclick="navigate(&quot;tickets&quot;)">All Tickets par jao</button>'
+    +'</div>';
+
+  // Refresh ticket data
+  if(success>0) allTickets = await sb('tickets','GET',null,'?order=created_at.desc&limit=300').catch(()=>allTickets);
+}
+
 async function renderWCDailyReports(c){
   if(!c)return;
   try{
@@ -4078,6 +4281,7 @@ async function renderReports(){
       <button class="tab" id="rtab-punch" onclick="switchReportTab('punch',this)">🕐 Punch Logs</button>
       <button class="tab" id="rtab-daily" onclick="switchReportTab('daily',this)">📋 Eng Daily Reports</button>
       <button class="tab" id="rtab-wcdaily" onclick="switchReportTab('wcdaily',this)">🎯 WC Daily Reports</button>
+      <button class="tab" id="rtab-import" onclick="switchReportTab('import',this)">📥 Import Calls</button>
     </div>
     <div id="report-tab-content"><div class="loading">Loading...</div></div>`;
   await switchReportTab('overview', document.getElementById('rtab-overview'));
@@ -4105,6 +4309,7 @@ async function switchReportTab(tab, el){
     else if(tab==='punch') await renderReportPunch(c);
     else if(tab==='daily') await renderDailyReports(c);
   else if(tab==='wcdaily') await renderWCDailyReports(c);
+  else if(tab==='import') await renderImportCalls(c);
   }catch(e){
     c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }finally{
