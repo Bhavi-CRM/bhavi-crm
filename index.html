@@ -318,7 +318,7 @@ tr:hover td{background:#f8fafc;}
           <div class="autocomplete-wrap"><input type="text" id="call-model" placeholder="Type model..." oninput="filterModelAC(this.value)" autocomplete="off" onkeydown="acKeydown(event,'model-ac')">
           <div class="ac-list" id="model-ac"></div></div>
         </div>
-        <div class="form-group"><label>Serial No <span class="req">*</span></label><input type="text" id="call-serial"></div>
+        <div class="form-group"><label>Serial No <span class="req">*</span></label><input type="text" id="call-serial" onblur="checkReRepair(this.value)"><div id="rerepair-alert" style="display:none;"></div></div>
         <div class="form-group"><label>Call Type <span class="req">*</span></label>
           <select id="call-type" onchange="handleCallTypeChange()">
             <option value="Warranty">Warranty</option><option value="Non-Warranty">Non-Warranty</option>
@@ -2274,6 +2274,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   const isEng = role==='engineer';
   const isAdminOrWC = role==='admin' || role==='work_controller';
   const isW = callType && (callType==='Warranty'||callType==='Warranty Repeat'||callType==='AMC');
+  const isRepeat = callType && (callType==='Warranty Repeat'||callType==='Non-Warranty Repeat');
   const isOOC = warrantyStatus==='Out of Coverage';
   const repairStatus = serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
 
@@ -2300,17 +2301,16 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         return['In Progress','Closed'];
 
       case 'In Progress':
+        if(isRepeat){
+          // Re-Repair — direct close, no estimate needed again
+          return['Closed'];
+        }
         if(isW && !isOOC){
-          // Warranty: 3 options
-          // 1. Out of coverage → handled by separate button (engVoidWarranty)
-          // 2. Request Part → handled by Part Request button
-          // 3. No part needed → Closed directly
+          // Warranty: Out of Coverage button + Request Part button + Closed
           return['Closed'];
-          // Note: Request Part and Out of Coverage handled by buttons
         } else {
-          // OW: no part → Closed directly
+          // OW: Request Part button (→ estimate) or direct Closed
           return['Closed'];
-          // Note: Request Part button handles part flow → Pending Customer Approval auto
         }
 
       case 'Pending Parts':
@@ -3071,6 +3071,71 @@ function handleCallTypeChange(){
   if(row)row.style.display=isNW?'':'none';
 }
 
+async function checkReRepair(serial){
+  if(!serial||serial.length<3) return;
+  const alertDiv=document.getElementById('rerepair-alert');
+  if(!alertDiv) return;
+  alertDiv.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:3px 0;">Checking previous calls...</div>';
+
+  try{
+    // Check last 30 days for same serial
+    const since=new Date();since.setDate(since.getDate()-30);
+    const sinceStr=since.toISOString();
+    const prev=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(serial)}&created_at=gte.${sinceStr}&order=created_at.desc&limit=5`);
+
+    if(!prev||prev.length===0){
+      alertDiv.innerHTML='';
+      return;
+    }
+
+    // Found previous calls within 30 days
+    const lastCall=prev[0];
+    const daysDiff=Math.floor((new Date()-new Date(lastCall.created_at))/(1000*60*60*24));
+    const prevType=lastCall.call_type||'';
+    const isWarrantyPrev=prevType==='Warranty'||prevType==='Warranty Repeat'||prevType==='AMC';
+
+    // Auto-set call type to Repeat
+    const repeatType=isWarrantyPrev?'Warranty Repeat':'Non-Warranty Repeat';
+    document.getElementById('call-type').value=repeatType;
+    document.getElementById('call-rerepair').value='Yes';
+    handleCallTypeChange();
+
+    alertDiv.innerHTML=`<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px;margin-top:4px;">
+      <div style="font-weight:700;font-size:13px;color:#92400e;">🔁 Re-Repair Detected!</div>
+      <div style="font-size:12px;color:#92400e;margin-top:4px;">
+        Same serial — ${daysDiff} days ago: <b>${lastCall.id}</b> (${prevType})<br>
+        Customer: ${lastCall.cname||'-'} | Status: ${lastCall.status||'-'}
+      </div>
+      <div style="margin-top:8px;font-size:12px;">
+        <b>Service Charges:</b>
+        <label style="margin-left:8px;cursor:pointer;">
+          <input type="radio" name="rr-charges" value="foc" checked onchange="setReRepairCharges('foc')"> FOC (Free — within 30 days)
+        </label>
+        <label style="margin-left:12px;cursor:pointer;">
+          <input type="radio" name="rr-charges" value="charge" onchange="setReRepairCharges('charge')"> Charges apply
+        </label>
+      </div>
+      <div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ Parts replace karva hoy to estimate aavse — service charges upar thi decide thase</div>
+    </div>`;
+
+    // Default FOC
+    setReRepairCharges('foc');
+
+  }catch(e){
+    alertDiv.innerHTML='';
+  }
+}
+
+function setReRepairCharges(type){
+  const scInput=document.getElementById('call-service-charges');
+  if(type==='foc'){
+    if(scInput){scInput.value='0';scInput.disabled=true;scInput.style.background='#f3f4f6';}
+    document.getElementById('call-rerepair').value='Yes';
+  }else{
+    if(scInput){scInput.disabled=false;scInput.style.background='';scInput.value='';}
+  }
+}
+
 async function saveCall(){
   const ev=document.getElementById('call-eng').value;
   const engId=ev?ev.split('|')[0]:'';const engName=ev?ev.split('|')[1]:'';
@@ -3091,7 +3156,9 @@ async function saveCall(){
     city:document.getElementById('call-city')?.value||'',pin:document.getElementById('call-pin')?.value||'',state:document.getElementById('call-state')?.value||'',
     area:document.getElementById('call-area').value,problem:document.getElementById('call-problem').value,
     description:document.getElementById('call-desc').value,condition:document.getElementById('call-condition').value,
-    accessories:document.getElementById('call-accessories').value,rerepair:'No',
+    accessories:document.getElementById('call-accessories').value,
+    rerepair:document.getElementById('call-rerepair').value||'No',
+    rerepair_foc:(()=>{const el=document.querySelector('input[name="rr-charges"]:checked');return el?el.value==='foc':false;})(),
     phys_js:document.getElementById('call-phys-js').value,
     assigned_to:engId||null,assigned_name:engName||null,
     status:engId?'Assigned':'Pending Allocation',
@@ -3152,10 +3219,11 @@ async function viewTicket(id,autoPrint=false){
   const svcCharge=labCharge;
   const grand=finalCharge>0?finalCharge:(labCharge+total+(parseFloat(t.other_charge)||0));
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
+  const isRepeatCall = t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat';
   const timeline=t.timeline||[];
 
-  document.getElementById('modal-ticket-title').textContent=t.id;
-  document.getElementById('modal-ticket-sub').textContent=`${t.call_type} | ${t.service_type} | ${t.cname} | ${t.model}`;
+  document.getElementById('modal-ticket-title').textContent=t.id+(isRepeatCall?' 🔁':'');
+  document.getElementById('modal-ticket-sub').textContent=`${t.call_type} | ${t.service_type} | ${t.cname} | ${t.model}`+(isRepeatCall?' — RE-REPAIR':'');
 
   // Timeline - Point 1 fix
   const tlHtml=timeline.length?timeline.map(tl=>`<div class="timeline-entry${tl.note?' has-note':''}">
@@ -3448,6 +3516,7 @@ async function openEngUpdate(id){
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];if(!t)return;
   viewingTicketId=id;currentSpares=[...(t.spares||[])];
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
+  const isRepeatCall = t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat';
   // Point 3: Closed calls — no update for engineer
   if(isClosed){viewTicket(id);return;}
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
@@ -3482,6 +3551,7 @@ async function openEngUpdate(id){
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
         ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
+        ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem fari aavyu. Direct close karo — novu estimate nahi banshe.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
       <div class="form-group"><label>Cause</label><input type="text" id="upd-cause" value="${t.cause||''}"></div>
@@ -3601,7 +3671,13 @@ async function savePartRequest(addAnother){
     }
   }else{
     // NON-WARRANTY or OUT-OF-COVERAGE: Need customer approval for parts
+    // Re-Repair FOC — service = 0 but parts estimate still required
     newStatus='Pending Customer Approval';
+    if(t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'))){
+      // Mark as FOC in timeline note
+      const ftiml=[...(t.timeline||[]),{action:'Re-Repair FOC — Part Estimate',by:currentUser.name,at:new Date().toISOString(),note:'Service charges waived. Parts estimate sent for approval.'}];
+      await sb('tickets','PATCH',{timeline:ftiml},`?id=eq.${partReqTicketId}`).catch(()=>{});
+    }
   }
 
   // Fetch price from inventory
@@ -3679,21 +3755,33 @@ async function saveEngUpdate(){
   
   // ASK SERVICE CHARGES when closing Non-Warranty or Out-of-Warranty call
   if(status==='Closed'){
-    const isNonWarranty=t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Non-Warranty Repeat');
-    const isOutCoverage=t.out_of_coverage===true;
+    const isNonWarranty=t.call_type&&(t.call_type.includes('Non-Warranty'));
+    const isRepeatFOC=t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'));
+    const isOutCoverage=t.warranty_coverage==='Out of Coverage';
     if(isNonWarranty||isOutCoverage){
-      // Calculate parts cost
       const partsCost=(currentSpares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
-      const defaultService=isOutCoverage?200:300; // default service charges
-      const chargesInput=prompt('Service Charges - Parts Cost: Rs '+partsCost.toFixed(0)+' - Enter Service Charges (Rs):',defaultService);
-      if(chargesInput===null){return;} // user cancelled
-      const serviceCharges=parseFloat(chargesInput)||defaultService;
-      const finalCharges=partsCost+serviceCharges;
-      data.service_charges=serviceCharges;
-      data.final_charges=finalCharges;
-      data.charges_note='Parts: ₹'+partsCost.toFixed(0)+' + Service: ₹'+serviceCharges.toFixed(0)+' = Total: ₹'+finalCharges.toFixed(0);
-      // Add to timeline
-      data.timeline=[...(t.timeline||[]),{action:'Charges Set',by:currentUser.name,at:new Date().toISOString(),note:'Service: ₹'+serviceCharges+' | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0)}];
+      if(isRepeatFOC){
+        // Re-Repair FOC — service charges = 0, only parts charged
+        const finalCharges=partsCost;
+        data.service_charges=0;
+        data.final_charges=finalCharges;
+        data.charges_note='Re-Repair FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0);
+        data.timeline=[...(t.timeline||[]),{action:'Charges Set (Re-Repair FOC)',by:currentUser.name,at:new Date().toISOString(),note:'Service: FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0)}];
+        if(partsCost>0){
+          const confirm=window.confirm('Re-Repair FOC — Service charges = ₹0\nParts charges = ₹'+partsCost.toFixed(0)+'\nTotal = ₹'+partsCost.toFixed(0)+'\n\nConfirm?');
+          if(!confirm) return;
+        }
+      }else{
+        const defaultService=isOutCoverage?200:300;
+        const chargesInput=prompt('Service Charges\nParts Cost: ₹'+partsCost.toFixed(0)+'\nService Charges (₹):',defaultService);
+        if(chargesInput===null){return;}
+        const serviceCharges=parseFloat(chargesInput)||defaultService;
+        const finalCharges=partsCost+serviceCharges;
+        data.service_charges=serviceCharges;
+        data.final_charges=finalCharges;
+        data.charges_note='Parts: ₹'+partsCost.toFixed(0)+' + Service: ₹'+serviceCharges.toFixed(0)+' = Total: ₹'+finalCharges.toFixed(0);
+        data.timeline=[...(t.timeline||[]),{action:'Charges Set',by:currentUser.name,at:new Date().toISOString(),note:'Service: ₹'+serviceCharges+' | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0)}];
+      }
     }
   }
 
