@@ -1130,6 +1130,60 @@ async function renderDailyReports(c){
   }catch(e){c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
+function setTrendView(view){
+  const tickets=allTickets||[];
+  const wrap=document.getElementById('trend-chart-wrap');
+  const legend=document.getElementById('trend-legend');
+  if(!wrap)return;
+
+  // Button styles
+  ['monthly','yearly'].forEach(v=>{
+    const b=document.getElementById('trend-btn-'+v);
+    if(b){b.style.background=view===v?'#1a56db':'transparent';b.style.color=view===v?'#fff':'var(--text-muted)';b.style.borderColor=view===v?'#1a56db':'var(--border)';}
+  });
+
+  // Build data
+  const grp={};
+  tickets.forEach(t=>{
+    if(!t.created_at)return;
+    const d=new Date(t.created_at);
+    const k=view==='monthly'
+      ?d.toLocaleString('en-IN',{month:'short',year:'2-digit'})
+      :d.getFullYear().toString();
+    if(!grp[k])grp[k]={w:0,nw:0,closed:0,total:0};
+    grp[k].total++;
+    if(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC') grp[k].w++;
+    else grp[k].nw++;
+    if(t.status==='Closed') grp[k].closed++;
+  });
+
+  const entries=Object.entries(grp).slice(view==='monthly'?-6:-20);
+  if(!entries.length){wrap.innerHTML='<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;">No data</div>';return;}
+  const maxV=Math.max(...entries.map(([,d])=>d.total),1);
+  const H=75; // bar height px
+
+  wrap.style.cssText='display:flex;align-items:flex-end;gap:5px;height:110px;padding-bottom:2px;';
+  wrap.innerHTML=entries.map(([lbl,d])=>{
+    const wH=d.w?Math.max(3,Math.round(d.w/maxV*H)):0;
+    const nwH=d.nw?Math.max(3,Math.round(d.nw/maxV*H)):0;
+    const clH=d.closed?Math.max(3,Math.round(d.closed/maxV*H)):0;
+    return '<div style="flex:1;min-width:24px;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+      +'<div style="font-size:10px;font-weight:600;color:var(--text-muted);">'+d.total+'</div>'
+      +'<div style="width:100%;display:flex;gap:1px;align-items:flex-end;height:'+H+'px;">'
+      +(wH?'<div style="flex:1;background:#1a56db;border-radius:2px 2px 0 0;height:'+wH+'px;" title="Warranty:'+d.w+'"></div>':'')
+      +(nwH?'<div style="flex:1;background:#ff9800;border-radius:2px 2px 0 0;height:'+nwH+'px;" title="NW:'+d.nw+'"></div>':'')
+      +(clH?'<div style="flex:1;background:#0e9f6e;border-radius:2px 2px 0 0;height:'+clH+'px;" title="Closed:'+d.closed+'"></div>':'')
+      +'</div>'
+      +'<div style="font-size:9px;color:var(--text-muted);text-align:center;overflow:hidden;width:100%;max-width:48px;">'+lbl+'</div>'
+      +'</div>';
+  }).join('');
+
+  if(legend)legend.innerHTML=
+    '<span><span style="display:inline-block;width:7px;height:7px;background:#1a56db;border-radius:1px;margin-right:2px;"></span>Warranty</span>'
+    +(entries.some(([,d])=>d.nw)?'<span style="margin-left:6px;"><span style="display:inline-block;width:7px;height:7px;background:#ff9800;border-radius:1px;margin-right:2px;"></span>Non-W</span>':'')
+    +'<span style="margin-left:6px;"><span style="display:inline-block;width:7px;height:7px;background:#0e9f6e;border-radius:1px;margin-right:2px;"></span>Closed</span>';
+}
+
 async function renderImportCalls(c){
   c.innerHTML=`<div class="card" style="max-width:800px;">
     <h2 style="font-weight:700;font-size:16px;margin-bottom:4px;">📥 Import Calls</h2>
@@ -4588,25 +4642,111 @@ async function renderReportOverview(c){
         </div>
       </div>
 
-      <!-- Monthly Trend Chart -->
-      <div class="card" style="margin-bottom:14px;">
-        <h3 style="font-weight:700;font-size:14px;margin-bottom:12px;">📈 Monthly Call Trend</h3>
-        <div style="display:flex;align-items:flex-end;gap:12px;height:150px;padding-bottom:4px;overflow-x:auto;">
-          ${monthEntries.map(([m,d])=>`
-            <div style="flex:1;min-width:70px;display:flex;flex-direction:column;align-items:center;gap:4px;">
-              <div style="font-size:11px;font-weight:700;color:var(--text-muted);">${d.total}</div>
-              <div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:120px;">
-                <div style="flex:1;background:#1a56db;border-radius:3px 3px 0 0;height:${Math.max(4,Math.round(d.warranty/maxMonth*110))}px;" title="Warranty: ${d.warranty}"></div>
-                <div style="flex:1;background:#ff9800;border-radius:3px 3px 0 0;height:${Math.max(d.nw?4:0,Math.round(d.nw/maxMonth*110))}px;" title="Non-Warranty: ${d.nw}"></div>
-                <div style="flex:1;background:#0e9f6e;border-radius:3px 3px 0 0;height:${Math.max(d.closed?4:0,Math.round(d.closed/maxMonth*110))}px;" title="Closed: ${d.closed}"></div>
-              </div>
-              <div style="font-size:10px;color:var(--text-muted);text-align:center;">${m}</div>
-            </div>`).join('')}
+      <!-- Call Trend + 3 Analysis Cards -->
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+
+        <!-- Vertical Bar Chart -->
+        <div class="card" style="padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="font-weight:700;font-size:13px;">📈 Call Trend</h3>
+            <div style="display:flex;gap:3px;">
+              <button id="trend-btn-monthly" onclick="setTrendView('monthly')" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid #1a56db;background:#1a56db;color:#fff;cursor:pointer;">Monthly</button>
+              <button id="trend-btn-yearly" onclick="setTrendView('yearly')" style="font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Yearly</button>
+            </div>
+          </div>
+          <div id="trend-chart-wrap" style="display:flex;align-items:flex-end;gap:5px;height:110px;padding-bottom:2px;">
+            <div style="width:100%;text-align:center;color:var(--text-muted);font-size:12px;padding-top:30px;">Loading...</div>
+          </div>
+          <div id="trend-legend" style="display:flex;gap:8px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
+            <span><span style="display:inline-block;width:7px;height:7px;background:#1a56db;border-radius:1px;margin-right:2px;"></span>Warranty</span>
+            <span><span style="display:inline-block;width:7px;height:7px;background:#ff9800;border-radius:1px;margin-right:2px;"></span>Non-W</span>
+            <span><span style="display:inline-block;width:7px;height:7px;background:#0e9f6e;border-radius:1px;margin-right:2px;"></span>Closed</span>
+          </div>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;">
-          <span><span style="display:inline-block;width:10px;height:10px;background:#1a56db;border-radius:2px;margin-right:4px;"></span>Warranty</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#ff9800;border-radius:2px;margin-right:4px;"></span>Non-Warranty</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:#0e9f6e;border-radius:2px;margin-right:4px;"></span>Closed</span>
+
+        <!-- Analysis Card 1: Performance -->
+        <div class="card" style="padding:12px;">
+          <h3 style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Performance</h3>
+          ${(()=>{
+            const lastM=monthEntries[monthEntries.length-1];
+            const prevM=monthEntries[monthEntries.length-2];
+            const growthPct=prevM&&prevM[1].total?Math.round((lastM[1].total-prevM[1].total)/prevM[1].total*100):0;
+            const resRate=total?Math.round(closed/total*100):0;
+            const avgMonthly=Math.round(monthEntries.reduce((a,[,d])=>a+d.total,0)/monthEntries.length);
+            return '<div style="display:flex;flex-direction:column;gap:8px;">'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:22px;font-weight:700;color:'+(growthPct>=0?'#0e9f6e':'#ef4444')+'">'+(growthPct>=0?'▲':'▼')+Math.abs(growthPct)+'%</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">vs last month</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:22px;font-weight:700;color:#0e9f6e;">'+resRate+'%</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Resolution rate</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:20px;font-weight:700;">'+avgMonthly+'</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Avg calls/month</div></div>'
+              +'</div>';
+          })()}
+        </div>
+
+        <!-- Analysis Card 2: Revenue -->
+        <div class="card" style="padding:12px;">
+          <h3 style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Revenue</h3>
+          ${(()=>{
+            // Revenue = sirf Non-Warranty / OOC calls na charges (service + parts)
+            const nwTickets=allTickets.filter(t=>{
+              const isW=t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC';
+              const isOOC=t.warranty_coverage==='Out of Coverage';
+              return !isW||isOOC;
+            });
+            const nwRev=nwTickets.reduce((a,t)=>{
+              const sp=(t.spares||[]).reduce((s,p)=>s+(p.qty||0)*(p.price||0),0);
+              const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+              const fin=parseFloat(t.final_charges)||0;
+              return a+(fin>0?fin:(svc+sp));
+            },0);
+            const nwClosed=nwTickets.filter(t=>t.status==='Closed').length;
+            const avgNwRev=nwClosed?Math.round(nwRev/nwClosed):0;
+            // Warranty mix
+            const wCount=allTickets.filter(t=>(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC')&&t.warranty_coverage!=='Out of Coverage').length;
+            const wPct3=total?Math.round(wCount/total*100):0;
+            return '<div style="display:flex;flex-direction:column;gap:8px;">'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:18px;font-weight:700;color:#7c3aed;">₹'+nwRev.toFixed(0)+'</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">NW Revenue (excl. warranty)</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:18px;font-weight:700;color:#7c3aed;">₹'+avgNwRev+'</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Avg per NW call</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:18px;font-weight:700;color:#1a56db;">'+wPct3+'%</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Free (Warranty)</div></div>'
+              +'</div>';
+          })()}
+        </div>
+
+        <!-- Analysis Card 3: Highlights -->
+        <div class="card" style="padding:12px;">
+          <h3 style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Highlights</h3>
+          ${(()=>{
+            const bestMonth3=monthEntries.length?monthEntries.reduce((a,b)=>b[1].total>a[1].total?b:a,monthEntries[0]):['—',{total:0}];
+            // Fix: byEng values are objects {total,closed,...} not numbers
+            const topEngEntry=Object.entries(byEng).filter(([n])=>n!=='Unassigned').sort((a,b)=>(b[1].total||b[1])-(a[1].total||a[1]))[0];
+            const topEngName=topEngEntry?topEngEntry[0].split(' ')[0]:'—';
+            const topEngCount=topEngEntry?(topEngEntry[1].total||topEngEntry[1]):0;
+            // Fix: Active = not closed/cancelled
+            const activeCount=allTickets.filter(t=>!['Closed','Call Cancel','Customer Reject'].includes(t.status)).length;
+            return '<div style="display:flex;flex-direction:column;gap:8px;">'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:14px;font-weight:700;color:#1a56db;">'+bestMonth3[0]+'</div>'
+              +'<div style="font-size:18px;font-weight:700;">'+bestMonth3[1].total+'</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Best month</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:14px;font-weight:700;color:#0e9f6e;">'+topEngName+'</div>'
+              +'<div style="font-size:18px;font-weight:700;">'+topEngCount+' calls</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Top engineer</div></div>'
+              +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
+              +'<div style="font-size:22px;font-weight:700;color:#d97706;">'+activeCount+'</div>'
+              +'<div style="font-size:10px;color:var(--text-muted);">Active calls</div></div>'
+              +'</div>';
+          })()}
         </div>
       </div>
 
