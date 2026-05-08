@@ -1155,22 +1155,87 @@ async function renderImportCalls(c){
 }
 
 function downloadImportTemplate(){
-  // Build template using XLSX.js
-  const headers = ['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','labor','final_charges','warranty_coverage','wc_type','remarks','visit_date','created_at'];
-  const mandatory = ['','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','MANDATORY','','MANDATORY','','','','','MANDATORY','','','','','','','','','','','','',''];
-  const notes = [
-    'Blank — auto generate','Warranty/Non-Warranty/AMC...','Carry In/On Site','Pending Allocation/Assigned/...','Canon/Panasonic etc','Model number','Serial number','Customer name','10 digit mobile','Optional','City','State','Address','PIN code','Area','Problem description','Detail (optional)','Action taken (closed)','Engineer full name','Engineer ID e.g. ENG001','Canon/SE call ID','Service charges ₹','Labour ₹','Final charges ₹','Under Coverage/Out of Coverage/NA','ICP or CSP','Remarks','YYYY-MM-DD','YYYY-MM-DD (blank=today)'
-  ];
-  const sample = ['','Non-Warranty','Carry In','Pending Allocation','Canon','EOS R50','SN123456','Ramesh Shah','9898989898','','Ahmedabad','Gujarat','Nr. SBI, Maninagar','380008','Maninagar','Camera not turning on','','','','','CD2026001','500','','','NA','ICP','','2026-04-15','2026-04-15'];
+  const headers=['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','final_charges','warranty_coverage','wc_type','rerepair','rerepair_foc','remarks','visit_date','created_at'];
+  const mandatory=['','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','optional','★ MANDATORY','optional','optional','optional','optional','★ MANDATORY','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional'];
+  const notes=['Blank — auto generate','Dropdown select karo','Dropdown select karo','Dropdown select karo','Canon/Panasonic/Fujifilm','Model number','Serial number','Customer full name','10 digit mobile','Alternate mobile','City name','State','Full address','PIN code','Area/locality','Problem description','Detailed description','Action taken (closed calls)','Engineer exact name','Engineer ID e.g. ENG001','Canon/SE call ID','Service/Labour ₹','Final charges ₹','Dropdown select karo','Dropdown: ICP/CSP','Dropdown: No/Yes','Dropdown: FALSE/TRUE','Remarks','YYYY-MM-DD','YYYY-MM-DD (blank=today)'];
+  const sample=['','Non-Warranty','Carry In','Pending Allocation','Canon','EOS R50','SN1234567','Ramesh Shah','9898989898','','Ahmedabad','Gujarat','Nr. SBI Bank, Maninagar','380008','Maninagar','Camera not turning on','','','','','CD2026001','500','','NA','ICP','No','FALSE','','2026-04-15','2026-04-15'];
 
-  const ws = XLSX.utils.aoa_to_sheet([headers, mandatory, notes, sample]);
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,mandatory,notes,sample]);
 
   // Column widths
-  ws['!cols'] = headers.map(()=>({wch:18}));
+  const widths=[18,18,14,26,14,18,18,24,16,16,14,14,32,10,16,30,30,30,22,12,16,14,14,20,10,12,14,30,14,20];
+  ws['!cols']=widths.map(w=>({wch:w}));
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Import Template');
-  XLSX.writeFile(wb, 'Bhavi_CRM_Import_Template.xlsx');
+  // Style header row (row 1) — blue background via cell styles
+  headers.forEach((h,i)=>{
+    const cellRef=XLSX.utils.encode_cell({r:0,c:i});
+    if(!ws[cellRef])ws[cellRef]={v:h,t:'s'};
+    ws[cellRef].s={
+      fill:{patternType:'solid',fgColor:{rgb:'1A56DB'}},
+      font:{bold:true,color:{rgb:'FFFFFF'},sz:11},
+      alignment:{horizontal:'center',vertical:'center',wrapText:true},
+      border:{top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}}
+    };
+  });
+
+  // Style mandatory row (row 2)
+  mandatory.forEach((m,i)=>{
+    const cellRef=XLSX.utils.encode_cell({r:1,c:i});
+    if(!ws[cellRef])ws[cellRef]={v:m,t:'s'};
+    ws[cellRef].s={
+      fill:{patternType:'solid',fgColor:{rgb:m.includes('MANDATORY')?'FFF3CD':'D1FAE5'}},
+      font:{bold:m.includes('MANDATORY'),color:{rgb:m.includes('MANDATORY')?'856404':'065F46'},sz:10},
+      alignment:{horizontal:'center'}
+    };
+  });
+
+  // Style sample row (row 4) — light gray
+  sample.forEach((s,i)=>{
+    const cellRef=XLSX.utils.encode_cell({r:3,c:i});
+    if(!ws[cellRef])ws[cellRef]={v:s,t:'s'};
+    ws[cellRef].s={
+      fill:{patternType:'solid',fgColor:{rgb:'F8F9FA'}},
+      font:{italic:true,color:{rgb:'495057'},sz:10}
+    };
+  });
+
+  // Row heights
+  ws['!rows']=[{hpt:32},{hpt:22},{hpt:38},{hpt:22}];
+
+  XLSX.utils.book_append_sheet(wb,'Import Template',ws);
+
+  // Instructions sheet
+  const inst=[
+    ['Bhavi CRM — Ticket Import Guide',''],
+    ['',''],
+    ['HOW TO USE',''],
+    ['Step 1','Row 4 (sample) delete karo pehela'],
+    ['Step 2','Row 5 thi data bharo'],
+    ['Step 3','Dropdown columns — cell click karo, arrow aavse, list mathi select karo'],
+    ['Step 4','CRM → Reports → Import Calls tab → file upload karo'],
+    ['Step 5','Preview joi ne Import button dabao'],
+    ['',''],
+    ['DROPDOWN VALUES',''],
+    ['call_type','Warranty / Non-Warranty / AMC / Warranty Repeat / Non-Warranty Repeat / Other'],
+    ['service_type','Carry In (product shop par laave) / On Site (engineer customer tyaan jaay)'],
+    ['status','Pending Allocation / Assigned / In Progress / Pending Parts / Pending Repair Carry In / Pending Repair On Site / Pending Customer Approval / Closed / Call Cancel / Customer Reject'],
+    ['warranty_coverage','Under Coverage / Out of Coverage / NA'],
+    ['wc_type','ICP / CSP'],
+    ['rerepair','No (default) / Yes (same problem fari aavyu)'],
+    ['rerepair_foc','FALSE (charges levo) / TRUE (service free — within 30 days)'],
+    ['',''],
+    ['DATE FORMAT','YYYY-MM-DD — e.g. 2026-05-08'],
+    ['ticket_id','Blank rakho — system auto generate karashe (BEA-2026-XXX)'],
+    ['assigned_name','Engineer nu exact naam — CRM ma je chhe te j'],
+    ['',''],
+    ['LIMITS','Max 500 rows per file'],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(inst);
+  ws2['!cols']=[{wch:22},{wch:65}];
+  XLSX.utils.book_append_sheet(wb,'Instructions',ws2);
+
+  XLSX.writeFile(wb,'Bhavi_CRM_Import_Template.xlsx');
 }
 
 async function handleImportFile(input){
@@ -1207,7 +1272,7 @@ async function handleImportFile(input){
       // Validate
       const errors = [];
       const valid = [];
-      const required = ['call_type','service_type','status','brand_name','model','serial','cname','mobile','city','problem'];
+      const required = ['call_type','service_type','status','brand_name','model','serial','cname','mobile','problem'];
       const validCallTypes = ['Warranty','Non-Warranty','AMC','Warranty Repeat','Non-Warranty Repeat'];
       const validServiceTypes = ['Carry In','On Site'];
       const validStatuses = ['Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site','Closed','Call Cancel','Customer Reject'];
@@ -1298,6 +1363,8 @@ async function processImport(data){
         final_charges:parseFloat(row.final_charges)||0,
         warranty_coverage:row.warranty_coverage||(isW?'Under Coverage':'NA'),
         wc_type:row.wc_type||'ICP',
+        rerepair:row.rerepair||'No',
+        rerepair_foc:row.rerepair_foc==='TRUE'||row.rerepair_foc===true||false,
         remarks:row.remarks||'',
         visit_date:row.visit_date||'',
         spares:[],
