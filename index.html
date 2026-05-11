@@ -3932,6 +3932,27 @@ async function saveEngUpdate(){
     closeModal('modal-eng-update');
     await sb('tickets','PATCH',data,`?id=eq.${id}`);
     currentSpares=[];
+    // ── AUTO WORK LOG close on signature flow too ──
+    try{
+      const closeNow=new Date();
+      const closeTime=closeNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      const closeDate=closeNow.toLocaleDateString('en-CA');
+      const memberId=currentUser.eng_id||currentUser.user_id;
+      const ticketLabel=(t?.ticket_no||id)+(t?.cname?' — '+t.cname:'');
+      const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+closeDate+'&to_time=eq.OPEN');
+      for(const ol of (openLogs||[])){
+        await sb('work_logs','PATCH',{to_time:closeTime,updated_at:closeNow.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+      }
+      if(t?.service_type==='On Site'){
+        await sb('work_logs','POST',{
+          eng_id:memberId,eng_name:currentUser.name,
+          member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+          log_date:closeDate,from_time:closeTime,to_time:'OPEN',
+          task_description:'🚗 Traveling — After '+ticketLabel,
+          ticket_id:id,log_type:'travel',created_at:closeNow.toISOString()
+        }).catch(()=>{});
+      }
+    }catch(ex){console.log('WorkLog sig error:',ex);}
     openSignature(id);
     if(currentPage==='my-calls')renderMyCalls();
     return;
@@ -3969,6 +3990,39 @@ async function saveEngUpdate(){
         const updatedSpares=(freshT?.spares||[]).map(s=>({...s,stock_deducted:true}));
         await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
       }
+
+      // ── AUTO WORK LOG on Call Closed ──
+      try{
+        const closeNow=new Date();
+        const closeTime=closeNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        const closeDate=closeNow.toLocaleDateString('en-CA');
+        const memberId=currentUser.eng_id||currentUser.user_id;
+        const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+        const ticketLabel=(t?.ticket_no||id)+(t?.cname?' — '+t.cname:'');
+
+        // Close any open work log for this ticket
+        const openLogs=await sb('work_logs','GET',null,
+          '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+closeDate+'&to_time=eq.OPEN');
+        for(const ol of (openLogs||[])){
+          await sb('work_logs','PATCH',{to_time:closeTime,updated_at:closeNow.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+        }
+
+        // Add Traveling log (from close time → OPEN, will close on next Work Start)
+        if(t?.service_type==='On Site'){
+          await sb('work_logs','POST',{
+            eng_id:memberId,
+            eng_name:currentUser.name,
+            member_role:memberRole,
+            log_date:closeDate,
+            from_time:closeTime,
+            to_time:'OPEN',
+            task_description:'🚗 Traveling — After '+ticketLabel,
+            ticket_id:id,
+            log_type:'travel',
+            created_at:closeNow.toISOString()
+          }).catch(()=>{});
+        }
+      }catch(ex){console.log('WorkLog auto error:',ex);}
     }
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
@@ -5654,7 +5708,7 @@ async function printJobSheet(){
 }
 
 
-// Work Start - auto sets Time In
+// Work Start - auto sets Time In + auto work log
 async function doWorkStart(ticketId){
   const now = new Date();
   const timeIn = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
@@ -5669,6 +5723,36 @@ async function doWorkStart(ticketId){
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
     const tl=[...(t?.timeline||[]),{action:'Work Started',by:currentUser.name,at:now.toISOString(),note:`Time In: ${timeIn}`}];
     await sb('tickets','PATCH',{visit_date:dateIn,visit_in:timeIn,status:'In Progress',timeline:tl,updated_at:now.toISOString()},`?id=eq.${ticketId}`);
+
+    // ── AUTO WORK LOG ──
+    const memberId=currentUser.eng_id||currentUser.user_id;
+    const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'');
+
+    // 1) Check if any previous open traveling log exists for today → close it
+    try{
+      const prevLogs=await sb('work_logs','GET',null,
+        '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN&order=created_at.desc');
+      if(prevLogs&&prevLogs.length){
+        // Close previous open log with current time
+        await sb('work_logs','PATCH',{to_time:timeIn,updated_at:now.toISOString()},'?id=eq.'+prevLogs[0].id);
+      }
+    }catch(ex){}
+
+    // 2) Add Work Start log for this ticket (to_time=OPEN → will close on call closed)
+    await sb('work_logs','POST',{
+      eng_id:memberId,
+      eng_name:currentUser.name,
+      member_role:memberRole,
+      log_date:dateIn,
+      from_time:timeIn,
+      to_time:'OPEN',
+      task_description:'🔧 Work Start — '+ticketLabel,
+      ticket_id:ticketId,
+      log_type:'work',
+      created_at:now.toISOString()
+    }).catch(function(){});
+
     alert(`Work Started! ✅ Time In: ${timeIn}`);
     closeModal('modal-eng-update');
     openEngUpdate(ticketId);
@@ -6025,11 +6109,21 @@ async function renderWorkLog(){
   try{logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+today+'&order=from_time');}catch(e){}
   function logsHtml(items){
     if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 આજ નો કોઈ log નથી</div>';
-    return items.map(function(l){return'<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--primary);position:relative;">'
-      +'<button onclick="deleteWorkLog(\''+l.id+'\')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;">✕</button>'
-      +'<div style="display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#4c1d95;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;margin-bottom:6px;">🕐 '+l.from_time+' – '+l.to_time+'</div>'
-      +'<div style="font-size:13px;color:var(--text);line-height:1.55;padding-right:20px;">'+l.task_description+'</div>'
-      +'</div>';}).join('');
+    return items.map(function(l){
+      var isOpen=l.to_time==='OPEN';
+      var isTravel=l.log_type==='travel';
+      var isAuto=l.log_type==='work'||l.log_type==='travel';
+      var borderColor=isTravel?'#f59e0b':isOpen?'#10b981':'var(--primary)';
+      var timeBg=isTravel?'#fef3c7':isOpen?'#d1fae5':'#ede9fe';
+      var timeColor=isTravel?'#92400e':isOpen?'#065f46':'#4c1d95';
+      var timeLabel=l.from_time+' – '+(isOpen?'<span style="color:#10b981;font-weight:700;">ચાલુ ⏳</span>':l.to_time);
+      return'<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+borderColor+';position:relative;">'
+        +(isAuto?'<span style="position:absolute;top:10px;right:'+(isAuto&&!isOpen?'36px':'10px')+'";font-size:10px;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:99px;">⚡ Auto</span>':'')
+        +(!isAuto?'<button onclick="deleteWorkLog(\''+l.id+'\')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;">✕</button>':'')
+        +'<div style="display:inline-flex;align-items:center;gap:4px;background:'+timeBg+';color:'+timeColor+';padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;margin-bottom:6px;">🕐 '+timeLabel+'</div>'
+        +'<div style="font-size:13px;color:var(--text);line-height:1.55;padding-right:20px;">'+l.task_description+'</div>'
+        +'</div>';
+    }).join('');
   }
   pc.innerHTML='<div style="background:#1e2a3a;border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">'
     +'<div style="width:44px;height:44px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📋</div>'
@@ -6202,8 +6296,14 @@ async function loadWorkLogReport(){
         html+='<div style="margin-bottom:14px;">'
           +'<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+'</div>';
         entries.forEach(function(l){
-          html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--primary);">'
-            +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:#4c1d95;background:#ede9fe;padding:3px 8px;border-radius:99px;white-space:nowrap;">'+l.from_time+'–'+l.to_time+'</div>'
+          var isOpen=l.to_time==='OPEN';
+          var isTravel=l.log_type==='travel';
+          var borderColor=isTravel?'#f59e0b':isOpen?'#10b981':'var(--primary)';
+          var timeBg=isTravel?'#fef3c7':isOpen?'#d1fae5':'#ede9fe';
+          var timeColor=isTravel?'#92400e':isOpen?'#065f46':'#4c1d95';
+          var timeLabel=l.from_time+' – '+(isOpen?'ચાલુ ⏳':l.to_time);
+          html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
+            +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
             +'</div>';
         });
