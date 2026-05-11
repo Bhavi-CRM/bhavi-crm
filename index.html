@@ -253,6 +253,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('my-calls')" id="nav-my-calls"><span class="icon">📞</span><span>My Calls</span></div>
+    <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
   </div>
   <div class="nav-section" id="nav-admin-section">
     <div class="nav-section-title">Management</div>
@@ -260,6 +261,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('tasks')" id="nav-tasks"><span class="icon">✅</span><span>Tasks</span></div>
     <div class="nav-item" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
     <div class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
+    <div class="nav-item" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -2318,26 +2320,30 @@ function setupNav(){
     var as=document.getElementById('nav-admin-section');
 
     if(isEng){
-      // ENGINEER: My Calls + Tasks only
+      // ENGINEER: My Calls + Tasks + Work Log only
       sv('nav-tickets',false);
       sv('nav-my-calls',true);
+      sv('nav-work-log',true);
       sv('btn-new-call',false);
       if(as)as.style.display='';
       sv('nav-inventory',false);
       sv('nav-customers',false);
       sv('nav-reports',false);
+      sv('nav-work-log-report',false);
       sv('nav-master',false);
       sv('nav-settings',false);
       sv('nav-tasks',true);
     }else if(isWC){
-      // WC: Tickets + Tasks + Customers + WC Report button
+      // WC: Tickets + Tasks + Customers + WC Report button + Work Log
       sv('nav-tickets',true);
       sv('nav-my-calls',false);
+      sv('nav-work-log',true);
       sv('btn-new-call',true);
       if(as)as.style.display='';
       sv('nav-inventory',false);
       sv('nav-customers',true);
       sv('nav-reports',false);
+      sv('nav-work-log-report',false);
       sv('nav-master',false);
       sv('nav-settings',false);
       sv('nav-tasks',true);
@@ -2348,11 +2354,13 @@ function setupNav(){
       // ADMIN: Everything
       sv('nav-tickets',true);
       sv('nav-my-calls',false);
+      sv('nav-work-log',false);
       sv('btn-new-call',true);
       if(as)as.style.display='';
       sv('nav-inventory',true);
       sv('nav-customers',true);
       sv('nav-reports',true);
+      sv('nav-work-log-report',true);
       sv('nav-master',true);
       sv('nav-settings',true);
       sv('nav-tasks',true);
@@ -2378,9 +2386,9 @@ async function navigate(page){
   if(currentUser)setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings}[page];
   if(renderFn)await renderFn();
 }
 
@@ -5992,6 +6000,263 @@ if('serviceWorker' in navigator){
       console.log('SW error:',e);
     });
   });
+}
+
+// ===== WORK LOG (ENGINEER) =====
+async function renderWorkLog(){
+  const pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  const today=new Date().toLocaleDateString('en-CA');
+  const dd=new Date().getDate();
+  const suffix=dd===1||dd===21||dd===31?'st':dd===2||dd===22?'nd':dd===3||dd===23?'rd':'th';
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const wdays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const d=new Date();
+  const dateStr=dd+suffix+' '+months[d.getMonth()]+' '+d.getFullYear()+', '+wdays[d.getDay()];
+  const slots=[];
+  for(var h=7;h<=21;h++){['00','30'].forEach(function(m){slots.push((h<10?'0':'')+h+':'+m);});}
+  const now=new Date();
+  const hh=now.getHours();const mm2=now.getMinutes()<30?'00':'30';
+  const curr=(hh<10?'0':'')+hh+':'+mm2;
+  const sidx=slots.indexOf(curr);
+  const fromDef=sidx>=0?curr:slots[0];
+  const toDef=sidx>=0?slots[Math.min(sidx+2,slots.length-1)]:slots[2];
+  var logs=[];
+  try{logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+today+'&order=from_time');}catch(e){}
+  function logsHtml(items){
+    if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 આજ નો કોઈ log નથી</div>';
+    return items.map(function(l){return'<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--primary);position:relative;">'
+      +'<button onclick="deleteWorkLog(\''+l.id+'\')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;">✕</button>'
+      +'<div style="display:inline-flex;align-items:center;gap:4px;background:#ede9fe;color:#4c1d95;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;margin-bottom:6px;">🕐 '+l.from_time+' – '+l.to_time+'</div>'
+      +'<div style="font-size:13px;color:var(--text);line-height:1.55;padding-right:20px;">'+l.task_description+'</div>'
+      +'</div>';}).join('');
+  }
+  pc.innerHTML='<div style="background:#1e2a3a;border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">'
+    +'<div style="width:44px;height:44px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📋</div>'
+    +'<div><div style="font-size:17px;font-weight:600;color:#fff;">Work Log — '+currentUser.name+'</div><div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:3px;">'+dateStr+'</div></div>'
+    +'</div>'
+    // Add entry card
+    +'<div class="card" style="margin-bottom:14px;">'
+    +'<div class="section-header"><h2>➕ Entry ઉમેરો</h2></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>From Time</label><select id="wl-from" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===fromDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>To Time</label><select id="wl-to" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===toDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:12px;"><label>શું કામ કર્યું? <span class="req">*</span></label>'
+    +'<textarea id="wl-task" rows="3" placeholder="દા.ત. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea></div>'
+    +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Log ઉમેરો</button>'
+    +'</div>'
+    // Today logs
+    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 આજના Logs</h2><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span></div>'
+    +'<div id="wl-list">'+logsHtml(logs)+'</div></div>'
+    // Past logs search section
+    +'<div class="card">'
+    +'<div class="section-header"><h2>🔍 જૂના Logs શોધો</h2></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
+    +'<div class="form-group" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="wl-search-date" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="searchMyWorkLogs()" style="margin-bottom:0;height:38px;">🔍 Search</button>'
+    +'</div>'
+    +'<div id="wl-past-list"></div>'
+    +'</div>';
+}
+
+async function saveWorkLog(){
+  var from=document.getElementById('wl-from').value;
+  var to=document.getElementById('wl-to').value;
+  var task=document.getElementById('wl-task').value.trim();
+  if(!task){alert('Task description lakhvo jaruri chhe');return;}
+  if(from>=to){alert('To time > From time hovo joie');return;}
+  var today=new Date().toLocaleDateString('en-CA');
+  // Engineer uses eng_id, WC uses user_id — store role type too
+  var memberId=currentUser.eng_id||currentUser.user_id;
+  var memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+  try{
+    await sb('work_logs','POST',{
+      eng_id:memberId,
+      eng_name:currentUser.name,
+      member_role:memberRole,
+      log_date:today,
+      from_time:from,
+      to_time:to,
+      task_description:task,
+      created_at:new Date().toISOString()
+    });
+    document.getElementById('wl-task').value='';
+    alert('✅ Entry save thayi!');
+    renderWorkLog();
+  }catch(e){alert('Error: '+e.message+'\n\nNote: Supabase ma "work_logs" table banavo jaruri chhe.');}
+}
+
+async function deleteWorkLog(id){
+  if(!confirm('Delete this entry?'))return;
+  try{await sb('work_logs','DELETE',null,'?id=eq.'+id);renderWorkLog();}
+  catch(e){alert('Error: '+e.message);}
+}
+
+async function searchMyWorkLogs(){
+  var date=document.getElementById('wl-search-date')?.value||'';
+  var res=document.getElementById('wl-past-list');
+  if(!res)return;
+  if(!date){res.innerHTML='<div class="alert alert-warning">Date select karo</div>';return;}
+  res.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+date+'&order=from_time');
+    if(!logs.length){
+      var dObj=new Date(date+'T00:00:00');
+      var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      res.innerHTML='<div class="alert alert-info">'+dLabel+' નો કોઈ log નથી.</div>';
+      return;
+    }
+    var dObj=new Date(date+'T00:00:00');
+    var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var html='<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+' — '+logs.length+' entries</div>';
+    logs.forEach(function(l){
+      html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--primary);">'
+        +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:#4c1d95;background:#ede9fe;padding:3px 8px;border-radius:99px;white-space:nowrap;">'+l.from_time+'–'+l.to_time+'</div>'
+        +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
+        +'</div>';
+    });
+    res.innerHTML=html;
+  }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+// ===== WORK LOG REPORT (ADMIN) =====
+async function renderWorkLogReport(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var [engineers, wcs]=await Promise.all([
+      sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
+      sb('users','GET',null,'?role_type=eq.work_controller&is_active=eq.true&order=name')
+    ]);
+    var allMembers=[
+      ...engineers.map(function(e){return{id:e.eng_id||e.user_id,name:e.name,role:'Engineer'};}),
+      ...wcs.map(function(w){return{id:w.user_id,name:w.name,role:'WC'};})
+    ];
+    var today=new Date().toLocaleDateString('en-CA');
+    pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
+      +'<div class="section-header"><h2>🔍 Filter Work Logs</h2></div>'
+      +'<div class="form-grid" style="margin-bottom:14px;">'
+      +'<div class="form-group"><label>Date From</label><input type="date" id="wlr-from" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>Date To</label><input type="date" id="wlr-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>Member (Engineer / WC)</label><select id="wlr-eng" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="">All Members</option>'
+      +allMembers.map(function(m){return'<option value="'+m.id+'">'+m.name+' ('+m.role+')</option>';}).join('')
+      +'</select></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +'<button class="btn btn-primary" onclick="loadWorkLogReport()">🔍 Search</button>'
+      +'<button class="btn btn-success" onclick="downloadWorkLogExcel()">📊 Excel Download</button>'
+      +'</div></div>'
+      +'<div id="wlr-results"></div>';
+    loadWorkLogReport();
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+async function loadWorkLogReport(){
+  var from=document.getElementById('wlr-from')?.value||'';
+  var to=document.getElementById('wlr-to')?.value||'';
+  var eng=document.getElementById('wlr-eng')?.value||'';
+  var res=document.getElementById('wlr-results');
+  if(!res)return;
+  res.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var q='?order=log_date.desc,from_time';
+    if(from)q+='&log_date=gte.'+from;
+    if(to)q+='&log_date=lte.'+to;
+    if(eng)q+='&eng_id=eq.'+encodeURIComponent(eng);
+    var logs=await sb('work_logs','GET',null,q);
+    window._wlrLogs=logs;
+    if(!logs.length){res.innerHTML='<div class="alert alert-info">No work logs found for selected filters.</div>';return;}
+    var byEng={};
+    logs.forEach(function(l){
+      var k=l.eng_name||l.eng_id;
+      if(!byEng[k])byEng[k]={};
+      var dt=l.log_date;
+      if(!byEng[k][dt])byEng[k][dt]=[];
+      byEng[k][dt].push(l);
+    });
+    var totalE=Object.keys(byEng).length;
+    var totalD=new Set(logs.map(function(l){return l.log_date;})).size;
+    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Entries</div><div class="kpi-value">'+logs.length+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Engineers</div><div class="kpi-value" style="color:#0e9f6e;">'+totalE+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Days</div><div class="kpi-value" style="color:#7c3aed;">'+totalD+'</div></div>'
+      +'</div>';
+    Object.entries(byEng).forEach(function([engName,dates]){
+      var totalEntries=Object.values(dates).reduce(function(a,d){return a+d.length;},0);
+      var initials=engName.split(' ').map(function(x){return x[0]||'';}).join('').slice(0,2).toUpperCase();
+      // Get first entry to check role
+      var firstEntry=Object.values(dates)[0]&&Object.values(dates)[0][0]||null;
+      var isWC=firstEntry&&firstEntry.member_role==='WC';
+      html+='<div class="card" style="margin-bottom:14px;">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);">'
+        +'<div style="width:38px;height:38px;border-radius:50%;background:'+(isWC?'#7c3aed':'var(--primary)')+';color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;">'+initials+'</div>'
+        +'<div><div style="font-weight:700;font-size:15px;">'+engName+'</div>'
+        +'<div style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">'
+        +(isWC?'<span class="badge" style="background:#ede9fe;color:#7c3aed;">🎯 WC</span>':'<span class="badge" style="background:#d1fae5;color:#065f46;">👷 Engineer</span>')
+        +'&nbsp;'+Object.keys(dates).length+' days | '+totalEntries+' entries</div></div>'
+        +'</div>';
+      Object.entries(dates).sort(function(a,b){return b[0].localeCompare(a[0]);}).forEach(function([date,entries]){
+        var dObj=new Date(date+'T00:00:00');
+        var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+        html+='<div style="margin-bottom:14px;">'
+          +'<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+'</div>';
+        entries.forEach(function(l){
+          html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--primary);">'
+            +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:#4c1d95;background:#ede9fe;padding:3px 8px;border-radius:99px;white-space:nowrap;">'+l.from_time+'–'+l.to_time+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
+            +'</div>';
+        });
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    res.innerHTML=html;
+  }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+async function downloadWorkLogExcel(){
+  var logs=window._wlrLogs||[];
+  if(!logs.length){alert('Pehela Search karo');return;}
+
+  var wb=XLSX.utils.book_new();
+
+  // Sheet 1 — All data combined
+  var allData=logs.map(function(l){return{
+    'Role':l.member_role||'Engineer',
+    'Name':l.eng_name,
+    'Date':l.log_date,
+    'From':l.from_time,
+    'To':l.to_time,
+    'Task':l.task_description
+  };});
+  var wsAll=XLSX.utils.json_to_sheet(allData);
+  wsAll['!cols']=[{wch:12},{wch:20},{wch:14},{wch:10},{wch:10},{wch:60}];
+  XLSX.utils.book_append_sheet(wb,'All Members',wsAll);
+
+  // Individual sheets per member
+  var byMember={};
+  logs.forEach(function(l){
+    var k=l.eng_name||l.eng_id;
+    if(!byMember[k])byMember[k]=[];
+    byMember[k].push(l);
+  });
+
+  Object.entries(byMember).forEach(function([name,mLogs]){
+    var data=mLogs.map(function(l){return{
+      'Date':l.log_date,
+      'From':l.from_time,
+      'To':l.to_time,
+      'Task':l.task_description
+    };});
+    var ws=XLSX.utils.json_to_sheet(data);
+    ws['!cols']=[{wch:14},{wch:10},{wch:10},{wch:60}];
+    // Sheet name max 31 chars, no special chars
+    var sheetName=name.replace(/[:\\\/\?\*\[\]]/g,'').slice(0,31);
+    XLSX.utils.book_append_sheet(wb,sheetName,ws);
+  });
+
+  XLSX.writeFile(wb,'work_logs_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
 </script>
 </body>
