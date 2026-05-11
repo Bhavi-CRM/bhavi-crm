@@ -3667,10 +3667,22 @@ async function openEngUpdate(id){
       ${t.problem} | ${t.call_type} | ${t.service_type} | ${statusBadge(t.status)}
       ${isOOC?'<br><span style="color:var(--danger);font-weight:700;">⚠️ Out of Coverage — charges apply</span>':''}
     </div>
-    <!-- Work Start Button - shows if not started -->
-    ${!t.visit_in && t.service_type==='On Site' ? `<div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>⏱️ Visit not started yet</span>
-      <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">▶ Work Start</button>
+    <!-- Visit Start / Work Start Buttons -->
+    ${!t.visit_in && t.service_type==='On Site' ? `
+    <div class="alert alert-info" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span>⏱️ Visit not started yet</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
+          <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
+        </div>
+      </div>
+    </div>` : ''}
+    ${t.visit_in && !t.visit_out && t.service_type==='On Site' ? `
+    <div class="alert" style="background:#d1fae5;border-color:#6ee7b7;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="color:#065f46;">🔧 Work In Progress — Time In: <b>${t.visit_in}</b></span>
+      </div>
     </div>` : ''}
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group">
@@ -5708,11 +5720,66 @@ async function printJobSheet(){
 }
 
 
+// Visit Start - starts traveling log
+async function doVisitStart(ticketId){
+  const now=new Date();
+  const timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const dateNow=now.toLocaleDateString('en-CA');
+  const memberId=currentUser.eng_id||currentUser.user_id;
+
+  // Block if already an OPEN log exists
+  try{
+    const openLogs=await sb('work_logs','GET',null,
+      '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN');
+    if(openLogs&&openLogs.length){
+      const ol=openLogs[0];
+      const isWork=ol.log_type==='work';
+      alert('⚠️ Already '+(isWork?'Work':'Traveling')+' log OPEN chhe!\n\n"'+ol.task_description+'"\n\nPehela ae call Closed karo — pachhi j navo Visit Start thase.');
+      return;
+    }
+  }catch(ex){}
+
+  try{
+    const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
+    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'');
+
+    // Add Traveling log (OPEN)
+    await sb('work_logs','POST',{
+      eng_id:memberId,
+      eng_name:currentUser.name,
+      member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+      log_date:dateNow,
+      from_time:timeNow,
+      to_time:'OPEN',
+      task_description:'🚗 Traveling — '+ticketLabel,
+      ticket_id:ticketId,
+      log_type:'travel',
+      created_at:now.toISOString()
+    });
+
+    alert('🚗 Visit Start! Traveling log started — '+timeNow);
+    closeModal('modal-eng-update');
+    openEngUpdate(ticketId);
+  }catch(e){alert('Error: '+e.message);}
+}
+
 // Work Start - auto sets Time In + auto work log
 async function doWorkStart(ticketId){
   const now = new Date();
   const timeIn = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const dateIn = now.toLocaleDateString('en-CA');
+  const memberId=currentUser.eng_id||currentUser.user_id;
+
+  // Block if already a WORK OPEN log exists (not travel — travel should auto-close)
+  try{
+    const openLogs=await sb('work_logs','GET',null,
+      '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN&log_type=eq.work');
+    if(openLogs&&openLogs.length){
+      alert('⚠️ Already ek call Work Start chhe!\n\n"'+openLogs[0].task_description+'"\n\nPehela ae call Closed karo — pachhi j aa call Work Start thase.');
+      return;
+    }
+  }catch(ex){}
+
   // Set in UI if modal is open
   const dateEl = document.getElementById('upd-date');
   const inEl = document.getElementById('upd-in');
@@ -5725,21 +5792,19 @@ async function doWorkStart(ticketId){
     await sb('tickets','PATCH',{visit_date:dateIn,visit_in:timeIn,status:'In Progress',timeline:tl,updated_at:now.toISOString()},`?id=eq.${ticketId}`);
 
     // ── AUTO WORK LOG ──
-    const memberId=currentUser.eng_id||currentUser.user_id;
     const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
     const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'');
 
-    // 1) Check if any previous open traveling log exists for today → close it
+    // Close any OPEN log (traveling) with current time
     try{
       const prevLogs=await sb('work_logs','GET',null,
-        '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN&order=created_at.desc');
+        '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN');
       if(prevLogs&&prevLogs.length){
-        // Close previous open log with current time
         await sb('work_logs','PATCH',{to_time:timeIn,updated_at:now.toISOString()},'?id=eq.'+prevLogs[0].id);
       }
     }catch(ex){}
 
-    // 2) Add Work Start log for this ticket (to_time=OPEN → will close on call closed)
+    // Add Work Start log (OPEN)
     await sb('work_logs','POST',{
       eng_id:memberId,
       eng_name:currentUser.name,
