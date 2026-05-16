@@ -7789,6 +7789,7 @@ function renderSiteCard(s){
     +'<button class="btn btn-outline btn-sm" onclick="viewSiteItems('+s.id+',\''+escQ(s.site_name)+'\')">📦 Items & Quotation</button>'
     +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="viewSiteVisits('+s.id+',\''+escQ(s.site_name)+'\')">📋 Visit History</button>'
     +'<button class="btn btn-primary btn-sm" onclick="openAddVisitModal('+s.id+',\''+escQ(s.site_name)+'\')">➕ Add Visit</button>'
+    +'<button class="btn btn-outline btn-sm" style="background:#e0e7ff;color:#3730a3;" onclick="openNewSiteModal({id:'+s.id+',site_name:\''+escQ(s.site_name)+'\',client_name:\''+escQ(s.client_name||\'\')+'\',mobile:\''+escQ(s.mobile||\'\')+'\',address:\''+escQ(s.address||\'\')+'\'},true)">✏️ Edit Site</button>'
     +'</div>'
     +'</div>'
     +'</div>';
@@ -7971,7 +7972,11 @@ async function viewSiteItems(siteId,siteName){
       +'</div>'
       +'<div class="table-wrap"><table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Selling ₹</th><th style="text-align:right;">Total</th><th style="text-align:right;">Margin</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
       +'</div>'
-      +'<div class="modal-footer"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Close</button></div>'
+      +'<div class="modal-footer" style="justify-content:space-between;">'
++'<button class="btn btn-primary" onclick="openAddSiteItem(\''+siteId+'\',\''+siteName+'\')">➕ Add Item</button>'
++'<button class="btn btn-outline" onclick="openQuotationPrint([],{name:\''+siteName+'\'},{})">📄 Quotation Print</button>'
++'<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
++'</div>'
       +'</div>';
     document.body.appendChild(modal);
   }catch(e){alert('Error: '+e.message);}
@@ -8568,5 +8573,61 @@ function printQuotationDoc(){
       </div>
     </div>
   </div>
-</div></body>
+<script>
+function openAddSiteItem(siteId,siteName){
+  var existing=document.getElementById('modal-add-site-item');
+  if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.className='modal-overlay';
+  modal.id='modal-add-site-item';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()"><div class="modal-header"><h2>➕ '+siteName+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-site-item\').remove()">✕</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:10px;"><label>Item Name</label><input type="text" id="asi-name" placeholder="Type karo..." list="asi-inv-list" oninput="filterASIList(this.value)"><datalist id="asi-inv-list"></datalist></div><div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div><div class="form-group"><label>Note</label><input type="text" id="asi-note" placeholder="Optional..."></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-add-site-item\').remove()">Cancel</button><button class="btn btn-primary" onclick="saveASIItem(\''+siteId+'\',\''+siteName+'\')">💾 Save</button></div></div>';
+  document.body.appendChild(modal);
+  loadASIInventory();
+  calcASITotal();
+}
+function calcASITotal(){
+  var sp=parseFloat(document.getElementById('asi-sp')?.value)||0;
+  var qty=parseFloat(document.getElementById('asi-qty')?.value)||1;
+  var gst=parseFloat(document.getElementById('asi-gst')?.value)||0;
+  var el=document.getElementById('asi-total');
+  if(el)el.value=Math.round(sp*qty*(1+gst/100));
+}
+async function loadASIInventory(){
+  try{
+    var items=await sb('auto_inventory','GET',null,'&order=item_name');
+    var dl=document.getElementById('asi-inv-list');
+    if(dl)dl.innerHTML=items.map(function(i){return '<option value="'+i.item_name+'" data-pp="'+(i.purchase_price||0)+'" data-sp="'+(i.selling_price||i.purchase_price||0)+'">';}).join('');
+  }catch(e){}
+}
+function filterASIList(val){
+  var opts=document.querySelectorAll('#asi-inv-list option');
+  opts.forEach(function(o){
+    if(o.value.toLowerCase()===val.toLowerCase()){
+      var pp=o.getAttribute('data-pp')||0;
+      var sp=o.getAttribute('data-sp')||0;
+      document.getElementById('asi-pp').value=pp;
+      document.getElementById('asi-sp').value=sp;
+      calcASITotal();
+    }
+  });
+}
+async function saveASIItem(siteId,siteName){
+  var name=document.getElementById('asi-name').value.trim();
+  var qty=parseFloat(document.getElementById('asi-qty').value)||1;
+  var unit=document.getElementById('asi-unit').value;
+  var pp=parseFloat(document.getElementById('asi-pp').value)||0;
+  var sp=parseFloat(document.getElementById('asi-sp').value)||0;
+  var gst=parseFloat(document.getElementById('asi-gst').value)||0;
+  var total=Math.round(sp*qty*(1+gst/100));
+  var note=document.getElementById('asi-note').value;
+  if(!name){alert('Item name jaruri chhe!');return;}
+  try{
+    await sb('auto_site_items','POST',{site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,gst_percent:gst,total_price:total,note:note});
+    document.getElementById('modal-add-site-item').remove();
+    alert('✅ Item saved!');
+    viewSiteItems(siteId,siteName);
+  }catch(e){alert('Error: '+e.message);}
+}
+</script></div></body>
 </html>
+  
