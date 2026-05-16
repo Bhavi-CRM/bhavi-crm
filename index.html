@@ -7789,7 +7789,7 @@ function renderSiteCard(s){
     +'<button class="btn btn-outline btn-sm" onclick="viewSiteItems('+s.id+',\''+escQ(s.site_name)+'\')">📦 Items & Quotation</button>'
     +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="viewSiteVisits('+s.id+',\''+escQ(s.site_name)+'\')">📋 Visit History</button>'
     +'<button class="btn btn-primary btn-sm" onclick="openAddVisitModal('+s.id+',\''+escQ(s.site_name)+'\')">➕ Add Visit</button>'
-    +'<button class="btn btn-outline btn-sm" style="background:#e0e7ff;color:#3730a3;" onclick="openNewSiteModal({id:'+s.id+',site_name:\''+escQ(s.site_name)+'\',client_name:\''+escQ(s.client_name||\'\')+'\',mobile:\''+escQ(s.mobile||\'\')+'\',address:\''+escQ(s.address||\'\')+'\'},true)">✏️ Edit Site</button>'
+    +'<button class="btn btn-outline btn-sm" style="background:#e0e7ff;color:#3730a3;" onclick="openNewSiteModal(s)">✏️ Edit</button>'
     +'</div>'
     +'</div>'
     +'</div>';
