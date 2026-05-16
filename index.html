@@ -269,6 +269,12 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
+  <div class="nav-section" id="nav-automation-section">
+    <div class="nav-section-title">Automation</div>
+    <div class="nav-item hidden" onclick="navigate('auto-inventory')" id="nav-auto-inventory"><span class="icon">📦</span><span>Auto Inventory</span></div>
+    <div class="nav-item hidden" onclick="navigate('auto-sites')" id="nav-auto-sites"><span class="icon">🏗️</span><span>Auto Sites</span></div>
+    <div class="nav-item hidden" onclick="navigate('auto-visits-report')" id="nav-auto-visits-report"><span class="icon">📋</span><span>Visit Report</span></div>
+  </div>
   <div id="sidebar-user">
     <div class="user-name" id="sidebar-username">-</div>
     <div class="user-role" id="sidebar-userrole">-</div>
@@ -287,6 +293,7 @@ tr:hover td{background:#f8fafc;}
     <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
       <button id="wc-daily-btn" class="btn btn-primary btn-sm" onclick="openWCDailyReport()" style="display:none;font-size:11px;padding:5px 8px;">📋 WC Report</button>
       <button id="walkin-quick-btn" class="btn btn-sm hidden" onclick="navigate('walk-in')" style="background:#f59e0b;color:#fff;border-color:#d97706;font-size:11px;padding:5px 8px;">🚶 Walk-in</button>
+      <button id="auto-visit-btn" class="btn btn-sm hidden" onclick="openSiteVisitModal()" style="background:#7c3aed;color:#fff;font-size:11px;padding:5px 8px;">🏗️ Site Visit</button>
       <button class="btn btn-outline btn-sm" onclick="refreshPage()" title="Refresh" style="padding:5px 8px;">🔄</button>
       <button class="btn btn-primary btn-sm hidden" id="btn-new-call" onclick="openNewCall()">+ New Call</button>
     </div>
@@ -2329,6 +2336,10 @@ function setupNav(){
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
+      // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi)
+      var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
+      sv('nav-auto-inventory',false);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',false);
+      var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -2343,6 +2354,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
+      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);
     }
   }catch(e){console.error('setupNav:',e);}
 }
@@ -2365,9 +2377,9 @@ async function navigate(page){
   if(currentUser)setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport}[page];
   if(renderFn)await renderFn();
 }
 
@@ -7537,6 +7549,752 @@ async function renderWorkLogReport(){
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
+
+// ===== AUTO INVENTORY MODULE =====
+
+async function renderAutoInventory(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var items=await sb('auto_inventory','GET',null,'?order=brand,item_name');
+    var brands=[...new Set(items.map(function(i){return i.brand||'';}).filter(Boolean))];
+    var totalItems=items.length;
+    var totalValue=items.reduce(function(a,i){return a+(i.purchase_price||0)*(i.stock_qty||0);},0);
+    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">'
+      +'<div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Items</div><div class="kpi-value">'+totalItems+'</div></div>'
+      +'<div class="kpi-card" style="padding:14px;border-color:#7c3aed;"><div class="kpi-label">Brands</div><div class="kpi-value" style="color:#7c3aed;">'+brands.length+'</div></div>'
+      +'<div class="kpi-card" style="padding:14px;border-color:#0e9f6e;"><div class="kpi-label">Stock Value</div><div class="kpi-value" style="color:#0e9f6e;font-size:20px;">₹'+Number(totalValue).toLocaleString('en-IN')+'</div></div>'
+      +'</div>'
+      +'<div class="section-header">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      +'<input type="text" id="ainv-search" placeholder="Search item / brand..." style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" oninput="filterAutoInv()">'
+      +'<select id="ainv-brand-filter" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" onchange="filterAutoInv()"><option value="">All Brands</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</select>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;">'
+      +'<button class="btn btn-success btn-sm" onclick="openBulkAddInventory()">📥 Bulk Add</button>'
+      +'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
+      +'</div>'
+      +'</div>'
+      +'<div class="card">'
+      +'<div class="table-wrap"><table id="ainv-table">'
+      +'<thead><tr><th>Brand</th><th>Item Name</th><th>Category</th><th>Unit</th><th style="text-align:right;">Purchase Price</th><th style="text-align:center;">Stock</th><th style="text-align:right;">Stock Value</th><th>Action</th></tr></thead>'
+      +'<tbody>';
+    if(!items.length){
+      html+='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">Koi item nathi. "Add Item" thi sharu karo!</td></tr>';
+    }else{
+      items.forEach(function(it){
+        var sv2=(it.purchase_price||0)*(it.stock_qty||0);
+        html+='<tr data-brand="'+(it.brand||'').toLowerCase()+'" data-name="'+(it.item_name||'').toLowerCase()+'">'
+          +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+(it.brand||'—')+'</span></td>'
+          +'<td><b>'+it.item_name+'</b></td>'
+          +'<td>'+(it.category||'—')+'</td>'
+          +'<td>'+(it.unit||'pcs')+'</td>'
+          +'<td style="text-align:right;font-weight:600;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
+          +'<td style="text-align:center;"><span style="font-weight:700;color:'+(it.stock_qty>0?'#065f46':'#dc2626')+';">'+it.stock_qty+'</span></td>'
+          +'<td style="text-align:right;color:#065f46;font-weight:600;">₹'+Number(sv2).toLocaleString('en-IN')+'</td>'
+          +'<td>'
+          +'<button class="btn-icon" onclick="openEditInventoryModal('+it.id+')">✏️</button>'
+          +'<button class="btn-icon" onclick="adjustAutoStock('+it.id+',\''+escQ(it.item_name)+'\','+it.stock_qty+')">📦</button>'
+          +'</td>'
+          +'</tr>';
+      });
+    }
+    html+='</tbody></table></div></div>';
+    pc.innerHTML=html;
+    window._autoInvItems=items;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function filterAutoInv(){
+  var q=(document.getElementById('ainv-search')?.value||'').toLowerCase();
+  var brand=(document.getElementById('ainv-brand-filter')?.value||'').toLowerCase();
+  document.querySelectorAll('#ainv-table tbody tr').forEach(function(r){
+    var nameMatch=!q||(r.dataset.name||'').includes(q)||(r.dataset.brand||'').includes(q);
+    var brandMatch=!brand||(r.dataset.brand||'')===(brand);
+    r.style.display=(nameMatch&&brandMatch)?'':'none';
+  });
+}
+
+function openAddInventoryModal(editData){
+  var existing=document.getElementById('modal-ainv');if(existing)existing.remove();
+  var isEdit=!!editData;
+  var brands=[...new Set((window._autoInvItems||[]).map(function(i){return i.brand||'';}).filter(Boolean))];
+  var modal=document.createElement('div');
+  modal.id='modal-ainv';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Item':'➕ Add Inventory Item')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-ainv\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Brand</label>'
+    +'<input type="text" id="ainv-brand" list="ainv-brand-list" value="'+(editData?.brand||'')+'" placeholder="e.g. Hikvision, CP Plus, Dahua">'
+    +'<datalist id="ainv-brand-list">'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</datalist></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Item Name <span class="req">*</span></label><input type="text" id="ainv-name" value="'+(editData?.item_name||'')+'" placeholder="e.g. 2MP Dome Camera, CAT6 Cable"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Category</label><input type="text" id="ainv-cat" value="'+(editData?.category||'')+'" placeholder="e.g. Camera, Cable, Switch"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Purchase Price ₹</label><input type="number" id="ainv-price" value="'+(editData?.purchase_price||0)+'" min="0"></div>'
+    +'<div class="form-group"><label>Unit</label><select id="ainv-unit" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="pcs"'+(editData?.unit==='pcs'?' selected':'')+'>pcs</option><option value="mtr"'+(editData?.unit==='mtr'?' selected':'')+'>mtr</option><option value="roll"'+(editData?.unit==='roll'?' selected':'')+'>roll</option><option value="set"'+(editData?.unit==='set'?' selected':'')+'>set</option><option value="box"'+(editData?.unit==='box'?' selected':'')+'>box</option></select></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="'+(editData?.stock_qty||0)+'" min="0"></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-ainv\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveAutoInventoryItem('+(isEdit?editData.id:'null')+')">💾 Save</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function openEditInventoryModal(id){
+  var item=(window._autoInvItems||[]).find(function(i){return i.id===id;});
+  if(!item){try{var r=await sb('auto_inventory','GET',null,'?id=eq.'+id);item=r[0];}catch(e){}}
+  if(item)openAddInventoryModal(item);
+}
+
+async function saveAutoInventoryItem(editId){
+  var brand=document.getElementById('ainv-brand').value.trim();
+  var name=document.getElementById('ainv-name').value.trim();
+  var cat=document.getElementById('ainv-cat').value.trim();
+  var price=parseFloat(document.getElementById('ainv-price').value)||0;
+  var unit=document.getElementById('ainv-unit').value;
+  var stock=parseFloat(document.getElementById('ainv-stock').value)||0;
+  if(!name){alert('Item name required!');return;}
+  try{
+    var data={brand:brand||null,item_name:name,category:cat||null,purchase_price:price,unit:unit,updated_at:new Date().toISOString()};
+    if(editId){
+      await sb('auto_inventory','PATCH',data,'?id=eq.'+editId);
+    }else{
+      data.stock_qty=stock;
+      await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(data)});
+    }
+    document.getElementById('modal-ainv').remove();
+    renderAutoInventory();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function openBulkAddInventory(){
+  var existing=document.getElementById('modal-bulk-ainv');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-bulk-ainv';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>📥 Bulk Add Items</h2><button class="close-btn" onclick="document.getElementById(\'modal-bulk-ainv\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="alert alert-info" style="margin-bottom:12px;">Ek saath multiple items add karo. Blank rows ignore thashe.</div>'
+    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+    +'<thead><tr style="background:#f8fafc;"><th style="padding:8px;text-align:left;font-size:12px;">Brand</th><th style="padding:8px;text-align:left;font-size:12px;">Item Name *</th><th style="padding:8px;text-align:left;font-size:12px;">Category</th><th style="padding:8px;text-align:left;font-size:12px;">Purchase ₹</th><th style="padding:8px;text-align:left;font-size:12px;">Stock</th><th style="padding:8px;text-align:left;font-size:12px;">Unit</th></tr></thead>'
+    +'<tbody id="bulk-rows">'
+    +Array.from({length:8},function(_,i){return bulkRow(i);}).join('')
+    +'</tbody></table></div>'
+    +'<button class="btn btn-outline btn-sm" onclick="addBulkRow()" style="margin-top:8px;">+ Add Row</button>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-bulk-ainv\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveBulkInventory()">💾 Save All</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  window._bulkRowCount=8;
+}
+
+function bulkRow(i){
+  return '<tr id="bulk-row-'+i+'">'
+    +'<td style="padding:4px;"><input type="text" id="br-brand-'+i+'" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;" placeholder="Hikvision"></td>'
+    +'<td style="padding:4px;"><input type="text" id="br-name-'+i+'" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;" placeholder="2MP Camera"></td>'
+    +'<td style="padding:4px;"><input type="text" id="br-cat-'+i+'" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;" placeholder="Camera"></td>'
+    +'<td style="padding:4px;"><input type="number" id="br-price-'+i+'" style="width:80px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;" value="0" min="0"></td>'
+    +'<td style="padding:4px;"><input type="number" id="br-stock-'+i+'" style="width:70px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;" value="0" min="0"></td>'
+    +'<td style="padding:4px;"><select id="br-unit-'+i+'" style="border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;"><option>pcs</option><option>mtr</option><option>roll</option><option>set</option><option>box</option></select></td>'
+    +'</tr>';
+}
+
+function addBulkRow(){
+  var n=window._bulkRowCount||8;
+  var tbody=document.getElementById('bulk-rows');
+  if(tbody){tbody.insertAdjacentHTML('beforeend',bulkRow(n));window._bulkRowCount=n+1;}
+}
+
+async function saveBulkInventory(){
+  var n=window._bulkRowCount||8;
+  var items=[];
+  for(var i=0;i<n;i++){
+    var nameEl=document.getElementById('br-name-'+i);
+    if(!nameEl||!nameEl.value.trim())continue;
+    items.push({
+      brand:document.getElementById('br-brand-'+i)?.value.trim()||null,
+      item_name:nameEl.value.trim(),
+      category:document.getElementById('br-cat-'+i)?.value.trim()||null,
+      purchase_price:parseFloat(document.getElementById('br-price-'+i)?.value)||0,
+      stock_qty:parseFloat(document.getElementById('br-stock-'+i)?.value)||0,
+      unit:document.getElementById('br-unit-'+i)?.value||'pcs'
+    });
+  }
+  if(!items.length){alert('Koi item nathi filled!');return;}
+  try{
+    await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(items)});
+    document.getElementById('modal-bulk-ainv').remove();
+    alert('✅ '+items.length+' items added!');
+    renderAutoInventory();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function adjustAutoStock(id,name,current){
+  var type=prompt('📦 '+name+'\nCurrent Stock: '+current+'\n\nType:\n"in X" = Stock In\n"out X" = Stock Out\n\nExample: in 5');
+  if(!type)return;
+  var parts=type.trim().split(' ');
+  var dir=parts[0].toLowerCase();
+  var qty=parseFloat(parts[1])||0;
+  if(!qty||!['in','out'].includes(dir)){alert('Format: "in 5" ya "out 3"');return;}
+  var newQty=dir==='in'?current+qty:Math.max(0,current-qty);
+  try{
+    await sb('auto_inventory','PATCH',{stock_qty:newQty,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    alert('✅ Stock updated: '+newQty);
+    renderAutoInventory();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ===== AUTOMATION SITE VISIT MODULE =====
+
+async function renderAutoSites(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var sites=await sb('auto_sites','GET',null,'?order=created_at.desc');
+    var html='<div class="section-header">'
+      +'<h2>🏗️ Automation Sites ('+sites.length+')</h2>'
+      +'<button class="btn btn-primary" onclick="openNewSiteModal()">+ New Site</button>'
+      +'</div>'
+      +'<div class="filter-bar" style="margin-bottom:14px;">'
+      +'<input type="text" id="site-search" placeholder="Search site / client / mobile..." style="flex:1;min-width:200px;" oninput="filterSiteList()">'
+      +'</div>';
+    if(!sites.length){
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🏗️ Koi site nathi abhi. "New Site" thi sharu karo!</div>';
+    }else{
+      html+='<div id="sites-list">';
+      sites.forEach(function(s){
+        html+=renderSiteCard(s);
+      });
+      html+='</div>';
+    }
+    pc.innerHTML=html;
+    window._allSites=sites;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function renderSiteCard(s){
+  return '<div class="card" style="margin-bottom:12px;border-left:4px solid #7c3aed;" data-site-name="'+(s.site_name||'').toLowerCase()+'" data-client="'+(s.client_name||'').toLowerCase()+'" data-mobile="'+(s.mobile||'').toLowerCase()+'">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+    +'<div>'
+    +'<div style="font-size:15px;font-weight:700;color:#7c3aed;">🏗️ '+s.site_name+'</div>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">👤 '+s.client_name+(s.mobile?' &nbsp;📱 '+s.mobile:'')+'</div>'
+    +(s.address?'<div style="font-size:12px;color:var(--text-muted);">📍 '+s.address+'</div>':'')
+    +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Created: '+new Date(s.created_at).toLocaleDateString('en-IN')+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+    +'<button class="btn btn-outline btn-sm" onclick="viewSiteItems('+s.id+',\''+escQ(s.site_name)+'\')">📦 Items & Quotation</button>'
+    +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="viewSiteVisits('+s.id+',\''+escQ(s.site_name)+'\')">📋 Visit History</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="openAddVisitModal('+s.id+',\''+escQ(s.site_name)+'\')">➕ Add Visit</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
+
+function escQ(s){return(s||'').replace(/'/g,"\\'");}
+
+function filterSiteList(){
+  var q=(document.getElementById('site-search')?.value||'').toLowerCase();
+  var cards=document.querySelectorAll('#sites-list .card');
+  cards.forEach(function(c){
+    var match=!q||(c.dataset.siteName||'').includes(q)||(c.dataset.client||'').includes(q)||(c.dataset.mobile||'').includes(q);
+    c.style.display=match?'':'none';
+  });
+}
+
+// ── NEW SITE MODAL ──
+async function openNewSiteModal(editData){
+  var existing=document.getElementById('modal-new-site');
+  if(existing)existing.remove();
+  var isEdit=!!editData;
+  // Load inventory for dropdown
+  var invItems=[];
+  try{invItems=await sb('auto_inventory','GET',null,'?order=brand,item_name');}catch(e){}
+  window._siteInvItems=invItems;
+
+  var modal=document.createElement('div');
+  modal.id='modal-new-site';
+  modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Site':'🏗️ New Automation Site')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-new-site\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-grid">'
+    +'<div class="form-group form-full"><label>Site Name <span class="req">*</span></label><input type="text" id="ns-name" placeholder="e.g. Rajesh Villa, ABC Office" value="'+(editData?.site_name||'')+'"></div>'
+    +'<div class="form-group"><label>Client Name <span class="req">*</span></label><input type="text" id="ns-client" value="'+(editData?.client_name||'')+'"></div>'
+    +'<div class="form-group"><label>Mobile No</label><input type="tel" id="ns-mobile" value="'+(editData?.mobile||'')+'"></div>'
+    +'<div class="form-group form-full"><label>Address</label><textarea id="ns-address" rows="2">'+(editData?.address||'')+'</textarea></div>'
+    +'</div>'
+    +'<hr class="divider">'
+    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Items / Products</h3>'
+    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Inventory thi select karo — purchase price auto aavse, selling price tame aapvo</p>'
+    +'<div id="ns-items-list"></div>'
+    +'<button class="btn btn-outline btn-sm" onclick="addSiteItemRow(\'ns-items-list\')" style="margin-top:8px;">+ Add Item</button>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-new-site\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveNewSite('+(isEdit?editData.id:'null')+')">💾 '+(isEdit?'Update':'Create Site')+'</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+  window._nsItemCount=0;
+  if(isEdit&&editData.items){editData.items.forEach(function(it){addSiteItemRow('ns-items-list',it);});}
+  else{addSiteItemRow('ns-items-list');}
+}
+
+function addSiteItemRow(listId,data){
+  var list=document.getElementById(listId);
+  if(!list)return;
+  var idx=(window._nsItemCount||0);
+  window._nsItemCount=(window._nsItemCount||0)+1;
+  var prefix=listId==='ns-items-list'?'nsi':'vmi'; // site item vs visit material
+  var invItems=window._siteInvItems||[];
+  var options='<option value="">-- Select from Inventory --</option>'
+    +invItems.map(function(it){return'<option value="'+it.id+'" data-price="'+it.purchase_price+'" data-unit="'+(it.unit||'pcs')+'">'+(it.brand?it.brand+' — ':'')+it.item_name+' (₹'+it.purchase_price+'/'+it.unit+')</option>';}).join('');
+
+  var row=document.createElement('div');
+  row.id=prefix+'-row-'+idx;
+  row.style.cssText='background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:8px;';
+  row.innerHTML='<div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">'
+    +'<div class="form-group" style="margin:0;">'
+    +'<label style="font-size:11px;">Item (Inventory thi)</label>'
+    +'<select id="'+prefix+'-item-'+idx+'" onchange="onSiteItemSelect(this,\''+idx+'\',\''+prefix+'\')" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+options+'</select>'
+    +'</div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Purchase ₹</label><input type="number" id="'+prefix+'-pp-'+idx+'" readonly style="width:100%;background:#f0f9ff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" placeholder="Auto"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Selling ₹ <span class="req">*</span></label><input type="number" id="'+prefix+'-sp-'+idx+'" min="0" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" onchange="calcSiteItemTotal(\''+idx+'\',\''+prefix+'\')" placeholder="0"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Qty</label><input type="number" id="'+prefix+'-qty-'+idx+'" value="'+(data?.qty||1)+'" min="0.1" step="0.1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" onchange="calcSiteItemTotal(\''+idx+'\',\''+prefix+'\')" ></div>'
+    +'<button onclick="this.closest(\'[id^='+prefix+'-row-]\').remove();calcSiteGrandTotal(\''+listId+'\',\''+prefix+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:6px 10px;cursor:pointer;height:36px;margin-top:18px;">✕</button>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:flex-end;margin-top:4px;font-size:12px;font-weight:700;color:#065f46;" id="'+prefix+'-total-'+idx+'"></div>';
+  list.appendChild(row);
+
+  if(data&&data.inv_id){
+    var sel=document.getElementById(prefix+'-item-'+idx);
+    if(sel){sel.value=data.inv_id;onSiteItemSelect(sel,idx,prefix);}
+    var spEl=document.getElementById(prefix+'-sp-'+idx);if(spEl&&data.selling_price)spEl.value=data.selling_price;
+    var qEl=document.getElementById(prefix+'-qty-'+idx);if(qEl&&data.qty)qEl.value=data.qty;
+    calcSiteItemTotal(idx,prefix);
+  }
+}
+
+function onSiteItemSelect(sel,idx,prefix){
+  var opt=sel.selectedOptions[0];
+  var pp=opt?parseFloat(opt.getAttribute('data-price')||0):0;
+  var ppEl=document.getElementById(prefix+'-pp-'+idx);
+  if(ppEl)ppEl.value=pp||'';
+  calcSiteItemTotal(idx,prefix);
+}
+
+function calcSiteItemTotal(idx,prefix){
+  var sp=parseFloat(document.getElementById(prefix+'-sp-'+idx)?.value)||0;
+  var qty=parseFloat(document.getElementById(prefix+'-qty-'+idx)?.value)||0;
+  var total=sp*qty;
+  var el=document.getElementById(prefix+'-total-'+idx);
+  if(el)el.textContent=total?'Total: ₹'+Number(total).toLocaleString('en-IN'):'';
+}
+
+function calcSiteGrandTotal(listId,prefix){
+  // optional: recalc grand total if shown
+}
+
+async function saveNewSite(editId){
+  var name=document.getElementById('ns-name').value.trim();
+  var client=document.getElementById('ns-client').value.trim();
+  var mobile=document.getElementById('ns-mobile').value.trim();
+  var address=document.getElementById('ns-address').value.trim();
+  if(!name||!client){alert('Site name and Client name required!');return;}
+  try{
+    var siteData={site_name:name,client_name:client,mobile:mobile||null,address:address||null,created_by:currentUser?.user_id||'ENG002'};
+    var siteId;
+    if(editId){
+      await sb('auto_sites','PATCH',siteData,'?id=eq.'+editId);
+      siteId=editId;
+      await sb('auto_site_items','DELETE',null,'?site_id=eq.'+siteId);
+    }else{
+      var res=await fetch(SB_URL+'/rest/v1/auto_sites',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(siteData)});
+      var created=await res.json();
+      siteId=created[0].id;
+    }
+    // Collect items from new format
+    var items=[];
+    document.querySelectorAll('#ns-items-list [id^="nsi-row-"]').forEach(function(row){
+      var idx=row.id.replace('nsi-row-','');
+      var sel=document.getElementById('nsi-item-'+idx);
+      var sp=parseFloat(document.getElementById('nsi-sp-'+idx)?.value)||0;
+      var qty=parseFloat(document.getElementById('nsi-qty-'+idx)?.value)||1;
+      var pp=parseFloat(document.getElementById('nsi-pp-'+idx)?.value)||0;
+      if(sel&&sel.value){
+        var opt=sel.selectedOptions[0];
+        items.push({site_id:siteId,inv_id:parseInt(sel.value),item_name:opt?.text?.split(' (')[0]||'',qty:qty,unit_price:sp,purchase_price:pp,total_price:sp*qty});
+      }
+    });
+    if(items.length){
+      await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(items)});
+    }
+    document.getElementById('modal-new-site').remove();
+    alert('✅ Site '+(editId?'updated':'created')+' successfully!');
+    renderAutoSites();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── VIEW ITEMS ──
+async function viewSiteItems(siteId,siteName){
+  try{
+    var items=await sb('auto_site_items','GET',null,'?site_id=eq.'+siteId+'&order=id');
+    var modal=document.createElement('div');
+    modal.className='modal-overlay';
+    var grandSell=items.reduce(function(a,i){return a+(i.total_price||0);},0);
+    var grandPurch=items.reduce(function(a,i){return a+(i.purchase_price||0)*(i.qty||0);},0);
+    var profit=grandSell-grandPurch;
+    var rows=items.length?items.map(function(it){
+      var pp=(it.purchase_price||0)*(it.qty||0);
+      var sp=it.total_price||0;
+      var margin=sp-pp;
+      return '<tr>'
+        +'<td>'+it.item_name+'</td>'
+        +'<td style="text-align:center;">'+it.qty+'</td>'
+        +'<td style="text-align:right;color:#6b7280;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
+        +'<td style="text-align:right;font-weight:600;">₹'+Number(it.unit_price||0).toLocaleString('en-IN')+'</td>'
+        +'<td style="text-align:right;font-weight:700;">₹'+Number(sp).toLocaleString('en-IN')+'</td>'
+        +'<td style="text-align:right;color:'+(margin>=0?'#065f46':'#dc2626')+';">₹'+Number(margin).toLocaleString('en-IN')+'</td>'
+        +'</tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No items added</td></tr>';
+    modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+      +'<div class="modal-header"><h2>📦 '+siteName+' — Items</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+      +'<div class="modal-body">'
+      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Selling Total</div><div class="kpi-value" style="font-size:18px;">₹'+Number(grandSell).toLocaleString('en-IN')+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#6b7280;"><div class="kpi-label">Purchase Total</div><div class="kpi-value" style="font-size:18px;color:#6b7280;">₹'+Number(grandPurch).toLocaleString('en-IN')+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Margin</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">₹'+Number(profit).toLocaleString('en-IN')+'</div></div>'
+      +'</div>'
+      +'<div class="table-wrap"><table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Selling ₹</th><th style="text-align:right;">Total</th><th style="text-align:right;">Margin</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'</div>'
+      +'<div class="modal-footer"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Close</button></div>'
+      +'</div>';
+    document.body.appendChild(modal);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── VIEW VISITS ──
+async function viewSiteVisits(siteId,siteName){
+  try{
+    var visits=await sb('auto_site_visits','GET',null,'?site_id=eq.'+siteId+'&order=visit_date.desc,created_at.desc');
+    var modal=document.createElement('div');
+    modal.className='modal-overlay';
+    var totalMatValue=visits.reduce(function(a,v){return a+(v.material_total||0);},0);
+    var rows=visits.length?visits.map(function(v){
+      var matItems=[];
+      try{if(v.material_items)matItems=JSON.parse(v.material_items);}catch(e){}
+      var matHtml=matItems.length
+        ?'<div style="margin-top:6px;"><b>📦 Material:</b>'
+          +matItems.map(function(m){return'<span style="display:inline-block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:2px 8px;margin:2px;font-size:12px;">'+m.qty+'x '+m.item_name+' <span style="color:#6b7280;">@₹'+m.purchase_price+'</span> → ₹'+m.selling_price+'</span>';}).join('')
+          +(v.material_total?'<span style="font-weight:700;color:#065f46;margin-left:8px;">Total: ₹'+Number(v.material_total).toLocaleString('en-IN')+'</span>':'')
+          +'</div>'
+        :(v.material_delivered?'<div style="margin-top:4px;font-size:13px;"><b>📦 Material:</b> '+v.material_delivered+'</div>':'');
+      return '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid #7c3aed;">'
+        +'<div style="font-weight:700;color:#7c3aed;">📅 '+fmtDate(v.visit_date)+(v.visit_time?' &nbsp;🕐 '+v.visit_time:'')+'</div>'
+        +(v.work_done?'<div style="margin-top:6px;font-size:13px;"><b>🔧 Kaam:</b> '+v.work_done+'</div>':'')
+        +matHtml
+        +'</div>';
+    }).join(''):'<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi visit nathi abhi</div>';
+    modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+      +'<div class="modal-header"><h2>📋 '+siteName+' — Visits ('+visits.length+')</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+      +'<div class="modal-body">'
+      +(totalMatValue?'<div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;"><span style="font-weight:700;">Total Material Delivered Value:</span><span style="font-weight:700;color:#065f46;font-size:15px;">₹'+Number(totalMatValue).toLocaleString('en-IN')+'</span></div>':'')
+      +rows+'</div>'
+      +'<div class="modal-footer">'
+      +'<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
+      +'<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').remove();openAddVisitModal('+siteId+',\''+escQ(siteName)+'\')">➕ Add Visit</button>'
+      +'</div></div>';
+    document.body.appendChild(modal);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── ADD VISIT MODAL (topbar button) ──
+async function openSiteVisitModal(){
+  try{
+    var sites=await sb('auto_sites','GET',null,'?order=site_name');
+    if(!sites.length){alert('Pehela koi site banavo!');navigate('auto-sites');return;}
+    var modal=document.createElement('div');
+    modal.id='modal-site-visit-quick';
+    modal.className='modal-overlay';
+    modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
+      +'<div class="modal-header"><h2>🏗️ Site Visit Add Karo</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">✕</button></div>'
+      +'<div class="modal-body">'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Site Select Karo <span class="req">*</span></label>'
+      +'<select id="qv-site" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Select Site --</option>'
+      +sites.map(function(s){return'<option value="'+s.id+'">'+s.site_name+' — '+s.client_name+'</option>';}).join('')
+      +'</select></div>'
+      +'<div class="form-grid">'
+      +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="qv-date" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
+      +'<div class="form-group"><label>Time</label><input type="time" id="qv-time"></div>'
+      +'</div>'
+      +'<div class="form-group" style="margin-top:10px;"><label>Shu Kaam Karyu? 🔧</label><textarea id="qv-work" rows="3" placeholder="Kaam ni detail lakhav..."></textarea></div>'
+      +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable..."></textarea></div>'
+      +'</div>'
+      +'<div class="modal-footer">'
+      +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">Cancel</button>'
+      +'<button class="btn btn-primary" onclick="saveQuickVisit()">💾 Save Visit</button>'
+      +'</div></div>';
+    document.body.appendChild(modal);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function openAddVisitModal(siteId,siteName){
+  // Load site items (has selling price) + cross-ref inventory for purchase price
+  var siteItems=[];
+  try{siteItems=await sb('auto_site_items','GET',null,'?site_id=eq.'+siteId+'&order=id');}catch(e){}
+  window._visitSiteItems=siteItems;
+  window._nsItemCount=0;
+
+  var modal=document.createElement('div');
+  modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>➕ Visit — '+siteName+'</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="av-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
+    +'<div class="form-group"><label>Time</label><input type="time" id="av-time-'+siteId+'"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>Shu Kaam Karyu? 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Kaam ni detail lakhav..."></textarea></div>'
+    +'<hr class="divider">'
+    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Material Delivered</h3>'
+    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Site na items — Purchase & Selling price auto aavse, bas Qty aapvo</p>'
+    +(siteItems.length?''
+      :'<div class="alert alert-warning">Aa site ma koi items nathi. Pehela site ma items add karo.</div>')
+    +'<div id="vm-items-list-'+siteId+'"></div>'
+    +(siteItems.length?'<button class="btn btn-outline btn-sm" onclick="addVisitMaterialRow('+siteId+')" style="margin-top:6px;">+ Add Material</button>':'')
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveVisitWithMaterial('+siteId+',this)">💾 Save Visit</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+function addVisitMaterialRow(siteId){
+  var listId='vm-items-list-'+siteId;
+  var list=document.getElementById(listId);
+  if(!list)return;
+  var siteItems=window._visitSiteItems||[];
+  var idx=(window._nsItemCount||0);
+  window._nsItemCount=(window._nsItemCount||0)+1;
+
+  // Build options from site items
+  var options='<option value="">-- Item Select Karo --</option>'
+    +siteItems.map(function(it){
+      return'<option value="'+it.id+'" data-pp="'+(it.purchase_price||0)+'" data-sp="'+(it.unit_price||0)+'" data-name="'+escQ(it.item_name)+'">'
+        +it.item_name+' (Purchase: ₹'+(it.purchase_price||0)+' | Selling: ₹'+(it.unit_price||0)+')</option>';
+    }).join('');
+
+  var row=document.createElement('div');
+  row.id='vmi-row-'+idx;
+  row.style.cssText='background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:8px;';
+  row.innerHTML='<div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Item (Site thi)</label>'
+    +'<select id="vmi-item-'+idx+'" onchange="onVisitItemSelect(this,\''+idx+'\')" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+options+'</select>'
+    +'</div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Purchase ₹</label>'
+    +'<input type="number" id="vmi-pp-'+idx+'" readonly style="width:100%;background:#f0f9ff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" placeholder="Auto"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Selling ₹</label>'
+    +'<input type="number" id="vmi-sp-'+idx+'" readonly style="width:100%;background:#f0fff4;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;" placeholder="Auto"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Qty <span class="req">*</span></label>'
+    +'<input type="number" id="vmi-qty-'+idx+'" value="1" min="0.1" step="0.1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" onchange="calcVisitItemTotal(\''+idx+'\')"></div>'
+    +'<button onclick="this.closest(\'[id^=vmi-row-]\').remove();calcVisitGrandTotal(\''+listId+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:6px 10px;cursor:pointer;height:36px;margin-top:18px;">✕</button>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;" id="vmi-total-'+idx+'"></div>';
+  list.appendChild(row);
+}
+
+function onVisitItemSelect(sel,idx){
+  var opt=sel.selectedOptions[0];
+  var pp=opt?parseFloat(opt.getAttribute('data-pp')||0):0;
+  var sp=opt?parseFloat(opt.getAttribute('data-sp')||0):0;
+  var ppEl=document.getElementById('vmi-pp-'+idx);if(ppEl)ppEl.value=pp||'';
+  var spEl=document.getElementById('vmi-sp-'+idx);if(spEl)spEl.value=sp||'';
+  calcVisitItemTotal(idx);
+}
+
+function calcVisitItemTotal(idx){
+  var pp=parseFloat(document.getElementById('vmi-pp-'+idx)?.value)||0;
+  var sp=parseFloat(document.getElementById('vmi-sp-'+idx)?.value)||0;
+  var qty=parseFloat(document.getElementById('vmi-qty-'+idx)?.value)||0;
+  var el=document.getElementById('vmi-total-'+idx);
+  if(!el)return;
+  if(sp&&qty){
+    var total=sp*qty;
+    var pTotal=pp*qty;
+    var margin=total-pTotal;
+    el.innerHTML='<span style="color:#065f46;font-weight:700;">Selling: ₹'+Number(total).toLocaleString('en-IN')+'</span>'
+      +'<span style="color:#6b7280;font-size:11px;">Purchase: ₹'+Number(pTotal).toLocaleString('en-IN')+' | Margin: ₹'+Number(margin).toLocaleString('en-IN')+'</span>';
+  }else{el.innerHTML='';}
+}
+
+function calcVisitGrandTotal(listId){}
+
+async function saveVisitWithMaterial(siteId,btn){
+  var date=document.getElementById('av-date-'+siteId)?.value;
+  var time=document.getElementById('av-time-'+siteId)?.value||null;
+  var work=document.getElementById('av-work-'+siteId)?.value.trim()||null;
+  if(!date){alert('Date required!');return;}
+
+  var materials=[];
+  var totalSelling=0;
+  document.querySelectorAll('[id^="vmi-row-"]').forEach(function(row){
+    var idx=row.id.replace('vmi-row-','');
+    var sel=document.getElementById('vmi-item-'+idx);
+    if(!sel||!sel.value)return;
+    var opt=sel.selectedOptions[0];
+    var pp=parseFloat(document.getElementById('vmi-pp-'+idx)?.value)||0;
+    var sp=parseFloat(document.getElementById('vmi-sp-'+idx)?.value)||0;
+    var qty=parseFloat(document.getElementById('vmi-qty-'+idx)?.value)||1;
+    var name=opt?.getAttribute('data-name')||opt?.text?.split(' (')[0]||'';
+    materials.push({site_item_id:parseInt(sel.value),item_name:name,purchase_price:pp,selling_price:sp,qty:qty,total:sp*qty});
+    totalSelling+=sp*qty;
+  });
+
+  var matText=materials.length?materials.map(function(m){return m.qty+'x '+m.item_name+' @₹'+m.selling_price;}).join(', '):'';
+
+  try{
+    var visitData={
+      site_id:siteId,visit_date:date,visit_time:time,
+      work_done:work,
+      material_delivered:matText||null,
+      material_items:materials.length?JSON.stringify(materials):null,
+      material_total:totalSelling||null,
+      created_by:currentUser?.user_id||'ENG002'
+    };
+    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(visitData)});
+    btn.closest('.modal-overlay').remove();
+    alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN'):''));
+    if(currentPage==='auto-sites')renderAutoSites();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function saveQuickVisit(){
+  var siteId=document.getElementById('qv-site')?.value;
+  var date=document.getElementById('qv-date')?.value;
+  var time=document.getElementById('qv-time')?.value||null;
+  var work=document.getElementById('qv-work')?.value.trim()||null;
+  var material=document.getElementById('qv-material')?.value.trim()||null;
+  if(!siteId){alert('Site select karo!');return;}
+  if(!date){alert('Date required!');return;}
+  try{
+    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({site_id:parseInt(siteId),visit_date:date,visit_time:time,work_done:work,material_delivered:material,created_by:currentUser?.user_id||'ENG002'})});
+    document.getElementById('modal-site-visit-quick').remove();
+    alert('✅ Visit saved!');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── VISIT REPORT (ADMIN + ENG) ──
+async function renderAutoVisitsReport(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var sites=await sb('auto_sites','GET',null,'?order=site_name');
+    var today=new Date().toLocaleDateString('en-CA');
+    pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
+      +'<div class="section-header"><h2>🔍 Filter Visits</h2></div>'
+      +'<div class="form-grid" style="margin-bottom:12px;">'
+      +'<div class="form-group"><label>Date From</label><input type="date" id="avr-from" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>Date To</label><input type="date" id="avr-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>Site</label><select id="avr-site" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="">All Sites</option>'+sites.map(function(s){return'<option value="'+s.id+'">'+s.site_name+'</option>';}).join('')+'</select></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +'<button class="btn btn-primary" onclick="loadAutoVisitReport()">🔍 Search</button>'
+      +'<button class="btn btn-success" onclick="downloadVisitExcel()">📊 Excel Download</button>'
+      +'</div></div>'
+      +'<div id="avr-results"></div>';
+    window._avrSites=sites;
+    loadAutoVisitReport();
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+async function loadAutoVisitReport(){
+  var from=document.getElementById('avr-from')?.value||'';
+  var to=document.getElementById('avr-to')?.value||'';
+  var siteFilter=document.getElementById('avr-site')?.value||'';
+  var res=document.getElementById('avr-results');
+  if(!res)return;
+  res.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var q='?order=visit_date.desc,created_at.desc';
+    if(from)q+='&visit_date=gte.'+from;
+    if(to)q+='&visit_date=lte.'+to;
+    if(siteFilter)q+='&site_id=eq.'+siteFilter;
+    var visits=await sb('auto_site_visits','GET',null,q);
+    var sites=window._avrSites||[];
+    var siteMap={};sites.forEach(function(s){siteMap[s.id]=s;});
+    window._avrVisits=visits.map(function(v){var s=siteMap[v.site_id]||{};return Object.assign({},v,{site_name:s.site_name||'-',client_name:s.client_name||'-'});});
+    if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">Koi visits nathi selected filter ma.</div>';return;}
+    // KPI
+    var totalVisits=window._avrVisits.length;
+    var sitesVisited=new Set(window._avrVisits.map(function(v){return v.site_id;})).size;
+    var withMaterial=window._avrVisits.filter(function(v){return v.material_delivered;}).length;
+    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Visits</div><div class="kpi-value">'+totalVisits+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Sites Visited</div><div class="kpi-value" style="color:#7c3aed;">'+sitesVisited+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Material Delivered</div><div class="kpi-value" style="color:#0e9f6e;">'+withMaterial+'</div></div>'
+      +'</div>';
+    // Group by site
+    var bySite={};
+    window._avrVisits.forEach(function(v){
+      var k=v.site_id;
+      if(!bySite[k])bySite[k]={site_name:v.site_name,client_name:v.client_name,visits:[]};
+      bySite[k].visits.push(v);
+    });
+    Object.values(bySite).forEach(function(sg){
+      html+='<div class="card" style="margin-bottom:14px;">'
+        +'<div style="font-size:15px;font-weight:700;color:#7c3aed;margin-bottom:2px;">🏗️ '+sg.site_name+'</div>'
+        +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">👤 '+sg.client_name+' &nbsp;|&nbsp; '+sg.visits.length+' visits</div>'
+        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Kaam Karyu</th><th>Material Delivered</th></tr></thead><tbody>'
+        +sg.visits.map(function(v){
+          return '<tr>'
+            +'<td><b>'+fmtDate(v.visit_date)+'</b></td>'
+            +'<td>'+(v.visit_time||'—')+'</td>'
+            +'<td style="max-width:200px;white-space:pre-wrap;">'+(v.work_done||'—')+'</td>'
+            +'<td style="max-width:200px;white-space:pre-wrap;">'+(v.material_delivered||'—')+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div></div>';
+    });
+    res.innerHTML=html;
+  }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function downloadVisitExcel(){
+  var visits=window._avrVisits||[];
+  if(!visits.length){alert('Pehela Search karo');return;}
+  var wb=XLSX.utils.book_new();
+  // All visits sheet
+  var data=visits.map(function(v){return{
+    'Site':v.site_name,'Client':v.client_name,
+    'Visit Date':fmtDate(v.visit_date),'Time':v.visit_time||'',
+    'Kaam Karyu':v.work_done||'','Material Delivered':v.material_delivered||''
+  };});
+  var ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:20},{wch:18},{wch:14},{wch:10},{wch:40},{wch:35}];
+  XLSX.utils.book_append_sheet(wb,'All Visits',ws);
+  // Per site sheets
+  var bySite={};
+  visits.forEach(function(v){
+    var k=v.site_name;
+    if(!bySite[k])bySite[k]=[];
+    bySite[k].push(v);
+  });
+  Object.entries(bySite).forEach(function([sn,svs]){
+    var sd=svs.map(function(v){return{'Date':fmtDate(v.visit_date),'Time':v.visit_time||'','Kaam':v.work_done||'','Material':v.material_delivered||''};});
+    var sw=XLSX.utils.json_to_sheet(sd);
+    sw['!cols']=[{wch:14},{wch:10},{wch:45},{wch:35}];
+    XLSX.utils.book_append_sheet(wb,sn.replace(/[:\\\/\?\*\[\]]/g,'').slice(0,31),sw);
+  });
+  XLSX.writeFile(wb,'site_visits_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
+}
+
+// ===== END AUTOMATION MODULE =====
+
 async function loadWorkLogReport(){
   var from=document.getElementById('wlr-from')?.value||'';
   var to=document.getElementById('wlr-to')?.value||'';
@@ -7651,164 +8409,6 @@ async function downloadWorkLogExcel(){
 
   XLSX.writeFile(wb,'work_logs_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
-function openPaymentModal(siteId,siteName,quotationTotal,paidSoFar){
-  var today=new Date().toISOString().split('T')[0];
-  document.getElementById('pay-date').value=today;
-  document.getElementById('pay-amount').value='';
-  document.getElementById('pay-mode').value='';
-  document.getElementById('pay-ref').value='';
-  document.getElementById('pay-note').value='';
-  document.getElementById('payment-site-info').innerHTML='<b>Site:</b> '+(siteName||'')+'<br><b>Quotation Total:</b> ₹'+(quotationTotal||0)+'<br><b>Paid:</b> ₹'+(paidSoFar||0)+'<br><b style="color:#d97706;">Pending: ₹'+((quotationTotal||0)-(paidSoFar||0))+'</b>';
-  document.getElementById('modal-payment').classList.remove('hidden');
-}
-function savePayment(){
-  var amount=document.getElementById('pay-amount').value;
-  var mode=document.getElementById('pay-mode').value;
-  if(!amount||!mode){alert('Amount ane Payment Mode jaruri chhe!');return;}
-  alert('✅ Payment Saved!\nAmount: ₹'+amount+'\nMode: '+mode);
-  closeModal('modal-payment');
-}
-function printDC(){
-  var content=document.getElementById('dc-print-area').innerHTML;
-  var w=window.open('','_blank');
-  w.document.write('<html><head><title>DC</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
-  w.document.close();
-  setTimeout(function(){w.print();},500);
-}
-function printQuotationDoc(){
-  var content=document.getElementById('quotation-print-area').innerHTML;
-  var w=window.open('','_blank');
-  w.document.write('<html><head><title>Quotation</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
-  w.document.close();
-  setTimeout(function(){w.print();},500);
-}</script>
-<!-- PAYMENT MODAL -->
-<div class="modal-overlay hidden" id="modal-payment" onclick="closeModal('modal-payment')">
-  <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2>💰 Payment Received</h2><button class="close-btn" onclick="closeModal('modal-payment')">✕</button></div>
-    <div class="modal-body">
-      <div id="payment-site-info" style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;"></div>
-      <div class="form-grid">
-        <div class="form-group"><label>Amount ₹ <span class="req">*</span></label><input type="number" id="pay-amount" min="0" placeholder="0"></div>
-        <div class="form-group"><label>Payment Mode <span class="req">*</span></label>
-          <select id="pay-mode">
-            <option value="">-- Select --</option>
-            <option value="Cash">💵 Cash</option>
-            <option value="NEFT">🏦 NEFT</option>
-            <option value="IMPS">📱 IMPS</option>
-            <option value="Cheque">📝 Cheque</option>
-            <option value="UPI">📲 UPI</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Date</label><input type="date" id="pay-date"></div>
-        <div class="form-group"><label>Reference No</label><input type="text" id="pay-ref" placeholder="UTR / Cheque No"></div>
-        <div class="form-group form-full"><label>Note</label><input type="text" id="pay-note" placeholder="Advance / Final..."></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-payment')">Cancel</button>
-      <button class="btn btn-success" onclick="savePayment()">✅ Save Payment</button>
-    </div>
-  </div>
-</div>
-<!-- DC PRINT MODAL -->
-<div class="modal-overlay hidden" id="modal-dc-print" onclick="closeModal('modal-dc-print')">
-  <div class="modal modal-lg" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2>🚚 Material DC</h2>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-primary btn-sm" onclick="printDC()">🖨️ Print DC</button>
-        <button class="close-btn" onclick="closeModal('modal-dc-print')">✕</button>
-      </div>
-    </div>
-    <div class="modal-body">
-      <div id="dc-print-area">
-        <div style="text-align:center;border-bottom:2px solid #1a56db;padding-bottom:10px;margin-bottom:14px;">
-          <div style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS & Automation</div>
-          <div style="font-size:11px;color:#64748b;">Delivery Challan</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:13px;">
-          <div><b>DC No:</b> <span id="dc-number">-</span></div>
-          <div><b>Date:</b> <span id="dc-date">-</span></div>
-        </div>
-        <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">
-          <div><b>Site:</b> <span id="dc-site-name">-</span></div>
-          <div><b>Visit Date:</b> <span id="dc-visit-date">-</span></div>
-          <div><b>Engineer:</b> <span id="dc-engineer">-</span></div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
-          <thead><tr style="background:#1a56db;color:#fff;">
-            <th style="padding:8px;">#</th>
-            <th style="padding:8px;text-align:left;">Item</th>
-            <th style="padding:8px;">Qty</th>
-            <th style="padding:8px;text-align:left;">Note</th>
-          </tr></thead>
-          <tbody id="dc-items-body"></tbody>
-        </table>
-        <div class="form-grid" style="margin-top:12px;">
-          <div class="form-group"><label>Delivery Mode</label>
-            <select id="dc-delivery-mode" style="border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;">
-              <option>🤝 By Hand</option><option>📦 Courier</option><option>🚛 Porter</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Receiver Name</label><input type="text" id="dc-receiver-name" placeholder="Name"></div>
-          <div class="form-group"><label>Receiver Mobile</label><input type="tel" id="dc-receiver-mobile"></div>
-          <div class="form-group"><label>Tracking / Details</label><input type="text" id="dc-courier-detail"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Receiver Signature<br><br><br></div>
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Engineer Signature<br><br><br></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- QUOTATION PRINT MODAL -->
-<div class="modal-overlay hidden" id="modal-quotation-print" onclick="closeModal('modal-quotation-print')">
-  <div class="modal modal-lg" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2>📄 Quotation Print</h2>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-primary btn-sm" onclick="printQuotationDoc()">🖨️ Print</button>
-        <button class="close-btn" onclick="closeModal('modal-quotation-print')">✕</button>
-      </div>
-    </div>
-    <div class="modal-body">
-      <div id="quotation-print-area">
-        <div style="text-align:center;border-bottom:2px solid #1a56db;padding-bottom:10px;margin-bottom:14px;">
-          <div style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS & Automation</div>
-        </div>
-        <div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:12px;text-decoration:underline;">QUOTATION</div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:12px;">
-          <div><b>No:</b> <span id="quot-number">-</span></div>
-          <div><b>Date:</b> <span id="quot-date">-</span></div>
-        </div>
-        <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">
-          <div><b>Site:</b> <span id="quot-site-name">-</span></div>
-          <div><b>Address:</b> <span id="quot-address">-</span></div>
-          <div><b>Mobile:</b> <span id="quot-mobile">-</span></div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
-          <thead><tr style="background:#1a56db;color:#fff;">
-            <th style="padding:8px;">#</th>
-            <th style="padding:8px;text-align:left;">Item</th>
-            <th style="padding:8px;">Qty</th>
-            <th style="padding:8px;text-align:right;">Rate ₹</th>
-            <th style="padding:8px;text-align:right;">Total ₹</th>
-          </tr></thead>
-          <tbody id="quot-items-body"></tbody>
-          <tfoot><tr>
-            <td colspan="4" style="padding:8px;text-align:right;font-weight:700;">Grand Total:</td>
-            <td style="padding:8px;text-align:right;font-weight:700;color:#1a56db;" id="quot-grand-total">₹0</td>
-          </tr></tfoot>
-        </table>
-        <div style="background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;margin-bottom:14px;" id="quot-payment-summary"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Customer Signature<br><br><br></div>
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Authorised Signatory<br><br><br></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div></body>
+</script>
+</body>
 </html>
