@@ -8632,7 +8632,7 @@ async function saveASIItem(siteId,siteName){
 async function deleteSite(siteId,siteName){
   if(!confirm('⚠️ "'+siteName+'" delete karvu chhe? Badha items pan delete thashe!'))return;
   try{
-    await sb('auto_site_items','DELETE',null,'&site_id=eq.'+siteId);
+    await sb('auto_site_items','DELETE',null,'?site_id=eq.'+siteId);
     await sb('auto_sites','DELETE',null,'&id=eq.'+siteId);
     alert('✅ Site deleted!');
     renderAutoSites();
