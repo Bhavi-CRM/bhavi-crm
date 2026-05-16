@@ -8409,6 +8409,164 @@ async function downloadWorkLogExcel(){
 
   XLSX.writeFile(wb,'work_logs_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
-</script>
-</body>
+function openPaymentModal(siteId,siteName,quotationTotal,paidSoFar){
+  var today=new Date().toISOString().split('T')[0];
+  document.getElementById('pay-date').value=today;
+  document.getElementById('pay-amount').value='';
+  document.getElementById('pay-mode').value='';
+  document.getElementById('pay-ref').value='';
+  document.getElementById('pay-note').value='';
+  document.getElementById('payment-site-info').innerHTML='<b>Site:</b> '+(siteName||'')+'<br><b>Quotation Total:</b> ₹'+(quotationTotal||0)+'<br><b>Paid:</b> ₹'+(paidSoFar||0)+'<br><b style="color:#d97706;">Pending: ₹'+((quotationTotal||0)-(paidSoFar||0))+'</b>';
+  document.getElementById('modal-payment').classList.remove('hidden');
+}
+function savePayment(){
+  var amount=document.getElementById('pay-amount').value;
+  var mode=document.getElementById('pay-mode').value;
+  if(!amount||!mode){alert('Amount ane Payment Mode jaruri chhe!');return;}
+  alert('✅ Payment Saved!\nAmount: ₹'+amount+'\nMode: '+mode);
+  closeModal('modal-payment');
+}
+function printDC(){
+  var content=document.getElementById('dc-print-area').innerHTML;
+  var w=window.open('','_blank');
+  w.document.write('<html><head><title>DC</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
+  w.document.close();
+  setTimeout(function(){w.print();},500);
+}
+function printQuotationDoc(){
+  var content=document.getElementById('quotation-print-area').innerHTML;
+  var w=window.open('','_blank');
+  w.document.write('<html><head><title>Quotation</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
+  w.document.close();
+  setTimeout(function(){w.print();},500);
+}</script>
+<!-- PAYMENT MODAL -->
+<div class="modal-overlay hidden" id="modal-payment" onclick="closeModal('modal-payment')">
+  <div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>💰 Payment Received</h2><button class="close-btn" onclick="closeModal('modal-payment')">✕</button></div>
+    <div class="modal-body">
+      <div id="payment-site-info" style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:12px;font-size:13px;"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Amount ₹ <span class="req">*</span></label><input type="number" id="pay-amount" min="0" placeholder="0"></div>
+        <div class="form-group"><label>Payment Mode <span class="req">*</span></label>
+          <select id="pay-mode">
+            <option value="">-- Select --</option>
+            <option value="Cash">💵 Cash</option>
+            <option value="NEFT">🏦 NEFT</option>
+            <option value="IMPS">📱 IMPS</option>
+            <option value="Cheque">📝 Cheque</option>
+            <option value="UPI">📲 UPI</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Date</label><input type="date" id="pay-date"></div>
+        <div class="form-group"><label>Reference No</label><input type="text" id="pay-ref" placeholder="UTR / Cheque No"></div>
+        <div class="form-group form-full"><label>Note</label><input type="text" id="pay-note" placeholder="Advance / Final..."></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-payment')">Cancel</button>
+      <button class="btn btn-success" onclick="savePayment()">✅ Save Payment</button>
+    </div>
+  </div>
+</div>
+<!-- DC PRINT MODAL -->
+<div class="modal-overlay hidden" id="modal-dc-print" onclick="closeModal('modal-dc-print')">
+  <div class="modal modal-lg" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>🚚 Material DC</h2>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" onclick="printDC()">🖨️ Print DC</button>
+        <button class="close-btn" onclick="closeModal('modal-dc-print')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div id="dc-print-area">
+        <div style="text-align:center;border-bottom:2px solid #1a56db;padding-bottom:10px;margin-bottom:14px;">
+          <div style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS & Automation</div>
+          <div style="font-size:11px;color:#64748b;">Delivery Challan</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:13px;">
+          <div><b>DC No:</b> <span id="dc-number">-</span></div>
+          <div><b>Date:</b> <span id="dc-date">-</span></div>
+        </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">
+          <div><b>Site:</b> <span id="dc-site-name">-</span></div>
+          <div><b>Visit Date:</b> <span id="dc-visit-date">-</span></div>
+          <div><b>Engineer:</b> <span id="dc-engineer">-</span></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
+          <thead><tr style="background:#1a56db;color:#fff;">
+            <th style="padding:8px;">#</th>
+            <th style="padding:8px;text-align:left;">Item</th>
+            <th style="padding:8px;">Qty</th>
+            <th style="padding:8px;text-align:left;">Note</th>
+          </tr></thead>
+          <tbody id="dc-items-body"></tbody>
+        </table>
+        <div class="form-grid" style="margin-top:12px;">
+          <div class="form-group"><label>Delivery Mode</label>
+            <select id="dc-delivery-mode" style="border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;">
+              <option>🤝 By Hand</option><option>📦 Courier</option><option>🚛 Porter</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Receiver Name</label><input type="text" id="dc-receiver-name" placeholder="Name"></div>
+          <div class="form-group"><label>Receiver Mobile</label><input type="tel" id="dc-receiver-mobile"></div>
+          <div class="form-group"><label>Tracking / Details</label><input type="text" id="dc-courier-detail"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Receiver Signature<br><br><br></div>
+          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Engineer Signature<br><br><br></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- QUOTATION PRINT MODAL -->
+<div class="modal-overlay hidden" id="modal-quotation-print" onclick="closeModal('modal-quotation-print')">
+  <div class="modal modal-lg" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>📄 Quotation Print</h2>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" onclick="printQuotationDoc()">🖨️ Print</button>
+        <button class="close-btn" onclick="closeModal('modal-quotation-print')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div id="quotation-print-area">
+        <div style="text-align:center;border-bottom:2px solid #1a56db;padding-bottom:10px;margin-bottom:14px;">
+          <div style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS & Automation</div>
+        </div>
+        <div style="text-align:center;font-size:15px;font-weight:700;margin-bottom:12px;text-decoration:underline;">QUOTATION</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:12px;">
+          <div><b>No:</b> <span id="quot-number">-</span></div>
+          <div><b>Date:</b> <span id="quot-date">-</span></div>
+        </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">
+          <div><b>Site:</b> <span id="quot-site-name">-</span></div>
+          <div><b>Address:</b> <span id="quot-address">-</span></div>
+          <div><b>Mobile:</b> <span id="quot-mobile">-</span></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
+          <thead><tr style="background:#1a56db;color:#fff;">
+            <th style="padding:8px;">#</th>
+            <th style="padding:8px;text-align:left;">Item</th>
+            <th style="padding:8px;">Qty</th>
+            <th style="padding:8px;text-align:right;">Rate ₹</th>
+            <th style="padding:8px;text-align:right;">Total ₹</th>
+          </tr></thead>
+          <tbody id="quot-items-body"></tbody>
+          <tfoot><tr>
+            <td colspan="4" style="padding:8px;text-align:right;font-weight:700;">Grand Total:</td>
+            <td style="padding:8px;text-align:right;font-weight:700;color:#1a56db;" id="quot-grand-total">₹0</td>
+          </tr></tfoot>
+        </table>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;margin-bottom:14px;" id="quot-payment-summary"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Customer Signature<br><br><br></div>
+          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Authorised Signatory<br><br><br></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></body>
 </html>
