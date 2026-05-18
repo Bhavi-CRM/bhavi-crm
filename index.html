@@ -2337,9 +2337,9 @@ function setupNav(){
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
-      // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi)
+      // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',false);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',false);sv('nav-inquiries',false);
+      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',isAutoEng);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
