@@ -274,6 +274,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('auto-inventory')" id="nav-auto-inventory"><span class="icon">📦</span><span>Auto Inventory</span></div>
     <div class="nav-item hidden" onclick="navigate('auto-sites')" id="nav-auto-sites"><span class="icon">🏗️</span><span>Auto Sites</span></div>
     <div class="nav-item hidden" onclick="navigate('auto-visits-report')" id="nav-auto-visits-report"><span class="icon">📋</span><span>Visit Report</span></div>
+    <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
   </div>
   <div id="sidebar-user">
     <div class="user-name" id="sidebar-username">-</div>
@@ -2338,7 +2339,7 @@ function setupNav(){
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi)
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',false);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',false);
+      sv('nav-auto-inventory',false);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',false);sv('nav-inquiries',false);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
@@ -2354,7 +2355,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
-      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);
+      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
     }
   }catch(e){console.error('setupNav:',e);}
 }
@@ -2377,9 +2378,9 @@ async function navigate(page){
   if(currentUser)setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2693,6 +2694,19 @@ async function renderDashboard(){
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
+    // Inquiry followup check
+    try{
+      var today=new Date().toLocaleDateString('en-CA');
+      var todayInqs=await sb('auto_inquiries','GET',null,'?followup_date=eq.'+today+'&status=neq.Converted&status=neq.Lost&select=customer_name');
+      if(todayInqs&&todayInqs.length){
+        var inqAlert=document.createElement('div');
+        inqAlert.style.cssText='position:fixed;bottom:20px;right:20px;background:#f59e0b;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+        inqAlert.innerHTML='🔔 '+todayInqs.length+' Inquiry Followup Today! <br><span style="font-size:11px;font-weight:400;">'+todayInqs.map(function(i){return i.customer_name;}).join(', ')+'</span>';
+        inqAlert.onclick=function(){navigate('inquiries');this.remove();};
+        document.body.appendChild(inqAlert);
+        setTimeout(function(){if(inqAlert.parentNode)inqAlert.remove();},8000);
+      }
+    }catch(ex){}
   }catch(e){
     console.error('Dashboard error:',e);
     document.getElementById('page-content').innerHTML='<div class="alert alert-warning">Error loading dashboard: '+e.message+'<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:8px;">🔄 Retry</button></div>';
@@ -7571,8 +7585,9 @@ async function renderAutoInventory(){
       +'<select id="ainv-brand-filter" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" onchange="filterAutoInv()"><option value="">All Brands</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</select>'
       +'</div>'
       +'<div style="display:flex;gap:8px;">'
-      +'<button class="btn btn-success btn-sm" onclick="openBulkAddInventory()">📥 Bulk Add</button>'
-      +'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
+      +'<button class="btn btn-outline" onclick="downloadInventoryTemplate()" style="margin-right:6px;">📥 Template</button>'
+      +'<button class="btn btn-outline" onclick="importInventoryExcel()" style="margin-right:6px;">📤 Import Excel</button>'
++'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
       +'</div>'
       +'</div>'
       +'<div class="card">'
@@ -7630,10 +7645,17 @@ function openAddInventoryModal(editData){
     +'<div class="form-group" style="margin-bottom:10px;"><label>Item Name <span class="req">*</span></label><input type="text" id="ainv-name" value="'+(editData?.item_name||'')+'" placeholder="e.g. 2MP Dome Camera, CAT6 Cable"></div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Category</label><input type="text" id="ainv-cat" value="'+(editData?.category||'')+'" placeholder="e.g. Camera, Cable, Switch"></div>'
     +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Purchase Price ₹</label><input type="number" id="ainv-price" value="'+(editData?.purchase_price||0)+'" min="0"></div>'
-    +'<div class="form-group"><label>Unit</label><select id="ainv-unit" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="pcs"'+(editData?.unit==='pcs'?' selected':'')+'>pcs</option><option value="mtr"'+(editData?.unit==='mtr'?' selected':'')+'>mtr</option><option value="roll"'+(editData?.unit==='roll'?' selected':'')+'>roll</option><option value="set"'+(editData?.unit==='set'?' selected':'')+'>set</option><option value="box"'+(editData?.unit==='box'?' selected':'')+'>box</option></select></div>'
+    +'<div class="form-group"><label>Purchase Price ₹ (Basic)</label><input type="number" id="ainv-price" value="'+(editData?.purchase_price||0)+'" min="0" oninput="calcAInvFinal()"></div>'
+    +'<div class="form-group"><label>Unit</label><select id="ainv-unit" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="pcs"'+(editData?.unit==='pcs'?' selected':'')+'>pcs</option><option value="Pair"'+(editData?.unit==='Pair'?' selected':'')+'>Pair</option><option value="mtr"'+(editData?.unit==='mtr'?' selected':'')+'>mtr</option><option value="roll"'+(editData?.unit==='roll'?' selected':'')+'>roll</option><option value="set"'+(editData?.unit==='set'?' selected':'')+'>set</option><option value="box"'+(editData?.unit==='box'?' selected':'')+'>box</option></select></div>'
     +'</div>'
     +'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="'+(editData?.stock_qty||0)+'" min="0"></div>'
+    +'</div>'
+    +'<hr class="divider" style="margin:10px 0;">'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>GST %</label><select id="ainv-gst" onchange="calcAInvFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="0"'+(!(editData?.gst_percent)?'selected':'')+'>No GST</option><option value="5"'+(editData?.gst_percent==5?' selected':'')+'>5%</option><option value="12"'+(editData?.gst_percent==12?' selected':'')+'>12%</option><option value="18"'+(editData?.gst_percent==18?' selected':'')+'>18%</option></select></div>'
+    +'<div class="form-group"><label>Final Purchase (after GST) ₹</label><input type="number" id="ainv-final-price" readonly style="background:#f0f9ff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-weight:700;outline:none;" value="'+Math.round((editData?.purchase_price||0)*(1+(editData?.gst_percent||0)/100))+'"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Selling Price ₹ (Basic, before GST)</label><input type="number" id="ainv-selling" value="'+(editData?.selling_price||0)+'" min="0" oninput="calcAInvSellingFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-ainv\').remove()">Cancel</button>'
@@ -7657,16 +7679,100 @@ async function saveAutoInventoryItem(editId){
   var stock=parseFloat(document.getElementById('ainv-stock').value)||0;
   if(!name){alert('Item name required!');return;}
   try{
+    var gst=parseFloat(document.getElementById('ainv-gst')?.value)||0;
+    var selling=parseFloat(document.getElementById('ainv-selling')?.value)||0;
     var data={brand:brand||null,item_name:name,category:cat||null,purchase_price:price,unit:unit,updated_at:new Date().toISOString()};
+    // Try with gst/selling columns first; fall back without if schema error
+    var dataFull=Object.assign({},data,{gst_percent:gst,selling_price:selling});
     if(editId){
-      await sb('auto_inventory','PATCH',data,'?id=eq.'+editId);
+      var r=await fetch(SB_URL+'/rest/v1/auto_inventory?id=eq.'+editId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataFull)});
+      if(!r.ok){
+        var txt=await r.text();
+        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+          var r2=await fetch(SB_URL+'/rest/v1/auto_inventory?id=eq.'+editId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(data)});
+          if(!r2.ok)throw new Error(await r2.text());
+        }else{throw new Error(txt);}
+      }
     }else{
-      data.stock_qty=stock;
-      await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(data)});
+      dataFull.stock_qty=stock;
+      var r=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataFull)});
+      if(!r.ok){
+        var txt=await r.text();
+        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+          var dataBase=Object.assign({},data,{stock_qty:stock});
+          var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataBase)});
+          if(!r2.ok)throw new Error(await r2.text());
+        }else{throw new Error(txt);}
+      }
     }
     document.getElementById('modal-ainv').remove();
     renderAutoInventory();
   }catch(e){alert('Error: '+e.message);}
+}
+
+function calcAInvFinal(){
+  var pp=parseFloat(document.getElementById('ainv-price')?.value)||0;
+  var gst=parseFloat(document.getElementById('ainv-gst')?.value)||0;
+  var el=document.getElementById('ainv-final-price');
+  if(el)el.value=Math.round(pp*(1+gst/100));
+}
+function calcAInvSellingFinal(){}
+
+function downloadInventoryTemplate(){
+  if(!window.XLSX){alert('XLSX library not loaded');return;}
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Brand','Item Name','Category','Purchase Price (Basic)','GST %','Selling Price (Basic)','Unit','Opening Stock'],
+    ['DLS Speaker','Flatbox XL-BLK','Speaker',35040,18,20000,'Pair',1],
+    ['Russound','In-Ceiling IC-610','Speaker',13081,18,15000,'pcs',1]
+  ]);
+  ws['!cols']=[{wch:15},{wch:25},{wch:15},{wch:20},{wch:8},{wch:20},{wch:8},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'Inventory',ws);
+  XLSX.writeFile(wb,'auto_inventory_template.xlsx');
+}
+
+function importInventoryExcel(){
+  if(!window.XLSX){alert('XLSX library not loaded. Page reload karo.');return;}
+  var input=document.createElement('input');
+  input.type='file';input.accept='.xlsx,.xls,.csv';
+  input.onchange=async function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        var wb=XLSX.read(ev.target.result,{type:'binary'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        var items=rows.map(function(r){return{
+          brand:r['Brand']||null,item_name:String(r['Item Name']||'').trim(),
+          category:r['Category']||null,
+          purchase_price:parseFloat(r['Purchase Price (Basic)'])||0,
+          gst_percent:parseFloat(r['GST %'])||0,
+          selling_price:parseFloat(r['Selling Price (Basic)'])||0,
+          unit:r['Unit']||'pcs',stock_qty:parseFloat(r['Opening Stock'])||0
+        };}).filter(function(i){return i.item_name;});
+        if(!items.length){alert('Koi valid rows nathi. Template format check karo.');return;}
+        if(!confirm(items.length+' items import karva chhe?'))return;
+        var ok=0,failed=0;
+        for(var i=0;i<items.length;i++){
+          var itm=items[i];
+          var r=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(itm)});
+          if(!r.ok){
+            var txt=await r.text();
+            if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+              var base={brand:itm.brand,item_name:itm.item_name,category:itm.category,purchase_price:itm.purchase_price,unit:itm.unit,stock_qty:itm.stock_qty};
+              var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(base)});
+              if(r2.ok)ok++;else failed++;
+            }else{failed++;}
+          }else{ok++;}
+        }
+        alert('✅ '+ok+' items imported!'+(failed?' ⚠️ '+failed+' failed.':''));
+        renderAutoInventory();
+      }catch(err){alert('Import error: '+err.message);}
+    };
+    reader.readAsBinaryString(file);
+  };
+  input.click();
 }
 
 function openBulkAddInventory(){
@@ -7755,6 +7861,11 @@ async function renderAutoSites(){
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
     var sites=await sb('auto_sites','GET',null,'?order=created_at.desc');
+    var payments=[];try{payments=await sb('auto_site_payments','GET',null,'?select=site_id,amount');}catch(e){}
+    var allItems=[];try{allItems=await sb('auto_site_items','GET',null,'?select=site_id,total_price');}catch(e){}
+    var payMap={};payments.forEach(function(p){payMap[p.site_id]=(payMap[p.site_id]||0)+parseFloat(p.amount||0);});
+    var itemMap={};allItems.forEach(function(i){itemMap[i.site_id]=(itemMap[i.site_id]||0)+parseFloat(i.total_price||0);});
+    window._sitePayMap=payMap;window._siteItemMap=itemMap;
     var html='<div class="section-header">'
       +'<h2>🏗️ Automation Sites ('+sites.length+')</h2>'
       +'<button class="btn btn-primary" onclick="openNewSiteModal()">+ New Site</button>'
@@ -7766,9 +7877,7 @@ async function renderAutoSites(){
       html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🏗️ Koi site nathi abhi. "New Site" thi sharu karo!</div>';
     }else{
       html+='<div id="sites-list">';
-      sites.forEach(function(s){
-        html+=renderSiteCard(s);
-      });
+      sites.forEach(function(s){html+=renderSiteCard(s,payMap[s.id]||0,itemMap[s.id]||0);});
       html+='</div>';
     }
     pc.innerHTML=html;
@@ -7776,7 +7885,14 @@ async function renderAutoSites(){
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
-function renderSiteCard(s){
+function renderSiteCard(s,paid,quotTotal){
+  paid=paid||0;quotTotal=quotTotal||0;
+  var pending=quotTotal-paid;
+  var payHtml=quotTotal>0||paid>0?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">'
+    +'<span style="font-size:11px;background:#eff6ff;color:#1a56db;padding:2px 8px;border-radius:99px;font-weight:600;">📋 ₹'+Number(quotTotal).toLocaleString('en-IN')+'</span>'
+    +(paid>0?'<span style="font-size:11px;background:#f0fdf4;color:#065f46;padding:2px 8px;border-radius:99px;font-weight:600;">✅ Paid ₹'+Number(paid).toLocaleString('en-IN')+'</span>':'')
+    +(pending>0?'<span style="font-size:11px;background:#fff7ed;color:#d97706;padding:2px 8px;border-radius:99px;font-weight:600;">⏳ Pending ₹'+Number(pending).toLocaleString('en-IN')+'</span>':'')
+    +'</div>':'';
   return '<div class="card" style="margin-bottom:12px;border-left:4px solid #7c3aed;" data-site-name="'+(s.site_name||'').toLowerCase()+'" data-client="'+(s.client_name||'').toLowerCase()+'" data-mobile="'+(s.mobile||'').toLowerCase()+'">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
     +'<div>'
@@ -7784,13 +7900,15 @@ function renderSiteCard(s){
     +'<div style="font-size:13px;color:var(--text-muted);margin-top:2px;">👤 '+s.client_name+(s.mobile?' &nbsp;📱 '+s.mobile:'')+'</div>'
     +(s.address?'<div style="font-size:12px;color:var(--text-muted);">📍 '+s.address+'</div>':'')
     +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Created: '+new Date(s.created_at).toLocaleDateString('en-IN')+'</div>'
+    +payHtml
     +'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-    +'<button class="btn btn-outline btn-sm" onclick="viewSiteItems('+s.id+',\''+escQ(s.site_name)+'\')">📦 Items & Quotation</button>'
-    +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="viewSiteVisits('+s.id+',\''+escQ(s.site_name)+'\')">📋 Visit History</button>'
-    +'<button class="btn btn-primary btn-sm" onclick="openAddVisitModal('+s.id+',\''+escQ(s.site_name)+'\')">➕ Add Visit</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="viewSiteItems('+s.id+',\''+escQ(s.site_name)+'\')">📦 Items</button>'
+    +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="viewSiteVisits('+s.id+',\''+escQ(s.site_name)+'\')">📋 Visits</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="openAddVisitModal('+s.id+',\''+escQ(s.site_name)+'\')">➕ Visit</button>'
+    +'<button class="btn btn-sm" style="background:#0891b2;color:#fff;" onclick="viewSiteContacts('+s.id+',\''+escQ(s.site_name)+'\')">📞 Contacts</button>'
     +'<button class="btn btn-outline btn-sm" style="background:#e0e7ff;color:#3730a3;" onclick="editSite('+s.id+')">✏️ Edit</button>'
-+'<button class="btn btn-danger btn-sm" onclick="deleteSite('+s.id+')">🗑️</button>'
+    +'<button class="btn btn-danger btn-sm" onclick="deleteSite('+s.id+')">🗑️</button>'
     +'</div>'
     +'</div>'
     +'</div>';
@@ -7829,11 +7947,6 @@ async function openNewSiteModal(editData){
     +'<div class="form-group"><label>Mobile No</label><input type="tel" id="ns-mobile" value="'+(editData?.mobile||'')+'"></div>'
     +'<div class="form-group form-full"><label>Address</label><textarea id="ns-address" rows="2">'+(editData?.address||'')+'</textarea></div>'
     +'</div>'
-    +'<hr class="divider">'
-    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Items / Products</h3>'
-    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Inventory thi select karo — purchase price auto aavse, selling price tame aapvo</p>'
-    +'<div id="ns-items-list"></div>'
-    +'<button class="btn btn-outline btn-sm" onclick="addSiteItemRow(\'ns-items-list\')" style="margin-top:8px;">+ Add Item</button>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-new-site\').remove()">Cancel</button>'
@@ -7841,9 +7954,6 @@ async function openNewSiteModal(editData){
     +'</div>'
     +'</div>';
   document.body.appendChild(modal);
-  window._nsItemCount=0;
-  if(isEdit&&editData.items){editData.items.forEach(function(it){addSiteItemRow('ns-items-list',it);});}
-  else{addSiteItemRow('ns-items-list');}
 }
 
 function addSiteItemRow(listId,data){
@@ -7875,7 +7985,7 @@ function addSiteItemRow(listId,data){
   if(data&&data.inv_id){
     var sel=document.getElementById(prefix+'-item-'+idx);
     if(sel){sel.value=data.inv_id;onSiteItemSelect(sel,idx,prefix);}
-    var spEl=document.getElementById(prefix+'-sp-'+idx);if(spEl&&data.selling_price)spEl.value=data.selling_price;
+    var spEl=document.getElementById(prefix+'-sp-'+idx);if(spEl&&(data.unit_price||data.selling_price))spEl.value=data.unit_price||data.selling_price;
     var qEl=document.getElementById(prefix+'-qty-'+idx);if(qEl&&data.qty)qEl.value=data.qty;
     calcSiteItemTotal(idx,prefix);
   }
@@ -7913,27 +8023,10 @@ async function saveNewSite(editId){
     if(editId){
       await sb('auto_sites','PATCH',siteData,'?id=eq.'+editId);
       siteId=editId;
-      await sb('auto_site_items','DELETE',null,'?site_id=eq.'+siteId);
     }else{
       var res=await fetch(SB_URL+'/rest/v1/auto_sites',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(siteData)});
       var created=await res.json();
       siteId=created[0].id;
-    }
-    // Collect items from new format
-    var items=[];
-    document.querySelectorAll('#ns-items-list [id^="nsi-row-"]').forEach(function(row){
-      var idx=row.id.replace('nsi-row-','');
-      var sel=document.getElementById('nsi-item-'+idx);
-      var sp=parseFloat(document.getElementById('nsi-sp-'+idx)?.value)||0;
-      var qty=parseFloat(document.getElementById('nsi-qty-'+idx)?.value)||1;
-      var pp=parseFloat(document.getElementById('nsi-pp-'+idx)?.value)||0;
-      if(sel&&sel.value){
-        var opt=sel.selectedOptions[0];
-        items.push({site_id:siteId,inv_id:parseInt(sel.value),item_name:opt?.text?.split(' (')[0]||'',qty:qty,unit_price:sp,purchase_price:pp,total_price:sp*qty});
-      }
-    });
-    if(items.length){
-      await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(items)});
     }
     document.getElementById('modal-new-site').remove();
     alert('✅ Site '+(editId?'updated':'created')+' successfully!');
@@ -7945,40 +8038,50 @@ async function saveNewSite(editId){
 async function viewSiteItems(siteId,siteName){
   try{
     var items=await sb('auto_site_items','GET',null,'?site_id=eq.'+siteId+'&order=id');
-    var modal=document.createElement('div');
-    modal.className='modal-overlay';
+    var payments=[];try{payments=await sb('auto_site_payments','GET',null,'?site_id=eq.'+siteId+'&order=payment_date.desc');}catch(e){}
+    window._currentSiteItems=items;window._currentSitePayments=payments;
+    var siteObj=(window._allSites||[]).find(function(s){return s.id==siteId;})||{};
+    window._currentSiteInfo={name:siteName,address:siteObj.address||'',mobile:siteObj.mobile||''};
+    var modal=document.createElement('div');modal.className='modal-overlay';
     var grandSell=items.reduce(function(a,i){return a+(i.total_price||0);},0);
     var grandPurch=items.reduce(function(a,i){return a+(i.purchase_price||0)*(i.qty||0);},0);
-    var profit=grandSell-grandPurch;
+    var totalPaid=payments.reduce(function(a,p){return a+parseFloat(p.amount||0);},0);
+    var pending=grandSell-totalPaid;
     var rows=items.length?items.map(function(it){
-      var pp=(it.purchase_price||0)*(it.qty||0);
-      var sp=it.total_price||0;
-      var margin=sp-pp;
+      var pp=(it.purchase_price||0)*(it.qty||0);var sp=it.total_price||0;var margin=sp-pp;
       return '<tr>'
         +'<td>'+it.item_name+'</td>'
-        +'<td style="text-align:center;">'+it.qty+'</td>'
+        +'<td style="text-align:center;">'+it.qty+(it.unit?' '+it.unit:'')+'</td>'
         +'<td style="text-align:right;color:#6b7280;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
         +'<td style="text-align:right;font-weight:600;">₹'+Number(it.unit_price||0).toLocaleString('en-IN')+'</td>'
         +'<td style="text-align:right;font-weight:700;">₹'+Number(sp).toLocaleString('en-IN')+'</td>'
         +'<td style="text-align:right;color:'+(margin>=0?'#065f46':'#dc2626')+';">₹'+Number(margin).toLocaleString('en-IN')+'</td>'
+        +'<td><button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px;" onclick="editSiteItem('+it.id+','+siteId+',\''+escQ(siteName)+'\')">✏️</button></td>'
         +'</tr>';
-    }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No items added</td></tr>';
+    }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No items added</td></tr>';
+    var payRows=payments.map(function(p){
+      return'<tr><td>'+fmtDate(p.payment_date)+'</td><td><b style="color:#065f46;">₹'+Number(p.amount).toLocaleString('en-IN')+'</b></td><td>'+p.payment_mode+'</td><td>'+(p.reference_no||'—')+'</td><td>'+(p.note||'—')+'</td>'
+        +'<td><button onclick="deleteSitePayment('+p.id+','+siteId+',\''+escQ(siteName)+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:11px;">🗑️</button></td></tr>';
+    }).join('');
     modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
-      +'<div class="modal-header"><h2>📦 '+siteName+' — Items</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
+      +'<div class="modal-header"><h2>📦 '+siteName+' — Items & Payment</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
       +'<div class="modal-body">'
-      +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Selling Total</div><div class="kpi-value" style="font-size:18px;">₹'+Number(grandSell).toLocaleString('en-IN')+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#6b7280;"><div class="kpi-label">Purchase Total</div><div class="kpi-value" style="font-size:18px;color:#6b7280;">₹'+Number(grandPurch).toLocaleString('en-IN')+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Margin</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">₹'+Number(profit).toLocaleString('en-IN')+'</div></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:10px;"><div class="kpi-label">Quotation</div><div class="kpi-value" style="font-size:15px;">₹'+Number(grandSell).toLocaleString('en-IN')+'</div></div>'
+      +'<div class="kpi-card" style="padding:10px;border-color:#6b7280;"><div class="kpi-label">Purchase</div><div class="kpi-value" style="font-size:15px;color:#6b7280;">₹'+Number(grandPurch).toLocaleString('en-IN')+'</div></div>'
+      +'<div class="kpi-card" style="padding:10px;border-color:#0e9f6e;"><div class="kpi-label">✅ Paid</div><div class="kpi-value" style="font-size:15px;color:#0e9f6e;">₹'+Number(totalPaid).toLocaleString('en-IN')+'</div></div>'
+      +'<div class="kpi-card" style="padding:10px;border-color:#d97706;"><div class="kpi-label">⏳ Pending</div><div class="kpi-value" style="font-size:15px;color:#d97706;">₹'+Number(pending).toLocaleString('en-IN')+'</div></div>'
       +'</div>'
-      +'<div class="table-wrap"><table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Selling ₹</th><th style="text-align:right;">Total</th><th style="text-align:right;">Margin</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +'<div class="table-wrap"><table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Selling ₹</th><th style="text-align:right;">Total</th><th style="text-align:right;">Margin</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +(payments.length?'<hr class="divider"><h3 style="font-size:13px;font-weight:700;margin-bottom:8px;">💰 Payment History</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Mode</th><th>Ref</th><th>Note</th><th></th></tr></thead><tbody>'+payRows+'</tbody></table></div>':'')
       +'</div>'
-      +'<div class="modal-footer" style="justify-content:space-between;">'
-+'<button class="btn btn-primary" onclick="openAddSiteItem(\''+siteId+'\',\''+siteName+'\')">➕ Add Item</button>'
-+'<button class="btn btn-outline" onclick="openQuotationPrint([],{name:\''+siteName+'\'},{})">📄 Quotation Print</button>'
-+'<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
-+'</div>'
-      +'</div>';
+      +'<div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">'
+      +'<button class="btn btn-primary btn-sm" onclick="openAddSiteItem(\''+siteId+'\',\''+escQ(siteName)+'\')">➕ Add Item</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openSiteDCPrint(\''+siteId+'\',\''+escQ(siteName)+'\',window._currentSiteItems,null)">🚚 DC Print</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openQuotationPrint(window._currentSiteItems,window._currentSiteInfo,{paid:'+totalPaid+'})">📄 Quotation</button>'
+      +'<button class="btn btn-success btn-sm" onclick="openPaymentModal(\''+siteId+'\',\''+escQ(siteName)+'\','+grandSell+','+totalPaid+')">💰 Add Payment</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
+      +'</div></div>';
     document.body.appendChild(modal);
   }catch(e){alert('Error: '+e.message);}
 }
@@ -7999,10 +8102,25 @@ async function viewSiteVisits(siteId,siteName){
           +(v.material_total?'<span style="font-weight:700;color:#065f46;margin-left:8px;">Total: ₹'+Number(v.material_total).toLocaleString('en-IN')+'</span>':'')
           +'</div>'
         :(v.material_delivered?'<div style="margin-top:4px;font-size:13px;"><b>📦 Material:</b> '+v.material_delivered+'</div>':'');
+      var dd=null;try{if(v.delivery_details)dd=JSON.parse(v.delivery_details);}catch(e){}
+      var ddHtml='';
+      if(dd&&dd.mode){
+        ddHtml='<div style="margin-top:6px;font-size:12px;background:#f0f9ff;border-radius:6px;padding:6px 10px;">'
+          +'<b>🚚 Delivery:</b> '+dd.mode;
+        if(dd.mode==='Courier')ddHtml+=(dd.docket?' &nbsp;| Docket: <b>'+dd.docket+'</b>':'')+(dd.courier_date?' &nbsp;| Date: '+dd.courier_date:'');
+        else if(dd.mode==='Porter')ddHtml+=(dd.contact_person?' &nbsp;| Contact: <b>'+dd.contact_person+'</b>':'')+(dd.porter_date?' &nbsp;| Date: '+dd.porter_date:'');
+        else if(dd.mode==='By Hand')ddHtml+=(dd.contact_person?' &nbsp;| Contact: <b>'+dd.contact_person+'</b>':'')+(dd.contact_mobile?' &nbsp;| Mobile: '+dd.contact_mobile:'');
+        ddHtml+='</div>';
+      }
+      var matItemsForDC=matItems.length?matItems.map(function(m){return{item_name:m.item_name,qty:m.qty,unit:'pcs',note:''};}):(v.material_delivered?[{item_name:v.material_delivered,qty:1,unit:'',note:''}]:[]);
       return '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid #7c3aed;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
         +'<div style="font-weight:700;color:#7c3aed;">📅 '+fmtDate(v.visit_date)+(v.visit_time?' &nbsp;🕐 '+v.visit_time:'')+'</div>'
+        +(matItemsForDC.length?'<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 10px;" onclick="openSiteDCPrint(\''+siteId+'\',\''+escQ(siteName)+'\','+JSON.stringify(matItemsForDC)+','+JSON.stringify(dd||null)+')">🚚 DC Print</button>':'')
+        +'</div>'
         +(v.work_done?'<div style="margin-top:6px;font-size:13px;"><b>🔧 Kaam:</b> '+v.work_done+'</div>':'')
         +matHtml
+        +ddHtml
         +'</div>';
     }).join(''):'<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi visit nathi abhi</div>';
     modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
@@ -8072,6 +8190,17 @@ async function openAddVisitModal(siteId,siteName){
       :'<div class="alert alert-warning">Aa site ma koi items nathi. Pehela site ma items add karo.</div>')
     +'<div id="vm-items-list-'+siteId+'"></div>'
     +(siteItems.length?'<button class="btn btn-outline btn-sm" onclick="addVisitMaterialRow('+siteId+')" style="margin-top:6px;">+ Add Material</button>':'')
+    +'<hr class="divider" style="margin-top:14px;">'
+    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:8px;">🚚 Delivery Method</h3>'
+    +'<div class="form-group" style="max-width:260px;">'
+    +'<label style="font-size:12px;">Delivery Mode</label>'
+    +'<select id="av-delivery-mode-'+siteId+'" onchange="onDeliveryModeChange(\''+siteId+'\')" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'
+    +'<option value="">-- Select Mode --</option>'
+    +'<option value="Courier">📦 Courier</option>'
+    +'<option value="Porter">🛵 Porter</option>'
+    +'<option value="By Hand">🤝 By Hand</option>'
+    +'</select></div>'
+    +'<div id="av-delivery-fields-'+siteId+'" style="margin-top:8px;"></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>'
@@ -8163,6 +8292,22 @@ async function saveVisitWithMaterial(siteId,btn){
 
   var matText=materials.length?materials.map(function(m){return m.qty+'x '+m.item_name+' @₹'+m.selling_price;}).join(', '):'';
 
+  var deliveryMode=document.getElementById('av-delivery-mode-'+siteId)?.value||'';
+  var deliveryDetails=null;
+  if(deliveryMode){
+    deliveryDetails={mode:deliveryMode};
+    if(deliveryMode==='Courier'){
+      deliveryDetails.docket=document.getElementById('av-docket-'+siteId)?.value||'';
+      deliveryDetails.courier_date=document.getElementById('av-courier-date-'+siteId)?.value||'';
+    }else if(deliveryMode==='Porter'){
+      deliveryDetails.contact_person=document.getElementById('av-porter-contact-'+siteId)?.value||'';
+      deliveryDetails.porter_date=document.getElementById('av-porter-date-'+siteId)?.value||'';
+    }else if(deliveryMode==='By Hand'){
+      deliveryDetails.contact_person=document.getElementById('av-byhand-contact-'+siteId)?.value||'';
+      deliveryDetails.contact_mobile=document.getElementById('av-byhand-mobile-'+siteId)?.value||'';
+    }
+  }
+
   try{
     var visitData={
       site_id:siteId,visit_date:date,visit_time:time,
@@ -8170,9 +8315,19 @@ async function saveVisitWithMaterial(siteId,btn){
       material_delivered:matText||null,
       material_items:materials.length?JSON.stringify(materials):null,
       material_total:totalSelling||null,
+      delivery_details:deliveryDetails?JSON.stringify(deliveryDetails):null,
       created_by:currentUser?.user_id||'ENG002'
     };
-    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(visitData)});
+    var vr=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(visitData)});
+    if(!vr.ok){
+      var vtxt=await vr.text();
+      // Fallback: retry without new columns if schema error
+      if(vtxt.includes('column')){
+        var vBase={site_id:visitData.site_id,visit_date:visitData.visit_date,visit_time:visitData.visit_time,work_done:visitData.work_done,material_delivered:visitData.material_delivered,created_by:visitData.created_by};
+        var vr2=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(vBase)});
+        if(!vr2.ok)throw new Error(await vr2.text());
+      }else{throw new Error(vtxt);}
+    }
     btn.closest('.modal-overlay').remove();
     alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN'):''));
     if(currentPage==='auto-sites')renderAutoSites();
@@ -8416,6 +8571,8 @@ async function downloadWorkLogExcel(){
   XLSX.writeFile(wb,'work_logs_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
 function openPaymentModal(siteId,siteName,quotationTotal,paidSoFar){
+  window._paymentSiteId=siteId;
+  window._paymentSiteName=siteName;
   var today=new Date().toISOString().split('T')[0];
   document.getElementById('pay-date').value=today;
   document.getElementById('pay-amount').value='';
@@ -8423,28 +8580,122 @@ function openPaymentModal(siteId,siteName,quotationTotal,paidSoFar){
   document.getElementById('pay-ref').value='';
   document.getElementById('pay-note').value='';
   document.getElementById('payment-site-info').innerHTML='<b>Site:</b> '+(siteName||'')+'<br><b>Quotation Total:</b> ₹'+(quotationTotal||0)+'<br><b>Paid:</b> ₹'+(paidSoFar||0)+'<br><b style="color:#d97706;">Pending: ₹'+((quotationTotal||0)-(paidSoFar||0))+'</b>';
-  document.getElementById('modal-payment').classList.remove('hidden');
+  var pm=document.getElementById('modal-payment');
+  pm.style.zIndex='99999';
+  document.body.appendChild(pm);
+  pm.classList.remove('hidden');
 }
-function savePayment(){
+async function savePayment(){
   var amount=document.getElementById('pay-amount').value;
   var mode=document.getElementById('pay-mode').value;
+  var date=document.getElementById('pay-date').value;
+  var ref=document.getElementById('pay-ref').value;
+  var note=document.getElementById('pay-note').value;
   if(!amount||!mode){alert('Amount ane Payment Mode jaruri chhe!');return;}
-  alert('✅ Payment Saved!\nAmount: ₹'+amount+'\nMode: '+mode);
-  closeModal('modal-payment');
+  try{
+    await sb('auto_site_payments','POST',{site_id:window._paymentSiteId,amount:parseFloat(amount),payment_mode:mode,payment_date:date||new Date().toISOString().split('T')[0],reference_no:ref||null,note:note||null,created_by:currentUser?.user_id||'ENG002'});
+    alert('✅ Payment Saved!\nAmount: ₹'+amount+'\nMode: '+mode);
+    closeModal('modal-payment');
+  }catch(e){alert('Error saving payment: '+e.message);}
 }
 function printDC(){
-  var content=document.getElementById('dc-print-area').innerHTML;
-  var w=window.open('','_blank');
-  w.document.write('<html><head><title>DC</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
-  w.document.close();
-  setTimeout(function(){w.print();},500);
+  var logo=localStorage.getItem('bhavi_logo')||'';
+  // Extract full banner from the courier DC function
+  var bannerSrc=window._bhaviBannerSrc;
+  if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
+  var logoHtml=bannerSrc
+    ?'<img src="'+bannerSrc+'" style="width:100%;display:block;max-height:120px;object-fit:cover;">'
+    :(logo?'<img src="'+logo+'" style="max-height:70px;object-fit:contain;">':'<span style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS<br>&amp; Automation</span>');
+  var dcNo=document.getElementById('dc-number')?.textContent||'';
+  var dcDate=document.getElementById('dc-date')?.textContent||'';
+  var siteName=document.getElementById('dc-site-name')?.textContent||'';
+  var visitDate=document.getElementById('dc-visit-date')?.textContent||'';
+  var eng=document.getElementById('dc-engineer')?.textContent||'';
+  var receiver=document.getElementById('dc-receiver-name')?.value||'';
+  var receiverMob=document.getElementById('dc-receiver-mobile')?.value||'';
+  var deliveryMode=document.getElementById('dc-delivery-mode')?.value||'';
+  var courierDetail=document.getElementById('dc-courier-detail')?.value||'';
+  var itemsHtml=document.getElementById('dc-items-body')?.innerHTML||'';
+  var custSig='',siteSig='';
+  var c1=document.getElementById('dc-sig-customer');var c2=document.getElementById('dc-sig-manager');
+  if(c1)custSig=c1.toDataURL('image/png');
+  if(c2)siteSig=c2.toDataURL('image/png');
+  var sigBlock='<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">'
+    +'<div style="border-top:2px solid #1a56db;padding-top:8px;text-align:center;font-size:11px;color:#555;">'
+    +(custSig&&custSig!=='data:,'?'<img src="'+custSig+'" style="max-height:50px;margin-bottom:4px;"><br>':'<br><br>')
+    +'Customer Signature</div>'
+    +'<div style="border-top:2px solid #1a56db;padding-top:8px;text-align:center;font-size:11px;color:#555;">'
+    +(siteSig&&siteSig!=='data:,'?'<img src="'+siteSig+'" style="max-height:50px;margin-bottom:4px;"><br>':'<br><br>')
+    +'Site Manager / Engineer</div>'
+    +'</div>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DC-'+dcNo+'</title>'
+    +'<style>@page{size:A4;margin:10mm;}*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;padding:0;}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:12px;}th{background:#1a56db;color:#fff;padding:6px 8px;border:1px solid #1a56db;font-size:10px;text-align:center;}'
+    +'td{padding:6px 8px;border:1px solid #ccc;font-size:11px;}'
+    +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc0000;padding-bottom:10px;margin-bottom:12px;">'
+    +'<div>'+logoHtml+'</div>'
+    +'<div style="text-align:right;font-size:11px;">'
+    +'<div style="font-size:16px;font-weight:800;color:#1a56db;">DELIVERY CHALLAN</div>'
+    +'<div><b>DC No:</b> '+dcNo+'</div>'
+    +'<div><b>Date:</b> '+dcDate+'</div>'
+    +'</div></div>'
+    +'<div style="background:#f0f4ff;border-radius:6px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">'
+    +'<div><b>Site:</b> '+siteName+'</div>'
+    +'<div><b>Visit Date:</b> '+visitDate+'</div>'
+    +'<div><b>Engineer:</b> '+eng+'</div>'
+    +(deliveryMode?'<div><b>Delivery:</b> '+deliveryMode+(courierDetail?' — '+courierDetail:'')+'</div>':'')
+    +(receiver?'<div><b>Receiver:</b> '+receiver+(receiverMob?' | '+receiverMob:'')+'</div>':'')
+    +'</div>'
+    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item</th><th>Qty</th><th style="text-align:left;">Note</th></tr></thead>'
+    +'<tbody>'+itemsHtml+'</tbody></table>'
+    +sigBlock
+    +'<div style="border-top:2px solid #cc0000;margin-top:16px;padding-top:8px;text-align:center;font-size:10px;color:#555;">Bhavi Electronics &amp; Automation | Delivery Challan</div>'
+    +'<script>window.onload=function(){window.print();};<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');w.document.write(html);w.document.close();
 }
 function printQuotationDoc(){
-  var content=document.getElementById('quotation-print-area').innerHTML;
-  var w=window.open('','_blank');
-  w.document.write('<html><head><title>Quotation</title><style>body{font-family:Segoe UI,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;}th,td{padding:8px;border:1px solid #ccc;}</style></head><body>'+content+'</body></html>');
-  w.document.close();
-  setTimeout(function(){w.print();},500);
+  var logo=localStorage.getItem('bhavi_logo')||'';
+  // Extract full banner from the courier DC function
+  var bannerSrc=window._bhaviBannerSrc;
+  if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
+  var logoHtml=bannerSrc
+    ?'<img src="'+bannerSrc+'" style="width:100%;display:block;max-height:120px;object-fit:cover;">'
+    :(logo?'<img src="'+logo+'" style="max-height:70px;object-fit:contain;">':'<span style="font-size:18px;font-weight:800;color:#1a56db;">BHAVI ELECTRONICS<br>&amp; Automation</span>');
+  var quotNo=document.getElementById('quot-number')?.textContent||'';
+  var quotDate=document.getElementById('quot-date')?.textContent||'';
+  var siteName=document.getElementById('quot-site-name')?.textContent||'';
+  var address=document.getElementById('quot-address')?.textContent||'';
+  var mobile=document.getElementById('quot-mobile')?.textContent||'';
+  var itemsHtml=document.getElementById('quot-items-body')?.innerHTML||'';
+  var grandTotal=document.getElementById('quot-grand-total')?.textContent||'';
+  var paySum=document.getElementById('quot-payment-summary')?.innerHTML||'';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Quotation-'+quotNo+'</title>'
+    +'<style>@page{size:A4;margin:10mm;}*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;padding:0;}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:12px;}th{background:#1a56db;color:#fff;padding:6px 8px;border:1px solid #1a56db;font-size:10px;text-align:center;}'
+    +'td{padding:6px 8px;border:1px solid #ccc;font-size:11px;}'
+    +'@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #cc0000;padding-bottom:10px;margin-bottom:12px;">'
+    +'<div>'+logoHtml+'</div>'
+    +'<div style="text-align:right;font-size:11px;">'
+    +'<div style="font-size:16px;font-weight:800;color:#1a56db;">QUOTATION</div>'
+    +'<div><b>No:</b> '+quotNo+'</div>'
+    +'<div><b>Date:</b> '+quotDate+'</div>'
+    +'</div></div>'
+    +'<div style="background:#f0f4ff;border-radius:6px;padding:10px;margin-bottom:12px;font-size:11px;">'
+    +'<div><b>Site:</b> '+siteName+'</div>'
+    +(address&&address!=='—'?'<div><b>Address:</b> '+address+'</div>':'')
+    +(mobile&&mobile!=='—'?'<div><b>Mobile:</b> '+mobile+'</div>':'')
+    +'</div>'
+    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item</th><th>Qty</th><th style="text-align:right;">Rate ₹</th><th style="text-align:right;">Total ₹</th></tr></thead>'
+    +'<tbody>'+itemsHtml+'</tbody></table>'
+    +'<div style="text-align:right;font-size:14px;font-weight:800;border-top:2px solid #1a56db;padding-top:8px;margin-bottom:8px;">Grand Total: '+grandTotal+'</div>'
+    +(paySum?'<div style="background:#fff7ed;border-radius:6px;padding:8px;margin-bottom:12px;font-size:12px;">'+paySum+'</div>':'')
+    +'<div style="border-top:2px solid #cc0000;margin-top:16px;padding-top:8px;text-align:center;font-size:10px;color:#555;">Bhavi Electronics &amp; Automation | Quotation</div>'
+    +'<script>window.onload=function(){window.print();};<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');w.document.write(html);w.document.close();
 }</script>
 <!-- PAYMENT MODAL -->
 <div class="modal-overlay hidden" id="modal-payment" onclick="closeModal('modal-payment')">
@@ -8519,9 +8770,23 @@ function printQuotationDoc(){
           <div class="form-group"><label>Receiver Mobile</label><input type="tel" id="dc-receiver-mobile"></div>
           <div class="form-group"><label>Tracking / Details</label><input type="text" id="dc-courier-detail"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Receiver Signature<br><br><br></div>
-          <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Engineer Signature<br><br><br></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;">
+          <div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#374151;">Customer Signature</div>
+            <canvas id="dc-sig-customer" width="300" height="100" style="border:1px solid #d1d5db;border-radius:6px;background:#fafafa;touch-action:none;width:100%;"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="clearDCSig('dc-sig-customer')">🔄 Clear</button>
+              <button class="btn btn-outline btn-sm skip-btn-dc" style="font-size:11px;padding:3px 8px;color:#6b7280;" onclick="skipDCSig('dc-sig-customer',this)">Skip</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:#374151;">Site Manager / Engineer</div>
+            <canvas id="dc-sig-manager" width="300" height="100" style="border:1px solid #d1d5db;border-radius:6px;background:#fafafa;touch-action:none;width:100%;"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 8px;" onclick="clearDCSig('dc-sig-manager')">🔄 Clear</button>
+              <button class="btn btn-outline btn-sm skip-btn-dc" style="font-size:11px;padding:3px 8px;color:#6b7280;" onclick="skipDCSig('dc-sig-manager',this)">Skip</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -8575,17 +8840,58 @@ function printQuotationDoc(){
     </div>
   </div>
 <script>
-function openAddSiteItem(siteId,siteName){
+async function openAddSiteItem(siteId,siteName){
   var existing=document.getElementById('modal-add-site-item');
   if(existing)existing.remove();
+  var invItems=[];
+  try{invItems=await sb('auto_inventory','GET',null,'?order=item_name');}catch(e){}
+  window._asiInvItems=invItems;
   var modal=document.createElement('div');
-  modal.className='modal-overlay';
   modal.id='modal-add-site-item';
-  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()"><div class="modal-header"><h2>➕ '+siteName+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-site-item\').remove()">✕</button></div><div class="modal-body"><div class="form-group" style="margin-bottom:10px;"><label>Item Name</label><input type="text" id="asi-name" placeholder="Type karo..." list="asi-inv-list" oninput="filterASIList(this.value)"><datalist id="asi-inv-list"></datalist></div><div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div><div class="form-group"><label>Note</label><input type="text" id="asi-note" placeholder="Optional..."></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-add-site-item\').remove()">Cancel</button><button class="btn btn-primary" onclick="saveASIItem(\''+siteId+'\',\''+siteName+'\')">💾 Save</button></div></div>';
+  modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()"><div class="modal-header"><h2>➕ '+siteName+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-site-item\').remove()">✕</button></div><div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:10px;position:relative;"><label>Item Search Karo</label>'
+    +'<input type="text" id="asi-search" placeholder="Type item name..." oninput="filterASIDropdown()" onfocus="showASIDropdown()" onblur="setTimeout(function(){hideASIDropdown();},200)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<div id="asi-dropdown" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);top:100%;left:0;"></div></div>'
+    +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-custom-group"><label>Custom Item Name <span class="req">*</span></label>'
+    +'<input type="text" id="asi-name" placeholder="Item name lakhav..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-selected-name-group"><label>Item</label>'
+    +'<input type="text" id="asi-name-readonly" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f0f9ff;outline:none;"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div>'
+    +'<div class="form-group"><label>Note</label><input type="text" id="asi-note" placeholder="Optional..."></div>'
+    +'</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-add-site-item\').remove()">Cancel</button><button class="btn btn-primary" onclick="saveASIItem(\''+siteId+'\',\''+escQ(siteName)+'\')">💾 Save</button></div></div>';
   document.body.appendChild(modal);
-  loadASIInventory();
-  calcASITotal();
 }
+
+function onASISelectChange(){
+  var sel=document.getElementById('asi-select');
+  var opt=sel.selectedOptions[0];
+  var customGrp=document.getElementById('asi-custom-group');
+  var selectedGrp=document.getElementById('asi-selected-name-group');
+  var nameRo=document.getElementById('asi-name-readonly');
+  if(!sel.value){
+    customGrp.style.display='none';
+    selectedGrp.style.display='none';
+  } else if(sel.value==='__custom__'){
+    customGrp.style.display='';
+    selectedGrp.style.display='none';
+    document.getElementById('asi-pp').value=0;
+    document.getElementById('asi-sp').value=0;
+    document.getElementById('asi-gst').value=0;
+    calcASITotal();
+  } else {
+    customGrp.style.display='none';
+    selectedGrp.style.display='';
+    var name=opt.getAttribute('data-name')||opt.text.split(' — ')[0]||'';
+    if(nameRo)nameRo.value=name;
+    document.getElementById('asi-pp').value=opt.getAttribute('data-pp')||0;
+    document.getElementById('asi-sp').value=opt.getAttribute('data-sp')||0;
+    var gstEl=document.getElementById('asi-gst');
+    if(gstEl)gstEl.value=opt.getAttribute('data-gst')||0;
+    calcASITotal();
+  }
+}
+
 function calcASITotal(){
   var sp=parseFloat(document.getElementById('asi-sp')?.value)||0;
   var qty=parseFloat(document.getElementById('asi-qty')?.value)||1;
@@ -8593,27 +8899,76 @@ function calcASITotal(){
   var el=document.getElementById('asi-total');
   if(el)el.value=Math.round(sp*qty*(1+gst/100));
 }
-async function loadASIInventory(){
-  try{
-    var items=await sb('auto_inventory','GET',null,'&order=item_name');
-    var dl=document.getElementById('asi-inv-list');
-    if(dl)dl.innerHTML=items.map(function(i){return '<option value="'+i.item_name+'" data-pp="'+(i.purchase_price||0)+'" data-sp="'+(i.selling_price||i.purchase_price||0)+'">';}).join('');
-  }catch(e){}
+function filterASIDropdown(){
+  var q=(document.getElementById('asi-search')?.value||'').toLowerCase();
+  var items=window._asiInvItems||[];
+  var filtered=q?items.filter(function(i){return(i.item_name||'').toLowerCase().includes(q)||(i.brand||'').toLowerCase().includes(q);}):items;
+  renderASIDropdown(filtered);
+  document.getElementById('asi-dropdown').style.display=filtered.length?'':'none';
 }
-function filterASIList(val){
-  var opts=document.querySelectorAll('#asi-inv-list option');
-  opts.forEach(function(o){
-    if(o.value.toLowerCase()===val.toLowerCase()){
-      var pp=o.getAttribute('data-pp')||0;
-      var sp=o.getAttribute('data-sp')||0;
-      document.getElementById('asi-pp').value=pp;
-      document.getElementById('asi-sp').value=sp;
-      calcASITotal();
-    }
-  });
+function showASIDropdown(){
+  var items=window._asiInvItems||[];
+  renderASIDropdown(items);
+  document.getElementById('asi-dropdown').style.display=items.length?'':'none';
+}
+function hideASIDropdown(){
+  var el=document.getElementById('asi-dropdown');
+  if(el)el.style.display='none';
+}
+function renderASIDropdown(items){
+  var el=document.getElementById('asi-dropdown');
+  if(!el)return;
+  el.innerHTML=items.slice(0,50).map(function(i){
+    return'<div onclick="selectASIItem('+i.id+',\''+escQ(i.item_name||'')+'\',\''+escQ(i.brand||'')+'\','+(i.purchase_price||0)+','+(i.selling_price||0)+','+(i.gst_percent||0)+',\''+escQ(i.unit||'pcs')+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background=\'#f0f4ff\'" onmouseleave="this.style.background=\'\'">'
+      +(i.brand?'<span style="font-size:11px;color:#6b7280;margin-right:6px;">'+i.brand+'</span>':'')
+      +'<b>'+i.item_name+'</b>'
+      +'<span style="float:right;font-size:11px;color:#059669;">₹'+Number(i.purchase_price||0).toLocaleString('en-IN')+'</span>'
+      +'</div>';
+  }).join('')
+  +(items.length>50?'<div style="padding:8px;font-size:11px;color:#6b7280;text-align:center;">Type more to narrow down ('+items.length+' items)</div>':'')
+  +(items.length===0?'<div style="padding:12px;text-align:center;color:#6b7280;font-size:12px;">Koi item nathi — Custom use karo</div>':'');
+  el.innerHTML+='<div onclick="selectASICustom()" style="padding:8px 12px;cursor:pointer;font-size:13px;color:#7c3aed;border-top:1px solid #e5e7eb;" onmouseenter="this.style.background=\'#faf5ff\'" onmouseleave="this.style.background=\'\'">✏️ Custom Item...</div>';
+}
+function selectASIItem(id,name,brand,pp,sp,gst,unit){
+  var searchEl=document.getElementById('asi-search');
+  if(searchEl)searchEl.value=name+(brand?' ('+brand+')':'');
+  hideASIDropdown();
+  window._asiSelectedId=id;
+  var customGrp=document.getElementById('asi-custom-group');
+  var selectedGrp=document.getElementById('asi-selected-name-group');
+  var nameRo=document.getElementById('asi-name-readonly');
+  if(customGrp)customGrp.style.display='none';
+  if(selectedGrp)selectedGrp.style.display='';
+  if(nameRo)nameRo.value=name;
+  var ppAfterGst=Math.round(pp*(1+gst/100));
+  document.getElementById('asi-pp').value=ppAfterGst;
+  document.getElementById('asi-sp').value=sp||0;
+  var gstEl=document.getElementById('asi-gst');if(gstEl)gstEl.value=gst||0;
+  var unitEl=document.getElementById('asi-unit');if(unitEl)unitEl.value=unit||'pcs';
+  calcASITotal();
+}
+function selectASICustom(){
+  var searchEl=document.getElementById('asi-search');
+  if(searchEl)searchEl.value='';
+  hideASIDropdown();
+  window._asiSelectedId=null;
+  var customGrp=document.getElementById('asi-custom-group');
+  var selectedGrp=document.getElementById('asi-selected-name-group');
+  if(customGrp)customGrp.style.display='';
+  if(selectedGrp)selectedGrp.style.display='none';
+  document.getElementById('asi-pp').value=0;
+  document.getElementById('asi-sp').value=0;
+  var gstEl=document.getElementById('asi-gst');if(gstEl)gstEl.value=0;
+  calcASITotal();
 }
 async function saveASIItem(siteId,siteName){
-  var name=document.getElementById('asi-name').value.trim();
+  var name='';
+  var nameRo=document.getElementById('asi-name-readonly');
+  if(nameRo&&nameRo.style.display!=='none'&&nameRo.value){
+    name=nameRo.value.trim();
+  } else {
+    name=(document.getElementById('asi-name')?.value||'').trim();
+  }
   var qty=parseFloat(document.getElementById('asi-qty').value)||1;
   var unit=document.getElementById('asi-unit').value;
   var pp=parseFloat(document.getElementById('asi-pp').value)||0;
@@ -8623,33 +8978,463 @@ async function saveASIItem(siteId,siteName){
   var note=document.getElementById('asi-note').value;
   if(!name){alert('Item name jaruri chhe!');return;}
   try{
-    await sb('auto_site_items','POST',{site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,gst_percent:gst,total_price:total,note:note});
+    var asiData={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total,note:note};
+    var asiR=await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(asiData)});
+    if(!asiR.ok){
+      var asiTxt=await asiR.text();
+      if(asiTxt.includes('column')){
+        // Retry with only columns known to exist
+        var asiBase={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total};
+        var asiR2=await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(asiBase)});
+        if(!asiR2.ok)throw new Error(await asiR2.text());
+      }else{throw new Error(asiTxt);}
+    }
     document.getElementById('modal-add-site-item').remove();
     alert('✅ Item saved!');
     viewSiteItems(siteId,siteName);
   }catch(e){alert('Error: '+e.message);}
 }
-async function deleteSite(siteId,siteName){
-  if(!confirm('⚠️ "'+siteName+'" delete karvu chhe? Badha items pan delete thashe!'))return;
-  try{
-    await sb('auto_site_items','DELETE',null,'?site_id=eq.'+siteId);
-    await sb('auto_sites','DELETE',null,'&id=eq.'+siteId);
-    alert('✅ Site deleted!');
-    renderAutoSites();
-  }catch(e){alert('Error: '+e.message);}
-function editSite(id){
+async function editSite(id){
   var site=window._allSites&&window._allSites.find(function(s){return s.id==id;});
-  if(site)openNewSiteModal(site);
+  if(!site)return;
+  try{
+    var items=await sb('auto_site_items','GET',null,'?site_id=eq.'+id+'&order=id');
+    openNewSiteModal(Object.assign({},site,{items:items}));
+  }catch(e){openNewSiteModal(site);}
 }
 async function deleteSite(id){
   var site=window._allSites&&window._allSites.find(function(s){return s.id==id;});
   if(!confirm('Delete "'+(site?site.site_name:'site')+'"?'))return;
   try{
-    await sb('auto_site_items','DELETE',null,'&site_id=eq.'+id);
-    await sb('auto_sites','DELETE',null,'&id=eq.'+id);
+    await sb('auto_site_items','DELETE',null,'?site_id=eq.'+id);
+    await sb('auto_sites','DELETE',null,'?id=eq.'+id);
     alert('✅ Deleted!');
     renderAutoSites();
   }catch(e){alert('Error: '+e.message);}
-}}</script></div></body>
+}
+function openSiteDCPrint(siteId,siteName,items,deliveryDetails){
+  items=items||window._currentSiteItems||[];
+  var today=new Date().toLocaleDateString('en-IN');
+  document.getElementById('dc-number').textContent='DC-'+Date.now().toString().slice(-6);
+  document.getElementById('dc-date').textContent=today;
+  document.getElementById('dc-site-name').textContent=siteName;
+  document.getElementById('dc-visit-date').textContent=today;
+  document.getElementById('dc-engineer').textContent=(currentUser&&currentUser.name)||'Engineer';
+  document.getElementById('dc-receiver-name').value='';
+  document.getElementById('dc-receiver-mobile').value='';
+  var dcCourierEl=document.getElementById('dc-courier-detail');
+  if(dcCourierEl){
+    if(deliveryDetails&&deliveryDetails.mode){
+      var dd=deliveryDetails;
+      var txt=dd.mode;
+      if(dd.mode==='Courier')txt+=(dd.docket?' | Docket: '+dd.docket:'')+(dd.courier_date?' | Date: '+dd.courier_date:'');
+      else if(dd.mode==='Porter')txt+=(dd.contact_person?' | Contact: '+dd.contact_person:'')+(dd.porter_date?' | Date: '+dd.porter_date:'');
+      else if(dd.mode==='By Hand')txt+=(dd.contact_person?' | Contact: '+dd.contact_person:'')+(dd.contact_mobile?' | Mobile: '+dd.contact_mobile:'');
+      dcCourierEl.value=txt;
+    }else{dcCourierEl.value='';}
+  }
+  var body=document.getElementById('dc-items-body');
+  if(body){
+    body.innerHTML=items.map(function(it,i){
+      return'<tr><td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(i+1)+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+it.item_name+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+it.qty+' '+(it.unit||'pcs')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+(it.note||'—')+'</td>'
+        +'</tr>';
+    }).join('');
+  }
+  var dcEl=document.getElementById('modal-dc-print');
+  document.body.appendChild(dcEl);
+  dcEl.classList.remove('hidden');
+  setTimeout(function(){initDCSigCanvas('dc-sig-customer');initDCSigCanvas('dc-sig-manager');},100);
+}
+function openQuotationPrint(items,siteInfo,payInfo){
+  items=items||window._currentSiteItems||[];
+  siteInfo=siteInfo||window._currentSiteInfo||{};
+  payInfo=payInfo||{};
+  var quotNo='QT-'+Date.now().toString().slice(-6);
+  var today=new Date().toLocaleDateString('en-IN');
+  document.getElementById('quot-number').textContent=quotNo;
+  document.getElementById('quot-date').textContent=today;
+  document.getElementById('quot-site-name').textContent=siteInfo.name||siteInfo.site_name||'-';
+  document.getElementById('quot-address').textContent=siteInfo.address||'—';
+  document.getElementById('quot-mobile').textContent=siteInfo.mobile||'—';
+  var body=document.getElementById('quot-items-body');
+  var grand=0;
+  if(body){
+    body.innerHTML=items.map(function(it,i){
+      var total=it.total_price||(it.unit_price||0)*(it.qty||0);
+      grand+=total;
+      return'<tr>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(i+1)+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+it.item_name+(it.unit?' ('+it.unit+')':'')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+it.qty+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">₹'+(it.unit_price||0).toLocaleString('en-IN')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;font-weight:700;">₹'+Number(total).toLocaleString('en-IN')+'</td>'
+        +'</tr>';
+    }).join('')||'<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;">Koi items nathi</td></tr>';
+  }
+  var grandEl=document.getElementById('quot-grand-total');
+  if(grandEl)grandEl.textContent='₹'+Number(grand).toLocaleString('en-IN');
+  var payEl=document.getElementById('quot-payment-summary');
+  if(payEl){
+    var paid=payInfo.paid||0;
+    if(paid){payEl.innerHTML='<b>Paid:</b> ₹'+Number(paid).toLocaleString('en-IN')+'&nbsp;&nbsp;<b style="color:#d97706;">Pending: ₹'+Number(grand-paid).toLocaleString('en-IN')+'</b>';}
+    else{payEl.innerHTML='';}
+  }
+  var qtEl=document.getElementById('modal-quotation-print');
+  document.body.appendChild(qtEl);
+  qtEl.classList.remove('hidden');
+}
+
+// ── DELIVERY MODE DYNAMIC FIELDS ──
+function onDeliveryModeChange(siteId){
+  var mode=document.getElementById('av-delivery-mode-'+siteId)?.value||'';
+  var container=document.getElementById('av-delivery-fields-'+siteId);
+  if(!container)return;
+  var html='';
+  if(mode==='Courier'){
+    html='<div class="form-grid">'
+      +'<div class="form-group"><label style="font-size:12px;">Docket / Tracking No</label><input type="text" id="av-docket-'+siteId+'" placeholder="Enter docket no." style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label style="font-size:12px;">Courier Date</label><input type="date" id="av-courier-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>';
+  }else if(mode==='Porter'){
+    html='<div class="form-grid">'
+      +'<div class="form-group"><label style="font-size:12px;">Contact Person Name</label><input type="text" id="av-porter-contact-'+siteId+'" placeholder="Porter contact name" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label style="font-size:12px;">Date</label><input type="date" id="av-porter-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>';
+  }else if(mode==='By Hand'){
+    html='<div class="form-grid">'
+      +'<div class="form-group"><label style="font-size:12px;">Contact Person</label><input type="text" id="av-byhand-contact-'+siteId+'" placeholder="Name of person" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label style="font-size:12px;">Mobile No</label><input type="tel" id="av-byhand-mobile-'+siteId+'" placeholder="Mobile number" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>';
+  }
+  container.innerHTML=html;
+}
+
+// ── DELETE PAYMENT ──
+async function deleteSitePayment(payId,siteId,siteName){
+  if(!confirm('Aa payment delete karvu chhe?'))return;
+  try{
+    await sb('auto_site_payments','DELETE',null,'?id=eq.'+payId);
+    viewSiteItems(siteId,siteName);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── EDIT SITE ITEM ──
+async function editSiteItem(itemId,siteId,siteName){
+  var item=(window._currentSiteItems||[]).find(function(i){return i.id==itemId;});
+  if(!item)return;
+  var invItems=[];
+  try{invItems=await sb('auto_inventory','GET',null,'?order=item_name');}catch(e){}
+  var dlOpts=invItems.map(function(i){return'<option value="'+i.item_name+'" data-pp="'+(i.purchase_price||0)+'" data-sp="'+(i.selling_price||i.purchase_price||0)+'" data-gst="'+(i.gst_percent||0)+'">';}).join('');
+  var existing=document.getElementById('modal-edit-site-item');
+  if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-edit-site-item';
+  modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>✏️ Edit Item</h2><button class="close-btn" onclick="document.getElementById(\'modal-edit-site-item\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<datalist id="esi-inv-list">'+dlOpts+'</datalist>'
+    +'<div class="form-group"><label>Item Name <span class="req">*</span></label>'
+    +'<input type="text" id="esi-name" list="esi-inv-list" value="'+escQ(item.item_name)+'" oninput="filterESIList(this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Qty <span class="req">*</span></label><input type="number" id="esi-qty" value="'+(item.qty||1)+'" min="0.1" step="0.1" oninput="calcESITotal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Unit</label><input type="text" id="esi-unit" value="'+(item.unit||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Purchase ₹</label><input type="number" id="esi-pp" value="'+(item.purchase_price||0)+'" oninput="calcESITotal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Selling ₹ <span class="req">*</span></label><input type="number" id="esi-sp" value="'+(item.unit_price||0)+'" oninput="calcESITotal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>GST %</label><input type="number" id="esi-gst" value="'+(item.gst_percent||0)+'" oninput="calcESITotal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Total ₹</label><input type="number" id="esi-total" readonly value="'+(item.total_price||0)+'" style="background:#f0fdf4;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-weight:700;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Note</label><input type="text" id="esi-note" value="'+escQ(item.note||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-edit-site-item\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveEditSiteItem('+itemId+','+siteId+',\''+escQ(siteName)+'\')">💾 Update</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  window._editItemId=itemId;
+}
+
+function filterESIList(val){
+  var opts=document.querySelectorAll('#esi-inv-list option');
+  opts.forEach(function(o){
+    if(o.value.toLowerCase()===val.toLowerCase()){
+      var pp=o.getAttribute('data-pp')||0;
+      var sp=o.getAttribute('data-sp')||0;
+      var gst=o.getAttribute('data-gst')||0;
+      document.getElementById('esi-pp').value=pp;
+      document.getElementById('esi-sp').value=sp;
+      var gstEl=document.getElementById('esi-gst');if(gstEl)gstEl.value=gst;
+      calcESITotal();
+    }
+  });
+}
+
+function calcESITotal(){
+  var sp=parseFloat(document.getElementById('esi-sp')?.value)||0;
+  var qty=parseFloat(document.getElementById('esi-qty')?.value)||1;
+  var gst=parseFloat(document.getElementById('esi-gst')?.value)||0;
+  var el=document.getElementById('esi-total');
+  if(el)el.value=Math.round(sp*qty*(1+gst/100));
+}
+
+async function saveEditSiteItem(itemId,siteId,siteName){
+  var name=document.getElementById('esi-name')?.value.trim();
+  var qty=parseFloat(document.getElementById('esi-qty')?.value)||1;
+  var unit=document.getElementById('esi-unit')?.value||'';
+  var pp=parseFloat(document.getElementById('esi-pp')?.value)||0;
+  var sp=parseFloat(document.getElementById('esi-sp')?.value)||0;
+  var gst=parseFloat(document.getElementById('esi-gst')?.value)||0;
+  var total=Math.round(sp*qty*(1+gst/100));
+  var note=document.getElementById('esi-note')?.value||'';
+  if(!name){alert('Item name jaruri chhe!');return;}
+  try{
+    var esiData={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total,note:note};
+    var esiR=await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+itemId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(esiData)});
+    if(!esiR.ok){
+      var esiTxt=await esiR.text();
+      if(esiTxt.includes('column')){
+        var esiBase={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total};
+        var esiR2=await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+itemId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(esiBase)});
+        if(!esiR2.ok)throw new Error(await esiR2.text());
+      }else{throw new Error(esiTxt);}
+    }
+    document.getElementById('modal-edit-site-item').remove();
+    viewSiteItems(siteId,siteName);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── SITE CONTACTS ──
+var _contactAgencies=['Mistry','Electrician','Plumber','POP','Painter','Automation','CCTV','Network','AC Technician','Carpenter'];
+
+async function viewSiteContacts(siteId,siteName){
+  var contacts=[];
+  try{contacts=await sb('auto_site_contacts','GET',null,'?site_id=eq.'+siteId+'&order=id');}catch(e){}
+  window._contactSiteId=siteId;window._contactSiteName=siteName;
+  var existing=document.getElementById('modal-site-contacts');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-site-contacts';
+  modal.className='modal-overlay';
+  var rows=contacts.map(function(c){
+    return'<tr>'
+      +'<td style="padding:8px 10px;">'+c.agency+'</td>'
+      +'<td style="padding:8px 10px;">'+c.contact_name+'</td>'
+      +'<td style="padding:8px 10px;"><a href="tel:'+c.mobile+'" style="color:#2563eb;">'+c.mobile+'</a></td>'
+      +'<td style="padding:8px 10px;"><button onclick="deleteSiteContact('+c.id+')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">🗑️</button></td>'
+      +'</tr>';
+  }).join('')||'<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted);">Koi contact nathi</td></tr>';
+  var agDl=_contactAgencies.map(function(a){return'<option value="'+a+'">';}).join('');
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>📞 '+siteName+' — Contacts</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-contacts\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>Agency</th><th>Name</th><th>Mobile</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<hr class="divider"><h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">➕ New Contact Add Karo</h3>'
+    +'<datalist id="sc-agency-list">'+agDl+'</datalist>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Agency <span class="req">*</span></label><input type="text" id="sc-agency" list="sc-agency-list" placeholder="Mistry, Electrician..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Name <span class="req">*</span></label><input type="text" id="sc-name" placeholder="Contact person name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="sc-mobile" placeholder="Mobile number" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-site-contacts\').remove()">Close</button>'
+    +'<button class="btn btn-primary" onclick="saveSiteContact()">💾 Save Contact</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveSiteContact(){
+  var agency=document.getElementById('sc-agency')?.value.trim();
+  var name=document.getElementById('sc-name')?.value.trim();
+  var mobile=document.getElementById('sc-mobile')?.value.trim();
+  if(!agency||!name||!mobile){alert('Agency, Name ane Mobile jaruri chhe!');return;}
+  try{
+    await sb('auto_site_contacts','POST',{site_id:window._contactSiteId,agency:agency,contact_name:name,mobile:mobile});
+    viewSiteContacts(window._contactSiteId,window._contactSiteName);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteSiteContact(id){
+  if(!confirm('Aa contact delete karvu?'))return;
+  try{
+    await sb('auto_site_contacts','DELETE',null,'?id=eq.'+id);
+    viewSiteContacts(window._contactSiteId,window._contactSiteName);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── DC PRINT SIGNATURE CANVASES ──
+function initDCSigCanvas(id){
+  var canvas=document.getElementById(id);
+  if(!canvas||canvas._dcSigInit)return;
+  canvas._dcSigInit=true;
+  var ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fafafa';ctx.fillRect(0,0,canvas.width,canvas.height);
+  var drawing=false;
+  function getPos(e){
+    var r=canvas.getBoundingClientRect();
+    var sx=canvas.width/r.width,sy=canvas.height/r.height;
+    if(e.touches){return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};}
+    return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+  }
+  function start(e){e.preventDefault();drawing=true;ctx.beginPath();var p=getPos(e);ctx.moveTo(p.x,p.y);}
+  function move(e){e.preventDefault();if(!drawing)return;ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#1a56db';var p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();}
+  function stop(){drawing=false;}
+  canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);canvas.addEventListener('mouseup',stop);canvas.addEventListener('mouseleave',stop);
+  canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',stop);
+}
+function clearDCSig(id){
+  var canvas=document.getElementById(id);if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fafafa';ctx.fillRect(0,0,canvas.width,canvas.height);
+  canvas._skipped=false;
+  var btn=canvas.nextElementSibling?.querySelector('.skip-btn-dc');
+  if(btn)btn.textContent='Skip';
+}
+function skipDCSig(id,btn){
+  var canvas=document.getElementById(id);if(!canvas)return;
+  canvas._skipped=true;
+  var ctx=canvas.getContext('2d');
+  ctx.fillStyle='#f3f4f6';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#9ca3af';ctx.font='13px Arial';ctx.textAlign='center';ctx.fillText('— Skipped —',canvas.width/2,canvas.height/2);
+  if(btn)btn.textContent='✓ Skipped';
+}
+
+// ── INQUIRIES MODULE ──
+async function renderInquiries(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var today=new Date().toLocaleDateString('en-CA');
+    var inqs=await sb('auto_inquiries','GET',null,'?order=created_at.desc');
+    var followupToday=inqs.filter(function(i){return i.followup_date===today&&i.status!=='Converted'&&i.status!=='Lost';});
+    var html='<div class="section-header">'
+      +'<h2>🔍 Inquiries ('+inqs.length+')</h2>'
+      +'<button class="btn btn-primary" onclick="openAddInquiryModal()">+ New Inquiry</button>'
+      +'</div>';
+    if(followupToday.length){
+      html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
+        +'<span style="font-size:20px;">🔔</span><div>'
+        +'<b style="color:#92400e;">Aaj '+followupToday.length+' inquiry(s) na followup chhe!</b><br>'
+        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(', ')+'</span>'
+        +'</div></div>';
+    }
+    html+='<div class="filter-bar" style="margin-bottom:14px;">'
+      +'<input type="text" id="inq-search" placeholder="Search name / mobile..." style="flex:1;min-width:180px;" oninput="filterInquiryList()">'
+      +'<select id="inq-status-filter" onchange="filterInquiryList()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
+      +'<option value="">All Status</option><option value="Open">Open</option><option value="In Progress">In Progress</option><option value="Converted">Converted</option><option value="Lost">Lost</option>'
+      +'</select></div>';
+    if(!inqs.length){
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🔍 Koi inquiry nathi. "New Inquiry" thi add karo!</div>';
+    }else{
+      html+='<div id="inq-list">';
+      inqs.forEach(function(inq){
+        var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
+        var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
+        var statusColor={Open:'#2563eb','In Progress':'#d97706',Converted:'#059669',Lost:'#6b7280'}[inq.status]||'#6b7280';
+        html+='<div class="card" style="margin-bottom:10px;border-left:4px solid '+statusColor+';'+(isFollowup?'background:#fffbeb;':'')+(isPast?'background:#fff1f2;':'')+'"'
+          +' data-name="'+(inq.customer_name||'').toLowerCase()+'" data-mobile="'+(inq.mobile||'').toLowerCase()+'" data-status="'+(inq.status||'')+'">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+          +'<div>'
+          +'<div style="font-size:15px;font-weight:700;">'+inq.customer_name+(inq.mobile?' &nbsp;📱 '+inq.mobile:'')+'</div>'
+          +(inq.inquiry_type?'<div style="font-size:12px;color:var(--text-muted);">🔖 '+inq.inquiry_type+'</div>':'')
+          +(inq.description?'<div style="font-size:13px;margin-top:4px;">'+inq.description+'</div>':'')
+          +(inq.followup_date?'<div style="font-size:12px;margin-top:4px;color:'+(isFollowup?'#92400e':isPast?'#dc2626':'#059669')+';">📅 Followup: '+new Date(inq.followup_date+'T00:00:00').toLocaleDateString('en-IN')+(isFollowup?' 🔔 TODAY!':isPast?' ⚠️ OVERDUE':'')+'</div>':'')
+          +'</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+          +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
+          +'<button class="btn btn-outline btn-sm" onclick="openAddInquiryModal('+JSON.stringify(inq).replace(/'/g,"\\'")+')">✏️</button>'
+          +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
+          +'</div>'
+          +'</div>'
+          +(inq.notes?'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">📝 '+inq.notes+'</div>':'')
+          +'</div>';
+      });
+      html+='</div>';
+    }
+    pc.innerHTML=html;
+    window._allInquiries=inqs;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function filterInquiryList(){
+  var q=(document.getElementById('inq-search')?.value||'').toLowerCase();
+  var sf=(document.getElementById('inq-status-filter')?.value||'');
+  var cards=document.querySelectorAll('#inq-list .card');
+  cards.forEach(function(c){
+    var matchQ=!q||(c.dataset.name||'').includes(q)||(c.dataset.mobile||'').includes(q);
+    var matchS=!sf||(c.dataset.status||'')===sf;
+    c.style.display=(matchQ&&matchS)?'':'none';
+  });
+}
+
+function openAddInquiryModal(editData){
+  var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
+  var isEdit=!!(editData&&editData.id);
+  var modal=document.createElement('div');
+  modal.id='modal-add-inquiry';
+  modal.className='modal-overlay';
+  var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Inquiry':'🔍 New Inquiry')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label><input type="text" id="inq-name" value="'+(isEdit?escQ(editData.customer_name||''):'')+'" placeholder="Customer name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label><input type="tel" id="inq-mobile" value="'+(isEdit?escQ(editData.mobile||''):'')+'" placeholder="Mobile" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label><input type="text" id="inq-address" value="'+(isEdit?escQ(editData.address||''):'')+'" placeholder="Address" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +types.map(function(t){return'<option value="'+t+'"'+(isEdit&&editData.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')
+    +'</select></div>'
+    +'<div class="form-group"><label>Status</label><select id="inq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<option value="Open"'+(isEdit&&editData.status==='Open'?' selected':'')+'>Open</option>'
+    +'<option value="In Progress"'+(isEdit&&editData.status==='In Progress'?' selected':'')+'>In Progress</option>'
+    +'<option value="Converted"'+(isEdit&&editData.status==='Converted'?' selected':'')+'>Converted</option>'
+    +'<option value="Lost"'+(isEdit&&editData.status==='Lost'?' selected':'')+'>Lost</option>'
+    +'</select></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Description</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.description||'':'')+'</textarea></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>📅 Followup Date</label><input type="date" id="inq-followup" value="'+(isEdit?editData.followup_date||'':'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Notes</label><textarea id="inq-notes" rows="2" placeholder="Internal notes..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.notes||'':'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-add-inquiry\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveInquiry('+(isEdit?editData.id:'null')+')">💾 Save</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveInquiry(editId){
+  var name=document.getElementById('inq-name')?.value.trim();
+  var mobile=document.getElementById('inq-mobile')?.value.trim();
+  var address=document.getElementById('inq-address')?.value.trim()||'';
+  var type=document.getElementById('inq-type')?.value||'Other';
+  var status=document.getElementById('inq-status')?.value||'Open';
+  var desc=document.getElementById('inq-desc')?.value.trim()||'';
+  var followup=document.getElementById('inq-followup')?.value||null;
+  var notes=document.getElementById('inq-notes')?.value.trim()||'';
+  if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
+  try{
+    var data={customer_name:name,mobile:mobile,address:address,inquiry_type:type,status:status,description:desc,followup_date:followup||null,notes:notes||null,updated_at:new Date().toISOString()};
+    if(editId){
+      await sb('auto_inquiries','PATCH',data,'?id=eq.'+editId);
+    }else{
+      data.created_by=currentUser?.user_id||'ENG002';
+      await sb('auto_inquiries','POST',data);
+    }
+    document.getElementById('modal-add-inquiry').remove();
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteInquiry(id){
+  if(!confirm('Aa inquiry delete karvu?'))return;
+  try{
+    await sb('auto_inquiries','DELETE',null,'?id=eq.'+id);
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}</script></div></body>
 </html>
   
