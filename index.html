@@ -8978,13 +8978,13 @@ async function saveASIItem(siteId,siteName){
   var note=document.getElementById('asi-note').value;
   if(!name){alert('Item name jaruri chhe!');return;}
   try{
-    var asiData={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total,note:note};
+    var asiData={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,note:note};
     var asiR=await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(asiData)});
     if(!asiR.ok){
       var asiTxt=await asiR.text();
       if(asiTxt.includes('column')){
         // Retry with only columns known to exist
-        var asiBase={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total};
+        var asiBase={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp};
         var asiR2=await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(asiBase)});
         if(!asiR2.ok)throw new Error(await asiR2.text());
       }else{throw new Error(asiTxt);}
@@ -9191,12 +9191,12 @@ async function saveEditSiteItem(itemId,siteId,siteName){
   var note=document.getElementById('esi-note')?.value||'';
   if(!name){alert('Item name jaruri chhe!');return;}
   try{
-    var esiData={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total,note:note};
+    var esiData={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,note:note};
     var esiR=await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+itemId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(esiData)});
     if(!esiR.ok){
       var esiTxt=await esiR.text();
       if(esiTxt.includes('column')){
-        var esiBase={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,total_price:total};
+        var esiBase={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp};
         var esiR2=await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+itemId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(esiBase)});
         if(!esiR2.ok)throw new Error(await esiR2.text());
       }else{throw new Error(esiTxt);}
