@@ -546,16 +546,42 @@ tr:hover td{background:#f8fafc;}
 <!-- STOCK MODAL -->
 <div class="modal-overlay hidden" id="modal-stock" onclick="closeModal('modal-stock')">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2>Adjust Stock</h2><button class="close-btn" onclick="closeModal('modal-stock')">✕</button></div>
+    <div class="modal-header"><h2>📦 Stock Update</h2><button class="close-btn" onclick="closeModal('modal-stock')">✕</button></div>
     <div class="modal-body">
-      <div id="stock-part-info" style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:13px;"></div>
-      <div class="form-group" style="margin-bottom:10px;"><label>Type</label><select id="stock-type"><option value="in">Stock In</option><option value="out">Stock Out</option></select></div>
-      <div class="form-group" style="margin-bottom:10px;"><label>Qty</label><input type="number" id="stock-qty" value="1" min="1"></div>
-      <div class="form-group"><label>Note</label><input type="text" id="stock-note"></div>
+      <div id="stock-part-info" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;"></div>
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">
+        <button id="st-btn-in" onclick="switchInvStockType('in')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#dcfce7;color:#065f46;cursor:pointer;">⬇️ Stock IN</button>
+        <button id="st-btn-out" onclick="switchInvStockType('out')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">⬆️ Stock OUT</button>
+        <button id="st-btn-sell" onclick="switchInvStockType('sell')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">💰 Sell</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group"><label>Quantity *</label><input type="number" id="stock-qty" value="1" min="1"></div>
+        <div class="form-group"><label>Date</label><input type="date" id="stock-date"></div>
+      </div>
+      <div id="st-in-fields">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div class="form-group"><label>Supplier / Dealer</label><input type="text" id="stock-supplier" placeholder="e.g. Rashmi Traders"></div>
+          <div class="form-group"><label>Invoice No</label><input type="text" id="stock-invoice" placeholder="e.g. INV-001"></div>
+        </div>
+        <div class="form-group"><label>Note</label><input type="text" id="stock-note" placeholder="e.g. New stock arrived"></div>
+      </div>
+      <div id="st-out-fields" style="display:none;">
+        <div class="form-group"><label>Purpose / Note</label><input type="text" id="stock-out-note" placeholder="e.g. Used in ticket #1234, Damaged"></div>
+      </div>
+      <div id="st-sell-fields" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div class="form-group"><label>Customer Name *</label><input type="text" id="stock-cust" placeholder="e.g. Rajesh Patel"></div>
+          <div class="form-group"><label>Invoice No</label><input type="text" id="stock-sell-inv" placeholder="e.g. INV-2026-001"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group"><label>Selling Price / Unit ₹</label><input type="number" id="stock-sell-price" value="0" min="0"></div>
+          <div class="form-group"><label>Note</label><input type="text" id="stock-sell-note" placeholder="Optional"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-stock')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStockAdjust()">✅ Confirm</button>
+      <button class="btn btn-primary" onclick="saveStockAdjust()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -2380,6 +2406,20 @@ function setupNav(){
       var isAutoEng2=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-ai-agent',isAutoEng2);
     }
+    // Hide/show entire Automation + AI Agent sections based on role
+    var autoSec=document.getElementById('nav-automation-section');
+    var aiSec=document.getElementById('nav-ai-section');
+    if(isWC){
+      if(autoSec)autoSec.style.display='none';
+      if(aiSec)aiSec.style.display='none';
+    } else if(isEng){
+      var isAE=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
+      if(autoSec)autoSec.style.display=isAE?'':'none';
+      if(aiSec)aiSec.style.display=isAE?'':'none';
+    } else {
+      if(autoSec)autoSec.style.display='';
+      if(aiSec)aiSec.style.display='';
+    }
   }catch(e){console.error('setupNav:',e);}
 }
 
@@ -2716,8 +2756,9 @@ async function renderDashboard(){
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
-    // Inquiry followup check
-    try{
+    // Inquiry followup check — only for Admin and ENG002/ENG008
+    var canInqAlert=(currentUser.role==='admin'&&currentUser.role_type!=='work_controller')||(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
+    if(canInqAlert) try{
       var today=new Date().toLocaleDateString('en-CA');
       var todayInqs=await sb('auto_inquiries','GET',null,'?followup_date=eq.'+today+'&status=neq.Converted&status=neq.Lost&select=customer_name');
       if(todayInqs&&todayInqs.length){
@@ -4343,59 +4384,154 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td>${i.item_name}</td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory(this.dataset.code,this.dataset.name)" data-code="${i.part_code||''}" data-name="${i.item_name}">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
 function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
 function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;editingInvId=id;openAddInv();document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-price').value=inv.unit_price||0;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;}
 async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,unit_price:parseFloat(document.getElementById('inv-price').value)||0,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){alert('Error: '+e.message);}}
-function openStockAdjust(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;adjustingInvId=id;document.getElementById('stock-part-info').innerHTML=`<b>${inv.part_code||''}</b> — ${inv.item_name}<br>Stock: <b>${inv.qty_in_stock}</b> | Min: ${inv.min_stock} | ₹${inv.unit_price}`;document.getElementById('stock-qty').value='1';document.getElementById('stock-note').value='';openModal('modal-stock');}
-async function saveStockAdjust(){const inv=allInventory.find(i=>i.id===adjustingInvId);if(!inv)return;const type=document.getElementById('stock-type').value;const qty=parseInt(document.getElementById('stock-qty').value)||1;const newQty=type==='in'?inv.qty_in_stock+qty:Math.max(0,inv.qty_in_stock-qty);try{await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${adjustingInvId}`);await sb('inventory_log','POST',{inventory_id:adjustingInvId,type,qty,note:document.getElementById('stock-note').value,done_by:currentUser.name});closeModal('modal-stock');renderInventory();checkPendingPartsAuto();}catch(e){alert('Error: '+e.message);}}
+function switchInvStockType(t){
+  window._invStockType=t;
+  ['in','out','sell'].forEach(function(x){
+    var btn=document.getElementById('st-btn-'+x);
+    if(btn){btn.style.background=x===t?(t==='in'?'#dcfce7':t==='sell'?'#fef3c7':'#fee2e2'):'#f3f4f6';btn.style.color=x===t?(t==='in'?'#065f46':t==='sell'?'#92400e':'#dc2626'):'var(--text-muted)';}
+  });
+  document.getElementById('st-in-fields').style.display=t==='in'?'':'none';
+  document.getElementById('st-out-fields').style.display=t==='out'?'':'none';
+  document.getElementById('st-sell-fields').style.display=t==='sell'?'':'none';
+}
+function openStockAdjust(id){
+  const inv=allInventory.find(i=>i.id===id);if(!inv)return;
+  adjustingInvId=id;
+  window._invStockType='in';
+  document.getElementById('stock-part-info').innerHTML=`<b>${inv.part_code||''}</b> — ${inv.item_name}<br>Current Stock: <b style="color:${inv.qty_in_stock>0?'#065f46':'#dc2626'}">${inv.qty_in_stock}</b> | Min: ${inv.min_stock} | ₹${inv.unit_price}`;
+  document.getElementById('stock-qty').value='1';
+  document.getElementById('stock-date').value=new Date().toISOString().slice(0,10);
+  ['stock-note','stock-supplier','stock-invoice','stock-out-note','stock-cust','stock-sell-inv','stock-sell-note'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('stock-sell-price').value=inv.unit_price||0;
+  switchInvStockType('in');
+  openModal('modal-stock');
+}
+async function saveStockAdjust(){
+  const inv=allInventory.find(i=>i.id===adjustingInvId);if(!inv)return;
+  const t=window._invStockType||'in';
+  const qty=parseInt(document.getElementById('stock-qty').value)||1;
+  const date=document.getElementById('stock-date')?.value||new Date().toISOString().slice(0,10);
+  if(t==='sell'&&!document.getElementById('stock-cust')?.value.trim()){alert('Customer name required!');return;}
+  const newQty=t==='in'?inv.qty_in_stock+qty:Math.max(0,inv.qty_in_stock-qty);
+  let logNote='';
+  let logData={inventory_id:adjustingInvId,type:t,qty,done_by:currentUser.name,created_at:new Date().toISOString()};
+  if(t==='in'){
+    const sup=document.getElementById('stock-supplier')?.value.trim()||'';
+    const inv2=document.getElementById('stock-invoice')?.value.trim()||'';
+    logNote='Purchase'+(sup?' from '+sup:'')+(inv2?' INV:'+inv2:'');
+    logData.note=logNote;logData.supplier=sup||null;logData.invoice_no=inv2||null;logData.txn_date=date;
+  }else if(t==='out'){
+    logNote=document.getElementById('stock-out-note')?.value.trim()||'Manual stock out';
+    logData.note=logNote;logData.txn_date=date;
+  }else{
+    const cust=document.getElementById('stock-cust')?.value.trim()||'';
+    const sinv=document.getElementById('stock-sell-inv')?.value.trim()||'';
+    const sp=parseFloat(document.getElementById('stock-sell-price')?.value)||0;
+    logNote='Sale to '+cust+(sinv?' INV:'+sinv:'');
+    logData.note=logNote;logData.customer_name=cust;logData.invoice_no=sinv;logData.price_per_unit=sp;logData.txn_date=date;
+  }
+  try{
+    await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${adjustingInvId}`);
+    await sb('inventory_log','POST',logData).catch(()=>{});
+    closeModal('modal-stock');renderInventory();checkPendingPartsAuto();
+  }catch(e){alert('Error: '+e.message);}
+}
 async function deleteInv(id){if(!confirm('Delete?'))return;try{await sb('inventory','DELETE',null,`?id=eq.${id}`);renderInventory();}catch(e){alert(e.message);}}
 
-async function openPartHistory(partCode,partName){
-  if(!partCode){alert('Part code nathi');return;}
+async function openPartHistory(partCode,partName,invId){
   var ex=document.getElementById('part-history-modal');if(ex)ex.remove();
   var overlay=document.createElement('div');
   overlay.id='part-history-modal';
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
-  overlay.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
-    +'<div class="modal-header"><h2>Part Usage History</h2><button class="close-btn" onclick="document.getElementById(\'part-history-modal\').remove()">x</button></div>'
-    +'<div class="modal-body">'
-    +'<div style="background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px;"><b>'+partCode+'</b> — '+partName+'</div>'
+  overlay.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-height:90vh;display:flex;flex-direction:column;">'
+    +'<div class="modal-header"><h2>📋 '+partName+' — History</h2><button class="close-btn" onclick="document.getElementById(\'part-history-modal\').remove()">✕</button></div>'
+    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 16px;background:var(--surface);">'
+    +'<button id="ph-tab-log" onclick="showPartHistoryTab(\'log\')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-2px;">📦 IN/OUT/Sell Log</button>'
+    +(partCode?'<button id="ph-tab-tickets" onclick="showPartHistoryTab(\'tickets\')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);">🔧 Ticket Usage</button>':'')
+    +'</div>'
+    +'<div class="modal-body" style="overflow-y:auto;flex:1;">'
     +'<div id="part-history-content"><div class="loading">Loading...</div></div>'
     +'</div></div>';
   document.body.appendChild(overlay);
-  try{
-    const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
-    const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
-    if(used.length===0){
-      document.getElementById('part-history-content').innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Aa part koi call ma use nathi thayo</div>';
-      return;
-    }
-    const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
-    const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
-    const rows=used.map(t=>{
-      const spare=(t.spares||[]).find(s=>s.code===partCode);
-      const qty=spare?.qty||1;const price=spare?.price||0;
-      const deducted=spare?.stock_deducted?'<span class="badge badge-closed">Deducted</span>':'<span class="badge badge-pending">Pending</span>';
-      return '<tr><td><b>'+t.id+'</b></td><td>'+(t.cname||'-')+'</td><td>'+(t.model||'-')+'</td><td>'+(t.assigned_name||'-')+'</td>'
-        +'<td style="text-align:center;">'+qty+'</td><td style="text-align:right;">Rs'+price+'</td>'
-        +'<td style="text-align:right;font-weight:700;">Rs'+(qty*price)+'</td>'
-        +'<td>'+deducted+'</td>'
-        +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
-        +'<td>'+(t.status||'-')+'</td></tr>';
-    }).join('');
-    document.getElementById('part-history-content').innerHTML=
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Calls</div><div class="kpi-value" style="font-size:22px;">'+used.length+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Qty Used</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">'+totalQty+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Value</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">Rs'+totalAmt.toFixed(0)+'</div></div>'
-      +'</div>'
-      +'<div class="table-wrap"><table>'
-      +'<thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>Qty</th><th>Price</th><th>Total</th><th>Stock</th><th>Date</th><th>Status</th></tr></thead>'
-      +'<tbody>'+rows+'</tbody></table></div>';
-  }catch(e){document.getElementById('part-history-content').innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+  window._phPartCode=partCode;window._phInvId=invId;window._phPartName=partName;
+  showPartHistoryTab('log');
+}
+
+async function showPartHistoryTab(tab){
+  ['log','tickets'].forEach(function(t){
+    var btn=document.getElementById('ph-tab-'+t);
+    if(btn){btn.style.borderBottom=t===tab?'2px solid var(--primary)':'2px solid transparent';btn.style.color=t===tab?'var(--primary)':'var(--text-muted)';}
+  });
+  var content=document.getElementById('part-history-content');
+  if(!content)return;
+  content.innerHTML='<div class="loading">Loading...</div>';
+  if(tab==='log'){
+    try{
+      var invId=window._phInvId;
+      var logs=invId?await sb('inventory_log','GET',null,'?inventory_id=eq.'+invId+'&order=created_at.desc&limit=100'):[];
+      if(!logs.length){content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock adjust karo to yahan record thashe.</small></div>';return;}
+      var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
+      var totOut=logs.filter(function(l){return l.type==='out';}).reduce(function(a,l){return a+(l.qty||0);},0);
+      var totSell=logs.filter(function(l){return l.type==='sell';}).reduce(function(a,l){return a+(l.qty||0);},0);
+      var rows=logs.map(function(l){
+        var typeHtml=l.type==='in'?'<span style="background:#dcfce7;color:#065f46;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬇️ IN</span>'
+          :l.type==='sell'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">💰 SELL</span>'
+          :'<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬆️ OUT</span>';
+        return '<tr>'
+          +'<td>'+(l.txn_date||l.created_at?new Date(l.txn_date||l.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
+          +'<td>'+typeHtml+'</td>'
+          +'<td style="text-align:center;font-weight:700;">'+(l.qty||0)+'</td>'
+          +'<td>'+(l.supplier||l.dealer_name||l.customer_name||'—')+'</td>'
+          +'<td>'+(l.invoice_no||'—')+'</td>'
+          +'<td>'+(l.price_per_unit?'₹'+Number(l.price_per_unit).toLocaleString('en-IN'):'—')+'</td>'
+          +'<td style="color:var(--text-muted);font-size:12px;">'+(l.note||'—')+'</td>'
+          +'<td style="color:var(--text-muted);font-size:12px;">'+(l.done_by||'—')+'</td>'
+          +'</tr>';
+      }).join('');
+      content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+        +'<div class="kpi-card" style="padding:12px;border-color:#065f46;"><div class="kpi-label">Total IN</div><div class="kpi-value" style="font-size:22px;color:#065f46;">+'+totIn+'</div></div>'
+        +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">Total OUT</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">-'+totOut+'</div></div>'
+        +'<div class="kpi-card" style="padding:12px;border-color:#d97706;"><div class="kpi-label">Total Sold</div><div class="kpi-value" style="font-size:22px;color:#d97706;">'+totSell+'</div></div>'
+        +'</div>'
+        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>Party</th><th>Invoice</th><th>Price/Unit</th><th>Note</th><th>By</th></tr></thead>'
+        +'<tbody>'+rows+'</tbody></table></div>';
+    }catch(e){content.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+  }else{
+    try{
+      var partCode=window._phPartCode;
+      if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code nathi</div>';return;}
+      const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+      const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
+      if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi ticket ma use nathi thayo</div>';return;}
+      const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
+      const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
+      const rows=used.map(t=>{
+        const spare=(t.spares||[]).find(s=>s.code===partCode);
+        const qty=spare?.qty||1;const price=spare?.price||0;
+        const deducted=spare?.stock_deducted?'<span class="badge badge-closed">Deducted</span>':'<span class="badge badge-pending">Pending</span>';
+        return '<tr><td><b>'+t.id+'</b></td><td>'+(t.cname||'-')+'</td><td>'+(t.model||'-')+'</td><td>'+(t.assigned_name||'-')+'</td>'
+          +'<td style="text-align:center;">'+qty+'</td><td style="text-align:right;">₹'+price+'</td>'
+          +'<td style="text-align:right;font-weight:700;">₹'+(qty*price)+'</td>'
+          +'<td>'+deducted+'</td>'
+          +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
+          +'<td>'+(t.status||'-')+'</td></tr>';
+      }).join('');
+      content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+        +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Calls</div><div class="kpi-value" style="font-size:22px;">'+used.length+'</div></div>'
+        +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Qty Used</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">'+totalQty+'</div></div>'
+        +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Value</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">₹'+totalAmt.toFixed(0)+'</div></div>'
+        +'</div>'
+        +'<div class="table-wrap"><table>'
+        +'<thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>Qty</th><th>Price</th><th>Total</th><th>Stock</th><th>Date</th><th>Status</th></tr></thead>'
+        +'<tbody>'+rows+'</tbody></table></div>';
+    }catch(e){content.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+  }
 }
 
 function toggleAllInv(cb){
@@ -7760,15 +7896,17 @@ async function renderAutoInventory(){
         var sv2=(it.purchase_price||0)*(it.stock_qty||0);
         html+='<tr data-brand="'+(it.brand||'').toLowerCase()+'" data-name="'+(it.item_name||'').toLowerCase()+'">'
           +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+(it.brand||'—')+'</span></td>'
-          +'<td><b>'+it.item_name+'</b></td>'
+          +'<td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="History dekho">'+it.item_name+'</span></td>'
           +'<td>'+(it.category||'—')+'</td>'
           +'<td>'+(it.unit||'pcs')+'</td>'
           +'<td style="text-align:right;font-weight:600;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
           +'<td style="text-align:center;"><span style="font-weight:700;color:'+(it.stock_qty>0?'#065f46':'#dc2626')+';">'+it.stock_qty+'</span></td>'
           +'<td style="text-align:right;color:#065f46;font-weight:600;">₹'+Number(sv2).toLocaleString('en-IN')+'</td>'
-          +'<td>'
-          +'<button class="btn-icon" onclick="openEditInventoryModal('+it.id+')">✏️</button>'
-          +'<button class="btn-icon" onclick="adjustAutoStock('+it.id+',\''+escQ(it.item_name)+'\','+it.stock_qty+')">📦</button>'
+          +'<td style="white-space:nowrap;">'
+          +'<button class="btn-icon" onclick="openStockModal('+it.id+')" title="Stock IN/OUT/Sell">📦</button>'
+          +'<button class="btn-icon" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="IN/OUT History">📋</button>'
+          +'<button class="btn-icon" onclick="openEditInventoryModal('+it.id+')" title="Edit">✏️</button>'
+          +'<button class="btn-icon" onclick="deleteAutoInvItem('+it.id+',\''+escQ(it.item_name)+'\')" title="Delete" style="color:var(--danger);">🗑️</button>'
           +'</td>'
           +'</tr>';
       });
@@ -7809,6 +7947,10 @@ function openAddInventoryModal(editData){
     +'</div>'
     +'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="'+(editData?.stock_qty||0)+'" min="0"></div>'
     +'</div>'
+    +(isEdit?'':'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="ainv-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Purchase Date</label><input type="date" id="ainv-pdate" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>')
     +'<hr class="divider" style="margin:10px 0;">'
     +'<div class="form-grid" style="margin-bottom:10px;">'
     +'<div class="form-group"><label>GST %</label><select id="ainv-gst" onchange="calcAInvFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="0"'+(!(editData?.gst_percent)?'selected':'')+'>No GST</option><option value="5"'+(editData?.gst_percent==5?' selected':'')+'>5%</option><option value="12"'+(editData?.gst_percent==12?' selected':'')+'>12%</option><option value="18"'+(editData?.gst_percent==18?' selected':'')+'>18%</option></select></div>'
@@ -7862,6 +8004,18 @@ async function saveAutoInventoryItem(editId){
           var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataBase)});
           if(!r2.ok)throw new Error(await r2.text());
         }else{throw new Error(txt);}
+      }
+      // Log opening stock as first IN transaction
+      if(stock>0){
+        try{
+          var dealer=document.getElementById('ainv-dealer')?.value.trim()||null;
+          var pdate=document.getElementById('ainv-pdate')?.value||new Date().toISOString().slice(0,10);
+          // Get newly created item id
+          var newItems=await sb('auto_inventory','GET',null,'?item_name=eq.'+encodeURIComponent(name)+'&order=created_at.desc&limit=1');
+          if(newItems&&newItems[0]){
+            await sb('auto_inventory_log','POST',{inventory_id:newItems[0].id,type:'in',qty:stock,dealer_name:dealer,price_per_unit:price,note:'Opening stock',done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:pdate});
+          }
+        }catch(ex){}
       }
     }
     document.getElementById('modal-ainv').remove();
@@ -8008,19 +8162,156 @@ async function saveBulkInventory(){
   }catch(e){alert('Error: '+e.message);}
 }
 
-async function adjustAutoStock(id,name,current){
-  var type=prompt('📦 '+name+'\nCurrent Stock: '+current+'\n\nType:\n"in X" = Stock In\n"out X" = Stock Out\n\nExample: in 5');
-  if(!type)return;
-  var parts=type.trim().split(' ');
-  var dir=parts[0].toLowerCase();
-  var qty=parseFloat(parts[1])||0;
-  if(!qty||!['in','out'].includes(dir)){alert('Format: "in 5" ya "out 3"');return;}
-  var newQty=dir==='in'?current+qty:Math.max(0,current-qty);
+async function deleteAutoInvItem(id,name){
+  if(!confirm('⚠️ "'+name+'" delete karvu chhe?\n\nAa permanently delete thashe!'))return;
   try{
-    await sb('auto_inventory','PATCH',{stock_qty:newQty,updated_at:new Date().toISOString()},'?id=eq.'+id);
-    alert('✅ Stock updated: '+newQty);
+    await sb('auto_inventory','DELETE',null,'?id=eq.'+id);
+    renderAutoInventory();
+  }catch(e){alert('Delete error: '+e.message);}
+}
+
+function openStockModal(id){
+  var item=(window._autoInvItems||[]).find(function(i){return i.id===id;});
+  if(!item){alert('Item not found');return;}
+  var existing=document.getElementById('modal-stock-ainv');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-stock-ainv';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>📦 Stock Update</h2><button class="close-btn" onclick="document.getElementById(\'modal-stock-ainv\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
+    +'<b style="color:var(--primary);">'+item.item_name+'</b>'+(item.brand?' &nbsp;·&nbsp; <span style="color:#7c3aed;">'+item.brand+'</span>':'')+'<br>'
+    +'<span style="font-size:13px;color:var(--text-muted);">Current Stock: <b style="color:'+(item.stock_qty>0?'#065f46':'#dc2626')+';">'+item.stock_qty+' '+(item.unit||'pcs')+'</b></span>'
+    +'</div>'
+    +'<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">'
+    +'<button id="stype-in" onclick="switchStockType(\'in\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#dcfce7;color:#065f46;cursor:pointer;">⬇️ Stock IN</button>'
+    +'<button id="stype-out" onclick="switchStockType(\'out\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">⬆️ Stock OUT</button>'
+    +'<button id="stype-sell" onclick="switchStockType(\'sell\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">💰 Sell</button>'
+    +'</div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Quantity <span class="req">*</span></label><input type="number" id="sm-qty" min="1" value="1" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Date</label><input type="date" id="sm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div id="sm-in-fields">'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="sm-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Purchase Price / Unit ₹</label><input type="number" id="sm-pprice" value="'+(item.purchase_price||0)+'" min="0" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Note</label><input type="text" id="sm-in-note" placeholder="e.g. New stock arrived" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div id="sm-out-fields" style="display:none;">'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Purpose / Note</label><input type="text" id="sm-out-note" placeholder="e.g. Used in site ABC, Damaged" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div id="sm-sell-fields" style="display:none;">'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label><input type="text" id="sm-cust" placeholder="e.g. Rajesh Patel" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Invoice No</label><input type="text" id="sm-inv-no" placeholder="e.g. INV-2026-001" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Selling Price / Unit ₹</label><input type="number" id="sm-sprice" value="'+(item.selling_price||0)+'" min="0" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Note</label><input type="text" id="sm-sell-note" placeholder="Optional" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-stock-ainv\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveStockModal('+id+','+item.stock_qty+')">💾 Save</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  window._stockModalType='in';
+}
+
+function switchStockType(t){
+  window._stockModalType=t;
+  ['in','out','sell'].forEach(function(x){
+    var btn=document.getElementById('stype-'+x);
+    if(btn)btn.style.background=x===t?(t==='in'?'#dcfce7':t==='sell'?'#fef3c7':'#fee2e2'):'#f3f4f6';
+    if(btn)btn.style.color=x===t?(t==='in'?'#065f46':t==='sell'?'#92400e':'#dc2626'):'var(--text-muted)';
+  });
+  document.getElementById('sm-in-fields').style.display=t==='in'?'':'none';
+  document.getElementById('sm-out-fields').style.display=t==='out'?'':'none';
+  document.getElementById('sm-sell-fields').style.display=t==='sell'?'':'none';
+}
+
+async function saveStockModal(id,currentStock){
+  var t=window._stockModalType||'in';
+  var qty=parseFloat(document.getElementById('sm-qty')?.value)||0;
+  var date=document.getElementById('sm-date')?.value||new Date().toISOString().slice(0,10);
+  if(!qty||qty<=0){alert('Quantity enter karo!');return;}
+  if(t==='sell'&&!document.getElementById('sm-cust')?.value.trim()){alert('Customer name required for Sell!');return;}
+
+  var newStock=t==='in'?currentStock+qty:Math.max(0,currentStock-qty);
+  var logData={inventory_id:id,type:t,qty:qty,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date};
+  if(t==='in'){
+    logData.dealer_name=document.getElementById('sm-dealer')?.value.trim()||null;
+    logData.price_per_unit=parseFloat(document.getElementById('sm-pprice')?.value)||null;
+    logData.note=document.getElementById('sm-in-note')?.value.trim()||null;
+  }else if(t==='out'){
+    logData.note=document.getElementById('sm-out-note')?.value.trim()||null;
+  }else{
+    logData.customer_name=document.getElementById('sm-cust')?.value.trim()||null;
+    logData.invoice_no=document.getElementById('sm-inv-no')?.value.trim()||null;
+    logData.price_per_unit=parseFloat(document.getElementById('sm-sprice')?.value)||null;
+    logData.note=document.getElementById('sm-sell-note')?.value.trim()||null;
+  }
+
+  try{
+    await sb('auto_inventory','PATCH',{stock_qty:newStock,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    // Log transaction (graceful fail if table doesn't exist)
+    try{await sb('auto_inventory_log','POST',logData);}catch(ex){}
+    document.getElementById('modal-stock-ainv').remove();
     renderAutoInventory();
   }catch(e){alert('Error: '+e.message);}
+}
+
+async function openAutoInvHistory(id,name){
+  var ex=document.getElementById('modal-ainv-history');if(ex)ex.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-ainv-history';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-height:90vh;display:flex;flex-direction:column;">'
+    +'<div class="modal-header"><h2>📋 '+name+' — IN/OUT History</h2><button class="close-btn" onclick="document.getElementById(\'modal-ainv-history\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="overflow-y:auto;flex:1;">'
+    +'<div id="ainv-hist-content"><div class="loading">Loading...</div></div>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  try{
+    var logs=await sb('auto_inventory_log','GET',null,'?inventory_id=eq.'+id+'&order=created_at.desc&limit=100');
+    var content=document.getElementById('ainv-hist-content');
+    if(!content)return;
+    if(!logs||!logs.length){
+      content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock update karo to yahan record thashe.</small></div>';
+      return;
+    }
+    var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
+    var totOut=logs.filter(function(l){return l.type==='out';}).reduce(function(a,l){return a+(l.qty||0);},0);
+    var totSell=logs.filter(function(l){return l.type==='sell';}).reduce(function(a,l){return a+(l.qty||0);},0);
+    var rows=logs.map(function(l){
+      var typeHtml=l.type==='in'?'<span style="background:#dcfce7;color:#065f46;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬇️ IN</span>'
+        :l.type==='sell'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">💰 SELL</span>'
+        :'<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬆️ OUT</span>';
+      return '<tr>'
+        +'<td>'+(l.txn_date||l.created_at?new Date(l.txn_date||l.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
+        +'<td>'+typeHtml+'</td>'
+        +'<td style="text-align:center;font-weight:700;">'+(l.qty||0)+'</td>'
+        +'<td>'+(l.dealer_name||l.customer_name||'—')+'</td>'
+        +'<td>'+(l.invoice_no||'—')+'</td>'
+        +'<td>'+(l.price_per_unit?'₹'+Number(l.price_per_unit).toLocaleString('en-IN'):'—')+'</td>'
+        +'<td style="color:var(--text-muted);font-size:12px;">'+(l.note||'—')+'</td>'
+        +'<td style="color:var(--text-muted);font-size:12px;">'+(l.done_by||'—')+'</td>'
+        +'</tr>';
+    }).join('');
+    content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;border-color:#065f46;"><div class="kpi-label">Total IN</div><div class="kpi-value" style="font-size:22px;color:#065f46;">+'+totIn+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">Total OUT</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">-'+totOut+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#d97706;"><div class="kpi-label">Total Sold</div><div class="kpi-value" style="font-size:22px;color:#d97706;">'+totSell+'</div></div>'
+      +'</div>'
+      +'<div class="table-wrap"><table>'
+      +'<thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>Party (Dealer/Customer)</th><th>Invoice</th><th>Price/Unit</th><th>Note</th><th>By</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+  }catch(e){
+    var c=document.getElementById('ainv-hist-content');
+    if(c)c.innerHTML='<div class="alert alert-warning">Log table available nathi. Supabase ma <b>auto_inventory_log</b> table create karo.</div>';
+  }
 }
 
 // ===== AUTOMATION SITE VISIT MODULE =====
@@ -8659,9 +8950,22 @@ async function saveVisitWithMaterial(siteId,btn){
         var newStatus=newDelivered>=(orig.qty||0)?'delivered':'partial';
         try{await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+mat.site_item_id,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({delivery_status:newStatus,delivered_qty:newDelivered,delivered_date:date,delivered_by:deliveryMode||'Visit'})});}catch(ex){}
       }
+      // Auto-deduct stock from auto_inventory for each material used on site
+      try{
+        var invItems=await sb('auto_inventory','GET',null,'?order=item_name');
+        for(var si=0;si<materials.length;si++){
+          var smat=materials[si];
+          // Match by item_name (case-insensitive)
+          var invMatch=invItems.find(function(iv){return iv.item_name.toLowerCase()===smat.item_name.toLowerCase();});
+          if(!invMatch)continue;
+          var deducted=Math.max(0,(invMatch.stock_qty||0)-smat.qty);
+          await sb('auto_inventory','PATCH',{stock_qty:deducted,updated_at:new Date().toISOString()},'?id=eq.'+invMatch.id);
+          try{await sb('auto_inventory_log','POST',{inventory_id:invMatch.id,type:'out',qty:smat.qty,note:'Site visit: '+date,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date});}catch(ex){}
+        }
+      }catch(ex){}
     }
     btn.closest('.modal-overlay').remove();
-    alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN'):''));
+    alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN')+' | Stock auto-updated':''));
     if(currentPage==='auto-sites')renderAutoSites();
   }catch(e){alert('Error: '+e.message);}
 }
@@ -9813,17 +10117,21 @@ var aiAgentTab='social';
 var aiAgentLog=[];
 
 async function renderVirtualAgent(){
+  // Access control: only Admin (non-WC) and ENG002/ENG008
+  var isAdminAccess=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+  var isAutoEngAccess=currentUser&&(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
+  if(!isAdminAccess&&!isAutoEngAccess){navigate('dashboard');return;}
+
   const pc=document.getElementById('page-content');
 
   // Load counts from Supabase for dashboard cards
   let pendingCalls=0,pendingPayments=0,pendingInquiries=0,totalCustomers=0;
   try{
-    const [callsRes,inquiriesRes,customersRes]=await Promise.all([
-      fetch(SB_URL+'/rest/v1/service_calls?status=eq.Pending+Allocation&select=id',{headers:SB_HEADERS}),
-      fetch(SB_URL+'/rest/v1/auto_inquiries?followup_status=eq.Pending&select=id',{headers:SB_HEADERS}),
-      fetch(SB_URL+'/rest/v1/customers?select=id',{headers:SB_HEADERS})
+    const [callsData,inquiriesData,customersData]=await Promise.all([
+      sb('service_calls','GET',null,'?status=eq.Pending+Allocation&select=id'),
+      sb('auto_inquiries','GET',null,'?followup_status=eq.Pending&select=id'),
+      sb('customers','GET',null,'?select=id')
     ]);
-    const [callsData,inquiriesData,customersData]=await Promise.all([callsRes.json(),inquiriesRes.json(),customersRes.json()]);
     pendingCalls=Array.isArray(callsData)?callsData.length:0;
     pendingInquiries=Array.isArray(inquiriesData)?inquiriesData.length:0;
     totalCustomers=Array.isArray(customersData)?customersData.length:0;
@@ -9975,7 +10283,7 @@ async function renderVirtualAgent(){
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
           <button class="btn btn-outline btn-sm" onclick="copyAIPost()" id="btn-copy-post" style="display:none;">📋 Copy</button>
-          <button class="btn btn-success btn-sm" onclick="downloadAIPost()" id="btn-dl-post" style="display:none;">⬇️ Download Text</button>
+          <button class="btn btn-success btn-sm" onclick="downloadAIPost()" id="btn-dl-post" style="display:none;">📸 Download PNG (1080×1080)</button>
           <button class="btn btn-primary btn-sm" onclick="scheduleAIPost()" id="btn-schedule-post" style="display:none;">⏰ Schedule</button>
         </div>
       </div>
@@ -10125,8 +10433,8 @@ function switchAITab(tab){
 
 // ─── Social Media ───────────────────────────────────────────────────────────
 var selectedTemplate='offer';
-var generatedPostText='';
 var generatedHashtags=[];
+var generatedCanvas=null;
 
 const AI_HASHTAG_SETS={
   offer:['#BhaviElectronics','#ElectronicsRepair','#ACService','#SuratElectronics','#HomeAppliances','#ServiceCenter','#SpecialOffer','#DiscountAlert','#SummerSale','#Surat','#Gujarat','#RepairService','#TechService','#ApplianceRepair'],
@@ -10137,20 +10445,125 @@ const AI_HASHTAG_SETS={
   custom:['#BhaviElectronics','#Surat','#Gujarat','#ElectronicsRepair','#HomeAppliances','#ServiceCenter','#TechService']
 };
 
-const AI_POST_TEMPLATES={
-  offer:(detail,city)=>`🎁 SPECIAL OFFER — ${detail}\n\n✅ Fast Service | ✅ Genuine Parts | ✅ Warranty\n\n📍 ${city} | 📞 Call Now\n\n💡 Don't miss this limited time deal!\n\n— Bhavi Electronics & Automation`,
-  service:(detail,city)=>`🔧 SERVICE TIP: ${detail}\n\n👨‍🔧 Our expert engineers are here to help!\n\nBook your service today:\n✅ On-Site & Carry-in available\n✅ All brands covered\n\n📍 ${city} | Bhavi Electronics`,
-  festival:(detail,city)=>`🎉 FESTIVAL SPECIAL!\n\n${detail}\n\n✨ Celebrate with the best electronics service in ${city}!\n\n📍 Visit us today — Bhavi Electronics & Automation`,
-  product:(detail,city)=>`📦 NEW ARRIVAL!\n\n${detail}\n\n🌟 Now available at Bhavi Electronics, ${city}!\n\n💰 Best Price | ✅ Warranty | 🔧 After Sales Support\n\nContact us today!`,
-  review:(detail,city)=>`⭐ CUSTOMER SPEAKS!\n\n"${detail}"\n\n😊 Thank you for trusting Bhavi Electronics, ${city}!\n\nYour satisfaction is our mission. 🙏\n\n#CustomerLove`,
-  custom:(detail,city)=>`${detail}\n\n📍 ${city} — Bhavi Electronics & Automation\n✅ Trusted Service | ✅ Expert Team`
+// Canvas template visual configs
+const AI_TMPL_CFG={
+  offer: {bg1:'#d4380d',bg2:'#fa8c16',accent:'#fff',badge:'#fff',badgeTxt:'#d4380d',icon:'🎁',label:'SPECIAL OFFER'},
+  service:{bg1:'#003eb3',bg2:'#1a56db',accent:'#fff',badge:'#fff',badgeTxt:'#003eb3',icon:'🔧',label:'SERVICE TIP'},
+  festival:{bg1:'#7c3aed',bg2:'#f59e0b',accent:'#fff',badge:'#fff',badgeTxt:'#7c3aed',icon:'🎉',label:'FESTIVAL SPECIAL'},
+  product:{bg1:'#065f46',bg2:'#059669',accent:'#fff',badge:'#fff',badgeTxt:'#065f46',icon:'📦',label:'NEW ARRIVAL'},
+  review: {bg1:'#0f172a',bg2:'#1a56db',accent:'#fff',badge:'#fbbf24',badgeTxt:'#0f172a',icon:'⭐',label:'CUSTOMER REVIEW'},
+  custom: {bg1:'#1e2a3a',bg2:'#7c3aed',accent:'#fff',badge:'#fff',badgeTxt:'#1e2a3a',icon:'✨',label:'BHAVI ELECTRONICS'}
 };
 
 function selectTemplate(type){
   selectedTemplate=type;
   document.querySelectorAll('.ai-template-btn').forEach(b=>b.classList.remove('selected'));
-  const el=document.getElementById('tmpl-'+type);
-  if(el)el.classList.add('selected');
+  const el=document.getElementById('tmpl-'+type);if(el)el.classList.add('selected');
+}
+
+// Draw wrapped text, return next Y
+function canvasWrapText(ctx,text,x,y,maxW,lineH){
+  const words=text.split(' ');let line='';let ly=y;
+  for(let w of words){
+    const t=line+w+' ';
+    if(ctx.measureText(t).width>maxW&&line!==''){ctx.fillText(line.trim(),x,ly);ly+=lineH;line=w+' ';}
+    else line=t;
+  }
+  if(line.trim())ctx.fillText(line.trim(),x,ly);
+  return ly+lineH;
+}
+
+function drawRoundRect(ctx,x,y,w,h,r,fill){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  if(fill)ctx.fill();
+}
+
+function drawPostCanvas(detail,city,template){
+  const S=1080;
+  const canvas=document.createElement('canvas');
+  canvas.width=S;canvas.height=S;
+  const ctx=canvas.getContext('2d');
+  const cfg=AI_TMPL_CFG[template]||AI_TMPL_CFG.custom;
+
+  // Background gradient
+  const gr=ctx.createLinearGradient(0,0,S,S);
+  gr.addColorStop(0,cfg.bg1);gr.addColorStop(1,cfg.bg2);
+  ctx.fillStyle=gr;ctx.fillRect(0,0,S,S);
+
+  // Subtle diagonal stripe pattern
+  ctx.save();ctx.globalAlpha=0.06;ctx.strokeStyle='#fff';ctx.lineWidth=40;
+  for(let i=-S;i<S*2;i+=80){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+S,S);ctx.stroke();}
+  ctx.restore();
+
+  // Outer border frame
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=12;
+  drawRoundRect(ctx,24,24,S-48,S-48,24,false);ctx.stroke();ctx.restore();
+
+  // Top header band
+  ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#000';
+  ctx.fillRect(0,0,S,145);ctx.restore();
+
+  // Company name - BHAVI ELECTRONICS
+  ctx.save();
+  ctx.fillStyle='#ffffff';ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=8;
+  ctx.font='bold 58px Arial';ctx.fillText('BHAVI ELECTRONICS',S/2,74);
+  ctx.font='500 30px Arial';ctx.globalAlpha=0.85;ctx.fillText('& Automation — Service CRM',S/2,115);
+  ctx.restore();
+
+  // Horizontal divider
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(60,148);ctx.lineTo(S-60,148);ctx.stroke();ctx.restore();
+
+  // Template badge (pill)
+  ctx.save();
+  const bw=380,bh=66,bx=(S-bw)/2,by=168;
+  ctx.fillStyle=cfg.badge;drawRoundRect(ctx,bx,by,bw,bh,33,true);
+  ctx.fillStyle=cfg.badgeTxt;ctx.font='bold 30px Arial';ctx.textAlign='center';
+  ctx.fillText(cfg.label,S/2,213);ctx.restore();
+
+  // Large icon (emoji)
+  ctx.save();ctx.font='130px serif';ctx.textAlign='center';
+  ctx.fillText(cfg.icon,S/2,390);ctx.restore();
+
+  // Main content text (auto-wrapped)
+  ctx.save();ctx.fillStyle=cfg.accent;ctx.textAlign='center';
+  ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;
+  ctx.font='bold 52px Arial';
+  // Estimate font size based on text length
+  const fs=detail.length>80?40:detail.length>50?46:52;
+  ctx.font='bold '+fs+'px Arial';
+  canvasWrapText(ctx,detail,S/2,448,920,fs+20);
+  ctx.restore();
+
+  // City + contact bar
+  ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#000';ctx.fillRect(0,730,S,80);ctx.restore();
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.92)';ctx.font='34px Arial';ctx.textAlign='center';
+  ctx.fillText('📍 '+city+'   |   📞 Call Now   |   ✅ Expert Service',S/2,778);ctx.restore();
+
+  // Bottom band
+  ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#000';ctx.fillRect(0,835,S,245);ctx.restore();
+
+  // Hashtags line
+  const tags=AI_HASHTAG_SETS[template]||AI_HASHTAG_SETS.custom;
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.75)';ctx.font='24px Arial';ctx.textAlign='center';
+  ctx.fillText(tags.slice(0,6).join('  '),S/2,890);
+  ctx.fillText(tags.slice(6,11).join('  '),S/2,924);ctx.restore();
+
+  // Divider before footer
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(60,942);ctx.lineTo(S-60,942);ctx.stroke();ctx.restore();
+
+  // Website URL footer
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font='bold 30px Arial';ctx.textAlign='center';
+  ctx.fillText('🌐 bhavi-electronics.com  |  Bhavi Electronics & Automation',S/2,988);
+  ctx.font='22px Arial';ctx.globalAlpha=0.6;
+  ctx.fillText('📷 Follow us on Instagram  •  Facebook  •  WhatsApp',S/2,1024);ctx.restore();
+
+  return canvas;
 }
 
 function generateAIPost(){
@@ -10158,47 +10571,51 @@ function generateAIPost(){
   const city=(document.getElementById('ai-post-city').value||'Surat').trim();
   if(!detail){alert('Pehela post details lakho!');return;}
 
-  const fn=AI_POST_TEMPLATES[selectedTemplate]||AI_POST_TEMPLATES.custom;
-  generatedPostText=fn(detail,city);
+  // Generate full 1080x1080 canvas
+  generatedCanvas=drawPostCanvas(detail,city,selectedTemplate);
 
+  // Hashtags
   const hashSet=AI_HASHTAG_SETS[selectedTemplate]||AI_HASHTAG_SETS.custom;
-  // Pick 10 relevant hashtags + city tag
   generatedHashtags=[...hashSet.slice(0,10),'#'+city.replace(/\s+/g,'')];
 
+  // Show scaled preview (500x500)
   const preview=document.getElementById('ai-post-preview-box');
   if(preview){
-    preview.innerHTML=`<div>${generatedPostText.replace(/\n/g,'<br>')}</div><div class="post-hashtags">${generatedHashtags.map(h=>`<span class="ai-hashtag-chip">${h}</span>`).join(' ')}</div>`;
+    preview.innerHTML='';preview.style.background='none';preview.style.padding='0';
+    const prev=document.createElement('canvas');
+    prev.width=500;prev.height=500;prev.style.cssText='width:100%;border-radius:12px;display:block;';
+    prev.getContext('2d').drawImage(generatedCanvas,0,0,500,500);
+    preview.appendChild(prev);
   }
 
-  // Show buttons
+  // Show action buttons
   ['btn-copy-post','btn-dl-post','btn-schedule-post'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display='';
   });
 
-  // Show hashtag card
+  // Hashtag chips
   const hcard=document.getElementById('ai-hashtag-card');
   if(hcard){
     hcard.style.display='';
     document.getElementById('ai-hashtag-box').innerHTML=generatedHashtags.map(h=>`<span class="ai-hashtag-chip" style="background:#e0e7ff;color:#4338ca;margin:2px;display:inline-block;cursor:pointer;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${h}')">${h}</span>`).join(' ');
   }
 
-  addAILog('social','📢 Social post generated: '+selectedTemplate+' template for '+city,'log-social');
+  addAILog('social','🎨 Design post generated: '+selectedTemplate+' | '+city,'log-social');
 }
 
 function copyAIPost(){
-  const full=generatedPostText+'\n\n'+generatedHashtags.join(' ');
-  if(navigator.clipboard){navigator.clipboard.writeText(full).then(()=>alert('Post + Hashtags copied!'));}
-  else{alert('Post:\n\n'+full);}
+  const txt=generatedHashtags.join(' ');
+  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Hashtags copied!\n\nImage ne Download karine Instagram/Facebook par post karo.'));}
+  else{alert(txt);}
 }
 
 function downloadAIPost(){
-  const full=generatedPostText+'\n\n'+generatedHashtags.join(' ');
-  const blob=new Blob([full],{type:'text/plain'});
+  if(!generatedCanvas){alert('Pehela Design Generate Karo!');return;}
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='bhavi_post_'+new Date().toISOString().slice(0,10)+'.txt';
-  a.click();
-  addAILog('social','⬇️ Post downloaded','log-social');
+  a.download='BhaviElectronics_Post_'+new Date().toISOString().slice(0,10)+'.png';
+  a.href=generatedCanvas.toDataURL('image/png');
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  addAILog('social','⬇️ PNG image downloaded (1080×1080)','log-social');
 }
 
 function scheduleAIPost(){
@@ -10222,7 +10639,7 @@ async function loadAIInquiries(){
   const el=document.getElementById('ai-inquiry-list');
   if(!el)return;
   try{
-    const data=await (await fetch(SB_URL+'/rest/v1/auto_inquiries?followup_status=eq.Pending&order=created_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    const data=await sb('auto_inquiries','GET',null,'?followup_status=eq.Pending&order=created_at.desc&limit=20');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending inquiry nathi. 🎉</div>';
       return;
@@ -10285,7 +10702,7 @@ async function loadAIPayments(){
   const el=document.getElementById('ai-payment-list');
   if(!el)return;
   try{
-    const data=await (await fetch(SB_URL+'/rest/v1/service_calls?status=eq.Closed&payment_status=eq.Pending&order=updated_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    const data=await sb('service_calls','GET',null,'?status=eq.Closed&payment_status=eq.Pending&order=updated_at.desc&limit=20');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending payment nathi. 🎉</div>';
       return;
@@ -10338,7 +10755,7 @@ async function loadAICalls(){
   const el=document.getElementById('ai-calls-list');
   if(!el)return;
   try{
-    const data=await (await fetch(SB_URL+'/rest/v1/service_calls?status=eq.Pending+Allocation&order=created_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    const data=await sb('service_calls','GET',null,'?status=eq.Pending+Allocation&order=created_at.desc&limit=20');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending allocation call nathi. 🎉</div>';
       return;
