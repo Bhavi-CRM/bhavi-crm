@@ -276,6 +276,10 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('auto-visits-report')" id="nav-auto-visits-report"><span class="icon">📋</span><span>Visit Report</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
   </div>
+  <div class="nav-section" id="nav-ai-section">
+    <div class="nav-section-title">AI Agent</div>
+    <div class="nav-item hidden" onclick="navigate('ai-agent')" id="nav-ai-agent"><span class="icon">🤖</span><span>Virtual AI Agent</span></div>
+  </div>
   <div id="sidebar-user">
     <div class="user-name" id="sidebar-username">-</div>
     <div class="user-role" id="sidebar-userrole">-</div>
@@ -2240,8 +2244,21 @@ function showLoginError(msg){const el=document.getElementById('login-error');el.
 function doLogout(){
   currentPage='dashboard';
   currentUser=null;
+  allTickets=[];
   localStorage.removeItem('bhavi_session');
   localStorage.removeItem('bhavi_user');
+  // Clear page content so next user doesn't see previous user's data
+  const pc=document.getElementById('page-content');
+  if(pc)pc.innerHTML='';
+  // Hide all role-specific nav items so next login starts clean
+  ['nav-tickets','nav-my-calls','nav-work-log','nav-walk-in','nav-courier',
+   'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
+   'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
+   'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.classList.add('hidden');
+  });
+  var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-id').value='';document.getElementById('login-pass').value='';
 }
@@ -2356,6 +2373,12 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
+      sv('nav-ai-agent',true);
+    }
+    // AI Agent nav: show for admin and special engineers
+    if(isEng){
+      var isAutoEng2=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
+      sv('nav-ai-agent',isAutoEng2);
     }
   }catch(e){console.error('setupNav:',e);}
 }
@@ -2378,9 +2401,9 @@ async function navigate(page){
   if(currentUser)setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2480,7 +2503,6 @@ async function renderDashboard(){
   const pc=document.getElementById('page-content');
   if(!pc)return;
   pc.innerHTML='<div class="loading">Loading...</div>';
-  await new Promise(r=>setTimeout(r,300));
   if(!currentUser){pc.innerHTML='';return;}
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
@@ -9784,6 +9806,614 @@ async function deleteInquiry(id){
     await sb('auto_inquiries','DELETE',null,'?id=eq.'+id);
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ─── VIRTUAL AI AGENT ────────────────────────────────────────────────────────
+var aiAgentTab='social';
+var aiAgentLog=[];
+
+async function renderVirtualAgent(){
+  const pc=document.getElementById('page-content');
+
+  // Load counts from Supabase for dashboard cards
+  let pendingCalls=0,pendingPayments=0,pendingInquiries=0,totalCustomers=0;
+  try{
+    const [callsRes,inquiriesRes,customersRes]=await Promise.all([
+      fetch(SB_URL+'/rest/v1/service_calls?status=eq.Pending+Allocation&select=id',{headers:SB_HEADERS}),
+      fetch(SB_URL+'/rest/v1/auto_inquiries?followup_status=eq.Pending&select=id',{headers:SB_HEADERS}),
+      fetch(SB_URL+'/rest/v1/customers?select=id',{headers:SB_HEADERS})
+    ]);
+    const [callsData,inquiriesData,customersData]=await Promise.all([callsRes.json(),inquiriesRes.json(),customersRes.json()]);
+    pendingCalls=Array.isArray(callsData)?callsData.length:0;
+    pendingInquiries=Array.isArray(inquiriesData)?inquiriesData.length:0;
+    totalCustomers=Array.isArray(customersData)?customersData.length:0;
+  }catch(e){}
+
+  pc.innerHTML=`
+<style>
+.ai-hero{background:linear-gradient(135deg,#0f172a 0%,#1a56db 60%,#7c3aed 100%);border-radius:16px;padding:24px 28px;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+.ai-hero-left h2{font-size:22px;font-weight:800;margin-bottom:4px;}
+.ai-hero-left p{font-size:13px;opacity:0.8;max-width:420px;}
+.ai-status-pill{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:30px;padding:8px 18px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;backdrop-filter:blur(8px);}
+.ai-dot{width:10px;height:10px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;animation:aipulse 1.5s infinite;}
+@keyframes aipulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.ai-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.ai-kpi{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.07);border-top:4px solid var(--primary);text-align:center;transition:transform 0.2s;}
+.ai-kpi:hover{transform:translateY(-2px);}
+.ai-kpi .ai-kpi-icon{font-size:28px;margin-bottom:6px;}
+.ai-kpi .ai-kpi-val{font-size:26px;font-weight:800;color:var(--primary);}
+.ai-kpi .ai-kpi-lbl{font-size:11px;color:var(--text-muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.ai-kpi.orange{border-top-color:#f59e0b;}.ai-kpi.orange .ai-kpi-val{color:#d97706;}
+.ai-kpi.green{border-top-color:#10b981;}.ai-kpi.green .ai-kpi-val{color:#059669;}
+.ai-kpi.purple{border-top-color:#8b5cf6;}.ai-kpi.purple .ai-kpi-val{color:#7c3aed;}
+.ai-tabs{display:flex;gap:4px;background:#f1f5f9;padding:4px;border-radius:12px;margin-bottom:20px;flex-wrap:wrap;}
+.ai-tab{padding:9px 18px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);border:none;background:none;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
+.ai-tab.active{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.ai-tab:hover:not(.active){background:rgba(255,255,255,0.6);}
+.ai-panel{display:none;}.ai-panel.active{display:block;}
+.ai-card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.07);padding:20px;margin-bottom:16px;}
+.ai-card-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.ai-post-preview{background:linear-gradient(135deg,#667eea,#764ba2);border-radius:14px;padding:20px;color:#fff;min-height:120px;font-size:14px;line-height:1.7;word-break:break-word;position:relative;}
+.ai-post-preview .post-hashtags{margin-top:10px;opacity:0.9;font-size:13px;line-height:1.8;}
+.ai-hashtag-chip{display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;margin:2px;font-size:12px;font-weight:600;}
+.ai-template-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.ai-template-btn{border:2px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;font-size:12px;text-align:center;transition:all 0.2s;background:#fff;}
+.ai-template-btn:hover,.ai-template-btn.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);}
+.ai-template-btn .t-icon{font-size:20px;margin-bottom:4px;}
+.ai-template-btn .t-label{font-weight:600;}
+.followup-item{background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);}
+.followup-item:hover{border-color:var(--primary);background:var(--primary-light);}
+.followup-info{flex:1;}
+.followup-info .fi-name{font-size:13px;font-weight:700;color:var(--text);}
+.followup-info .fi-detail{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.followup-actions{display:flex;gap:6px;flex-shrink:0;}
+.ai-action-btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;transition:all 0.2s;}
+.ai-btn-wa{background:#25d366;color:#fff;}.ai-btn-wa:hover{background:#128c7e;}
+.ai-btn-sms{background:#3b82f6;color:#fff;}.ai-btn-sms:hover{background:#1d4ed8;}
+.ai-btn-call{background:#f59e0b;color:#fff;}.ai-btn-call:hover{background:#d97706;}
+.ai-btn-done{background:#10b981;color:#fff;}.ai-btn-done:hover{background:#059669;}
+.ai-log-item{padding:10px 14px;border-radius:10px;background:#f8fafc;border-left:3px solid var(--primary);margin-bottom:8px;font-size:13px;}
+.ai-log-item .log-time{font-size:11px;color:var(--text-muted);margin-top:3px;}
+.ai-log-item.log-wa{border-left-color:#25d366;}
+.ai-log-item.log-sms{border-left-color:#3b82f6;}
+.ai-log-item.log-social{border-left-color:#8b5cf6;}
+.ai-log-item.log-call{border-left-color:#f59e0b;}
+.ai-msg-template{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:#065f46;white-space:pre-wrap;margin-bottom:10px;}
+.ai-msg-template.blue{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;}
+.ai-msg-template.orange{background:#fff7ed;border-color:#fed7aa;color:#c2410c;}
+.char-badge{background:#e0e7ff;color:#4338ca;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;}
+.ai-schedule-row{display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:10px;}
+.ai-schedule-row select,.ai-schedule-row input{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;background:#fff;}
+@media(max-width:768px){
+  .ai-kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .ai-template-grid{grid-template-columns:repeat(2,1fr);}
+  .ai-hero{padding:16px;}
+  .ai-hero-left h2{font-size:16px;}
+}
+</style>
+
+<!-- HERO BANNER -->
+<div class="ai-hero">
+  <div class="ai-hero-left">
+    <h2>🤖 Virtual AI Agent — Bhavi Electronics</h2>
+    <p>Tamara daily kaam ne automate karo — Social Media posts, CRM followups, Payment reminders, Inquiry replies badhu ek jagahe thi.</p>
+  </div>
+  <div class="ai-status-pill"><div class="ai-dot"></div><span>Agent Active</span></div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="ai-kpi-grid">
+  <div class="ai-kpi">
+    <div class="ai-kpi-icon">📢</div>
+    <div class="ai-kpi-val">Social</div>
+    <div class="ai-kpi-lbl">Post Generator</div>
+  </div>
+  <div class="ai-kpi orange">
+    <div class="ai-kpi-icon">🎫</div>
+    <div class="ai-kpi-val">${pendingCalls}</div>
+    <div class="ai-kpi-lbl">Pending Calls</div>
+  </div>
+  <div class="ai-kpi green">
+    <div class="ai-kpi-icon">🔍</div>
+    <div class="ai-kpi-val">${pendingInquiries}</div>
+    <div class="ai-kpi-lbl">Pending Inquiries</div>
+  </div>
+  <div class="ai-kpi purple">
+    <div class="ai-kpi-icon">👥</div>
+    <div class="ai-kpi-val">${totalCustomers}</div>
+    <div class="ai-kpi-lbl">Total Customers</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="ai-tabs">
+  <button class="ai-tab active" id="aitab-social" onclick="switchAITab('social')">📢 Social Media</button>
+  <button class="ai-tab" id="aitab-inquiry" onclick="switchAITab('inquiry')">🔍 Inquiry Followup</button>
+  <button class="ai-tab" id="aitab-payment" onclick="switchAITab('payment')">💰 Payment Followup</button>
+  <button class="ai-tab" id="aitab-calls" onclick="switchAITab('calls')">📞 CRM Calls</button>
+  <button class="ai-tab" id="aitab-log" onclick="switchAITab('log')">📋 Activity Log</button>
+</div>
+
+<!-- TAB: SOCIAL MEDIA -->
+<div class="ai-panel active" id="aipanel-social">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div class="ai-card">
+        <div class="ai-card-title">📝 Post Type Select Karo</div>
+        <div class="ai-template-grid">
+          <div class="ai-template-btn selected" id="tmpl-offer" onclick="selectTemplate('offer')"><div class="t-icon">🎁</div><div class="t-label">Offer / Sale</div></div>
+          <div class="ai-template-btn" id="tmpl-service" onclick="selectTemplate('service')"><div class="t-icon">🔧</div><div class="t-label">Service Tips</div></div>
+          <div class="ai-template-btn" id="tmpl-festival" onclick="selectTemplate('festival')"><div class="t-icon">🎉</div><div class="t-label">Festival</div></div>
+          <div class="ai-template-btn" id="tmpl-product" onclick="selectTemplate('product')"><div class="t-icon">📦</div><div class="t-label">New Product</div></div>
+          <div class="ai-template-btn" id="tmpl-review" onclick="selectTemplate('review')"><div class="t-icon">⭐</div><div class="t-label">Customer Review</div></div>
+          <div class="ai-template-btn" id="tmpl-custom" onclick="selectTemplate('custom')"><div class="t-icon">✏️</div><div class="t-label">Custom</div></div>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Post Details (Gujarati / Hindi / English)</label>
+          <textarea id="ai-post-input" rows="4" style="border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;width:100%;outline:none;resize:vertical;" placeholder="Post ni details likho... jema ke: '25% off on all AC service this summer'"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Platform</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-instagram" checked> Instagram</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-facebook" checked> Facebook</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-whatsapp"> WhatsApp Status</label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>City / Location Tag</label>
+          <input type="text" id="ai-post-city" value="Surat" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="generateAIPost()">✨ AI Post Generate Karo</button>
+      </div>
+    </div>
+    <div>
+      <div class="ai-card">
+        <div class="ai-card-title">👁️ Post Preview</div>
+        <div class="ai-post-preview" id="ai-post-preview-box">
+          <div style="opacity:0.6;text-align:center;padding:20px 0;">Post generate karo to preview yahan aavse...</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="copyAIPost()" id="btn-copy-post" style="display:none;">📋 Copy</button>
+          <button class="btn btn-success btn-sm" onclick="downloadAIPost()" id="btn-dl-post" style="display:none;">⬇️ Download Text</button>
+          <button class="btn btn-primary btn-sm" onclick="scheduleAIPost()" id="btn-schedule-post" style="display:none;">⏰ Schedule</button>
+        </div>
+      </div>
+      <div class="ai-card" id="ai-hashtag-card" style="display:none;">
+        <div class="ai-card-title">🏷️ Suggested Hashtags</div>
+        <div id="ai-hashtag-box"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Post sathe aapamele-le hashtags add thay chhe — copy karva upar click karo.</div>
+      </div>
+      <div class="ai-card" id="ai-schedule-card" style="display:none;">
+        <div class="ai-card-title">⏰ Post Schedule</div>
+        <div class="ai-schedule-row">
+          <span style="font-size:13px;font-weight:600;min-width:60px;">Date:</span>
+          <input type="date" id="schedule-date" value="${new Date().toISOString().slice(0,10)}">
+          <input type="time" id="schedule-time" value="09:00">
+        </div>
+        <div id="schedule-confirm-msg" style="display:none;" class="alert alert-success" style="margin-top:8px;"></div>
+        <button class="btn btn-primary btn-sm" onclick="confirmSchedulePost()">✅ Confirm Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: INQUIRY FOLLOWUP -->
+<div class="ai-panel" id="aipanel-inquiry">
+  <div class="ai-card">
+    <div class="ai-card-title">🔍 Pending Inquiry Followups
+      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllInquiryFollowups()">📤 Send All WhatsApp</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:12px;">Agent automatically pending inquiries ne WhatsApp message mokle. Tamara Twilio / Meta WABA account sathe connected hovu joiye.</div>
+    <div id="ai-inquiry-list"><div class="loading">Loading...</div></div>
+  </div>
+  <div class="ai-card">
+    <div class="ai-card-title">💬 Inquiry Message Template</div>
+    <div class="ai-msg-template" id="inquiry-wa-template">Namaste {name}! 🙏
+
+Bhavi Electronics & Automation thi baat kar raha hun.
+
+Apne hamare yahan inquiry di thi — {product} ke bare mein.
+Kya aap abhi baat kar sakte hain?
+
+Hamare experts se FREE consultation ke liye reply karein. ✅
+
+📞 Call: +91-XXXXXXXXXX
+📍 Surat, Gujarat</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn btn-outline btn-sm" onclick="editInquiryTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-success btn-sm" onclick="copyTemplate('inquiry-wa-template')">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: PAYMENT FOLLOWUP -->
+<div class="ai-panel" id="aipanel-payment">
+  <div class="ai-card">
+    <div class="ai-card-title">💰 Payment Pending Tickets
+      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllPaymentFollowups()">📤 Send All Reminders</button>
+    </div>
+    <div class="alert alert-warning" style="margin-bottom:12px;">Jema payment pending chhe aeva completed tickets niche dikhe chhe. Agent auto-reminder mokle chhe.</div>
+    <div id="ai-payment-list"><div class="loading">Loading...</div></div>
+  </div>
+  <div class="ai-card">
+    <div class="ai-card-title">💬 Payment Reminder Template</div>
+    <div class="ai-msg-template orange" id="payment-wa-template">Namaste {name}! 🙏
+
+Bhavi Electronics thi reminder chhe.
+
+Tamara ticket #{ticket_id} ({model}) ni service complete thai gayi chhe.
+
+💰 Due Amount: ₹{amount}
+
+Krpaya payment karo:
+• Cash / UPI / Card accepted
+• Shop par: {shop_address}
+
+Koi sawaal hoy to reply karo. Aabhaar! 🙏</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn btn-outline btn-sm" onclick="editPaymentTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-success btn-sm" onclick="copyTemplate('payment-wa-template')">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: CRM CALLS -->
+<div class="ai-panel" id="aipanel-calls">
+  <div class="ai-card">
+    <div class="ai-card-title">📞 Pending Allocation Calls
+      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllCallFollowups()">📤 Send All Updates</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:12px;">Customers ne automatically "Tamaro call registered thayo chhe" message moklo. Customer confidence vadhse.</div>
+    <div id="ai-calls-list"><div class="loading">Loading...</div></div>
+  </div>
+  <div class="ai-card">
+    <div class="ai-card-title">💬 Call Acknowledgement Template</div>
+    <div class="ai-msg-template blue" id="call-wa-template">Namaste {name}! 🙏
+
+Bhavi Electronics & Automation thi suchit karvama aave chhe ke tamaro service call *registered* thayo chhe.
+
+🎫 Ticket No: *{ticket_id}*
+📱 Product: {model}
+🔧 Problem: {problem}
+📍 Service Type: {service_type}
+
+Amaro engineer 24 kaalaak ni andar contact karshe.
+
+Status track karvaa WhatsApp par reply karo: *STATUS {ticket_id}*
+
+Aabhaar! — Bhavi Electronics 🙏</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn btn-outline btn-sm" onclick="editCallTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-success btn-sm" onclick="copyTemplate('call-wa-template')">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: ACTIVITY LOG -->
+<div class="ai-panel" id="aipanel-log">
+  <div class="ai-card">
+    <div class="ai-card-title">📋 Agent Activity Log
+      <button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="clearAILog()">🗑️ Clear Log</button>
+    </div>
+    <div id="ai-activity-log">
+      <div style="text-align:center;padding:40px;color:var(--text-muted);">
+        <div style="font-size:36px;margin-bottom:10px;">🤖</div>
+        <div>Koi activity nathi. Agent kaam sharu karshe to yahan dekhashhe.</div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+  // Load data for tabs
+  loadAIInquiries();
+  loadAIPayments();
+  loadAICalls();
+  renderAILog();
+}
+
+function switchAITab(tab){
+  aiAgentTab=tab;
+  document.querySelectorAll('.ai-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.ai-panel').forEach(p=>p.classList.remove('active'));
+  const tabEl=document.getElementById('aitab-'+tab);
+  const panelEl=document.getElementById('aipanel-'+tab);
+  if(tabEl)tabEl.classList.add('active');
+  if(panelEl)panelEl.classList.add('active');
+}
+
+// ─── Social Media ───────────────────────────────────────────────────────────
+var selectedTemplate='offer';
+var generatedPostText='';
+var generatedHashtags=[];
+
+const AI_HASHTAG_SETS={
+  offer:['#BhaviElectronics','#ElectronicsRepair','#ACService','#SuratElectronics','#HomeAppliances','#ServiceCenter','#SpecialOffer','#DiscountAlert','#SummerSale','#Surat','#Gujarat','#RepairService','#TechService','#ApplianceRepair'],
+  service:['#BhaviElectronics','#ServiceTips','#ACMaintenance','#HomeAppliances','#ElectronicsRepair','#ProTips','#Surat','#Gujarat','#TechTips','#DIYRepair','#ApplianceCare','#MaintenanceTips'],
+  festival:['#BhaviElectronics','#FestivalOffer','#Diwali','#Navratri','#Gujarat','#Surat','#FestiveSeason','#SpecialDiscount','#ElectronicsGifts','#HomeAppliances','#FestivalSale','#CelebrationDeals'],
+  product:['#BhaviElectronics','#NewArrival','#ElectronicsIndia','#HomeAppliances','#Surat','#Gujarat','#TechProducts','#Innovation','#SmartHome','#BestBuy','#QualityProducts','#NewProduct'],
+  review:['#BhaviElectronics','#CustomerReview','#HappyCustomer','#5Stars','#Surat','#Gujarat','#TrustedService','#BestService','#CustomerSatisfaction','#Reviews','#ServiceExcellence','#Recommend'],
+  custom:['#BhaviElectronics','#Surat','#Gujarat','#ElectronicsRepair','#HomeAppliances','#ServiceCenter','#TechService']
+};
+
+const AI_POST_TEMPLATES={
+  offer:(detail,city)=>`🎁 SPECIAL OFFER — ${detail}\n\n✅ Fast Service | ✅ Genuine Parts | ✅ Warranty\n\n📍 ${city} | 📞 Call Now\n\n💡 Don't miss this limited time deal!\n\n— Bhavi Electronics & Automation`,
+  service:(detail,city)=>`🔧 SERVICE TIP: ${detail}\n\n👨‍🔧 Our expert engineers are here to help!\n\nBook your service today:\n✅ On-Site & Carry-in available\n✅ All brands covered\n\n📍 ${city} | Bhavi Electronics`,
+  festival:(detail,city)=>`🎉 FESTIVAL SPECIAL!\n\n${detail}\n\n✨ Celebrate with the best electronics service in ${city}!\n\n📍 Visit us today — Bhavi Electronics & Automation`,
+  product:(detail,city)=>`📦 NEW ARRIVAL!\n\n${detail}\n\n🌟 Now available at Bhavi Electronics, ${city}!\n\n💰 Best Price | ✅ Warranty | 🔧 After Sales Support\n\nContact us today!`,
+  review:(detail,city)=>`⭐ CUSTOMER SPEAKS!\n\n"${detail}"\n\n😊 Thank you for trusting Bhavi Electronics, ${city}!\n\nYour satisfaction is our mission. 🙏\n\n#CustomerLove`,
+  custom:(detail,city)=>`${detail}\n\n📍 ${city} — Bhavi Electronics & Automation\n✅ Trusted Service | ✅ Expert Team`
+};
+
+function selectTemplate(type){
+  selectedTemplate=type;
+  document.querySelectorAll('.ai-template-btn').forEach(b=>b.classList.remove('selected'));
+  const el=document.getElementById('tmpl-'+type);
+  if(el)el.classList.add('selected');
+}
+
+function generateAIPost(){
+  const detail=(document.getElementById('ai-post-input').value||'').trim();
+  const city=(document.getElementById('ai-post-city').value||'Surat').trim();
+  if(!detail){alert('Pehela post details lakho!');return;}
+
+  const fn=AI_POST_TEMPLATES[selectedTemplate]||AI_POST_TEMPLATES.custom;
+  generatedPostText=fn(detail,city);
+
+  const hashSet=AI_HASHTAG_SETS[selectedTemplate]||AI_HASHTAG_SETS.custom;
+  // Pick 10 relevant hashtags + city tag
+  generatedHashtags=[...hashSet.slice(0,10),'#'+city.replace(/\s+/g,'')];
+
+  const preview=document.getElementById('ai-post-preview-box');
+  if(preview){
+    preview.innerHTML=`<div>${generatedPostText.replace(/\n/g,'<br>')}</div><div class="post-hashtags">${generatedHashtags.map(h=>`<span class="ai-hashtag-chip">${h}</span>`).join(' ')}</div>`;
+  }
+
+  // Show buttons
+  ['btn-copy-post','btn-dl-post','btn-schedule-post'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='';
+  });
+
+  // Show hashtag card
+  const hcard=document.getElementById('ai-hashtag-card');
+  if(hcard){
+    hcard.style.display='';
+    document.getElementById('ai-hashtag-box').innerHTML=generatedHashtags.map(h=>`<span class="ai-hashtag-chip" style="background:#e0e7ff;color:#4338ca;margin:2px;display:inline-block;cursor:pointer;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${h}')">${h}</span>`).join(' ');
+  }
+
+  addAILog('social','📢 Social post generated: '+selectedTemplate+' template for '+city,'log-social');
+}
+
+function copyAIPost(){
+  const full=generatedPostText+'\n\n'+generatedHashtags.join(' ');
+  if(navigator.clipboard){navigator.clipboard.writeText(full).then(()=>alert('Post + Hashtags copied!'));}
+  else{alert('Post:\n\n'+full);}
+}
+
+function downloadAIPost(){
+  const full=generatedPostText+'\n\n'+generatedHashtags.join(' ');
+  const blob=new Blob([full],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bhavi_post_'+new Date().toISOString().slice(0,10)+'.txt';
+  a.click();
+  addAILog('social','⬇️ Post downloaded','log-social');
+}
+
+function scheduleAIPost(){
+  const sc=document.getElementById('ai-schedule-card');
+  if(sc){sc.style.display=sc.style.display==='none'?'':'none';}
+}
+
+function confirmSchedulePost(){
+  const d=document.getElementById('schedule-date').value;
+  const t=document.getElementById('schedule-time').value;
+  const msg=document.getElementById('schedule-confirm-msg');
+  if(msg){
+    msg.style.display='';
+    msg.textContent=`✅ Post scheduled for ${d} at ${t}. (Integration sathe auto-post thashe)`;
+  }
+  addAILog('social',`⏰ Post scheduled for ${d} ${t}`,'log-social');
+}
+
+// ─── Inquiry Followup ───────────────────────────────────────────────────────
+async function loadAIInquiries(){
+  const el=document.getElementById('ai-inquiry-list');
+  if(!el)return;
+  try{
+    const data=await (await fetch(SB_URL+'/rest/v1/auto_inquiries?followup_status=eq.Pending&order=created_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    if(!Array.isArray(data)||data.length===0){
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending inquiry nathi. 🎉</div>';
+      return;
+    }
+    el.innerHTML=data.map(inq=>`
+      <div class="followup-item" id="inq-item-${inq.id}">
+        <div class="followup-info">
+          <div class="fi-name">${inq.customer_name||'Unknown'} — ${inq.product_interest||'General Inquiry'}</div>
+          <div class="fi-detail">📞 ${inq.phone||'-'} &nbsp;|&nbsp; 📅 ${inq.created_at?new Date(inq.created_at).toLocaleDateString('en-IN'):'-'} &nbsp;|&nbsp; ${inq.source||'Walk-in'}</div>
+        </div>
+        <div class="followup-actions">
+          <button class="ai-action-btn ai-btn-wa" onclick="sendInquiryWA('${inq.id}','${(inq.phone||'').replace(/\D/g,'')}','${(inq.customer_name||'').replace(/'/g,'')}')" title="WhatsApp">💬 WA</button>
+          <button class="ai-action-btn ai-btn-sms" onclick="sendInquirySMS('${inq.id}','${(inq.phone||'').replace(/\D/g,'')}')" title="SMS">📱 SMS</button>
+          <button class="ai-action-btn ai-btn-done" onclick="markInquiryDone('${inq.id}')" title="Done">✅</button>
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;
+  }
+}
+
+function sendInquiryWA(id,phone,name){
+  const tmpl=(document.getElementById('inquiry-wa-template').innerText||'').replace('{name}',name||'Customer').replace('{product}','aapni inquiry');
+  const url=`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`;
+  window.open(url,'_blank');
+  addAILog('inquiry',`💬 Inquiry WA sent to ${name} (${phone})`,'log-wa');
+  markInquiryDone(id);
+}
+
+function sendInquirySMS(id,phone){
+  window.open(`sms:+91${phone}?body=${encodeURIComponent('Namaste! Bhavi Electronics thi — tamari inquiry maate contact karo: +91-XXXXXXXXXX')}`, '_blank');
+  addAILog('inquiry',`📱 Inquiry SMS to ${phone}`,'log-sms');
+}
+
+async function markInquiryDone(id){
+  try{
+    await sb('auto_inquiries','PATCH',{followup_status:'Done',followup_date:new Date().toISOString()},'?id=eq.'+id);
+    const el=document.getElementById('inq-item-'+id);
+    if(el)el.style.opacity='0.4';
+  }catch(e){}
+}
+
+async function sendAllInquiryFollowups(){
+  if(!confirm('Badha pending inquiries ne WhatsApp message mokavo?'))return;
+  const items=document.querySelectorAll('#ai-inquiry-list .followup-item');
+  items.forEach(item=>{
+    const waBtn=item.querySelector('.ai-btn-wa');
+    if(waBtn)waBtn.click();
+  });
+  addAILog('inquiry','📤 Bulk inquiry followup sent','log-wa');
+}
+
+function editInquiryTemplate(){
+  const el=document.getElementById('inquiry-wa-template');
+  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
+}
+
+// ─── Payment Followup ───────────────────────────────────────────────────────
+async function loadAIPayments(){
+  const el=document.getElementById('ai-payment-list');
+  if(!el)return;
+  try{
+    const data=await (await fetch(SB_URL+'/rest/v1/service_calls?status=eq.Closed&payment_status=eq.Pending&order=updated_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    if(!Array.isArray(data)||data.length===0){
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending payment nathi. 🎉</div>';
+      return;
+    }
+    el.innerHTML=data.map(call=>`
+      <div class="followup-item" id="pay-item-${call.id}">
+        <div class="followup-info">
+          <div class="fi-name">${call.customer_name||'Customer'} — ${call.model_no||'-'} <span style="color:var(--danger);font-weight:700;">₹${call.total_amount||0}</span></div>
+          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.call_id||'-'} &nbsp;|&nbsp; 📅 ${call.updated_at?new Date(call.updated_at).toLocaleDateString('en-IN'):'-'}</div>
+        </div>
+        <div class="followup-actions">
+          <button class="ai-action-btn ai-btn-wa" onclick="sendPaymentWA('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.customer_name||'').replace(/'/g,'')}','${call.call_id||''}','${call.model_no||''}','${call.total_amount||0}')" title="WhatsApp Reminder">💬 WA</button>
+          <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-warning">Error loading payments: ${e.message}</div>`;
+  }
+}
+
+function sendPaymentWA(id,phone,name,ticketId,model,amount){
+  const tmpl=(document.getElementById('payment-wa-template').innerText||'')
+    .replace('{name}',name||'Customer')
+    .replace('{ticket_id}',ticketId||'-')
+    .replace('{model}',model||'-')
+    .replace('{amount}',amount||'0')
+    .replace('{shop_address}','Bhavi Electronics, Surat');
+  window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`,'_blank');
+  addAILog('payment',`💰 Payment reminder sent to ${name} (₹${amount})`,'log-wa');
+}
+
+async function sendAllPaymentFollowups(){
+  if(!confirm('Badha pending payments ne reminder mokavo?'))return;
+  document.querySelectorAll('#ai-payment-list .ai-btn-wa').forEach(btn=>btn.click());
+  addAILog('payment','📤 Bulk payment reminders sent','log-wa');
+}
+
+function callCustomer(phone){
+  window.open('tel:+91'+phone,'_self');
+  addAILog('calls','📞 Call initiated to +91'+phone,'log-call');
+}
+
+function editPaymentTemplate(){
+  const el=document.getElementById('payment-wa-template');
+  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
+}
+
+// ─── CRM Calls ──────────────────────────────────────────────────────────────
+async function loadAICalls(){
+  const el=document.getElementById('ai-calls-list');
+  if(!el)return;
+  try{
+    const data=await (await fetch(SB_URL+'/rest/v1/service_calls?status=eq.Pending+Allocation&order=created_at.desc&limit=20',{headers:SB_HEADERS})).json();
+    if(!Array.isArray(data)||data.length===0){
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending allocation call nathi. 🎉</div>';
+      return;
+    }
+    el.innerHTML=data.map(call=>`
+      <div class="followup-item" id="call-item-${call.id}">
+        <div class="followup-info">
+          <div class="fi-name">${call.customer_name||'Customer'} — ${call.model_no||'-'}</div>
+          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.call_id||'-'} &nbsp;|&nbsp; 🔧 ${call.problem||'-'} &nbsp;|&nbsp; ${call.service_type||'-'}</div>
+        </div>
+        <div class="followup-actions">
+          <button class="ai-action-btn ai-btn-wa" onclick="sendCallAck('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.customer_name||'').replace(/'/g,'')}','${call.call_id||''}','${(call.model_no||'').replace(/'/g,'')}','${(call.problem||'').replace(/'/g,'')}','${call.service_type||''}')" title="Acknowledgement">💬 Ack</button>
+          <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;
+  }
+}
+
+function sendCallAck(id,phone,name,ticketId,model,problem,serviceType){
+  const tmpl=(document.getElementById('call-wa-template').innerText||'')
+    .replace('{name}',name||'Customer')
+    .replace('{ticket_id}',ticketId||'-')
+    .replace('{model}',model||'-')
+    .replace('{problem}',problem||'-')
+    .replace('{service_type}',serviceType||'-');
+  window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`,'_blank');
+  addAILog('calls',`📞 Ack sent to ${name} for ${ticketId}`,'log-wa');
+}
+
+async function sendAllCallFollowups(){
+  if(!confirm('Badha pending calls ne acknowledgement mokavo?'))return;
+  document.querySelectorAll('#ai-calls-list .ai-btn-wa').forEach(btn=>btn.click());
+  addAILog('calls','📤 Bulk call acknowledgements sent','log-wa');
+}
+
+function editCallTemplate(){
+  const el=document.getElementById('call-wa-template');
+  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function copyTemplate(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const txt=el.innerText||el.textContent;
+  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Template copied!'));}
+  else{alert(txt);}
+}
+
+function addAILog(type,msg,cls){
+  aiAgentLog.unshift({type,msg,cls,time:new Date()});
+  if(aiAgentLog.length>100)aiAgentLog.length=100;
+  renderAILog();
+}
+
+function renderAILog(){
+  const el=document.getElementById('ai-activity-log');
+  if(!el)return;
+  if(aiAgentLog.length===0){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">🤖</div><div>Koi activity nathi.</div></div>';
+    return;
+  }
+  el.innerHTML=aiAgentLog.map(log=>`
+    <div class="ai-log-item ${log.cls||''}">
+      <div>${log.msg}</div>
+      <div class="log-time">${log.time.toLocaleTimeString('en-IN')} — ${log.time.toLocaleDateString('en-IN')}</div>
+    </div>`).join('');
+}
+
+function clearAILog(){
+  if(!confirm('Log clear karvo?'))return;
+  aiAgentLog=[];
+  renderAILog();
 }</script></div></body>
 </html>
   
