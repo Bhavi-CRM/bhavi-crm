@@ -7879,10 +7879,12 @@ async function renderAutoInventory(){
       +'<input type="text" id="ainv-search" placeholder="Search item / brand..." style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" oninput="filterAutoInv()">'
       +'<select id="ainv-brand-filter" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" onchange="filterAutoInv()"><option value="">All Brands</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</select>'
       +'</div>'
-      +'<div style="display:flex;gap:8px;">'
-      +'<button class="btn btn-outline" onclick="downloadInventoryTemplate()" style="margin-right:6px;">📥 Template</button>'
-      +'<button class="btn btn-outline" onclick="importInventoryExcel()" style="margin-right:6px;">📤 Import Excel</button>'
-+'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +'<button class="btn btn-outline" onclick="downloadInventoryTemplate()">📥 Template</button>'
+      +'<button class="btn btn-outline" onclick="importInventoryExcel()">📤 Import</button>'
+      +'<button class="btn btn-success" onclick="openBulkStockModal(\'in\')" style="background:#059669;color:#fff;border-color:#059669;">⬇️ Bulk IN</button>'
+      +'<button class="btn btn-outline" onclick="openBulkStockModal(\'out\')" style="border-color:#dc2626;color:#dc2626;">⬆️ Bulk OUT</button>'
+      +'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
       +'</div>'
       +'</div>'
       +'<div class="card">'
@@ -8312,6 +8314,248 @@ async function openAutoInvHistory(id,name){
     var c=document.getElementById('ainv-hist-content');
     if(c)c.innerHTML='<div class="alert alert-warning">Log table available nathi. Supabase ma <b>auto_inventory_log</b> table create karo.</div>';
   }
+}
+
+function openBulkStockModal(type){
+  var existing=document.getElementById('modal-bulk-stock');if(existing)existing.remove();
+  var items=window._autoInvItems||[];
+  var isIn=type==='in';
+  var modal=document.createElement('div');
+  modal.id='modal-bulk-stock';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:1000px;">'
+    +'<div class="modal-header"><h2>'+(isIn?'⬇️ Bulk Stock IN (Purchase)':'⬆️ Bulk Stock OUT / Sell')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-bulk-stock\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +(isIn?'<div class="form-grid" style="margin-bottom:12px;">'
+      +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="bsm-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label>Invoice No</label><input type="text" id="bsm-invoice" placeholder="e.g. INV-2026-001" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label>Purchase Date</label><input type="date" id="bsm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>'
+      :'<div class="form-grid" style="margin-bottom:12px;">'
+      +'<div class="form-group"><label>Customer / Purpose</label><input type="text" id="bsm-customer" placeholder="e.g. Rajesh Patel / Site Use" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label>Invoice No</label><input type="text" id="bsm-invoice" placeholder="e.g. INV-001 (optional)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group"><label>Date</label><input type="date" id="bsm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>'
+    )
+    +'<div class="alert alert-info" style="margin-bottom:10px;padding:8px 12px;font-size:12px;">Item search karo, quantity lakho. Navin item automatically inventory ma add thashe.</div>'
+    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:700px;" id="bsm-table">'
+    +'<thead><tr style="background:#f8fafc;font-size:11px;">'
+    +'<th style="padding:8px;text-align:left;min-width:200px;">Item / Product</th>'
+    +'<th style="padding:8px;text-align:center;width:65px;">Qty</th>'
+    +(isIn
+      ?'<th style="padding:8px;text-align:center;width:55px;">Unit</th>'
+       +'<th style="padding:8px;text-align:right;width:90px;">Purchase ₹</th>'
+       +'<th style="padding:8px;text-align:right;width:90px;">Sell ₹/Unit</th>'
+       +'<th style="padding:8px;text-align:center;width:70px;">GST %</th>'
+       +'<th style="padding:8px;text-align:right;width:95px;">Total ₹</th>'
+      :'<th style="padding:8px;text-align:right;width:90px;">Purchase ₹</th>'
+       +'<th style="padding:8px;text-align:right;width:90px;">Sell ₹/Unit</th>'
+    )
+    +'<th style="padding:8px;text-align:left;">Note</th>'
+    +'<th style="padding:8px;width:32px;"></th>'
+    +'</tr></thead>'
+    +'<tbody id="bsm-rows">'
+    +[0,1,2,3,4].map(function(i){return buildBSMRow(i,isIn,items);}).join('')
+    +'</tbody>'
+    +(isIn?'<tfoot><tr><td colspan="6" style="padding:8px;text-align:right;font-weight:700;font-size:13px;">Grand Total (incl. GST):</td><td style="padding:8px;text-align:right;font-weight:800;font-size:14px;color:#059669;" id="bsm-grand-total">₹0</td><td colspan="2"></td></tr></tfoot>':'')
+    +'</table></div>'
+    +'<button class="btn btn-outline btn-sm" onclick="addBSMRow()" style="margin-top:8px;">+ Add Row</button>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-bulk-stock\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveBulkStockModal(\''+type+'\')">💾 Save & Update Stock</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  window._bsmRowCount=5;window._bsmType=type;
+}
+
+function buildBSMRow(i,isIn,items){
+  return '<tr id="bsm-row-'+i+'">'
+    +'<td style="padding:4px;min-width:200px;position:relative;">'
+    +'<input type="hidden" id="bsm-itemid-'+i+'" value="">'
+    +'<input type="hidden" id="bsm-pricePP-'+i+'" value="0">'
+    +'<input type="text" id="bsm-item-'+i+'" placeholder="Item search karo..." autocomplete="off"'
+      +' oninput="filterBSMDrop('+i+')" onfocus="filterBSMDrop('+i+')"'
+      +' onblur="setTimeout(function(){hideBSMDrop('+i+');},200)"'
+      +' style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;">'
+    +'<div id="bsm-drop-'+i+'" style="display:none;position:absolute;z-index:9999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;width:220px;box-shadow:0 4px 16px rgba(0,0,0,0.15);top:calc(100% + 2px);left:0;"></div>'
+    +'</td>'
+    +'<td style="padding:4px;"><input type="number" id="bsm-qty-'+i+'" value="1" min="0" oninput="calcBSMRowTotal('+i+')" style="width:60px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:center;"></td>'
+    +(isIn
+      ?'<td style="padding:4px;"><input type="text" id="bsm-unit-'+i+'" value="pcs" style="width:48px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;"></td>'
+       +'<td style="padding:4px;"><input type="number" id="bsm-price-'+i+'" value="0" min="0" oninput="calcBSMRowTotal('+i+')" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Purchase ₹"></td>'
+       +'<td style="padding:4px;"><input type="number" id="bsm-sp-'+i+'" value="0" min="0" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Sell ₹"></td>'
+       +'<td style="padding:4px;"><select id="bsm-gst-'+i+'" onchange="calcBSMRowTotal('+i+')" style="width:62px;border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;"><option value="0">0%</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option><option value="28">28%</option></select></td>'
+       +'<td style="padding:4px;"><input type="number" id="bsm-total-'+i+'" readonly value="0" style="width:85px;border:1px solid #bbf7d0;border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;background:#f0fdf4;font-weight:700;color:#065f46;"></td>'
+      :'<td style="padding:4px;"><input type="number" id="bsm-price-'+i+'" readonly value="0" style="width:82px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;background:#f8fafc;color:#6b7280;" title="Purchase price from inventory"></td>'
+       +'<td style="padding:4px;"><input type="number" id="bsm-sp-'+i+'" value="0" min="0" oninput="checkBSMSellPrice('+i+')" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Sell ₹"></td>'
+    )
+    +'<td style="padding:4px;"><input type="text" id="bsm-note-'+i+'" placeholder="optional" style="width:100px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;"></td>'
+    +'<td style="padding:4px;"><button onclick="document.getElementById(\'bsm-row-'+i+'\').remove();calcBSMGrandTotal()" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px;">✕</button></td>'
+    +'</tr>';
+}
+
+function calcBSMRowTotal(i){
+  var pp=parseFloat(document.getElementById('bsm-price-'+i)?.value)||0;
+  var qty=parseFloat(document.getElementById('bsm-qty-'+i)?.value)||0;
+  var gst=parseFloat(document.getElementById('bsm-gst-'+i)?.value)||0;
+  var total=Math.round(pp*qty*(1+gst/100));
+  var el=document.getElementById('bsm-total-'+i);
+  if(el)el.value=total;
+  calcBSMGrandTotal();
+}
+
+function calcBSMGrandTotal(){
+  var grand=0;
+  var n=(window._bsmRowCount||5)+10;
+  for(var i=0;i<n;i++){
+    var t=parseFloat(document.getElementById('bsm-total-'+i)?.value)||0;
+    grand+=t;
+  }
+  var el=document.getElementById('bsm-grand-total');
+  if(el)el.textContent='₹'+Number(grand).toLocaleString('en-IN');
+}
+
+function checkBSMSellPrice(i){
+  var pp=parseFloat(document.getElementById('bsm-pricePP-'+i)?.value)||0;
+  var sp=parseFloat(document.getElementById('bsm-sp-'+i)?.value)||0;
+  var spEl=document.getElementById('bsm-sp-'+i);
+  if(spEl){
+    if(pp>0&&sp>0&&sp<pp){
+      spEl.style.borderColor='#f59e0b';spEl.style.background='#fffbeb';
+      spEl.title='⚠️ Sell price ₹'+sp+' < Purchase price ₹'+pp;
+    }else{
+      spEl.style.borderColor='';spEl.style.background='';spEl.title='';
+    }
+  }
+}
+
+function filterBSMDrop(i){
+  var input=document.getElementById('bsm-item-'+i);
+  var drop=document.getElementById('bsm-drop-'+i);
+  if(!input||!drop)return;
+  var q=(input.value||'').toLowerCase().trim();
+  var items=window._autoInvItems||[];
+  var filtered=q?items.filter(function(it){return(it.item_name||'').toLowerCase().includes(q)||(it.brand||'').toLowerCase().includes(q);}):items;
+  var html='';
+  filtered.slice(0,40).forEach(function(it){
+    // Store all data in dataset — no escaping issues
+    var safeData=JSON.stringify({id:String(it.id),name:it.item_name||'',brand:it.brand||'',pp:it.purchase_price||0,sp:it.selling_price||0,unit:it.unit||'pcs'});
+    var label=(it.item_name||'')+(it.brand?' <span style="color:#7c3aed;font-size:10px;">('+it.brand+')</span>':'')
+      +' <span style="color:#059669;font-size:10px;">Stock:'+it.stock_qty+'</span>';
+    // onmousedown+preventDefault prevents blur from firing before selection
+    html+='<div onmousedown="event.preventDefault();bsmPickItem('+i+',this)" '
+      +'data-bsm=\''+safeData.replace(/'/g,'&#39;')+'\' '
+      +'style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9;"'
+      +' onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+label+'</div>';
+  });
+  html+='<div onmousedown="event.preventDefault();bsmPickNew('+i+')" '
+    +'style="padding:8px 12px;cursor:pointer;font-size:12px;color:#1a56db;font-weight:600;border-top:2px solid #e5e7eb;"'
+    +' onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">➕ New Item add kariye</div>';
+  drop.innerHTML=html;
+  drop.style.display='';
+}
+
+function bsmPickItem(i,el){
+  var raw=(el.getAttribute('data-bsm')||'{}').replace(/&#39;/g,"'");
+  var d={};try{d=JSON.parse(raw);}catch(e){}
+  var drop=document.getElementById('bsm-drop-'+i);if(drop)drop.style.display='none';
+  var input=document.getElementById('bsm-item-'+i);
+  if(input)input.value=d.name+(d.brand?' ('+d.brand+')':'');
+  var idEl=document.getElementById('bsm-itemid-'+i);if(idEl)idEl.value=d.id||'';
+  var ppH=document.getElementById('bsm-pricePP-'+i);if(ppH)ppH.value=d.pp||0;
+  var priceEl=document.getElementById('bsm-price-'+i);if(priceEl)priceEl.value=d.pp||0;
+  var spEl=document.getElementById('bsm-sp-'+i);if(spEl&&(!spEl.value||spEl.value==='0'))spEl.value=d.sp||d.pp||0;
+  var unitEl=document.getElementById('bsm-unit-'+i);if(unitEl)unitEl.value=d.unit||'pcs';
+  calcBSMRowTotal(i);
+  checkBSMSellPrice(i);
+}
+
+function bsmPickNew(i){
+  var drop=document.getElementById('bsm-drop-'+i);if(drop)drop.style.display='none';
+  var input=document.getElementById('bsm-item-'+i);
+  var idEl=document.getElementById('bsm-itemid-'+i);
+  var ppH=document.getElementById('bsm-pricePP-'+i);
+  if(idEl)idEl.value='__new__';
+  if(ppH)ppH.value=0;
+  if(input){input.value='';input.placeholder='Navu item name type karo...';}
+}
+
+function hideBSMDrop(i){
+  var drop=document.getElementById('bsm-drop-'+i);
+  if(drop)drop.style.display='none';
+}
+
+function selectBSMItem(){}
+function onBSMItemChange(i){}
+
+function addBSMRow(){
+  var n=window._bsmRowCount||5;
+  var isIn=window._bsmType==='in';
+  var tbody=document.getElementById('bsm-rows');
+  if(tbody){tbody.insertAdjacentHTML('beforeend',buildBSMRow(n,isIn,window._autoInvItems||[]));window._bsmRowCount=n+1;}
+}
+
+async function saveBulkStockModal(type){
+  var date=document.getElementById('bsm-date')?.value||new Date().toISOString().slice(0,10);
+  var dealer=document.getElementById('bsm-dealer')?.value.trim()||document.getElementById('bsm-customer')?.value.trim()||'';
+  var invoice=document.getElementById('bsm-invoice')?.value.trim()||'';
+  var n=window._bsmRowCount||5;
+  var rows=[];
+  for(var i=0;i<n+10;i++){
+    var row=document.getElementById('bsm-row-'+i);if(!row)continue;
+    var idInput=document.getElementById('bsm-itemid-'+i);
+    var textInput=document.getElementById('bsm-item-'+i);
+    var itemIdVal=idInput?.value||'';
+    var itemTextVal=(textInput?.value||'').trim();
+    if(!itemTextVal)continue;
+    var qty=parseFloat(document.getElementById('bsm-qty-'+i)?.value)||0;
+    if(!qty)continue;
+    var itemId=(!itemIdVal||itemIdVal==='__new__')?null:itemIdVal;
+    // Name: if new item, use text input directly; else extract base name before brand bracket
+    var itemName=(!itemIdVal||itemIdVal==='__new__')?itemTextVal:itemTextVal.replace(/\s*\([^)]*\)\s*$/,'').trim();
+    if(!itemName)continue;
+    var price=parseFloat(document.getElementById('bsm-price-'+i)?.value)||0;
+    var sprice=parseFloat(document.getElementById('bsm-sp-'+i)?.value)||0;
+    var pprice=parseFloat(document.getElementById('bsm-pricePP-'+i)?.value)||price;
+    var gst=parseFloat(document.getElementById('bsm-gst-'+i)?.value)||0;
+    var unit=document.getElementById('bsm-unit-'+i)?.value||'pcs';
+    var note=document.getElementById('bsm-note-'+i)?.value.trim()||'';
+    rows.push({itemId,itemName,qty,price,sprice,pprice,gst,unit,note});
+  }
+  if(!rows.length){alert('Koi item fill nathi karyu!');return;}
+  // Warn if any sell price < purchase price (OUT only)
+  if(type!=='in'){
+    var warnings=rows.filter(function(r){return r.pprice>0&&r.sprice>0&&r.sprice<r.pprice;});
+    if(warnings.length){
+      var wList=warnings.map(function(r){return r.itemName+': Purchase ₹'+r.pprice+' > Sell ₹'+r.sprice;}).join('\n');
+      if(!confirm('⚠️ Sell price, Purchase price thi ochhi chhe:\n\n'+wList+'\n\nPan bhi save karvu chhe?'))return;
+    }
+  }
+  var errors=[];
+  var success=0;
+  for(var r=0;r<rows.length;r++){
+    var row=rows[r];
+    try{
+      var invId=row.itemId;
+      var currentStock=0;
+      if(invId){
+        var found=(window._autoInvItems||[]).find(function(i){return String(i.id)===String(invId);});
+        currentStock=found?.stock_qty||0;
+      }else{
+        // Create new item
+        var newItem=await sb('auto_inventory','POST',{item_name:row.itemName,stock_qty:0,purchase_price:row.price||0,unit:row.unit||'pcs',updated_at:new Date().toISOString()});
+        var created=await sb('auto_inventory','GET',null,'?item_name=eq.'+encodeURIComponent(row.itemName)+'&order=created_at.desc&limit=1');
+        if(created&&created[0])invId=created[0].id;
+      }
+      var newStock=type==='in'?currentStock+row.qty:Math.max(0,currentStock-row.qty);
+      await sb('auto_inventory','PATCH',{stock_qty:newStock,updated_at:new Date().toISOString()},'?id=eq.'+invId);
+      try{await sb('auto_inventory_log','POST',{inventory_id:invId,type:type,qty:row.qty,dealer_name:type==='in'?dealer:null,customer_name:type!=='in'?dealer:null,invoice_no:invoice||null,price_per_unit:type==='in'?row.price||null:row.sprice||null,note:(row.note||(row.gst?'GST '+row.gst+'%':null))||null,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date});}catch(ex){}
+      success++;
+    }catch(e){errors.push(row.itemName+': '+e.message);}
+  }
+  document.getElementById('modal-bulk-stock').remove();
+  alert('✅ '+success+' items stock updated!'+(errors.length?'\n\nErrors:\n'+errors.join('\n'):''));
+  renderAutoInventory();
 }
 
 // ===== AUTOMATION SITE VISIT MODULE =====
@@ -9483,6 +9727,11 @@ async function openAddSiteItem(siteId,siteName){
   modal.id='modal-add-site-item';
   modal.className='modal-overlay';
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()"><div class="modal-header"><h2>➕ '+siteName+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-site-item\').remove()">✕</button></div><div class="modal-body">'
+    +'<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">'
+    +'<button id="asi-type-product" onclick="switchASIType(\'product\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;background:#eff6ff;color:#1a56db;cursor:pointer;">📦 Product</button>'
+    +'<button id="asi-type-service" onclick="switchASIType(\'service\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">🔧 Service Charge</button>'
+    +'</div>'
+    +'<div id="asi-product-section">'
     +'<div class="form-group" style="margin-bottom:10px;position:relative;"><label>Item Search Karo</label>'
     +'<input type="text" id="asi-search" placeholder="Type item name..." oninput="filterASIDropdown()" onfocus="showASIDropdown()" onblur="setTimeout(function(){hideASIDropdown();},200)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
     +'<div id="asi-dropdown" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);top:100%;left:0;"></div></div>'
@@ -9490,10 +9739,27 @@ async function openAddSiteItem(siteId,siteName){
     +'<input type="text" id="asi-name" placeholder="Item name lakhav..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-selected-name-group"><label>Item</label>'
     +'<input type="text" id="asi-name-readonly" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f0f9ff;outline:none;"></div>'
-    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div>'
+    +'</div>'
+    +'<div id="asi-service-section" style="display:none;">'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Charge Type <span class="req">*</span></label><select id="asi-charge-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="Configuration Charges">Configuration Charges</option><option value="Installation Charges">Installation Charges</option><option value="Service Charges">Service Charges</option><option value="AMC Charges">AMC Charges</option><option value="Labour Charges">Labour Charges</option><option value="Commissioning Charges">Commissioning Charges</option><option value="Other Charges">Other Charges</option></select></div>'
+    +'<div class="form-group"><label>Description (optional)</label><input type="text" id="asi-charge-desc" placeholder="e.g. Per camera installation" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'</div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option><option>job</option><option>yr</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div>'
     +'<div class="form-group"><label>Note</label><input type="text" id="asi-note" placeholder="Optional..."></div>'
     +'</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-add-site-item\').remove()">Cancel</button><button class="btn btn-primary" onclick="saveASIItem(\''+siteId+'\',\''+escQ(siteName)+'\')">💾 Save</button></div></div>';
   document.body.appendChild(modal);
+}
+
+function switchASIType(type){
+  var isProduct=type==='product';
+  document.getElementById('asi-product-section').style.display=isProduct?'':'none';
+  document.getElementById('asi-service-section').style.display=isProduct?'none':'';
+  var pb=document.getElementById('asi-type-product'),sb2=document.getElementById('asi-type-service');
+  if(pb){pb.style.background=isProduct?'#eff6ff':'#f3f4f6';pb.style.color=isProduct?'#1a56db':'var(--text-muted)';}
+  if(sb2){sb2.style.background=isProduct?'#f3f4f6':'#fef3c7';sb2.style.color=isProduct?'var(--text-muted)':'#92400e';}
+  window._asiType=type;
 }
 
 function onASISelectChange(){
@@ -9601,6 +9867,13 @@ async function saveASIItem(siteId,siteName){
     name=nameRo.value.trim();
   } else {
     name=(document.getElementById('asi-name')?.value||'').trim();
+  }
+  // Service charge type override
+  if(window._asiType==='service'){
+    var chargeType=document.getElementById('asi-charge-type')?.value||'Service Charges';
+    var chargeDesc=document.getElementById('asi-charge-desc')?.value.trim()||'';
+    name=chargeType+(chargeDesc?' — '+chargeDesc:'');
+    window._asiSelectedId=null;
   }
   var qty=parseFloat(document.getElementById('asi-qty').value)||1;
   var unit=document.getElementById('asi-unit').value;
@@ -10128,8 +10401,8 @@ async function renderVirtualAgent(){
   let pendingCalls=0,pendingPayments=0,pendingInquiries=0,totalCustomers=0;
   try{
     const [callsData,inquiriesData,customersData]=await Promise.all([
-      sb('service_calls','GET',null,'?status=eq.Pending+Allocation&select=id'),
-      sb('auto_inquiries','GET',null,'?followup_status=eq.Pending&select=id'),
+      sb('tickets','GET',null,'?status=eq.Open&select=id'),
+      sb('auto_inquiries','GET',null,'?status=not.in.(Converted,Lost)&select=id'),
       sb('customers','GET',null,'?select=id')
     ]);
     pendingCalls=Array.isArray(callsData)?callsData.length:0;
@@ -10482,7 +10755,17 @@ function drawRoundRect(ctx,x,y,w,h,r,fill){
   if(fill)ctx.fill();
 }
 
-function drawPostCanvas(detail,city,template){
+function drawPostCanvas(content,city,template){
+  // content can be string (legacy) or object {headline,body,cta,hashtags}
+  var detail='',headline='',cta='',hashStr='';
+  if(typeof content==='object'&&content!==null){
+    headline=content.headline||'';
+    detail=content.body||'';
+    cta=content.cta||'';
+    hashStr=content.hashtags||'';
+  }else{
+    detail=content||'';
+  }
   const S=1080;
   const canvas=document.createElement('canvas');
   canvas.width=S;canvas.height=S;
@@ -10518,52 +10801,117 @@ function drawPostCanvas(detail,city,template){
   ctx.save();ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(60,148);ctx.lineTo(S-60,148);ctx.stroke();ctx.restore();
 
-  // Template badge (pill)
-  ctx.save();
-  const bw=380,bh=66,bx=(S-bw)/2,by=168;
-  ctx.fillStyle=cfg.badge;drawRoundRect(ctx,bx,by,bw,bh,33,true);
-  ctx.fillStyle=cfg.badgeTxt;ctx.font='bold 30px Arial';ctx.textAlign='center';
-  ctx.fillText(cfg.label,S/2,213);ctx.restore();
+  // Headline (from content object) or fallback template badge
+  if(headline){
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.95)';ctx.textAlign='center';
+    ctx.font='bold 44px Arial';ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;
+    ctx.fillText(headline,S/2,210);ctx.restore();
+  }else{
+    // Template badge (pill) — legacy fallback
+    ctx.save();
+    const bw=380,bh=66,bx=(S-bw)/2,by=168;
+    ctx.fillStyle=cfg.badge;drawRoundRect(ctx,bx,by,bw,bh,33,true);
+    ctx.fillStyle=cfg.badgeTxt;ctx.font='bold 30px Arial';ctx.textAlign='center';
+    ctx.fillText(cfg.label,S/2,213);ctx.restore();
+  }
 
   // Large icon (emoji)
-  ctx.save();ctx.font='130px serif';ctx.textAlign='center';
-  ctx.fillText(cfg.icon,S/2,390);ctx.restore();
+  ctx.save();ctx.font='110px serif';ctx.textAlign='center';
+  ctx.fillText(cfg.icon,S/2,360);ctx.restore();
 
-  // Main content text (auto-wrapped)
+  // Main content body text (auto-wrapped)
   ctx.save();ctx.fillStyle=cfg.accent;ctx.textAlign='center';
   ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;
-  ctx.font='bold 52px Arial';
-  // Estimate font size based on text length
-  const fs=detail.length>80?40:detail.length>50?46:52;
+  const fs=detail.length>100?34:detail.length>70?38:detail.length>50?42:46;
   ctx.font='bold '+fs+'px Arial';
-  canvasWrapText(ctx,detail,S/2,448,920,fs+20);
+  var nextY=canvasWrapText(ctx,detail,S/2,400,920,fs+18);
   ctx.restore();
 
+  // CTA line
+  if(cta){
+    ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.textAlign='center';
+    ctx.font='italic 28px Arial';
+    var ctaY=Math.max(nextY+10,620);
+    canvasWrapText(ctx,cta,S/2,ctaY,900,36);
+    ctx.restore();
+  }
+
   // City + contact bar
-  ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#000';ctx.fillRect(0,730,S,80);ctx.restore();
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.92)';ctx.font='34px Arial';ctx.textAlign='center';
-  ctx.fillText('📍 '+city+'   |   📞 Call Now   |   ✅ Expert Service',S/2,778);ctx.restore();
+  ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#000';ctx.fillRect(0,710,S,70);ctx.restore();
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.92)';ctx.font='30px Arial';ctx.textAlign='center';
+  ctx.fillText('📍 '+city+'   |   📞 Call Now   |   ✅ Expert Service',S/2,754);ctx.restore();
 
   // Bottom band
-  ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#000';ctx.fillRect(0,835,S,245);ctx.restore();
+  ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#000';ctx.fillRect(0,800,S,280);ctx.restore();
 
-  // Hashtags line
-  const tags=AI_HASHTAG_SETS[template]||AI_HASHTAG_SETS.custom;
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.75)';ctx.font='24px Arial';ctx.textAlign='center';
-  ctx.fillText(tags.slice(0,6).join('  '),S/2,890);
-  ctx.fillText(tags.slice(6,11).join('  '),S/2,924);ctx.restore();
+  // Hashtags — use content hashtags or fallback to AI_HASHTAG_SETS
+  var hashTags=[];
+  if(hashStr){
+    hashTags=hashStr.split(' ').filter(Boolean);
+  }else{
+    hashTags=AI_HASHTAG_SETS[template]||AI_HASHTAG_SETS.custom;
+  }
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.72)';ctx.font='22px Arial';ctx.textAlign='center';
+  ctx.fillText(hashTags.slice(0,5).join('  '),S/2,850);
+  ctx.fillText(hashTags.slice(5,10).join('  '),S/2,882);ctx.restore();
 
   // Divider before footer
   ctx.save();ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(60,942);ctx.lineTo(S-60,942);ctx.stroke();ctx.restore();
+  ctx.beginPath();ctx.moveTo(60,910);ctx.lineTo(S-60,910);ctx.stroke();ctx.restore();
 
   // Website URL footer
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font='bold 30px Arial';ctx.textAlign='center';
-  ctx.fillText('🌐 bhavi-electronics.com  |  Bhavi Electronics & Automation',S/2,988);
+  ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font='bold 28px Arial';ctx.textAlign='center';
+  ctx.fillText('🌐 bhavi-electronics.com  |  Bhavi Electronics & Automation',S/2,952);
   ctx.font='22px Arial';ctx.globalAlpha=0.6;
-  ctx.fillText('📷 Follow us on Instagram  •  Facebook  •  WhatsApp',S/2,1024);ctx.restore();
+  ctx.fillText('📷 Follow us on Instagram  •  Facebook  •  WhatsApp',S/2,990);ctx.restore();
 
   return canvas;
+}
+
+function generatePostContent(template,userDetail,city){
+  const companyName='Bhavi Electronics & Automation';
+  const city2=city||'Surat';
+  const templates={
+    offer:{
+      headline:'🎉 SPECIAL OFFER!',
+      body:userDetail||'Ghar baithke Electronics Service karvao! Bhavi Electronics ma trusted repair service maate contact karo.',
+      cta:'📞 Call Now | ✅ Expert Technicians | 🏠 Home Service Available',
+      hashtags:'#'+city2+'Electronics #BhaviElectronics #SpecialOffer #DiscountAlert #ElectronicsRepair #ACService #HomeAppliances #ServiceCenter #'+city2+'Gujarat'
+    },
+    service:{
+      headline:'🔧 PROFESSIONAL SERVICE',
+      body:userDetail||'AC, TV, Washing Machine, Refrigerator — tamara ghar na badha electronics mate trusted repair service. '+companyName+', '+city2+'.',
+      cta:'🏠 On-Site Service | 🔧 All Brands | ⚡ Same Day',
+      hashtags:'#'+city2+'Service #ACRepair #TVRepair #ApplianceRepair #BhaviElectronics #HomeService #'+city2+'Electronics #Gujarat'
+    },
+    festival:{
+      headline:'🪔 FESTIVE GREETINGS!',
+      body:userDetail||companyName+' taraf thi tamne ane tamara parivarnu khub khub abhinandan! Tamara vishwaas aur pyar mate aabhaari chhi.',
+      cta:'💙 '+companyName+' Team',
+      hashtags:'#FestivalGreetings #BhaviElectronics #'+city2+' #Gujarat #Celebration #HappyFestival'
+    },
+    tip:{
+      headline:'💡 SERVICE TIP',
+      body:userDetail||'AC filter mahine ma ek vaara saaf karo — cooling vadhse ane electricity bill ghatshe! Expert tip by '+companyName+'.',
+      cta:'🔧 Need Service? Call Us! | ✅ Free Consultation',
+      hashtags:'#ServiceTip #ACTips #ElectronicsCare #BhaviElectronics #'+city2+' #HomeAppliance #EnergySaving'
+    },
+    product:{
+      headline:'✨ NEW PRODUCT',
+      body:userDetail||'Latest automation products available at '+companyName+'! Smart home, CCTV, Home Theatre ane vadhare — Surat na best dealers.',
+      cta:'🏪 Visit Us | 📞 Call for Demo | 🚚 Installation Available',
+      hashtags:'#NewProduct #SmartHome #HomeAutomation #CCTV #'+city2+' #BhaviElectronics #Automation'
+    },
+    custom:{
+      headline:'📢 ANNOUNCEMENT',
+      body:userDetail||companyName+' — '+city2+'ma Electronics Repair ane Automation Solutions mate tamaro bharosapaatr partner.',
+      cta:'📞 Call Now | 🌐 bhavi-electronics.com',
+      hashtags:'#BhaviElectronics #'+city2+' #Electronics #Automation #Gujarat #TrustedService'
+    }
+  };
+  var t=templates[template]||templates.custom;
+  return {headline:t.headline,body:t.body,cta:t.cta,hashtags:t.hashtags};
 }
 
 function generateAIPost(){
@@ -10571,12 +10919,14 @@ function generateAIPost(){
   const city=(document.getElementById('ai-post-city').value||'Surat').trim();
   if(!detail){alert('Pehela post details lakho!');return;}
 
-  // Generate full 1080x1080 canvas
-  generatedCanvas=drawPostCanvas(detail,city,selectedTemplate);
+  // Generate smart post content
+  var content=generatePostContent(selectedTemplate,detail,city);
 
-  // Hashtags
-  const hashSet=AI_HASHTAG_SETS[selectedTemplate]||AI_HASHTAG_SETS.custom;
-  generatedHashtags=[...hashSet.slice(0,10),'#'+city.replace(/\s+/g,'')];
+  // Generate full 1080x1080 canvas
+  generatedCanvas=drawPostCanvas(content,city,selectedTemplate);
+
+  // Hashtags — use generated content hashtags + fallback
+  generatedHashtags=content.hashtags.split(' ').filter(Boolean);
 
   // Show scaled preview (500x500)
   const preview=document.getElementById('ai-post-preview-box');
@@ -10639,7 +10989,7 @@ async function loadAIInquiries(){
   const el=document.getElementById('ai-inquiry-list');
   if(!el)return;
   try{
-    const data=await sb('auto_inquiries','GET',null,'?followup_status=eq.Pending&order=created_at.desc&limit=20');
+    const data=await sb('auto_inquiries','GET',null,'?status=not.in.(Converted,Lost)&order=followup_date.asc&limit=30');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending inquiry nathi. 🎉</div>';
       return;
@@ -10676,7 +11026,7 @@ function sendInquirySMS(id,phone){
 
 async function markInquiryDone(id){
   try{
-    await sb('auto_inquiries','PATCH',{followup_status:'Done',followup_date:new Date().toISOString()},'?id=eq.'+id);
+    await sb('auto_inquiries','PATCH',{status:'In Progress',followup_date:new Date().toISOString().slice(0,10)},'?id=eq.'+id);
     const el=document.getElementById('inq-item-'+id);
     if(el)el.style.opacity='0.4';
   }catch(e){}
@@ -10702,7 +11052,7 @@ async function loadAIPayments(){
   const el=document.getElementById('ai-payment-list');
   if(!el)return;
   try{
-    const data=await sb('service_calls','GET',null,'?status=eq.Closed&payment_status=eq.Pending&order=updated_at.desc&limit=20');
+    const data=await sb('tickets','GET',null,'?status=in.(Completed,Closed)&call_type=not.in.(Warranty,Warranty+Repeat)&order=updated_at.desc&limit=30');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending payment nathi. 🎉</div>';
       return;
@@ -10710,11 +11060,11 @@ async function loadAIPayments(){
     el.innerHTML=data.map(call=>`
       <div class="followup-item" id="pay-item-${call.id}">
         <div class="followup-info">
-          <div class="fi-name">${call.customer_name||'Customer'} — ${call.model_no||'-'} <span style="color:var(--danger);font-weight:700;">₹${call.total_amount||0}</span></div>
-          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.call_id||'-'} &nbsp;|&nbsp; 📅 ${call.updated_at?new Date(call.updated_at).toLocaleDateString('en-IN'):'-'}</div>
+          <div class="fi-name">${call.cname||call.customer_name||'Customer'} — ${call.model||call.model_no||'-'}</div>
+          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.id||'-'} &nbsp;|&nbsp; 🔧 ${call.call_type||'-'} &nbsp;|&nbsp; 📅 ${call.updated_at?new Date(call.updated_at).toLocaleDateString('en-IN'):'-'}</div>
         </div>
         <div class="followup-actions">
-          <button class="ai-action-btn ai-btn-wa" onclick="sendPaymentWA('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.customer_name||'').replace(/'/g,'')}','${call.call_id||''}','${call.model_no||''}','${call.total_amount||0}')" title="WhatsApp Reminder">💬 WA</button>
+          <button class="ai-action-btn ai-btn-wa" onclick="sendPaymentWA('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.cname||call.customer_name||'').replace(/'/g,'')}','${call.id||''}','${(call.model||call.model_no||'').replace(/'/g,'')}','0')" title="WhatsApp Reminder">💬 WA</button>
           <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
         </div>
       </div>`).join('');
@@ -10755,7 +11105,7 @@ async function loadAICalls(){
   const el=document.getElementById('ai-calls-list');
   if(!el)return;
   try{
-    const data=await sb('service_calls','GET',null,'?status=eq.Pending+Allocation&order=created_at.desc&limit=20');
+    const data=await sb('tickets','GET',null,'?status=eq.Open&order=created_at.desc&limit=30');
     if(!Array.isArray(data)||data.length===0){
       el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending allocation call nathi. 🎉</div>';
       return;
@@ -10763,11 +11113,11 @@ async function loadAICalls(){
     el.innerHTML=data.map(call=>`
       <div class="followup-item" id="call-item-${call.id}">
         <div class="followup-info">
-          <div class="fi-name">${call.customer_name||'Customer'} — ${call.model_no||'-'}</div>
-          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.call_id||'-'} &nbsp;|&nbsp; 🔧 ${call.problem||'-'} &nbsp;|&nbsp; ${call.service_type||'-'}</div>
+          <div class="fi-name">${call.cname||call.customer_name||'Customer'} — ${call.model||call.model_no||'-'}</div>
+          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.id||'-'} &nbsp;|&nbsp; 🔧 ${call.problem||'-'} &nbsp;|&nbsp; ${call.service_type||'-'}</div>
         </div>
         <div class="followup-actions">
-          <button class="ai-action-btn ai-btn-wa" onclick="sendCallAck('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.customer_name||'').replace(/'/g,'')}','${call.call_id||''}','${(call.model_no||'').replace(/'/g,'')}','${(call.problem||'').replace(/'/g,'')}','${call.service_type||''}')" title="Acknowledgement">💬 Ack</button>
+          <button class="ai-action-btn ai-btn-wa" onclick="sendCallAck('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.cname||call.customer_name||'').replace(/'/g,'')}','${call.id||''}','${(call.model||call.model_no||'').replace(/'/g,'')}','${(call.problem||'').replace(/'/g,'')}','${call.service_type||''}')" title="Acknowledgement">💬 Ack</button>
           <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
         </div>
       </div>`).join('');
