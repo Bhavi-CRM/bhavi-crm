@@ -2245,7 +2245,9 @@ async function doLogin(){
     if(loginRole==='engineer'&&currentUser.role!=='engineer'){showLoginError('Use Engineer tab');return;}
     if(loginRole==='admin'&&currentUser.role==='engineer'){showLoginError('Use Admin/WC tab');return;}
     // Save full user to localStorage for instant restore
-    localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now()}));
+    const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+    try{await sb('users','PATCH',{session_token:_stok},'?user_id=eq.'+encodeURIComponent(user.user_id));}catch(e){}
+    localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
@@ -2300,13 +2302,20 @@ async function tryAutoLogin(){
       loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
     }
     const session=JSON.parse(saved);
-    // Session valid for 12 hours
+    // Session valid for 30 days
     if(Date.now()-session.savedAt > 30*24*60*60*1000){localStorage.removeItem('bhavi_session');return;}
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
     const users=await res.json();
     if(!users||!users.length){localStorage.removeItem('bhavi_session');return;}
     currentUser=null;
     currentUser=users[0];
+    // Single-device check: if session_token column exists and token mismatches, force logout
+    if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
+      localStorage.removeItem('bhavi_session');
+      localStorage.removeItem('bhavi_user');
+      alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
+      return;
+    }
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
@@ -2545,7 +2554,8 @@ async function renderDashboard(){
   pc.innerHTML='<div class="loading">Loading...</div>';
   if(!currentUser){pc.innerHTML='';return;}
   try{
-    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    const _engId=currentUser.eng_id||currentUser.user_id;
+    let q=currentUser.role==='engineer'?`?assigned_to=eq.${_engId}&order=created_at.desc`:'?order=created_at.desc&limit=300';
     if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}
     allTickets=await sb('tickets','GET',null,q);
     const total=allTickets.length;
@@ -3054,15 +3064,16 @@ async function savePunchOut(key){
 async function renderTickets(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
-    let q='?order=created_at.desc';
-    // WC filter: ICP WC sees ICP calls only, CSP WC sees CSP calls only
-    if(currentUser.role_type==='work_controller'){
+    const engId=currentUser.eng_id||currentUser.user_id;
+    let q='?order=created_at.desc&limit=300';
+    if(currentUser.role==='engineer'){
+      q=`?assigned_to=eq.${engId}&order=created_at.desc`;
+    } else if(currentUser.role_type==='work_controller'){
       const wcName=(currentUser.name||'').toUpperCase();
-      // Check name for ICP/CSP, fallback to user_id
       let wcType='ICP';
       if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
       else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
-      q+='&wc_type=eq.'+wcType;
+      q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';
     }
     allTickets=await sb('tickets','GET',null,q);
     renderTicketTable();
@@ -3133,8 +3144,8 @@ async function renderMyCalls(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     const[tickets,tasks]=await Promise.all([
-      sb('tickets','GET',null,`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`),
-      sb('tasks','GET',null,`?assigned_to=eq.${currentUser.eng_id}&status=neq.Closed&order=created_at.desc`)
+      sb('tickets','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&order=created_at.desc`),
+      sb('tasks','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&status=neq.Closed&order=created_at.desc`)
     ]);
     // Punch bar
     const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
@@ -10275,6 +10286,7 @@ async function renderInquiries(){
   try{
     var today=new Date().toLocaleDateString('en-CA');
     var inqs=await sb('auto_inquiries','GET',null,'?order=created_at.desc');
+    window._inqCache=inqs;
     var followupToday=inqs.filter(function(i){return i.followup_date===today&&i.status!=='Converted'&&i.status!=='Lost';});
     var html='<div class="section-header">'
       +'<h2>🔍 Inquiries ('+inqs.length+')</h2>'
@@ -10311,7 +10323,7 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +'<button class="btn btn-outline btn-sm" onclick="openAddInquiryModal('+JSON.stringify(inq).replace(/'/g,"\\'")+')">✏️</button>'
+          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiry('+inq.id+')">✏️</button>'
           +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
           +'</div>'
           +'</div>'
@@ -10336,6 +10348,11 @@ function filterInquiryList(){
   });
 }
 
+function openEditInquiry(id){
+  var inq=(window._inqCache||[]).find(function(i){return i.id==id;});
+  if(!inq){alert('Inquiry not found');return;}
+  openAddInquiryModal(inq);
+}
 function openAddInquiryModal(editData){
   var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
   var isEdit=!!(editData&&editData.id);
