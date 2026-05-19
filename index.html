@@ -6748,10 +6748,29 @@ async function loadWalkInReport(){
     if(!logs.length){res.innerHTML='<div class="alert alert-info">No walk-in records found.</div>';return;}
 
     var totalProducts=logs.reduce(function(a,l){return a+(l.product_count||0);},0);
-    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Walk-ins</div><div class="kpi-value">'+logs.length+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Products</div><div class="kpi-value" style="color:#0e9f6e;">'+totalProducts+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Days</div><div class="kpi-value" style="color:#7c3aed;">'+new Set(logs.map(function(l){return l.visit_date;})).size+'</div></div>'
+    // Inward/Outward breakdown from products array
+    var inwardCusts=0,inwardProds=0,outwardCusts=0,outwardProds=0;
+    logs.forEach(function(l){
+      var prods=l.products||[];
+      if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
+      var inProd=prods.filter(function(p){return(p.type||'Inward')==='Inward';});
+      var outProd=prods.filter(function(p){return p.type==='Outward';});
+      if(inProd.length){inwardCusts++;inwardProds+=inProd.length;}
+      if(outProd.length){outwardCusts++;outwardProds+=outProd.length;}
+    });
+    var mkCard=function(bg,bc,tc,sub,icon,val){
+      return '<div class="kpi-card" style="padding:14px 10px;border-color:'+bc+';background:'+bg+';min-width:0;">'
+        +'<div style="font-size:10px;font-weight:700;color:'+tc+';text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+icon+' '+sub+'</div>'
+        +'<div style="font-size:44px;font-weight:800;color:'+tc+';line-height:1;">'+val+'</div>'
+        +'</div>';
+    };
+    var html='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px;">'
+      +mkCard('linear-gradient(135deg,#eff6ff,#fff)','#1a56db','#1a56db','Inward Customers','📥',inwardCusts)
+      +mkCard('linear-gradient(135deg,#dbeafe,#fff)','#3b82f6','#1d4ed8','Inward Products','📥',inwardProds)
+      +mkCard('linear-gradient(135deg,#ecfdf5,#fff)','#059669','#059669','Outward Customers','📤',outwardCusts)
+      +mkCard('linear-gradient(135deg,#d1fae5,#fff)','#10b981','#047857','Outward Products','📤',outwardProds)
+      +mkCard('linear-gradient(135deg,#f5f3ff,#fff)','#7c3aed','#7c3aed','Total Customers','📊',logs.length)
+      +mkCard('linear-gradient(135deg,#ede9fe,#fff)','#a855f7','#9333ea','Total Products','📊',totalProducts)
       +'</div>';
 
     // Group by date
@@ -6771,7 +6790,7 @@ async function loadWalkInReport(){
           +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">'
           +products.map(function(p){
             return'<span style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;">'
-              +(p.brand?p.brand+' ':'')+p.model
+              +(p.brand?p.brand+' ':'')+cleanModelNo(p.model||'')
               +' <span style="color:#1a56db;">['+p.type+']</span>'
               +' <span style="color:'+(p.warranty==='In Warranty'?'#065f46':'#991b1b')+';">('+p.warranty+')</span>'
               +(p.remarks?' — '+p.remarks:'')+'</span>';
