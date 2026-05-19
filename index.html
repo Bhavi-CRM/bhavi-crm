@@ -251,7 +251,7 @@ tr:hover td{background:#f8fafc;}
   <div class="nav-section">
     <div class="nav-section-title">Main</div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
-    <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
+    <div class="nav-item hidden" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('my-calls')" id="nav-my-calls"><span class="icon">📞</span><span>My Calls</span></div>
     <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
     <div class="nav-item hidden" onclick="navigate('walk-in')" id="nav-walk-in"><span class="icon">🚶</span><span>Walk-in</span></div>
@@ -259,15 +259,15 @@ tr:hover td{background:#f8fafc;}
   </div>
   <div class="nav-section" id="nav-admin-section">
     <div class="nav-section-title">Management</div>
-    <div class="nav-item" onclick="navigate('inventory')" id="nav-inventory"><span class="icon">🗃️</span><span>Inventory</span></div>
-    <div class="nav-item" onclick="navigate('tasks')" id="nav-tasks"><span class="icon">✅</span><span>Tasks</span></div>
-    <div class="nav-item" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
-    <div class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
-    <div class="nav-item" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
-    <div class="nav-item" onclick="navigate('walk-in-report')" id="nav-walk-in-report"><span class="icon">🚶</span><span>Walk-in Report</span></div>
-    <div class="nav-item" onclick="navigate('courier-report')" id="nav-courier-report"><span class="icon">📦</span><span>Courier Register</span></div>
-    <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
-    <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
+    <div class="nav-item hidden" onclick="navigate('inventory')" id="nav-inventory"><span class="icon">🗃️</span><span>Inventory</span></div>
+    <div class="nav-item hidden" onclick="navigate('tasks')" id="nav-tasks"><span class="icon">✅</span><span>Tasks</span></div>
+    <div class="nav-item hidden" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
+    <div class="nav-item hidden" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
+    <div class="nav-item hidden" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
+    <div class="nav-item hidden" onclick="navigate('walk-in-report')" id="nav-walk-in-report"><span class="icon">🚶</span><span>Walk-in Report</span></div>
+    <div class="nav-item hidden" onclick="navigate('courier-report')" id="nav-courier-report"><span class="icon">📦</span><span>Courier Register</span></div>
+    <div class="nav-item hidden" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
+    <div class="nav-item hidden" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
   <div class="nav-section" id="nav-automation-section">
     <div class="nav-section-title">Automation</div>
@@ -2254,18 +2254,14 @@ async function doLogin(){
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
-    // Clear page content first
+    setupNav(); // immediately set correct nav before any async
     currentPage='';
     allTickets=[];
     const pc=document.getElementById('page-content');
     if(pc)pc.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
-    setupNav();
-    await new Promise(r=>setTimeout(r,300));
     await navigate('dashboard');
-    // Run setupNav again after render to ensure correct state
-    setTimeout(setupNav, 100);
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
@@ -2321,17 +2317,14 @@ async function tryAutoLogin(){
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
+    setupNav(); // immediately set correct nav before any async
     currentPage='';
     allTickets=[];
     const pc2=document.getElementById('page-content');
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
-    setupNav();
     await loadLogoFromDB();
-    await new Promise(r=>setTimeout(r,300));
-    setupNav();
     await navigate('dashboard');
-    setTimeout(setupNav,200);
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
