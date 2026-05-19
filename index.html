@@ -10283,8 +10283,8 @@ async function renderInquiries(){
     if(followupToday.length){
       html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
         +'<span style="font-size:20px;">🔔</span><div>'
-        +'<b style="color:#92400e;">Aaj '+followupToday.length+' inquiry(s) na followup chhe!</b><br>'
-        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(', ')+'</span>'
+        +'<b style="color:#92400e;">'+followupToday.length+' Follow-up'+(followupToday.length>1?'s':'')+' Due Today</b><br>'
+        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(' &nbsp;·&nbsp; ')+'</span>'
         +'</div></div>';
     }
     html+='<div class="filter-bar" style="margin-bottom:14px;">'
