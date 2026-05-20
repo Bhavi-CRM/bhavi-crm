@@ -2240,8 +2240,11 @@ function showLoginError(msg){const el=document.getElementById('login-error');el.
 function doLogout(){
   currentPage='dashboard';
   currentUser=null;
+  allTickets=[];
   localStorage.removeItem('bhavi_session');
   localStorage.removeItem('bhavi_user');
+  var pc=document.getElementById('page-content');
+  if(pc)pc.innerHTML='';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-id').value='';document.getElementById('login-pass').value='';
 }
