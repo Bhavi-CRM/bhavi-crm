@@ -276,10 +276,6 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('auto-visits-report')" id="nav-auto-visits-report"><span class="icon">📋</span><span>Visit Report</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
   </div>
-  <div class="nav-section" id="nav-ai-section">
-    <div class="nav-section-title">AI Agent</div>
-    <div class="nav-item hidden" onclick="navigate('ai-agent')" id="nav-ai-agent"><span class="icon">🤖</span><span>Virtual AI Agent</span></div>
-  </div>
   <div id="sidebar-user">
     <div class="user-name" id="sidebar-username">-</div>
     <div class="user-role" id="sidebar-userrole">-</div>
@@ -546,42 +542,16 @@ tr:hover td{background:#f8fafc;}
 <!-- STOCK MODAL -->
 <div class="modal-overlay hidden" id="modal-stock" onclick="closeModal('modal-stock')">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2>📦 Stock Update</h2><button class="close-btn" onclick="closeModal('modal-stock')">✕</button></div>
+    <div class="modal-header"><h2>Adjust Stock</h2><button class="close-btn" onclick="closeModal('modal-stock')">✕</button></div>
     <div class="modal-body">
-      <div id="stock-part-info" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;"></div>
-      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">
-        <button id="st-btn-in" onclick="switchInvStockType('in')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#dcfce7;color:#065f46;cursor:pointer;">⬇️ Stock IN</button>
-        <button id="st-btn-out" onclick="switchInvStockType('out')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">⬆️ Stock OUT</button>
-        <button id="st-btn-sell" onclick="switchInvStockType('sell')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">💰 Sell</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group"><label>Quantity *</label><input type="number" id="stock-qty" value="1" min="1"></div>
-        <div class="form-group"><label>Date</label><input type="date" id="stock-date"></div>
-      </div>
-      <div id="st-in-fields">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-          <div class="form-group"><label>Supplier / Dealer</label><input type="text" id="stock-supplier" placeholder="e.g. Rashmi Traders"></div>
-          <div class="form-group"><label>Invoice No</label><input type="text" id="stock-invoice" placeholder="e.g. INV-001"></div>
-        </div>
-        <div class="form-group"><label>Note</label><input type="text" id="stock-note" placeholder="e.g. New stock arrived"></div>
-      </div>
-      <div id="st-out-fields" style="display:none;">
-        <div class="form-group"><label>Purpose / Note</label><input type="text" id="stock-out-note" placeholder="e.g. Used in ticket #1234, Damaged"></div>
-      </div>
-      <div id="st-sell-fields" style="display:none;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-          <div class="form-group"><label>Customer Name *</label><input type="text" id="stock-cust" placeholder="e.g. Rajesh Patel"></div>
-          <div class="form-group"><label>Invoice No</label><input type="text" id="stock-sell-inv" placeholder="e.g. INV-2026-001"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group"><label>Selling Price / Unit ₹</label><input type="number" id="stock-sell-price" value="0" min="0"></div>
-          <div class="form-group"><label>Note</label><input type="text" id="stock-sell-note" placeholder="Optional"></div>
-        </div>
-      </div>
+      <div id="stock-part-info" style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:13px;"></div>
+      <div class="form-group" style="margin-bottom:10px;"><label>Type</label><select id="stock-type"><option value="in">Stock In</option><option value="out">Stock Out</option></select></div>
+      <div class="form-group" style="margin-bottom:10px;"><label>Qty</label><input type="number" id="stock-qty" value="1" min="1"></div>
+      <div class="form-group"><label>Note</label><input type="text" id="stock-note"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-stock')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStockAdjust()">💾 Save</button>
+      <button class="btn btn-primary" onclick="saveStockAdjust()">✅ Confirm</button>
     </div>
   </div>
 </div>
@@ -2244,6 +2214,7 @@ async function doLogin(){
     currentUser=user;
     if(loginRole==='engineer'&&currentUser.role!=='engineer'){showLoginError('Use Engineer tab');return;}
     if(loginRole==='admin'&&currentUser.role==='engineer'){showLoginError('Use Admin/WC tab');return;}
+    // Save full user to localStorage for instant restore
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now()}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     document.getElementById('login-screen').style.display='none';
@@ -2251,7 +2222,7 @@ async function doLogin(){
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
-    setupNav();
+    // Clear page content first
     currentPage='';
     allTickets=[];
     const pc=document.getElementById('page-content');
@@ -2259,28 +2230,18 @@ async function doLogin(){
     await loadMasterData();
     await loadLogoFromDB();
     setupNav();
+    await new Promise(r=>setTimeout(r,300));
     await navigate('dashboard');
+    // Run setupNav again after render to ensure correct state
+    setTimeout(setupNav, 100);
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
 function doLogout(){
   currentPage='dashboard';
   currentUser=null;
-  allTickets=[];
   localStorage.removeItem('bhavi_session');
   localStorage.removeItem('bhavi_user');
-  // Clear page content so next user doesn't see previous user's data
-  const pc=document.getElementById('page-content');
-  if(pc)pc.innerHTML='';
-  // Hide all role-specific nav items so next login starts clean
-  ['nav-tickets','nav-my-calls','nav-work-log','nav-walk-in','nav-courier',
-   'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
-   'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
-   'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call'].forEach(function(id){
-    var el=document.getElementById(id);if(el)el.classList.add('hidden');
-  });
-  var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-id').value='';document.getElementById('login-pass').value='';
 }
@@ -2296,12 +2257,11 @@ async function tryAutoLogin(){
       loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
     }
     const session=JSON.parse(saved);
-    // Session valid for 30 days
+    // Session valid for 12 hours
     if(Date.now()-session.savedAt > 30*24*60*60*1000){localStorage.removeItem('bhavi_session');return;}
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
-    if(!res.ok){localStorage.removeItem('bhavi_session');throw new Error('Session fetch failed');}
     const users=await res.json();
-    if(!Array.isArray(users)||!users.length){localStorage.removeItem('bhavi_session');throw new Error('User not found');}
+    if(!users||!users.length){localStorage.removeItem('bhavi_session');return;}
     currentUser=null;
     currentUser=users[0];
     document.getElementById('login-screen').style.display='none';
@@ -2309,15 +2269,17 @@ async function tryAutoLogin(){
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
-    setupNav();
     currentPage='';
     allTickets=[];
     const pc2=document.getElementById('page-content');
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
+    setupNav();
     await loadLogoFromDB();
+    await new Promise(r=>setTimeout(r,300));
     setupNav();
     await navigate('dashboard');
+    setTimeout(setupNav,200);
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
@@ -2394,26 +2356,6 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
-      sv('nav-ai-agent',true);
-    }
-    // AI Agent nav: show for admin and special engineers
-    if(isEng){
-      var isAutoEng2=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-ai-agent',isAutoEng2);
-    }
-    // Hide/show entire Automation + AI Agent sections based on role
-    var autoSec=document.getElementById('nav-automation-section');
-    var aiSec=document.getElementById('nav-ai-section');
-    if(isWC){
-      if(autoSec)autoSec.style.display='none';
-      if(aiSec)aiSec.style.display='none';
-    } else if(isEng){
-      var isAE=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      if(autoSec)autoSec.style.display=isAE?'':'none';
-      if(aiSec)aiSec.style.display=isAE?'':'none';
-    } else {
-      if(autoSec)autoSec.style.display='';
-      if(aiSec)aiSec.style.display='';
     }
   }catch(e){console.error('setupNav:',e);}
 }
@@ -2431,14 +2373,19 @@ async function loadMasterData(){
 
 // NAVIGATE
 async function navigate(page){
+  if(!currentUser){
+    // Not logged in — show login screen, do not render any page
+    var ls=document.getElementById('login-screen');
+    if(ls)ls.style.display='flex';
+    return;
+  }
   currentPage=page;
-  // Ensure nav is setup
-  if(currentUser)setupNav();
+  setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2537,13 +2484,15 @@ async function validateStatusChange(ticketId, fromStatus, toStatus, role){
 async function renderDashboard(){
   const pc=document.getElementById('page-content');
   if(!pc)return;
+  if(!currentUser){
+    pc.innerHTML='<div class="alert alert-warning" style="margin:30px auto;max-width:400px;text-align:center;">Session expired. Please <a href="#" onclick="document.getElementById(\'login-screen\').style.display=\'flex\'">login again</a>.<br><button class="btn btn-primary btn-sm" onclick="document.getElementById(\'login-screen\').style.display=\'flex\'" style="margin-top:10px;">Sign In</button></div>';
+    return;
+  }
   pc.innerHTML='<div class="loading">Loading...</div>';
-  if(!currentUser){pc.innerHTML='<div class="alert alert-warning" style="margin:20px;">Session not ready. <button class="btn btn-primary btn-sm" onclick="location.reload()">🔄 Reload</button></div>';return;}
   try{
-    const _engId=currentUser.eng_id||currentUser.user_id;
-    let q=currentUser.role==='engineer'?`?assigned_to=eq.${_engId}&order=created_at.desc`:'?order=created_at.desc&limit=300';
-    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}
-    allTickets=await sb('tickets','GET',null,q);
+    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc&limit=300';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}}
+    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=300');}
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
     const closed=allTickets.filter(t=>t.status==='Closed').length;
@@ -2752,9 +2701,8 @@ async function renderDashboard(){
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
-    // Inquiry followup check — only for Admin and ENG002/ENG008
-    var canInqAlert=(currentUser.role==='admin'&&currentUser.role_type!=='work_controller')||(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-    if(canInqAlert) try{
+    // Inquiry followup check
+    try{
       var today=new Date().toLocaleDateString('en-CA');
       var todayInqs=await sb('auto_inquiries','GET',null,'?followup_date=eq.'+today+'&status=neq.Converted&status=neq.Lost&select=customer_name');
       if(todayInqs&&todayInqs.length){
@@ -2768,7 +2716,8 @@ async function renderDashboard(){
     }catch(ex){}
   }catch(e){
     console.error('Dashboard error:',e);
-    document.getElementById('page-content').innerHTML='<div class="alert alert-warning">Error loading dashboard: '+e.message+'<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:8px;">🔄 Retry</button></div>';
+    var pce=document.getElementById('page-content');
+    if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Dashboard load karvama error aavyo:<br><b>'+e.message+'</b><br><br>Supabase connection thapu joie. Internet check karo.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
   }
 }
 
@@ -3050,18 +2999,17 @@ async function savePunchOut(key){
 async function renderTickets(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
-    const engId=currentUser.eng_id||currentUser.user_id;
-    let q='?order=created_at.desc&limit=300';
-    if(currentUser.role==='engineer'){
-      q=`?assigned_to=eq.${engId}&order=created_at.desc`;
-    } else if(currentUser.role_type==='work_controller'){
+    let q='?order=created_at.desc';
+    // WC filter: ICP WC sees ICP calls only, CSP WC sees CSP calls only
+    if(currentUser.role_type==='work_controller'){
       const wcName=(currentUser.name||'').toUpperCase();
+      // Check name for ICP/CSP, fallback to user_id
       let wcType='ICP';
       if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
       else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
-      q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';
+      if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
     }
-    allTickets=await sb('tickets','GET',null,q);
+    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc');}
     renderTicketTable();
   }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
@@ -3130,8 +3078,8 @@ async function renderMyCalls(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     const[tickets,tasks]=await Promise.all([
-      sb('tickets','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&order=created_at.desc`),
-      sb('tasks','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&status=neq.Closed&order=created_at.desc`)
+      sb('tickets','GET',null,`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`),
+      sb('tasks','GET',null,`?assigned_to=eq.${currentUser.eng_id}&status=neq.Closed&order=created_at.desc`)
     ]);
     // Punch bar
     const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
@@ -4381,154 +4329,59 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td>${i.item_name}</td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory(this.dataset.code,this.dataset.name)" data-code="${i.part_code||''}" data-name="${i.item_name}">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
 function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
 function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;editingInvId=id;openAddInv();document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-price').value=inv.unit_price||0;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;}
 async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,unit_price:parseFloat(document.getElementById('inv-price').value)||0,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){alert('Error: '+e.message);}}
-function switchInvStockType(t){
-  window._invStockType=t;
-  ['in','out','sell'].forEach(function(x){
-    var btn=document.getElementById('st-btn-'+x);
-    if(btn){btn.style.background=x===t?(t==='in'?'#dcfce7':t==='sell'?'#fef3c7':'#fee2e2'):'#f3f4f6';btn.style.color=x===t?(t==='in'?'#065f46':t==='sell'?'#92400e':'#dc2626'):'var(--text-muted)';}
-  });
-  document.getElementById('st-in-fields').style.display=t==='in'?'':'none';
-  document.getElementById('st-out-fields').style.display=t==='out'?'':'none';
-  document.getElementById('st-sell-fields').style.display=t==='sell'?'':'none';
-}
-function openStockAdjust(id){
-  const inv=allInventory.find(i=>i.id===id);if(!inv)return;
-  adjustingInvId=id;
-  window._invStockType='in';
-  document.getElementById('stock-part-info').innerHTML=`<b>${inv.part_code||''}</b> — ${inv.item_name}<br>Current Stock: <b style="color:${inv.qty_in_stock>0?'#065f46':'#dc2626'}">${inv.qty_in_stock}</b> | Min: ${inv.min_stock} | ₹${inv.unit_price}`;
-  document.getElementById('stock-qty').value='1';
-  document.getElementById('stock-date').value=new Date().toISOString().slice(0,10);
-  ['stock-note','stock-supplier','stock-invoice','stock-out-note','stock-cust','stock-sell-inv','stock-sell-note'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('stock-sell-price').value=inv.unit_price||0;
-  switchInvStockType('in');
-  openModal('modal-stock');
-}
-async function saveStockAdjust(){
-  const inv=allInventory.find(i=>i.id===adjustingInvId);if(!inv)return;
-  const t=window._invStockType||'in';
-  const qty=parseInt(document.getElementById('stock-qty').value)||1;
-  const date=document.getElementById('stock-date')?.value||new Date().toISOString().slice(0,10);
-  if(t==='sell'&&!document.getElementById('stock-cust')?.value.trim()){alert('Customer name required!');return;}
-  const newQty=t==='in'?inv.qty_in_stock+qty:Math.max(0,inv.qty_in_stock-qty);
-  let logNote='';
-  let logData={inventory_id:adjustingInvId,type:t,qty,done_by:currentUser.name,created_at:new Date().toISOString()};
-  if(t==='in'){
-    const sup=document.getElementById('stock-supplier')?.value.trim()||'';
-    const inv2=document.getElementById('stock-invoice')?.value.trim()||'';
-    logNote='Purchase'+(sup?' from '+sup:'')+(inv2?' INV:'+inv2:'');
-    logData.note=logNote;logData.supplier=sup||null;logData.invoice_no=inv2||null;logData.txn_date=date;
-  }else if(t==='out'){
-    logNote=document.getElementById('stock-out-note')?.value.trim()||'Manual stock out';
-    logData.note=logNote;logData.txn_date=date;
-  }else{
-    const cust=document.getElementById('stock-cust')?.value.trim()||'';
-    const sinv=document.getElementById('stock-sell-inv')?.value.trim()||'';
-    const sp=parseFloat(document.getElementById('stock-sell-price')?.value)||0;
-    logNote='Sale to '+cust+(sinv?' INV:'+sinv:'');
-    logData.note=logNote;logData.customer_name=cust;logData.invoice_no=sinv;logData.price_per_unit=sp;logData.txn_date=date;
-  }
-  try{
-    await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${adjustingInvId}`);
-    await sb('inventory_log','POST',logData).catch(()=>{});
-    closeModal('modal-stock');renderInventory();checkPendingPartsAuto();
-  }catch(e){alert('Error: '+e.message);}
-}
+function openStockAdjust(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;adjustingInvId=id;document.getElementById('stock-part-info').innerHTML=`<b>${inv.part_code||''}</b> — ${inv.item_name}<br>Stock: <b>${inv.qty_in_stock}</b> | Min: ${inv.min_stock} | ₹${inv.unit_price}`;document.getElementById('stock-qty').value='1';document.getElementById('stock-note').value='';openModal('modal-stock');}
+async function saveStockAdjust(){const inv=allInventory.find(i=>i.id===adjustingInvId);if(!inv)return;const type=document.getElementById('stock-type').value;const qty=parseInt(document.getElementById('stock-qty').value)||1;const newQty=type==='in'?inv.qty_in_stock+qty:Math.max(0,inv.qty_in_stock-qty);try{await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${adjustingInvId}`);await sb('inventory_log','POST',{inventory_id:adjustingInvId,type,qty,note:document.getElementById('stock-note').value,done_by:currentUser.name});closeModal('modal-stock');renderInventory();checkPendingPartsAuto();}catch(e){alert('Error: '+e.message);}}
 async function deleteInv(id){if(!confirm('Delete?'))return;try{await sb('inventory','DELETE',null,`?id=eq.${id}`);renderInventory();}catch(e){alert(e.message);}}
 
-async function openPartHistory(partCode,partName,invId){
+async function openPartHistory(partCode,partName){
+  if(!partCode){alert('Part code nathi');return;}
   var ex=document.getElementById('part-history-modal');if(ex)ex.remove();
   var overlay=document.createElement('div');
   overlay.id='part-history-modal';
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
-  overlay.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-height:90vh;display:flex;flex-direction:column;">'
-    +'<div class="modal-header"><h2>📋 '+partName+' — History</h2><button class="close-btn" onclick="document.getElementById(\'part-history-modal\').remove()">✕</button></div>'
-    +'<div style="display:flex;gap:0;border-bottom:2px solid var(--border);padding:0 16px;background:var(--surface);">'
-    +'<button id="ph-tab-log" onclick="showPartHistoryTab(\'log\')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--primary);margin-bottom:-2px;">📦 IN/OUT/Sell Log</button>'
-    +(partCode?'<button id="ph-tab-tickets" onclick="showPartHistoryTab(\'tickets\')" style="padding:10px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text-muted);">🔧 Ticket Usage</button>':'')
-    +'</div>'
-    +'<div class="modal-body" style="overflow-y:auto;flex:1;">'
+  overlay.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>Part Usage History</h2><button class="close-btn" onclick="document.getElementById(\'part-history-modal\').remove()">x</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px;"><b>'+partCode+'</b> — '+partName+'</div>'
     +'<div id="part-history-content"><div class="loading">Loading...</div></div>'
     +'</div></div>';
   document.body.appendChild(overlay);
-  window._phPartCode=partCode;window._phInvId=invId;window._phPartName=partName;
-  showPartHistoryTab('log');
-}
-
-async function showPartHistoryTab(tab){
-  ['log','tickets'].forEach(function(t){
-    var btn=document.getElementById('ph-tab-'+t);
-    if(btn){btn.style.borderBottom=t===tab?'2px solid var(--primary)':'2px solid transparent';btn.style.color=t===tab?'var(--primary)':'var(--text-muted)';}
-  });
-  var content=document.getElementById('part-history-content');
-  if(!content)return;
-  content.innerHTML='<div class="loading">Loading...</div>';
-  if(tab==='log'){
-    try{
-      var invId=window._phInvId;
-      var logs=invId?await sb('inventory_log','GET',null,'?inventory_id=eq.'+invId+'&order=created_at.desc&limit=100'):[];
-      if(!logs.length){content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock adjust karo to yahan record thashe.</small></div>';return;}
-      var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
-      var totOut=logs.filter(function(l){return l.type==='out';}).reduce(function(a,l){return a+(l.qty||0);},0);
-      var totSell=logs.filter(function(l){return l.type==='sell';}).reduce(function(a,l){return a+(l.qty||0);},0);
-      var rows=logs.map(function(l){
-        var typeHtml=l.type==='in'?'<span style="background:#dcfce7;color:#065f46;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬇️ IN</span>'
-          :l.type==='sell'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">💰 SELL</span>'
-          :'<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬆️ OUT</span>';
-        return '<tr>'
-          +'<td>'+(l.txn_date||l.created_at?new Date(l.txn_date||l.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
-          +'<td>'+typeHtml+'</td>'
-          +'<td style="text-align:center;font-weight:700;">'+(l.qty||0)+'</td>'
-          +'<td>'+(l.supplier||l.dealer_name||l.customer_name||'—')+'</td>'
-          +'<td>'+(l.invoice_no||'—')+'</td>'
-          +'<td>'+(l.price_per_unit?'₹'+Number(l.price_per_unit).toLocaleString('en-IN'):'—')+'</td>'
-          +'<td style="color:var(--text-muted);font-size:12px;">'+(l.note||'—')+'</td>'
-          +'<td style="color:var(--text-muted);font-size:12px;">'+(l.done_by||'—')+'</td>'
-          +'</tr>';
-      }).join('');
-      content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-        +'<div class="kpi-card" style="padding:12px;border-color:#065f46;"><div class="kpi-label">Total IN</div><div class="kpi-value" style="font-size:22px;color:#065f46;">+'+totIn+'</div></div>'
-        +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">Total OUT</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">-'+totOut+'</div></div>'
-        +'<div class="kpi-card" style="padding:12px;border-color:#d97706;"><div class="kpi-label">Total Sold</div><div class="kpi-value" style="font-size:22px;color:#d97706;">'+totSell+'</div></div>'
-        +'</div>'
-        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>Party</th><th>Invoice</th><th>Price/Unit</th><th>Note</th><th>By</th></tr></thead>'
-        +'<tbody>'+rows+'</tbody></table></div>';
-    }catch(e){content.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
-  }else{
-    try{
-      var partCode=window._phPartCode;
-      if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code nathi</div>';return;}
-      const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
-      const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
-      if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi ticket ma use nathi thayo</div>';return;}
-      const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
-      const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
-      const rows=used.map(t=>{
-        const spare=(t.spares||[]).find(s=>s.code===partCode);
-        const qty=spare?.qty||1;const price=spare?.price||0;
-        const deducted=spare?.stock_deducted?'<span class="badge badge-closed">Deducted</span>':'<span class="badge badge-pending">Pending</span>';
-        return '<tr><td><b>'+t.id+'</b></td><td>'+(t.cname||'-')+'</td><td>'+(t.model||'-')+'</td><td>'+(t.assigned_name||'-')+'</td>'
-          +'<td style="text-align:center;">'+qty+'</td><td style="text-align:right;">₹'+price+'</td>'
-          +'<td style="text-align:right;font-weight:700;">₹'+(qty*price)+'</td>'
-          +'<td>'+deducted+'</td>'
-          +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
-          +'<td>'+(t.status||'-')+'</td></tr>';
-      }).join('');
-      content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-        +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Calls</div><div class="kpi-value" style="font-size:22px;">'+used.length+'</div></div>'
-        +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Qty Used</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">'+totalQty+'</div></div>'
-        +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Value</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">₹'+totalAmt.toFixed(0)+'</div></div>'
-        +'</div>'
-        +'<div class="table-wrap"><table>'
-        +'<thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>Qty</th><th>Price</th><th>Total</th><th>Stock</th><th>Date</th><th>Status</th></tr></thead>'
-        +'<tbody>'+rows+'</tbody></table></div>';
-    }catch(e){content.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
-  }
+  try{
+    const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+    const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
+    if(used.length===0){
+      document.getElementById('part-history-content').innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Aa part koi call ma use nathi thayo</div>';
+      return;
+    }
+    const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
+    const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
+    const rows=used.map(t=>{
+      const spare=(t.spares||[]).find(s=>s.code===partCode);
+      const qty=spare?.qty||1;const price=spare?.price||0;
+      const deducted=spare?.stock_deducted?'<span class="badge badge-closed">Deducted</span>':'<span class="badge badge-pending">Pending</span>';
+      return '<tr><td><b>'+t.id+'</b></td><td>'+(t.cname||'-')+'</td><td>'+(t.model||'-')+'</td><td>'+(t.assigned_name||'-')+'</td>'
+        +'<td style="text-align:center;">'+qty+'</td><td style="text-align:right;">Rs'+price+'</td>'
+        +'<td style="text-align:right;font-weight:700;">Rs'+(qty*price)+'</td>'
+        +'<td>'+deducted+'</td>'
+        +'<td>'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
+        +'<td>'+(t.status||'-')+'</td></tr>';
+    }).join('');
+    document.getElementById('part-history-content').innerHTML=
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Calls</div><div class="kpi-value" style="font-size:22px;">'+used.length+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Qty Used</div><div class="kpi-value" style="font-size:22px;color:#7c3aed;">'+totalQty+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Value</div><div class="kpi-value" style="font-size:18px;color:#0e9f6e;">Rs'+totalAmt.toFixed(0)+'</div></div>'
+      +'</div>'
+      +'<div class="table-wrap"><table>'
+      +'<thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>Qty</th><th>Price</th><th>Total</th><th>Stock</th><th>Date</th><th>Status</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+  }catch(e){document.getElementById('part-history-content').innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
 function toggleAllInv(cb){
@@ -6745,29 +6598,10 @@ async function loadWalkInReport(){
     if(!logs.length){res.innerHTML='<div class="alert alert-info">No walk-in records found.</div>';return;}
 
     var totalProducts=logs.reduce(function(a,l){return a+(l.product_count||0);},0);
-    // Inward/Outward breakdown from products array
-    var inwardCusts=0,inwardProds=0,outwardCusts=0,outwardProds=0;
-    logs.forEach(function(l){
-      var prods=l.products||[];
-      if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
-      var inProd=prods.filter(function(p){return(p.type||'Inward')==='Inward';});
-      var outProd=prods.filter(function(p){return p.type==='Outward';});
-      if(inProd.length){inwardCusts++;inwardProds+=inProd.length;}
-      if(outProd.length){outwardCusts++;outwardProds+=outProd.length;}
-    });
-    var mkCard=function(bg,bc,tc,sub,icon,val){
-      return '<div class="kpi-card" style="padding:14px 10px;border-color:'+bc+';background:'+bg+';min-width:0;">'
-        +'<div style="font-size:10px;font-weight:700;color:'+tc+';text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+icon+' '+sub+'</div>'
-        +'<div style="font-size:44px;font-weight:800;color:'+tc+';line-height:1;">'+val+'</div>'
-        +'</div>';
-    };
-    var html='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px;">'
-      +mkCard('linear-gradient(135deg,#eff6ff,#fff)','#1a56db','#1a56db','Inward Customers','📥',inwardCusts)
-      +mkCard('linear-gradient(135deg,#dbeafe,#fff)','#3b82f6','#1d4ed8','Inward Products','📥',inwardProds)
-      +mkCard('linear-gradient(135deg,#ecfdf5,#fff)','#059669','#059669','Outward Customers','📤',outwardCusts)
-      +mkCard('linear-gradient(135deg,#d1fae5,#fff)','#10b981','#047857','Outward Products','📤',outwardProds)
-      +mkCard('linear-gradient(135deg,#f5f3ff,#fff)','#7c3aed','#7c3aed','Total Customers','📊',logs.length)
-      +mkCard('linear-gradient(135deg,#ede9fe,#fff)','#a855f7','#9333ea','Total Products','📊',totalProducts)
+    var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Walk-ins</div><div class="kpi-value">'+logs.length+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Total Products</div><div class="kpi-value" style="color:#0e9f6e;">'+totalProducts+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Days</div><div class="kpi-value" style="color:#7c3aed;">'+new Set(logs.map(function(l){return l.visit_date;})).size+'</div></div>'
       +'</div>';
 
     // Group by date
@@ -6787,7 +6621,7 @@ async function loadWalkInReport(){
           +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">'
           +products.map(function(p){
             return'<span style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;">'
-              +(p.brand?p.brand+' ':'')+cleanModelNo(p.model||'')
+              +(p.brand?p.brand+' ':'')+p.model
               +' <span style="color:#1a56db;">['+p.type+']</span>'
               +' <span style="color:'+(p.warranty==='In Warranty'?'#065f46':'#991b1b')+';">('+p.warranty+')</span>'
               +(p.remarks?' — '+p.remarks:'')+'</span>';
@@ -7895,12 +7729,10 @@ async function renderAutoInventory(){
       +'<input type="text" id="ainv-search" placeholder="Search item / brand..." style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" oninput="filterAutoInv()">'
       +'<select id="ainv-brand-filter" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" onchange="filterAutoInv()"><option value="">All Brands</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</select>'
       +'</div>'
-      +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      +'<button class="btn btn-outline" onclick="downloadInventoryTemplate()">📥 Template</button>'
-      +'<button class="btn btn-outline" onclick="importInventoryExcel()">📤 Import</button>'
-      +'<button class="btn btn-success" onclick="openBulkStockModal(\'in\')" style="background:#059669;color:#fff;border-color:#059669;">⬇️ Bulk IN</button>'
-      +'<button class="btn btn-outline" onclick="openBulkStockModal(\'out\')" style="border-color:#dc2626;color:#dc2626;">⬆️ Bulk OUT</button>'
-      +'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
+      +'<div style="display:flex;gap:8px;">'
+      +'<button class="btn btn-outline" onclick="downloadInventoryTemplate()" style="margin-right:6px;">📥 Template</button>'
+      +'<button class="btn btn-outline" onclick="importInventoryExcel()" style="margin-right:6px;">📤 Import Excel</button>'
++'<button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Item</button>'
       +'</div>'
       +'</div>'
       +'<div class="card">'
@@ -7914,17 +7746,15 @@ async function renderAutoInventory(){
         var sv2=(it.purchase_price||0)*(it.stock_qty||0);
         html+='<tr data-brand="'+(it.brand||'').toLowerCase()+'" data-name="'+(it.item_name||'').toLowerCase()+'">'
           +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+(it.brand||'—')+'</span></td>'
-          +'<td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="History dekho">'+it.item_name+'</span></td>'
+          +'<td><b>'+it.item_name+'</b></td>'
           +'<td>'+(it.category||'—')+'</td>'
           +'<td>'+(it.unit||'pcs')+'</td>'
           +'<td style="text-align:right;font-weight:600;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
           +'<td style="text-align:center;"><span style="font-weight:700;color:'+(it.stock_qty>0?'#065f46':'#dc2626')+';">'+it.stock_qty+'</span></td>'
           +'<td style="text-align:right;color:#065f46;font-weight:600;">₹'+Number(sv2).toLocaleString('en-IN')+'</td>'
-          +'<td style="white-space:nowrap;">'
-          +'<button class="btn-icon" onclick="openStockModal('+it.id+')" title="Stock IN/OUT/Sell">📦</button>'
-          +'<button class="btn-icon" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="IN/OUT History">📋</button>'
-          +'<button class="btn-icon" onclick="openEditInventoryModal('+it.id+')" title="Edit">✏️</button>'
-          +'<button class="btn-icon" onclick="deleteAutoInvItem('+it.id+',\''+escQ(it.item_name)+'\')" title="Delete" style="color:var(--danger);">🗑️</button>'
+          +'<td>'
+          +'<button class="btn-icon" onclick="openEditInventoryModal('+it.id+')">✏️</button>'
+          +'<button class="btn-icon" onclick="adjustAutoStock('+it.id+',\''+escQ(it.item_name)+'\','+it.stock_qty+')">📦</button>'
           +'</td>'
           +'</tr>';
       });
@@ -7965,10 +7795,6 @@ function openAddInventoryModal(editData){
     +'</div>'
     +'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="'+(editData?.stock_qty||0)+'" min="0"></div>'
     +'</div>'
-    +(isEdit?'':'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="ainv-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Purchase Date</label><input type="date" id="ainv-pdate" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>')
     +'<hr class="divider" style="margin:10px 0;">'
     +'<div class="form-grid" style="margin-bottom:10px;">'
     +'<div class="form-group"><label>GST %</label><select id="ainv-gst" onchange="calcAInvFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="0"'+(!(editData?.gst_percent)?'selected':'')+'>No GST</option><option value="5"'+(editData?.gst_percent==5?' selected':'')+'>5%</option><option value="12"'+(editData?.gst_percent==12?' selected':'')+'>12%</option><option value="18"'+(editData?.gst_percent==18?' selected':'')+'>18%</option></select></div>'
@@ -8022,18 +7848,6 @@ async function saveAutoInventoryItem(editId){
           var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataBase)});
           if(!r2.ok)throw new Error(await r2.text());
         }else{throw new Error(txt);}
-      }
-      // Log opening stock as first IN transaction
-      if(stock>0){
-        try{
-          var dealer=document.getElementById('ainv-dealer')?.value.trim()||null;
-          var pdate=document.getElementById('ainv-pdate')?.value||new Date().toISOString().slice(0,10);
-          // Get newly created item id
-          var newItems=await sb('auto_inventory','GET',null,'?item_name=eq.'+encodeURIComponent(name)+'&order=created_at.desc&limit=1');
-          if(newItems&&newItems[0]){
-            await sb('auto_inventory_log','POST',{inventory_id:newItems[0].id,type:'in',qty:stock,dealer_name:dealer,price_per_unit:price,note:'Opening stock',done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:pdate});
-          }
-        }catch(ex){}
       }
     }
     document.getElementById('modal-ainv').remove();
@@ -8180,398 +7994,19 @@ async function saveBulkInventory(){
   }catch(e){alert('Error: '+e.message);}
 }
 
-async function deleteAutoInvItem(id,name){
-  if(!confirm('⚠️ "'+name+'" delete karvu chhe?\n\nAa permanently delete thashe!'))return;
+async function adjustAutoStock(id,name,current){
+  var type=prompt('📦 '+name+'\nCurrent Stock: '+current+'\n\nType:\n"in X" = Stock In\n"out X" = Stock Out\n\nExample: in 5');
+  if(!type)return;
+  var parts=type.trim().split(' ');
+  var dir=parts[0].toLowerCase();
+  var qty=parseFloat(parts[1])||0;
+  if(!qty||!['in','out'].includes(dir)){alert('Format: "in 5" ya "out 3"');return;}
+  var newQty=dir==='in'?current+qty:Math.max(0,current-qty);
   try{
-    await sb('auto_inventory','DELETE',null,'?id=eq.'+id);
-    renderAutoInventory();
-  }catch(e){alert('Delete error: '+e.message);}
-}
-
-function openStockModal(id){
-  var item=(window._autoInvItems||[]).find(function(i){return i.id===id;});
-  if(!item){alert('Item not found');return;}
-  var existing=document.getElementById('modal-stock-ainv');if(existing)existing.remove();
-  var modal=document.createElement('div');
-  modal.id='modal-stock-ainv';modal.className='modal-overlay';
-  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
-    +'<div class="modal-header"><h2>📦 Stock Update</h2><button class="close-btn" onclick="document.getElementById(\'modal-stock-ainv\').remove()">✕</button></div>'
-    +'<div class="modal-body">'
-    +'<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
-    +'<b style="color:var(--primary);">'+item.item_name+'</b>'+(item.brand?' &nbsp;·&nbsp; <span style="color:#7c3aed;">'+item.brand+'</span>':'')+'<br>'
-    +'<span style="font-size:13px;color:var(--text-muted);">Current Stock: <b style="color:'+(item.stock_qty>0?'#065f46':'#dc2626')+';">'+item.stock_qty+' '+(item.unit||'pcs')+'</b></span>'
-    +'</div>'
-    +'<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">'
-    +'<button id="stype-in" onclick="switchStockType(\'in\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#dcfce7;color:#065f46;cursor:pointer;">⬇️ Stock IN</button>'
-    +'<button id="stype-out" onclick="switchStockType(\'out\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">⬆️ Stock OUT</button>'
-    +'<button id="stype-sell" onclick="switchStockType(\'sell\')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">💰 Sell</button>'
-    +'</div>'
-    +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Quantity <span class="req">*</span></label><input type="number" id="sm-qty" min="1" value="1" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Date</label><input type="date" id="sm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'<div id="sm-in-fields">'
-    +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="sm-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Purchase Price / Unit ₹</label><input type="number" id="sm-pprice" value="'+(item.purchase_price||0)+'" min="0" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Note</label><input type="text" id="sm-in-note" placeholder="e.g. New stock arrived" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'<div id="sm-out-fields" style="display:none;">'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Purpose / Note</label><input type="text" id="sm-out-note" placeholder="e.g. Used in site ABC, Damaged" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'<div id="sm-sell-fields" style="display:none;">'
-    +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label><input type="text" id="sm-cust" placeholder="e.g. Rajesh Patel" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Invoice No</label><input type="text" id="sm-inv-no" placeholder="e.g. INV-2026-001" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Selling Price / Unit ₹</label><input type="number" id="sm-sprice" value="'+(item.selling_price||0)+'" min="0" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Note</label><input type="text" id="sm-sell-note" placeholder="Optional" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'</div>'
-    +'</div>'
-    +'<div class="modal-footer">'
-    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-stock-ainv\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveStockModal('+id+','+item.stock_qty+')">💾 Save</button>'
-    +'</div></div>';
-  document.body.appendChild(modal);
-  window._stockModalType='in';
-}
-
-function switchStockType(t){
-  window._stockModalType=t;
-  ['in','out','sell'].forEach(function(x){
-    var btn=document.getElementById('stype-'+x);
-    if(btn)btn.style.background=x===t?(t==='in'?'#dcfce7':t==='sell'?'#fef3c7':'#fee2e2'):'#f3f4f6';
-    if(btn)btn.style.color=x===t?(t==='in'?'#065f46':t==='sell'?'#92400e':'#dc2626'):'var(--text-muted)';
-  });
-  document.getElementById('sm-in-fields').style.display=t==='in'?'':'none';
-  document.getElementById('sm-out-fields').style.display=t==='out'?'':'none';
-  document.getElementById('sm-sell-fields').style.display=t==='sell'?'':'none';
-}
-
-async function saveStockModal(id,currentStock){
-  var t=window._stockModalType||'in';
-  var qty=parseFloat(document.getElementById('sm-qty')?.value)||0;
-  var date=document.getElementById('sm-date')?.value||new Date().toISOString().slice(0,10);
-  if(!qty||qty<=0){alert('Quantity enter karo!');return;}
-  if(t==='sell'&&!document.getElementById('sm-cust')?.value.trim()){alert('Customer name required for Sell!');return;}
-
-  var newStock=t==='in'?currentStock+qty:Math.max(0,currentStock-qty);
-  var logData={inventory_id:id,type:t,qty:qty,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date};
-  if(t==='in'){
-    logData.dealer_name=document.getElementById('sm-dealer')?.value.trim()||null;
-    logData.price_per_unit=parseFloat(document.getElementById('sm-pprice')?.value)||null;
-    logData.note=document.getElementById('sm-in-note')?.value.trim()||null;
-  }else if(t==='out'){
-    logData.note=document.getElementById('sm-out-note')?.value.trim()||null;
-  }else{
-    logData.customer_name=document.getElementById('sm-cust')?.value.trim()||null;
-    logData.invoice_no=document.getElementById('sm-inv-no')?.value.trim()||null;
-    logData.price_per_unit=parseFloat(document.getElementById('sm-sprice')?.value)||null;
-    logData.note=document.getElementById('sm-sell-note')?.value.trim()||null;
-  }
-
-  try{
-    await sb('auto_inventory','PATCH',{stock_qty:newStock,updated_at:new Date().toISOString()},'?id=eq.'+id);
-    // Log transaction (graceful fail if table doesn't exist)
-    try{await sb('auto_inventory_log','POST',logData);}catch(ex){}
-    document.getElementById('modal-stock-ainv').remove();
+    await sb('auto_inventory','PATCH',{stock_qty:newQty,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    alert('✅ Stock updated: '+newQty);
     renderAutoInventory();
   }catch(e){alert('Error: '+e.message);}
-}
-
-async function openAutoInvHistory(id,name){
-  var ex=document.getElementById('modal-ainv-history');if(ex)ex.remove();
-  var modal=document.createElement('div');
-  modal.id='modal-ainv-history';modal.className='modal-overlay';
-  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-height:90vh;display:flex;flex-direction:column;">'
-    +'<div class="modal-header"><h2>📋 '+name+' — IN/OUT History</h2><button class="close-btn" onclick="document.getElementById(\'modal-ainv-history\').remove()">✕</button></div>'
-    +'<div class="modal-body" style="overflow-y:auto;flex:1;">'
-    +'<div id="ainv-hist-content"><div class="loading">Loading...</div></div>'
-    +'</div></div>';
-  document.body.appendChild(modal);
-  try{
-    var logs=await sb('auto_inventory_log','GET',null,'?inventory_id=eq.'+id+'&order=created_at.desc&limit=100');
-    var content=document.getElementById('ainv-hist-content');
-    if(!content)return;
-    if(!logs||!logs.length){
-      content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock update karo to yahan record thashe.</small></div>';
-      return;
-    }
-    var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
-    var totOut=logs.filter(function(l){return l.type==='out';}).reduce(function(a,l){return a+(l.qty||0);},0);
-    var totSell=logs.filter(function(l){return l.type==='sell';}).reduce(function(a,l){return a+(l.qty||0);},0);
-    var rows=logs.map(function(l){
-      var typeHtml=l.type==='in'?'<span style="background:#dcfce7;color:#065f46;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬇️ IN</span>'
-        :l.type==='sell'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">💰 SELL</span>'
-        :'<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">⬆️ OUT</span>';
-      return '<tr>'
-        +'<td>'+(l.txn_date||l.created_at?new Date(l.txn_date||l.created_at).toLocaleDateString('en-IN'):'-')+'</td>'
-        +'<td>'+typeHtml+'</td>'
-        +'<td style="text-align:center;font-weight:700;">'+(l.qty||0)+'</td>'
-        +'<td>'+(l.dealer_name||l.customer_name||'—')+'</td>'
-        +'<td>'+(l.invoice_no||'—')+'</td>'
-        +'<td>'+(l.price_per_unit?'₹'+Number(l.price_per_unit).toLocaleString('en-IN'):'—')+'</td>'
-        +'<td style="color:var(--text-muted);font-size:12px;">'+(l.note||'—')+'</td>'
-        +'<td style="color:var(--text-muted);font-size:12px;">'+(l.done_by||'—')+'</td>'
-        +'</tr>';
-    }).join('');
-    content.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
-      +'<div class="kpi-card" style="padding:12px;border-color:#065f46;"><div class="kpi-label">Total IN</div><div class="kpi-value" style="font-size:22px;color:#065f46;">+'+totIn+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">Total OUT</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">-'+totOut+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#d97706;"><div class="kpi-label">Total Sold</div><div class="kpi-value" style="font-size:22px;color:#d97706;">'+totSell+'</div></div>'
-      +'</div>'
-      +'<div class="table-wrap"><table>'
-      +'<thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>Party (Dealer/Customer)</th><th>Invoice</th><th>Price/Unit</th><th>Note</th><th>By</th></tr></thead>'
-      +'<tbody>'+rows+'</tbody></table></div>';
-  }catch(e){
-    var c=document.getElementById('ainv-hist-content');
-    if(c)c.innerHTML='<div class="alert alert-warning">Log table available nathi. Supabase ma <b>auto_inventory_log</b> table create karo.</div>';
-  }
-}
-
-function openBulkStockModal(type){
-  var existing=document.getElementById('modal-bulk-stock');if(existing)existing.remove();
-  var items=window._autoInvItems||[];
-  var isIn=type==='in';
-  var modal=document.createElement('div');
-  modal.id='modal-bulk-stock';modal.className='modal-overlay';
-  modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:1000px;">'
-    +'<div class="modal-header"><h2>'+(isIn?'⬇️ Bulk Stock IN (Purchase)':'⬆️ Bulk Stock OUT / Sell')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-bulk-stock\').remove()">✕</button></div>'
-    +'<div class="modal-body">'
-    +(isIn?'<div class="form-grid" style="margin-bottom:12px;">'
-      +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="bsm-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'<div class="form-group"><label>Invoice No</label><input type="text" id="bsm-invoice" placeholder="e.g. INV-2026-001" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'<div class="form-group"><label>Purchase Date</label><input type="date" id="bsm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'</div>'
-      :'<div class="form-grid" style="margin-bottom:12px;">'
-      +'<div class="form-group"><label>Customer / Purpose</label><input type="text" id="bsm-customer" placeholder="e.g. Rajesh Patel / Site Use" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'<div class="form-group"><label>Invoice No</label><input type="text" id="bsm-invoice" placeholder="e.g. INV-001 (optional)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'<div class="form-group"><label>Date</label><input type="date" id="bsm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-      +'</div>'
-    )
-    +'<div class="alert alert-info" style="margin-bottom:10px;padding:8px 12px;font-size:12px;">Item search karo, quantity lakho. Navin item automatically inventory ma add thashe.</div>'
-    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:700px;" id="bsm-table">'
-    +'<thead><tr style="background:#f8fafc;font-size:11px;">'
-    +'<th style="padding:8px;text-align:left;min-width:200px;">Item / Product</th>'
-    +'<th style="padding:8px;text-align:center;width:65px;">Qty</th>'
-    +(isIn
-      ?'<th style="padding:8px;text-align:center;width:55px;">Unit</th>'
-       +'<th style="padding:8px;text-align:right;width:90px;">Purchase ₹</th>'
-       +'<th style="padding:8px;text-align:right;width:90px;">Sell ₹/Unit</th>'
-       +'<th style="padding:8px;text-align:center;width:70px;">GST %</th>'
-       +'<th style="padding:8px;text-align:right;width:95px;">Total ₹</th>'
-      :'<th style="padding:8px;text-align:right;width:90px;">Purchase ₹</th>'
-       +'<th style="padding:8px;text-align:right;width:90px;">Sell ₹/Unit</th>'
-    )
-    +'<th style="padding:8px;text-align:left;">Note</th>'
-    +'<th style="padding:8px;width:32px;"></th>'
-    +'</tr></thead>'
-    +'<tbody id="bsm-rows">'
-    +[0,1,2,3,4].map(function(i){return buildBSMRow(i,isIn,items);}).join('')
-    +'</tbody>'
-    +(isIn?'<tfoot><tr><td colspan="6" style="padding:8px;text-align:right;font-weight:700;font-size:13px;">Grand Total (incl. GST):</td><td style="padding:8px;text-align:right;font-weight:800;font-size:14px;color:#059669;" id="bsm-grand-total">₹0</td><td colspan="2"></td></tr></tfoot>':'')
-    +'</table></div>'
-    +'<button class="btn btn-outline btn-sm" onclick="addBSMRow()" style="margin-top:8px;">+ Add Row</button>'
-    +'</div>'
-    +'<div class="modal-footer">'
-    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-bulk-stock\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveBulkStockModal(\''+type+'\')">💾 Save & Update Stock</button>'
-    +'</div></div>';
-  document.body.appendChild(modal);
-  window._bsmRowCount=5;window._bsmType=type;
-}
-
-function buildBSMRow(i,isIn,items){
-  return '<tr id="bsm-row-'+i+'">'
-    +'<td style="padding:4px;min-width:200px;position:relative;">'
-    +'<input type="hidden" id="bsm-itemid-'+i+'" value="">'
-    +'<input type="hidden" id="bsm-pricePP-'+i+'" value="0">'
-    +'<input type="text" id="bsm-item-'+i+'" placeholder="Item search karo..." autocomplete="off"'
-      +' oninput="filterBSMDrop('+i+')" onfocus="filterBSMDrop('+i+')"'
-      +' onblur="setTimeout(function(){hideBSMDrop('+i+');},200)"'
-      +' style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;">'
-    +'<div id="bsm-drop-'+i+'" style="display:none;position:absolute;z-index:9999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;width:220px;box-shadow:0 4px 16px rgba(0,0,0,0.15);top:calc(100% + 2px);left:0;"></div>'
-    +'</td>'
-    +'<td style="padding:4px;"><input type="number" id="bsm-qty-'+i+'" value="1" min="0" oninput="calcBSMRowTotal('+i+')" style="width:60px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:center;"></td>'
-    +(isIn
-      ?'<td style="padding:4px;"><input type="text" id="bsm-unit-'+i+'" value="pcs" style="width:48px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;"></td>'
-       +'<td style="padding:4px;"><input type="number" id="bsm-price-'+i+'" value="0" min="0" oninput="calcBSMRowTotal('+i+')" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Purchase ₹"></td>'
-       +'<td style="padding:4px;"><input type="number" id="bsm-sp-'+i+'" value="0" min="0" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Sell ₹"></td>'
-       +'<td style="padding:4px;"><select id="bsm-gst-'+i+'" onchange="calcBSMRowTotal('+i+')" style="width:62px;border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;"><option value="0">0%</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option><option value="28">28%</option></select></td>'
-       +'<td style="padding:4px;"><input type="number" id="bsm-total-'+i+'" readonly value="0" style="width:85px;border:1px solid #bbf7d0;border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;background:#f0fdf4;font-weight:700;color:#065f46;"></td>'
-      :'<td style="padding:4px;"><input type="number" id="bsm-price-'+i+'" readonly value="0" style="width:82px;border:1px solid #e5e7eb;border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;background:#f8fafc;color:#6b7280;" title="Purchase price from inventory"></td>'
-       +'<td style="padding:4px;"><input type="number" id="bsm-sp-'+i+'" value="0" min="0" oninput="checkBSMSellPrice('+i+')" style="width:82px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;text-align:right;" placeholder="Sell ₹"></td>'
-    )
-    +'<td style="padding:4px;"><input type="text" id="bsm-note-'+i+'" placeholder="optional" style="width:100px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;"></td>'
-    +'<td style="padding:4px;"><button onclick="document.getElementById(\'bsm-row-'+i+'\').remove();calcBSMGrandTotal()" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px;">✕</button></td>'
-    +'</tr>';
-}
-
-function calcBSMRowTotal(i){
-  var pp=parseFloat(document.getElementById('bsm-price-'+i)?.value)||0;
-  var qty=parseFloat(document.getElementById('bsm-qty-'+i)?.value)||0;
-  var gst=parseFloat(document.getElementById('bsm-gst-'+i)?.value)||0;
-  var total=Math.round(pp*qty*(1+gst/100));
-  var el=document.getElementById('bsm-total-'+i);
-  if(el)el.value=total;
-  calcBSMGrandTotal();
-}
-
-function calcBSMGrandTotal(){
-  var grand=0;
-  var n=(window._bsmRowCount||5)+10;
-  for(var i=0;i<n;i++){
-    var t=parseFloat(document.getElementById('bsm-total-'+i)?.value)||0;
-    grand+=t;
-  }
-  var el=document.getElementById('bsm-grand-total');
-  if(el)el.textContent='₹'+Number(grand).toLocaleString('en-IN');
-}
-
-function checkBSMSellPrice(i){
-  var pp=parseFloat(document.getElementById('bsm-pricePP-'+i)?.value)||0;
-  var sp=parseFloat(document.getElementById('bsm-sp-'+i)?.value)||0;
-  var spEl=document.getElementById('bsm-sp-'+i);
-  if(spEl){
-    if(pp>0&&sp>0&&sp<pp){
-      spEl.style.borderColor='#f59e0b';spEl.style.background='#fffbeb';
-      spEl.title='⚠️ Sell price ₹'+sp+' < Purchase price ₹'+pp;
-    }else{
-      spEl.style.borderColor='';spEl.style.background='';spEl.title='';
-    }
-  }
-}
-
-function filterBSMDrop(i){
-  var input=document.getElementById('bsm-item-'+i);
-  var drop=document.getElementById('bsm-drop-'+i);
-  if(!input||!drop)return;
-  var q=(input.value||'').toLowerCase().trim();
-  var items=window._autoInvItems||[];
-  var filtered=q?items.filter(function(it){return(it.item_name||'').toLowerCase().includes(q)||(it.brand||'').toLowerCase().includes(q);}):items;
-  var html='';
-  filtered.slice(0,40).forEach(function(it){
-    // Store all data in dataset — no escaping issues
-    var safeData=JSON.stringify({id:String(it.id),name:it.item_name||'',brand:it.brand||'',pp:it.purchase_price||0,sp:it.selling_price||0,unit:it.unit||'pcs'});
-    var label=(it.item_name||'')+(it.brand?' <span style="color:#7c3aed;font-size:10px;">('+it.brand+')</span>':'')
-      +' <span style="color:#059669;font-size:10px;">Stock:'+it.stock_qty+'</span>';
-    // onmousedown+preventDefault prevents blur from firing before selection
-    html+='<div onmousedown="event.preventDefault();bsmPickItem('+i+',this)" '
-      +'data-bsm=\''+safeData.replace(/'/g,'&#39;')+'\' '
-      +'style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9;"'
-      +' onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+label+'</div>';
-  });
-  html+='<div onmousedown="event.preventDefault();bsmPickNew('+i+')" '
-    +'style="padding:8px 12px;cursor:pointer;font-size:12px;color:#1a56db;font-weight:600;border-top:2px solid #e5e7eb;"'
-    +' onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">➕ New Item add kariye</div>';
-  drop.innerHTML=html;
-  drop.style.display='';
-}
-
-function bsmPickItem(i,el){
-  var raw=(el.getAttribute('data-bsm')||'{}').replace(/&#39;/g,"'");
-  var d={};try{d=JSON.parse(raw);}catch(e){}
-  var drop=document.getElementById('bsm-drop-'+i);if(drop)drop.style.display='none';
-  var input=document.getElementById('bsm-item-'+i);
-  if(input)input.value=d.name+(d.brand?' ('+d.brand+')':'');
-  var idEl=document.getElementById('bsm-itemid-'+i);if(idEl)idEl.value=d.id||'';
-  var ppH=document.getElementById('bsm-pricePP-'+i);if(ppH)ppH.value=d.pp||0;
-  var priceEl=document.getElementById('bsm-price-'+i);if(priceEl)priceEl.value=d.pp||0;
-  var spEl=document.getElementById('bsm-sp-'+i);if(spEl&&(!spEl.value||spEl.value==='0'))spEl.value=d.sp||d.pp||0;
-  var unitEl=document.getElementById('bsm-unit-'+i);if(unitEl)unitEl.value=d.unit||'pcs';
-  calcBSMRowTotal(i);
-  checkBSMSellPrice(i);
-}
-
-function bsmPickNew(i){
-  var drop=document.getElementById('bsm-drop-'+i);if(drop)drop.style.display='none';
-  var input=document.getElementById('bsm-item-'+i);
-  var idEl=document.getElementById('bsm-itemid-'+i);
-  var ppH=document.getElementById('bsm-pricePP-'+i);
-  if(idEl)idEl.value='__new__';
-  if(ppH)ppH.value=0;
-  if(input){input.value='';input.placeholder='Navu item name type karo...';}
-}
-
-function hideBSMDrop(i){
-  var drop=document.getElementById('bsm-drop-'+i);
-  if(drop)drop.style.display='none';
-}
-
-function selectBSMItem(){}
-function onBSMItemChange(i){}
-
-function addBSMRow(){
-  var n=window._bsmRowCount||5;
-  var isIn=window._bsmType==='in';
-  var tbody=document.getElementById('bsm-rows');
-  if(tbody){tbody.insertAdjacentHTML('beforeend',buildBSMRow(n,isIn,window._autoInvItems||[]));window._bsmRowCount=n+1;}
-}
-
-async function saveBulkStockModal(type){
-  var date=document.getElementById('bsm-date')?.value||new Date().toISOString().slice(0,10);
-  var dealer=document.getElementById('bsm-dealer')?.value.trim()||document.getElementById('bsm-customer')?.value.trim()||'';
-  var invoice=document.getElementById('bsm-invoice')?.value.trim()||'';
-  var n=window._bsmRowCount||5;
-  var rows=[];
-  for(var i=0;i<n+10;i++){
-    var row=document.getElementById('bsm-row-'+i);if(!row)continue;
-    var idInput=document.getElementById('bsm-itemid-'+i);
-    var textInput=document.getElementById('bsm-item-'+i);
-    var itemIdVal=idInput?.value||'';
-    var itemTextVal=(textInput?.value||'').trim();
-    if(!itemTextVal)continue;
-    var qty=parseFloat(document.getElementById('bsm-qty-'+i)?.value)||0;
-    if(!qty)continue;
-    var itemId=(!itemIdVal||itemIdVal==='__new__')?null:itemIdVal;
-    // Name: if new item, use text input directly; else extract base name before brand bracket
-    var itemName=(!itemIdVal||itemIdVal==='__new__')?itemTextVal:itemTextVal.replace(/\s*\([^)]*\)\s*$/,'').trim();
-    if(!itemName)continue;
-    var price=parseFloat(document.getElementById('bsm-price-'+i)?.value)||0;
-    var sprice=parseFloat(document.getElementById('bsm-sp-'+i)?.value)||0;
-    var pprice=parseFloat(document.getElementById('bsm-pricePP-'+i)?.value)||price;
-    var gst=parseFloat(document.getElementById('bsm-gst-'+i)?.value)||0;
-    var unit=document.getElementById('bsm-unit-'+i)?.value||'pcs';
-    var note=document.getElementById('bsm-note-'+i)?.value.trim()||'';
-    rows.push({itemId,itemName,qty,price,sprice,pprice,gst,unit,note});
-  }
-  if(!rows.length){alert('Koi item fill nathi karyu!');return;}
-  // Warn if any sell price < purchase price (OUT only)
-  if(type!=='in'){
-    var warnings=rows.filter(function(r){return r.pprice>0&&r.sprice>0&&r.sprice<r.pprice;});
-    if(warnings.length){
-      var wList=warnings.map(function(r){return r.itemName+': Purchase ₹'+r.pprice+' > Sell ₹'+r.sprice;}).join('\n');
-      if(!confirm('⚠️ Sell price, Purchase price thi ochhi chhe:\n\n'+wList+'\n\nPan bhi save karvu chhe?'))return;
-    }
-  }
-  var errors=[];
-  var success=0;
-  for(var r=0;r<rows.length;r++){
-    var row=rows[r];
-    try{
-      var invId=row.itemId;
-      var currentStock=0;
-      if(invId){
-        var found=(window._autoInvItems||[]).find(function(i){return String(i.id)===String(invId);});
-        currentStock=found?.stock_qty||0;
-      }else{
-        // Create new item
-        var newItem=await sb('auto_inventory','POST',{item_name:row.itemName,stock_qty:0,purchase_price:row.price||0,unit:row.unit||'pcs',updated_at:new Date().toISOString()});
-        var created=await sb('auto_inventory','GET',null,'?item_name=eq.'+encodeURIComponent(row.itemName)+'&order=created_at.desc&limit=1');
-        if(created&&created[0])invId=created[0].id;
-      }
-      var newStock=type==='in'?currentStock+row.qty:Math.max(0,currentStock-row.qty);
-      await sb('auto_inventory','PATCH',{stock_qty:newStock,updated_at:new Date().toISOString()},'?id=eq.'+invId);
-      try{await sb('auto_inventory_log','POST',{inventory_id:invId,type:type,qty:row.qty,dealer_name:type==='in'?dealer:null,customer_name:type!=='in'?dealer:null,invoice_no:invoice||null,price_per_unit:type==='in'?row.price||null:row.sprice||null,note:(row.note||(row.gst?'GST '+row.gst+'%':null))||null,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date});}catch(ex){}
-      success++;
-    }catch(e){errors.push(row.itemName+': '+e.message);}
-  }
-  document.getElementById('modal-bulk-stock').remove();
-  alert('✅ '+success+' items stock updated!'+(errors.length?'\n\nErrors:\n'+errors.join('\n'):''));
-  renderAutoInventory();
 }
 
 // ===== AUTOMATION SITE VISIT MODULE =====
@@ -9210,22 +8645,9 @@ async function saveVisitWithMaterial(siteId,btn){
         var newStatus=newDelivered>=(orig.qty||0)?'delivered':'partial';
         try{await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+mat.site_item_id,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({delivery_status:newStatus,delivered_qty:newDelivered,delivered_date:date,delivered_by:deliveryMode||'Visit'})});}catch(ex){}
       }
-      // Auto-deduct stock from auto_inventory for each material used on site
-      try{
-        var invItems=await sb('auto_inventory','GET',null,'?order=item_name');
-        for(var si=0;si<materials.length;si++){
-          var smat=materials[si];
-          // Match by item_name (case-insensitive)
-          var invMatch=invItems.find(function(iv){return iv.item_name.toLowerCase()===smat.item_name.toLowerCase();});
-          if(!invMatch)continue;
-          var deducted=Math.max(0,(invMatch.stock_qty||0)-smat.qty);
-          await sb('auto_inventory','PATCH',{stock_qty:deducted,updated_at:new Date().toISOString()},'?id=eq.'+invMatch.id);
-          try{await sb('auto_inventory_log','POST',{inventory_id:invMatch.id,type:'out',qty:smat.qty,note:'Site visit: '+date,done_by:currentUser?.name||'',created_at:new Date().toISOString(),txn_date:date});}catch(ex){}
-        }
-      }catch(ex){}
     }
     btn.closest('.modal-overlay').remove();
-    alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN')+' | Stock auto-updated':''));
+    alert('✅ Visit saved!'+(materials.length?' Material: ₹'+Number(totalSelling).toLocaleString('en-IN'):''));
     if(currentPage==='auto-sites')renderAutoSites();
   }catch(e){alert('Error: '+e.message);}
 }
@@ -9743,11 +9165,6 @@ async function openAddSiteItem(siteId,siteName){
   modal.id='modal-add-site-item';
   modal.className='modal-overlay';
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()"><div class="modal-header"><h2>➕ '+siteName+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-site-item\').remove()">✕</button></div><div class="modal-body">'
-    +'<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">'
-    +'<button id="asi-type-product" onclick="switchASIType(\'product\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;background:#eff6ff;color:#1a56db;cursor:pointer;">📦 Product</button>'
-    +'<button id="asi-type-service" onclick="switchASIType(\'service\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">🔧 Service Charge</button>'
-    +'</div>'
-    +'<div id="asi-product-section">'
     +'<div class="form-group" style="margin-bottom:10px;position:relative;"><label>Item Search Karo</label>'
     +'<input type="text" id="asi-search" placeholder="Type item name..." oninput="filterASIDropdown()" onfocus="showASIDropdown()" onblur="setTimeout(function(){hideASIDropdown();},200)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
     +'<div id="asi-dropdown" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);top:100%;left:0;"></div></div>'
@@ -9755,27 +9172,10 @@ async function openAddSiteItem(siteId,siteName){
     +'<input type="text" id="asi-name" placeholder="Item name lakhav..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-selected-name-group"><label>Item</label>'
     +'<input type="text" id="asi-name-readonly" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f0f9ff;outline:none;"></div>'
-    +'</div>'
-    +'<div id="asi-service-section" style="display:none;">'
-    +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Charge Type <span class="req">*</span></label><select id="asi-charge-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="Configuration Charges">Configuration Charges</option><option value="Installation Charges">Installation Charges</option><option value="Service Charges">Service Charges</option><option value="AMC Charges">AMC Charges</option><option value="Labour Charges">Labour Charges</option><option value="Commissioning Charges">Commissioning Charges</option><option value="Other Charges">Other Charges</option></select></div>'
-    +'<div class="form-group"><label>Description (optional)</label><input type="text" id="asi-charge-desc" placeholder="e.g. Per camera installation" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'</div>'
-    +'</div>'
-    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option><option>job</option><option>yr</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="asi-qty" value="1" min="0.5" step="0.5" oninput="calcASITotal()"></div><div class="form-group"><label>Unit</label><select id="asi-unit"><option>pcs</option><option>set</option><option>Pair</option><option>mtr</option><option>rft</option></select></div><div class="form-group"><label>Purchase ₹</label><input type="number" id="asi-pp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>Selling ₹</label><input type="number" id="asi-sp" value="0" oninput="calcASITotal()"></div><div class="form-group"><label>GST %</label><select id="asi-gst" onchange="calcASITotal()"><option value="0">No GST</option><option value="5">5%</option><option value="12">12%</option><option value="18">18%</option></select></div><div class="form-group"><label>Total ₹</label><input type="number" id="asi-total" readonly style="background:#f0f9ff;font-weight:700;"></div></div>'
     +'<div class="form-group"><label>Note</label><input type="text" id="asi-note" placeholder="Optional..."></div>'
     +'</div><div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-add-site-item\').remove()">Cancel</button><button class="btn btn-primary" onclick="saveASIItem(\''+siteId+'\',\''+escQ(siteName)+'\')">💾 Save</button></div></div>';
   document.body.appendChild(modal);
-}
-
-function switchASIType(type){
-  var isProduct=type==='product';
-  document.getElementById('asi-product-section').style.display=isProduct?'':'none';
-  document.getElementById('asi-service-section').style.display=isProduct?'none':'';
-  var pb=document.getElementById('asi-type-product'),sb2=document.getElementById('asi-type-service');
-  if(pb){pb.style.background=isProduct?'#eff6ff':'#f3f4f6';pb.style.color=isProduct?'#1a56db':'var(--text-muted)';}
-  if(sb2){sb2.style.background=isProduct?'#f3f4f6':'#fef3c7';sb2.style.color=isProduct?'var(--text-muted)':'#92400e';}
-  window._asiType=type;
 }
 
 function onASISelectChange(){
@@ -9883,13 +9283,6 @@ async function saveASIItem(siteId,siteName){
     name=nameRo.value.trim();
   } else {
     name=(document.getElementById('asi-name')?.value||'').trim();
-  }
-  // Service charge type override
-  if(window._asiType==='service'){
-    var chargeType=document.getElementById('asi-charge-type')?.value||'Service Charges';
-    var chargeDesc=document.getElementById('asi-charge-desc')?.value.trim()||'';
-    name=chargeType+(chargeDesc?' — '+chargeDesc:'');
-    window._asiSelectedId=null;
   }
   var qty=parseFloat(document.getElementById('asi-qty').value)||1;
   var unit=document.getElementById('asi-unit').value;
@@ -10272,7 +9665,6 @@ async function renderInquiries(){
   try{
     var today=new Date().toLocaleDateString('en-CA');
     var inqs=await sb('auto_inquiries','GET',null,'?order=created_at.desc');
-    window._inqCache=inqs;
     var followupToday=inqs.filter(function(i){return i.followup_date===today&&i.status!=='Converted'&&i.status!=='Lost';});
     var html='<div class="section-header">'
       +'<h2>🔍 Inquiries ('+inqs.length+')</h2>'
@@ -10281,8 +9673,8 @@ async function renderInquiries(){
     if(followupToday.length){
       html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
         +'<span style="font-size:20px;">🔔</span><div>'
-        +'<b style="color:#92400e;">'+followupToday.length+' Follow-up'+(followupToday.length>1?'s':'')+' Due Today</b><br>'
-        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(' &nbsp;·&nbsp; ')+'</span>'
+        +'<b style="color:#92400e;">Aaj '+followupToday.length+' inquiry(s) na followup chhe!</b><br>'
+        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(', ')+'</span>'
         +'</div></div>';
     }
     html+='<div class="filter-bar" style="margin-bottom:14px;">'
@@ -10309,7 +9701,7 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiry('+inq.id+')">✏️</button>'
+          +'<button class="btn btn-outline btn-sm" onclick="openAddInquiryModal('+JSON.stringify(inq).replace(/'/g,"\\'")+')">✏️</button>'
           +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
           +'</div>'
           +'</div>'
@@ -10334,11 +9726,6 @@ function filterInquiryList(){
   });
 }
 
-function openEditInquiry(id){
-  var inq=(window._inqCache||[]).find(function(i){return i.id==id;});
-  if(!inq){alert('Inquiry not found');return;}
-  openAddInquiryModal(inq);
-}
 function openAddInquiryModal(editData){
   var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
   var isEdit=!!(editData&&editData.id);
@@ -10405,804 +9792,6 @@ async function deleteInquiry(id){
     await sb('auto_inquiries','DELETE',null,'?id=eq.'+id);
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
-}
-
-// ─── VIRTUAL AI AGENT ────────────────────────────────────────────────────────
-var aiAgentTab='social';
-var aiAgentLog=[];
-
-async function renderVirtualAgent(){
-  // Access control: only Admin (non-WC) and ENG002/ENG008
-  var isAdminAccess=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
-  var isAutoEngAccess=currentUser&&(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-  if(!isAdminAccess&&!isAutoEngAccess){navigate('dashboard');return;}
-
-  const pc=document.getElementById('page-content');
-
-  // Load counts from Supabase for dashboard cards
-  let pendingCalls=0,pendingPayments=0,pendingInquiries=0,totalCustomers=0;
-  try{
-    const [callsData,inquiriesData,customersData]=await Promise.all([
-      sb('tickets','GET',null,'?status=eq.Open&select=id'),
-      sb('auto_inquiries','GET',null,'?status=not.in.(Converted,Lost)&select=id'),
-      sb('customers','GET',null,'?select=id')
-    ]);
-    pendingCalls=Array.isArray(callsData)?callsData.length:0;
-    pendingInquiries=Array.isArray(inquiriesData)?inquiriesData.length:0;
-    totalCustomers=Array.isArray(customersData)?customersData.length:0;
-  }catch(e){}
-
-  pc.innerHTML=`
-<style>
-.ai-hero{background:linear-gradient(135deg,#0f172a 0%,#1a56db 60%,#7c3aed 100%);border-radius:16px;padding:24px 28px;color:#fff;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
-.ai-hero-left h2{font-size:22px;font-weight:800;margin-bottom:4px;}
-.ai-hero-left p{font-size:13px;opacity:0.8;max-width:420px;}
-.ai-status-pill{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:30px;padding:8px 18px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;backdrop-filter:blur(8px);}
-.ai-dot{width:10px;height:10px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;animation:aipulse 1.5s infinite;}
-@keyframes aipulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
-.ai-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
-.ai-kpi{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.07);border-top:4px solid var(--primary);text-align:center;transition:transform 0.2s;}
-.ai-kpi:hover{transform:translateY(-2px);}
-.ai-kpi .ai-kpi-icon{font-size:28px;margin-bottom:6px;}
-.ai-kpi .ai-kpi-val{font-size:26px;font-weight:800;color:var(--primary);}
-.ai-kpi .ai-kpi-lbl{font-size:11px;color:var(--text-muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
-.ai-kpi.orange{border-top-color:#f59e0b;}.ai-kpi.orange .ai-kpi-val{color:#d97706;}
-.ai-kpi.green{border-top-color:#10b981;}.ai-kpi.green .ai-kpi-val{color:#059669;}
-.ai-kpi.purple{border-top-color:#8b5cf6;}.ai-kpi.purple .ai-kpi-val{color:#7c3aed;}
-.ai-tabs{display:flex;gap:4px;background:#f1f5f9;padding:4px;border-radius:12px;margin-bottom:20px;flex-wrap:wrap;}
-.ai-tab{padding:9px 18px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);border:none;background:none;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
-.ai-tab.active{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-.ai-tab:hover:not(.active){background:rgba(255,255,255,0.6);}
-.ai-panel{display:none;}.ai-panel.active{display:block;}
-.ai-card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.07);padding:20px;margin-bottom:16px;}
-.ai-card-title{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.ai-post-preview{background:linear-gradient(135deg,#667eea,#764ba2);border-radius:14px;padding:20px;color:#fff;min-height:120px;font-size:14px;line-height:1.7;word-break:break-word;position:relative;}
-.ai-post-preview .post-hashtags{margin-top:10px;opacity:0.9;font-size:13px;line-height:1.8;}
-.ai-hashtag-chip{display:inline-block;background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 10px;margin:2px;font-size:12px;font-weight:600;}
-.ai-template-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
-.ai-template-btn{border:2px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;font-size:12px;text-align:center;transition:all 0.2s;background:#fff;}
-.ai-template-btn:hover,.ai-template-btn.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);}
-.ai-template-btn .t-icon{font-size:20px;margin-bottom:4px;}
-.ai-template-btn .t-label{font-weight:600;}
-.followup-item{background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);}
-.followup-item:hover{border-color:var(--primary);background:var(--primary-light);}
-.followup-info{flex:1;}
-.followup-info .fi-name{font-size:13px;font-weight:700;color:var(--text);}
-.followup-info .fi-detail{font-size:11px;color:var(--text-muted);margin-top:2px;}
-.followup-actions{display:flex;gap:6px;flex-shrink:0;}
-.ai-action-btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;transition:all 0.2s;}
-.ai-btn-wa{background:#25d366;color:#fff;}.ai-btn-wa:hover{background:#128c7e;}
-.ai-btn-sms{background:#3b82f6;color:#fff;}.ai-btn-sms:hover{background:#1d4ed8;}
-.ai-btn-call{background:#f59e0b;color:#fff;}.ai-btn-call:hover{background:#d97706;}
-.ai-btn-done{background:#10b981;color:#fff;}.ai-btn-done:hover{background:#059669;}
-.ai-log-item{padding:10px 14px;border-radius:10px;background:#f8fafc;border-left:3px solid var(--primary);margin-bottom:8px;font-size:13px;}
-.ai-log-item .log-time{font-size:11px;color:var(--text-muted);margin-top:3px;}
-.ai-log-item.log-wa{border-left-color:#25d366;}
-.ai-log-item.log-sms{border-left-color:#3b82f6;}
-.ai-log-item.log-social{border-left-color:#8b5cf6;}
-.ai-log-item.log-call{border-left-color:#f59e0b;}
-.ai-msg-template{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:#065f46;white-space:pre-wrap;margin-bottom:10px;}
-.ai-msg-template.blue{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;}
-.ai-msg-template.orange{background:#fff7ed;border-color:#fed7aa;color:#c2410c;}
-.char-badge{background:#e0e7ff;color:#4338ca;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;}
-.ai-schedule-row{display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:10px;}
-.ai-schedule-row select,.ai-schedule-row input{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;background:#fff;}
-@media(max-width:768px){
-  .ai-kpi-grid{grid-template-columns:repeat(2,1fr);}
-  .ai-template-grid{grid-template-columns:repeat(2,1fr);}
-  .ai-hero{padding:16px;}
-  .ai-hero-left h2{font-size:16px;}
-}
-</style>
-
-<!-- HERO BANNER -->
-<div class="ai-hero">
-  <div class="ai-hero-left">
-    <h2>🤖 Virtual AI Agent — Bhavi Electronics</h2>
-    <p>Tamara daily kaam ne automate karo — Social Media posts, CRM followups, Payment reminders, Inquiry replies badhu ek jagahe thi.</p>
-  </div>
-  <div class="ai-status-pill"><div class="ai-dot"></div><span>Agent Active</span></div>
-</div>
-
-<!-- KPI CARDS -->
-<div class="ai-kpi-grid">
-  <div class="ai-kpi">
-    <div class="ai-kpi-icon">📢</div>
-    <div class="ai-kpi-val">Social</div>
-    <div class="ai-kpi-lbl">Post Generator</div>
-  </div>
-  <div class="ai-kpi orange">
-    <div class="ai-kpi-icon">🎫</div>
-    <div class="ai-kpi-val">${pendingCalls}</div>
-    <div class="ai-kpi-lbl">Pending Calls</div>
-  </div>
-  <div class="ai-kpi green">
-    <div class="ai-kpi-icon">🔍</div>
-    <div class="ai-kpi-val">${pendingInquiries}</div>
-    <div class="ai-kpi-lbl">Pending Inquiries</div>
-  </div>
-  <div class="ai-kpi purple">
-    <div class="ai-kpi-icon">👥</div>
-    <div class="ai-kpi-val">${totalCustomers}</div>
-    <div class="ai-kpi-lbl">Total Customers</div>
-  </div>
-</div>
-
-<!-- TABS -->
-<div class="ai-tabs">
-  <button class="ai-tab active" id="aitab-social" onclick="switchAITab('social')">📢 Social Media</button>
-  <button class="ai-tab" id="aitab-inquiry" onclick="switchAITab('inquiry')">🔍 Inquiry Followup</button>
-  <button class="ai-tab" id="aitab-payment" onclick="switchAITab('payment')">💰 Payment Followup</button>
-  <button class="ai-tab" id="aitab-calls" onclick="switchAITab('calls')">📞 CRM Calls</button>
-  <button class="ai-tab" id="aitab-log" onclick="switchAITab('log')">📋 Activity Log</button>
-</div>
-
-<!-- TAB: SOCIAL MEDIA -->
-<div class="ai-panel active" id="aipanel-social">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-    <div>
-      <div class="ai-card">
-        <div class="ai-card-title">📝 Post Type Select Karo</div>
-        <div class="ai-template-grid">
-          <div class="ai-template-btn selected" id="tmpl-offer" onclick="selectTemplate('offer')"><div class="t-icon">🎁</div><div class="t-label">Offer / Sale</div></div>
-          <div class="ai-template-btn" id="tmpl-service" onclick="selectTemplate('service')"><div class="t-icon">🔧</div><div class="t-label">Service Tips</div></div>
-          <div class="ai-template-btn" id="tmpl-festival" onclick="selectTemplate('festival')"><div class="t-icon">🎉</div><div class="t-label">Festival</div></div>
-          <div class="ai-template-btn" id="tmpl-product" onclick="selectTemplate('product')"><div class="t-icon">📦</div><div class="t-label">New Product</div></div>
-          <div class="ai-template-btn" id="tmpl-review" onclick="selectTemplate('review')"><div class="t-icon">⭐</div><div class="t-label">Customer Review</div></div>
-          <div class="ai-template-btn" id="tmpl-custom" onclick="selectTemplate('custom')"><div class="t-icon">✏️</div><div class="t-label">Custom</div></div>
-        </div>
-        <div class="form-group" style="margin-bottom:10px;">
-          <label>Post Details (Gujarati / Hindi / English)</label>
-          <textarea id="ai-post-input" rows="4" style="border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;width:100%;outline:none;resize:vertical;" placeholder="Post ni details likho... jema ke: '25% off on all AC service this summer'"></textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:10px;">
-          <label>Platform</label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-instagram" checked> Instagram</label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-facebook" checked> Facebook</label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:400;cursor:pointer;"><input type="checkbox" id="plt-whatsapp"> WhatsApp Status</label>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:12px;">
-          <label>City / Location Tag</label>
-          <input type="text" id="ai-post-city" value="Surat" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
-        </div>
-        <button class="btn btn-primary" style="width:100%;" onclick="generateAIPost()">✨ AI Post Generate Karo</button>
-      </div>
-    </div>
-    <div>
-      <div class="ai-card">
-        <div class="ai-card-title">👁️ Post Preview</div>
-        <div class="ai-post-preview" id="ai-post-preview-box">
-          <div style="opacity:0.6;text-align:center;padding:20px 0;">Post generate karo to preview yahan aavse...</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" onclick="copyAIPost()" id="btn-copy-post" style="display:none;">📋 Copy</button>
-          <button class="btn btn-success btn-sm" onclick="downloadAIPost()" id="btn-dl-post" style="display:none;">📸 Download PNG (1080×1080)</button>
-          <button class="btn btn-primary btn-sm" onclick="scheduleAIPost()" id="btn-schedule-post" style="display:none;">⏰ Schedule</button>
-        </div>
-      </div>
-      <div class="ai-card" id="ai-hashtag-card" style="display:none;">
-        <div class="ai-card-title">🏷️ Suggested Hashtags</div>
-        <div id="ai-hashtag-box"></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Post sathe aapamele-le hashtags add thay chhe — copy karva upar click karo.</div>
-      </div>
-      <div class="ai-card" id="ai-schedule-card" style="display:none;">
-        <div class="ai-card-title">⏰ Post Schedule</div>
-        <div class="ai-schedule-row">
-          <span style="font-size:13px;font-weight:600;min-width:60px;">Date:</span>
-          <input type="date" id="schedule-date" value="${new Date().toISOString().slice(0,10)}">
-          <input type="time" id="schedule-time" value="09:00">
-        </div>
-        <div id="schedule-confirm-msg" style="display:none;" class="alert alert-success" style="margin-top:8px;"></div>
-        <button class="btn btn-primary btn-sm" onclick="confirmSchedulePost()">✅ Confirm Schedule</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- TAB: INQUIRY FOLLOWUP -->
-<div class="ai-panel" id="aipanel-inquiry">
-  <div class="ai-card">
-    <div class="ai-card-title">🔍 Pending Inquiry Followups
-      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllInquiryFollowups()">📤 Send All WhatsApp</button>
-    </div>
-    <div class="alert alert-info" style="margin-bottom:12px;">Agent automatically pending inquiries ne WhatsApp message mokle. Tamara Twilio / Meta WABA account sathe connected hovu joiye.</div>
-    <div id="ai-inquiry-list"><div class="loading">Loading...</div></div>
-  </div>
-  <div class="ai-card">
-    <div class="ai-card-title">💬 Inquiry Message Template</div>
-    <div class="ai-msg-template" id="inquiry-wa-template">Namaste {name}! 🙏
-
-Bhavi Electronics & Automation thi baat kar raha hun.
-
-Apne hamare yahan inquiry di thi — {product} ke bare mein.
-Kya aap abhi baat kar sakte hain?
-
-Hamare experts se FREE consultation ke liye reply karein. ✅
-
-📞 Call: +91-XXXXXXXXXX
-📍 Surat, Gujarat</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editInquiryTemplate()">✏️ Template Edit Karo</button>
-      <button class="btn btn-success btn-sm" onclick="copyTemplate('inquiry-wa-template')">📋 Copy</button>
-    </div>
-  </div>
-</div>
-
-<!-- TAB: PAYMENT FOLLOWUP -->
-<div class="ai-panel" id="aipanel-payment">
-  <div class="ai-card">
-    <div class="ai-card-title">💰 Payment Pending Tickets
-      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllPaymentFollowups()">📤 Send All Reminders</button>
-    </div>
-    <div class="alert alert-warning" style="margin-bottom:12px;">Jema payment pending chhe aeva completed tickets niche dikhe chhe. Agent auto-reminder mokle chhe.</div>
-    <div id="ai-payment-list"><div class="loading">Loading...</div></div>
-  </div>
-  <div class="ai-card">
-    <div class="ai-card-title">💬 Payment Reminder Template</div>
-    <div class="ai-msg-template orange" id="payment-wa-template">Namaste {name}! 🙏
-
-Bhavi Electronics thi reminder chhe.
-
-Tamara ticket #{ticket_id} ({model}) ni service complete thai gayi chhe.
-
-💰 Due Amount: ₹{amount}
-
-Krpaya payment karo:
-• Cash / UPI / Card accepted
-• Shop par: {shop_address}
-
-Koi sawaal hoy to reply karo. Aabhaar! 🙏</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editPaymentTemplate()">✏️ Template Edit Karo</button>
-      <button class="btn btn-success btn-sm" onclick="copyTemplate('payment-wa-template')">📋 Copy</button>
-    </div>
-  </div>
-</div>
-
-<!-- TAB: CRM CALLS -->
-<div class="ai-panel" id="aipanel-calls">
-  <div class="ai-card">
-    <div class="ai-card-title">📞 Pending Allocation Calls
-      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllCallFollowups()">📤 Send All Updates</button>
-    </div>
-    <div class="alert alert-info" style="margin-bottom:12px;">Customers ne automatically "Tamaro call registered thayo chhe" message moklo. Customer confidence vadhse.</div>
-    <div id="ai-calls-list"><div class="loading">Loading...</div></div>
-  </div>
-  <div class="ai-card">
-    <div class="ai-card-title">💬 Call Acknowledgement Template</div>
-    <div class="ai-msg-template blue" id="call-wa-template">Namaste {name}! 🙏
-
-Bhavi Electronics & Automation thi suchit karvama aave chhe ke tamaro service call *registered* thayo chhe.
-
-🎫 Ticket No: *{ticket_id}*
-📱 Product: {model}
-🔧 Problem: {problem}
-📍 Service Type: {service_type}
-
-Amaro engineer 24 kaalaak ni andar contact karshe.
-
-Status track karvaa WhatsApp par reply karo: *STATUS {ticket_id}*
-
-Aabhaar! — Bhavi Electronics 🙏</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editCallTemplate()">✏️ Template Edit Karo</button>
-      <button class="btn btn-success btn-sm" onclick="copyTemplate('call-wa-template')">📋 Copy</button>
-    </div>
-  </div>
-</div>
-
-<!-- TAB: ACTIVITY LOG -->
-<div class="ai-panel" id="aipanel-log">
-  <div class="ai-card">
-    <div class="ai-card-title">📋 Agent Activity Log
-      <button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="clearAILog()">🗑️ Clear Log</button>
-    </div>
-    <div id="ai-activity-log">
-      <div style="text-align:center;padding:40px;color:var(--text-muted);">
-        <div style="font-size:36px;margin-bottom:10px;">🤖</div>
-        <div>Koi activity nathi. Agent kaam sharu karshe to yahan dekhashhe.</div>
-      </div>
-    </div>
-  </div>
-</div>
-`;
-
-  // Load data for tabs
-  loadAIInquiries();
-  loadAIPayments();
-  loadAICalls();
-  renderAILog();
-}
-
-function switchAITab(tab){
-  aiAgentTab=tab;
-  document.querySelectorAll('.ai-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.ai-panel').forEach(p=>p.classList.remove('active'));
-  const tabEl=document.getElementById('aitab-'+tab);
-  const panelEl=document.getElementById('aipanel-'+tab);
-  if(tabEl)tabEl.classList.add('active');
-  if(panelEl)panelEl.classList.add('active');
-}
-
-// ─── Social Media ───────────────────────────────────────────────────────────
-var selectedTemplate='offer';
-var generatedHashtags=[];
-var generatedCanvas=null;
-
-const AI_HASHTAG_SETS={
-  offer:['#BhaviElectronics','#ElectronicsRepair','#ACService','#SuratElectronics','#HomeAppliances','#ServiceCenter','#SpecialOffer','#DiscountAlert','#SummerSale','#Surat','#Gujarat','#RepairService','#TechService','#ApplianceRepair'],
-  service:['#BhaviElectronics','#ServiceTips','#ACMaintenance','#HomeAppliances','#ElectronicsRepair','#ProTips','#Surat','#Gujarat','#TechTips','#DIYRepair','#ApplianceCare','#MaintenanceTips'],
-  festival:['#BhaviElectronics','#FestivalOffer','#Diwali','#Navratri','#Gujarat','#Surat','#FestiveSeason','#SpecialDiscount','#ElectronicsGifts','#HomeAppliances','#FestivalSale','#CelebrationDeals'],
-  product:['#BhaviElectronics','#NewArrival','#ElectronicsIndia','#HomeAppliances','#Surat','#Gujarat','#TechProducts','#Innovation','#SmartHome','#BestBuy','#QualityProducts','#NewProduct'],
-  review:['#BhaviElectronics','#CustomerReview','#HappyCustomer','#5Stars','#Surat','#Gujarat','#TrustedService','#BestService','#CustomerSatisfaction','#Reviews','#ServiceExcellence','#Recommend'],
-  custom:['#BhaviElectronics','#Surat','#Gujarat','#ElectronicsRepair','#HomeAppliances','#ServiceCenter','#TechService']
-};
-
-// Canvas template visual configs
-const AI_TMPL_CFG={
-  offer: {bg1:'#d4380d',bg2:'#fa8c16',accent:'#fff',badge:'#fff',badgeTxt:'#d4380d',icon:'🎁',label:'SPECIAL OFFER'},
-  service:{bg1:'#003eb3',bg2:'#1a56db',accent:'#fff',badge:'#fff',badgeTxt:'#003eb3',icon:'🔧',label:'SERVICE TIP'},
-  festival:{bg1:'#7c3aed',bg2:'#f59e0b',accent:'#fff',badge:'#fff',badgeTxt:'#7c3aed',icon:'🎉',label:'FESTIVAL SPECIAL'},
-  product:{bg1:'#065f46',bg2:'#059669',accent:'#fff',badge:'#fff',badgeTxt:'#065f46',icon:'📦',label:'NEW ARRIVAL'},
-  review: {bg1:'#0f172a',bg2:'#1a56db',accent:'#fff',badge:'#fbbf24',badgeTxt:'#0f172a',icon:'⭐',label:'CUSTOMER REVIEW'},
-  custom: {bg1:'#1e2a3a',bg2:'#7c3aed',accent:'#fff',badge:'#fff',badgeTxt:'#1e2a3a',icon:'✨',label:'BHAVI ELECTRONICS'}
-};
-
-function selectTemplate(type){
-  selectedTemplate=type;
-  document.querySelectorAll('.ai-template-btn').forEach(b=>b.classList.remove('selected'));
-  const el=document.getElementById('tmpl-'+type);if(el)el.classList.add('selected');
-}
-
-// Draw wrapped text, return next Y
-function canvasWrapText(ctx,text,x,y,maxW,lineH){
-  const words=text.split(' ');let line='';let ly=y;
-  for(let w of words){
-    const t=line+w+' ';
-    if(ctx.measureText(t).width>maxW&&line!==''){ctx.fillText(line.trim(),x,ly);ly+=lineH;line=w+' ';}
-    else line=t;
-  }
-  if(line.trim())ctx.fillText(line.trim(),x,ly);
-  return ly+lineH;
-}
-
-function drawRoundRect(ctx,x,y,w,h,r,fill){
-  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
-  ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
-  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
-  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
-  ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
-  if(fill)ctx.fill();
-}
-
-function drawPostCanvas(content,city,template){
-  // content can be string (legacy) or object {headline,body,cta,hashtags}
-  var detail='',headline='',cta='',hashStr='';
-  if(typeof content==='object'&&content!==null){
-    headline=content.headline||'';
-    detail=content.body||'';
-    cta=content.cta||'';
-    hashStr=content.hashtags||'';
-  }else{
-    detail=content||'';
-  }
-  const S=1080;
-  const canvas=document.createElement('canvas');
-  canvas.width=S;canvas.height=S;
-  const ctx=canvas.getContext('2d');
-  const cfg=AI_TMPL_CFG[template]||AI_TMPL_CFG.custom;
-
-  // Background gradient
-  const gr=ctx.createLinearGradient(0,0,S,S);
-  gr.addColorStop(0,cfg.bg1);gr.addColorStop(1,cfg.bg2);
-  ctx.fillStyle=gr;ctx.fillRect(0,0,S,S);
-
-  // Subtle diagonal stripe pattern
-  ctx.save();ctx.globalAlpha=0.06;ctx.strokeStyle='#fff';ctx.lineWidth=40;
-  for(let i=-S;i<S*2;i+=80){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+S,S);ctx.stroke();}
-  ctx.restore();
-
-  // Outer border frame
-  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=12;
-  drawRoundRect(ctx,24,24,S-48,S-48,24,false);ctx.stroke();ctx.restore();
-
-  // Top header band
-  ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#000';
-  ctx.fillRect(0,0,S,145);ctx.restore();
-
-  // Company name - BHAVI ELECTRONICS
-  ctx.save();
-  ctx.fillStyle='#ffffff';ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=8;
-  ctx.font='bold 58px Arial';ctx.fillText('BHAVI ELECTRONICS',S/2,74);
-  ctx.font='500 30px Arial';ctx.globalAlpha=0.85;ctx.fillText('& Automation — Service CRM',S/2,115);
-  ctx.restore();
-
-  // Horizontal divider
-  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(60,148);ctx.lineTo(S-60,148);ctx.stroke();ctx.restore();
-
-  // Headline (from content object) or fallback template badge
-  if(headline){
-    ctx.save();
-    ctx.fillStyle='rgba(255,255,255,0.95)';ctx.textAlign='center';
-    ctx.font='bold 44px Arial';ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;
-    ctx.fillText(headline,S/2,210);ctx.restore();
-  }else{
-    // Template badge (pill) — legacy fallback
-    ctx.save();
-    const bw=380,bh=66,bx=(S-bw)/2,by=168;
-    ctx.fillStyle=cfg.badge;drawRoundRect(ctx,bx,by,bw,bh,33,true);
-    ctx.fillStyle=cfg.badgeTxt;ctx.font='bold 30px Arial';ctx.textAlign='center';
-    ctx.fillText(cfg.label,S/2,213);ctx.restore();
-  }
-
-  // Large icon (emoji)
-  ctx.save();ctx.font='110px serif';ctx.textAlign='center';
-  ctx.fillText(cfg.icon,S/2,360);ctx.restore();
-
-  // Main content body text (auto-wrapped)
-  ctx.save();ctx.fillStyle=cfg.accent;ctx.textAlign='center';
-  ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;
-  const fs=detail.length>100?34:detail.length>70?38:detail.length>50?42:46;
-  ctx.font='bold '+fs+'px Arial';
-  var nextY=canvasWrapText(ctx,detail,S/2,400,920,fs+18);
-  ctx.restore();
-
-  // CTA line
-  if(cta){
-    ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.textAlign='center';
-    ctx.font='italic 28px Arial';
-    var ctaY=Math.max(nextY+10,620);
-    canvasWrapText(ctx,cta,S/2,ctaY,900,36);
-    ctx.restore();
-  }
-
-  // City + contact bar
-  ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#000';ctx.fillRect(0,710,S,70);ctx.restore();
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.92)';ctx.font='30px Arial';ctx.textAlign='center';
-  ctx.fillText('📍 '+city+'   |   📞 Call Now   |   ✅ Expert Service',S/2,754);ctx.restore();
-
-  // Bottom band
-  ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#000';ctx.fillRect(0,800,S,280);ctx.restore();
-
-  // Hashtags — use content hashtags or fallback to AI_HASHTAG_SETS
-  var hashTags=[];
-  if(hashStr){
-    hashTags=hashStr.split(' ').filter(Boolean);
-  }else{
-    hashTags=AI_HASHTAG_SETS[template]||AI_HASHTAG_SETS.custom;
-  }
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.72)';ctx.font='22px Arial';ctx.textAlign='center';
-  ctx.fillText(hashTags.slice(0,5).join('  '),S/2,850);
-  ctx.fillText(hashTags.slice(5,10).join('  '),S/2,882);ctx.restore();
-
-  // Divider before footer
-  ctx.save();ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(60,910);ctx.lineTo(S-60,910);ctx.stroke();ctx.restore();
-
-  // Website URL footer
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font='bold 28px Arial';ctx.textAlign='center';
-  ctx.fillText('🌐 bhavi-electronics.com  |  Bhavi Electronics & Automation',S/2,952);
-  ctx.font='22px Arial';ctx.globalAlpha=0.6;
-  ctx.fillText('📷 Follow us on Instagram  •  Facebook  •  WhatsApp',S/2,990);ctx.restore();
-
-  return canvas;
-}
-
-function generatePostContent(template,userDetail,city){
-  const companyName='Bhavi Electronics & Automation';
-  const city2=city||'Surat';
-  const templates={
-    offer:{
-      headline:'🎉 SPECIAL OFFER!',
-      body:userDetail||'Ghar baithke Electronics Service karvao! Bhavi Electronics ma trusted repair service maate contact karo.',
-      cta:'📞 Call Now | ✅ Expert Technicians | 🏠 Home Service Available',
-      hashtags:'#'+city2+'Electronics #BhaviElectronics #SpecialOffer #DiscountAlert #ElectronicsRepair #ACService #HomeAppliances #ServiceCenter #'+city2+'Gujarat'
-    },
-    service:{
-      headline:'🔧 PROFESSIONAL SERVICE',
-      body:userDetail||'AC, TV, Washing Machine, Refrigerator — tamara ghar na badha electronics mate trusted repair service. '+companyName+', '+city2+'.',
-      cta:'🏠 On-Site Service | 🔧 All Brands | ⚡ Same Day',
-      hashtags:'#'+city2+'Service #ACRepair #TVRepair #ApplianceRepair #BhaviElectronics #HomeService #'+city2+'Electronics #Gujarat'
-    },
-    festival:{
-      headline:'🪔 FESTIVE GREETINGS!',
-      body:userDetail||companyName+' taraf thi tamne ane tamara parivarnu khub khub abhinandan! Tamara vishwaas aur pyar mate aabhaari chhi.',
-      cta:'💙 '+companyName+' Team',
-      hashtags:'#FestivalGreetings #BhaviElectronics #'+city2+' #Gujarat #Celebration #HappyFestival'
-    },
-    tip:{
-      headline:'💡 SERVICE TIP',
-      body:userDetail||'AC filter mahine ma ek vaara saaf karo — cooling vadhse ane electricity bill ghatshe! Expert tip by '+companyName+'.',
-      cta:'🔧 Need Service? Call Us! | ✅ Free Consultation',
-      hashtags:'#ServiceTip #ACTips #ElectronicsCare #BhaviElectronics #'+city2+' #HomeAppliance #EnergySaving'
-    },
-    product:{
-      headline:'✨ NEW PRODUCT',
-      body:userDetail||'Latest automation products available at '+companyName+'! Smart home, CCTV, Home Theatre ane vadhare — Surat na best dealers.',
-      cta:'🏪 Visit Us | 📞 Call for Demo | 🚚 Installation Available',
-      hashtags:'#NewProduct #SmartHome #HomeAutomation #CCTV #'+city2+' #BhaviElectronics #Automation'
-    },
-    custom:{
-      headline:'📢 ANNOUNCEMENT',
-      body:userDetail||companyName+' — '+city2+'ma Electronics Repair ane Automation Solutions mate tamaro bharosapaatr partner.',
-      cta:'📞 Call Now | 🌐 bhavi-electronics.com',
-      hashtags:'#BhaviElectronics #'+city2+' #Electronics #Automation #Gujarat #TrustedService'
-    }
-  };
-  var t=templates[template]||templates.custom;
-  return {headline:t.headline,body:t.body,cta:t.cta,hashtags:t.hashtags};
-}
-
-function generateAIPost(){
-  const detail=(document.getElementById('ai-post-input').value||'').trim();
-  const city=(document.getElementById('ai-post-city').value||'Surat').trim();
-  if(!detail){alert('Pehela post details lakho!');return;}
-
-  // Generate smart post content
-  var content=generatePostContent(selectedTemplate,detail,city);
-
-  // Generate full 1080x1080 canvas
-  generatedCanvas=drawPostCanvas(content,city,selectedTemplate);
-
-  // Hashtags — use generated content hashtags + fallback
-  generatedHashtags=content.hashtags.split(' ').filter(Boolean);
-
-  // Show scaled preview (500x500)
-  const preview=document.getElementById('ai-post-preview-box');
-  if(preview){
-    preview.innerHTML='';preview.style.background='none';preview.style.padding='0';
-    const prev=document.createElement('canvas');
-    prev.width=500;prev.height=500;prev.style.cssText='width:100%;border-radius:12px;display:block;';
-    prev.getContext('2d').drawImage(generatedCanvas,0,0,500,500);
-    preview.appendChild(prev);
-  }
-
-  // Show action buttons
-  ['btn-copy-post','btn-dl-post','btn-schedule-post'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.style.display='';
-  });
-
-  // Hashtag chips
-  const hcard=document.getElementById('ai-hashtag-card');
-  if(hcard){
-    hcard.style.display='';
-    document.getElementById('ai-hashtag-box').innerHTML=generatedHashtags.map(h=>`<span class="ai-hashtag-chip" style="background:#e0e7ff;color:#4338ca;margin:2px;display:inline-block;cursor:pointer;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${h}')">${h}</span>`).join(' ');
-  }
-
-  addAILog('social','🎨 Design post generated: '+selectedTemplate+' | '+city,'log-social');
-}
-
-function copyAIPost(){
-  const txt=generatedHashtags.join(' ');
-  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Hashtags copied!\n\nImage ne Download karine Instagram/Facebook par post karo.'));}
-  else{alert(txt);}
-}
-
-function downloadAIPost(){
-  if(!generatedCanvas){alert('Pehela Design Generate Karo!');return;}
-  const a=document.createElement('a');
-  a.download='BhaviElectronics_Post_'+new Date().toISOString().slice(0,10)+'.png';
-  a.href=generatedCanvas.toDataURL('image/png');
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  addAILog('social','⬇️ PNG image downloaded (1080×1080)','log-social');
-}
-
-function scheduleAIPost(){
-  const sc=document.getElementById('ai-schedule-card');
-  if(sc){sc.style.display=sc.style.display==='none'?'':'none';}
-}
-
-function confirmSchedulePost(){
-  const d=document.getElementById('schedule-date').value;
-  const t=document.getElementById('schedule-time').value;
-  const msg=document.getElementById('schedule-confirm-msg');
-  if(msg){
-    msg.style.display='';
-    msg.textContent=`✅ Post scheduled for ${d} at ${t}. (Integration sathe auto-post thashe)`;
-  }
-  addAILog('social',`⏰ Post scheduled for ${d} ${t}`,'log-social');
-}
-
-// ─── Inquiry Followup ───────────────────────────────────────────────────────
-async function loadAIInquiries(){
-  const el=document.getElementById('ai-inquiry-list');
-  if(!el)return;
-  try{
-    const data=await sb('auto_inquiries','GET',null,'?status=not.in.(Converted,Lost)&order=followup_date.asc&limit=30');
-    if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending inquiry nathi. 🎉</div>';
-      return;
-    }
-    el.innerHTML=data.map(inq=>`
-      <div class="followup-item" id="inq-item-${inq.id}">
-        <div class="followup-info">
-          <div class="fi-name">${inq.customer_name||'Unknown'} — ${inq.product_interest||'General Inquiry'}</div>
-          <div class="fi-detail">📞 ${inq.phone||'-'} &nbsp;|&nbsp; 📅 ${inq.created_at?new Date(inq.created_at).toLocaleDateString('en-IN'):'-'} &nbsp;|&nbsp; ${inq.source||'Walk-in'}</div>
-        </div>
-        <div class="followup-actions">
-          <button class="ai-action-btn ai-btn-wa" onclick="sendInquiryWA('${inq.id}','${(inq.phone||'').replace(/\D/g,'')}','${(inq.customer_name||'').replace(/'/g,'')}')" title="WhatsApp">💬 WA</button>
-          <button class="ai-action-btn ai-btn-sms" onclick="sendInquirySMS('${inq.id}','${(inq.phone||'').replace(/\D/g,'')}')" title="SMS">📱 SMS</button>
-          <button class="ai-action-btn ai-btn-done" onclick="markInquiryDone('${inq.id}')" title="Done">✅</button>
-        </div>
-      </div>`).join('');
-  }catch(e){
-    el.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;
-  }
-}
-
-function sendInquiryWA(id,phone,name){
-  const tmpl=(document.getElementById('inquiry-wa-template').innerText||'').replace('{name}',name||'Customer').replace('{product}','aapni inquiry');
-  const url=`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`;
-  window.open(url,'_blank');
-  addAILog('inquiry',`💬 Inquiry WA sent to ${name} (${phone})`,'log-wa');
-  markInquiryDone(id);
-}
-
-function sendInquirySMS(id,phone){
-  window.open(`sms:+91${phone}?body=${encodeURIComponent('Namaste! Bhavi Electronics thi — tamari inquiry maate contact karo: +91-XXXXXXXXXX')}`, '_blank');
-  addAILog('inquiry',`📱 Inquiry SMS to ${phone}`,'log-sms');
-}
-
-async function markInquiryDone(id){
-  try{
-    await sb('auto_inquiries','PATCH',{status:'In Progress',followup_date:new Date().toISOString().slice(0,10)},'?id=eq.'+id);
-    const el=document.getElementById('inq-item-'+id);
-    if(el)el.style.opacity='0.4';
-  }catch(e){}
-}
-
-async function sendAllInquiryFollowups(){
-  if(!confirm('Badha pending inquiries ne WhatsApp message mokavo?'))return;
-  const items=document.querySelectorAll('#ai-inquiry-list .followup-item');
-  items.forEach(item=>{
-    const waBtn=item.querySelector('.ai-btn-wa');
-    if(waBtn)waBtn.click();
-  });
-  addAILog('inquiry','📤 Bulk inquiry followup sent','log-wa');
-}
-
-function editInquiryTemplate(){
-  const el=document.getElementById('inquiry-wa-template');
-  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
-}
-
-// ─── Payment Followup ───────────────────────────────────────────────────────
-async function loadAIPayments(){
-  const el=document.getElementById('ai-payment-list');
-  if(!el)return;
-  try{
-    const data=await sb('tickets','GET',null,'?status=in.(Completed,Closed)&call_type=not.in.(Warranty,Warranty+Repeat)&order=updated_at.desc&limit=30');
-    if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending payment nathi. 🎉</div>';
-      return;
-    }
-    el.innerHTML=data.map(call=>`
-      <div class="followup-item" id="pay-item-${call.id}">
-        <div class="followup-info">
-          <div class="fi-name">${call.cname||call.customer_name||'Customer'} — ${call.model||call.model_no||'-'}</div>
-          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.id||'-'} &nbsp;|&nbsp; 🔧 ${call.call_type||'-'} &nbsp;|&nbsp; 📅 ${call.updated_at?new Date(call.updated_at).toLocaleDateString('en-IN'):'-'}</div>
-        </div>
-        <div class="followup-actions">
-          <button class="ai-action-btn ai-btn-wa" onclick="sendPaymentWA('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.cname||call.customer_name||'').replace(/'/g,'')}','${call.id||''}','${(call.model||call.model_no||'').replace(/'/g,'')}','0')" title="WhatsApp Reminder">💬 WA</button>
-          <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
-        </div>
-      </div>`).join('');
-  }catch(e){
-    el.innerHTML=`<div class="alert alert-warning">Error loading payments: ${e.message}</div>`;
-  }
-}
-
-function sendPaymentWA(id,phone,name,ticketId,model,amount){
-  const tmpl=(document.getElementById('payment-wa-template').innerText||'')
-    .replace('{name}',name||'Customer')
-    .replace('{ticket_id}',ticketId||'-')
-    .replace('{model}',model||'-')
-    .replace('{amount}',amount||'0')
-    .replace('{shop_address}','Bhavi Electronics, Surat');
-  window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`,'_blank');
-  addAILog('payment',`💰 Payment reminder sent to ${name} (₹${amount})`,'log-wa');
-}
-
-async function sendAllPaymentFollowups(){
-  if(!confirm('Badha pending payments ne reminder mokavo?'))return;
-  document.querySelectorAll('#ai-payment-list .ai-btn-wa').forEach(btn=>btn.click());
-  addAILog('payment','📤 Bulk payment reminders sent','log-wa');
-}
-
-function callCustomer(phone){
-  window.open('tel:+91'+phone,'_self');
-  addAILog('calls','📞 Call initiated to +91'+phone,'log-call');
-}
-
-function editPaymentTemplate(){
-  const el=document.getElementById('payment-wa-template');
-  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
-}
-
-// ─── CRM Calls ──────────────────────────────────────────────────────────────
-async function loadAICalls(){
-  const el=document.getElementById('ai-calls-list');
-  if(!el)return;
-  try{
-    const data=await sb('tickets','GET',null,'?status=eq.Open&order=created_at.desc&limit=30');
-    if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending allocation call nathi. 🎉</div>';
-      return;
-    }
-    el.innerHTML=data.map(call=>`
-      <div class="followup-item" id="call-item-${call.id}">
-        <div class="followup-info">
-          <div class="fi-name">${call.cname||call.customer_name||'Customer'} — ${call.model||call.model_no||'-'}</div>
-          <div class="fi-detail">📞 ${call.mobile||'-'} &nbsp;|&nbsp; 🎫 ${call.id||'-'} &nbsp;|&nbsp; 🔧 ${call.problem||'-'} &nbsp;|&nbsp; ${call.service_type||'-'}</div>
-        </div>
-        <div class="followup-actions">
-          <button class="ai-action-btn ai-btn-wa" onclick="sendCallAck('${call.id}','${(call.mobile||'').replace(/\D/g,'')}','${(call.cname||call.customer_name||'').replace(/'/g,'')}','${call.id||''}','${(call.model||call.model_no||'').replace(/'/g,'')}','${(call.problem||'').replace(/'/g,'')}','${call.service_type||''}')" title="Acknowledgement">💬 Ack</button>
-          <button class="ai-action-btn ai-btn-call" onclick="callCustomer('${(call.mobile||'').replace(/\D/g,'')}')" title="Call">📞 Call</button>
-        </div>
-      </div>`).join('');
-  }catch(e){
-    el.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;
-  }
-}
-
-function sendCallAck(id,phone,name,ticketId,model,problem,serviceType){
-  const tmpl=(document.getElementById('call-wa-template').innerText||'')
-    .replace('{name}',name||'Customer')
-    .replace('{ticket_id}',ticketId||'-')
-    .replace('{model}',model||'-')
-    .replace('{problem}',problem||'-')
-    .replace('{service_type}',serviceType||'-');
-  window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`,'_blank');
-  addAILog('calls',`📞 Ack sent to ${name} for ${ticketId}`,'log-wa');
-}
-
-async function sendAllCallFollowups(){
-  if(!confirm('Badha pending calls ne acknowledgement mokavo?'))return;
-  document.querySelectorAll('#ai-calls-list .ai-btn-wa').forEach(btn=>btn.click());
-  addAILog('calls','📤 Bulk call acknowledgements sent','log-wa');
-}
-
-function editCallTemplate(){
-  const el=document.getElementById('call-wa-template');
-  if(el){el.contentEditable=el.contentEditable==='true'?'false':'true';el.style.outline=el.contentEditable==='true'?'2px solid var(--primary)':'';}
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-function copyTemplate(id){
-  const el=document.getElementById(id);
-  if(!el)return;
-  const txt=el.innerText||el.textContent;
-  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Template copied!'));}
-  else{alert(txt);}
-}
-
-function addAILog(type,msg,cls){
-  aiAgentLog.unshift({type,msg,cls,time:new Date()});
-  if(aiAgentLog.length>100)aiAgentLog.length=100;
-  renderAILog();
-}
-
-function renderAILog(){
-  const el=document.getElementById('ai-activity-log');
-  if(!el)return;
-  if(aiAgentLog.length===0){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">🤖</div><div>Koi activity nathi.</div></div>';
-    return;
-  }
-  el.innerHTML=aiAgentLog.map(log=>`
-    <div class="ai-log-item ${log.cls||''}">
-      <div>${log.msg}</div>
-      <div class="log-time">${log.time.toLocaleTimeString('en-IN')} — ${log.time.toLocaleDateString('en-IN')}</div>
-    </div>`).join('');
-}
-
-function clearAILog(){
-  if(!confirm('Log clear karvo?'))return;
-  aiAgentLog=[];
-  renderAILog();
 }</script></div></body>
 </html>
   
