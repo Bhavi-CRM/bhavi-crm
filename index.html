@@ -2244,10 +2244,7 @@ async function doLogin(){
     currentUser=user;
     if(loginRole==='engineer'&&currentUser.role!=='engineer'){showLoginError('Use Engineer tab');return;}
     if(loginRole==='admin'&&currentUser.role==='engineer'){showLoginError('Use Admin/WC tab');return;}
-    // Save full user to localStorage for instant restore
-    const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
-    try{await sb('users','PATCH',{session_token:_stok},'?user_id=eq.'+encodeURIComponent(user.user_id));}catch(e){}
-    localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
+    localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now()}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
@@ -2302,17 +2299,11 @@ async function tryAutoLogin(){
     // Session valid for 30 days
     if(Date.now()-session.savedAt > 30*24*60*60*1000){localStorage.removeItem('bhavi_session');return;}
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
+    if(!res.ok){localStorage.removeItem('bhavi_session');throw new Error('Session fetch failed');}
     const users=await res.json();
-    if(!users||!users.length){localStorage.removeItem('bhavi_session');return;}
+    if(!Array.isArray(users)||!users.length){localStorage.removeItem('bhavi_session');throw new Error('User not found');}
     currentUser=null;
     currentUser=users[0];
-    // Single-device check: if session_token column exists and token mismatches, force logout
-    if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
-      localStorage.removeItem('bhavi_session');
-      localStorage.removeItem('bhavi_user');
-      alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
-      return;
-    }
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
