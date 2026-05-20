@@ -2230,9 +2230,7 @@ async function doLogin(){
     await loadMasterData();
     await loadLogoFromDB();
     setupNav();
-    await new Promise(r=>setTimeout(r,300));
     await navigate('dashboard');
-    // Run setupNav again after render to ensure correct state
     setTimeout(setupNav, 100);
   }catch(e){showLoginError('Error: '+e.message);}
 }
@@ -2260,8 +2258,13 @@ async function tryAutoLogin(){
       loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
     }
     const session=JSON.parse(saved);
-    // Session valid for 12 hours
-    if(Date.now()-session.savedAt > 30*24*60*60*1000){localStorage.removeItem('bhavi_session');return;}
+    if(Date.now()-session.savedAt > 30*24*60*60*1000){
+      localStorage.removeItem('bhavi_session');
+      // Restore login form (it was replaced with spinner above)
+      if(loginScreen){loginScreen.style.display='flex';loginScreen.innerHTML=document.getElementById('login-screen')?loginScreen.innerHTML:'';}
+      location.reload();
+      return;
+    }
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
     const users=await res.json();
     if(!users||!users.length){localStorage.removeItem('bhavi_session');return;}
@@ -2279,10 +2282,8 @@ async function tryAutoLogin(){
     await loadMasterData();
     setupNav();
     await loadLogoFromDB();
-    await new Promise(r=>setTimeout(r,300));
-    setupNav();
     await navigate('dashboard');
-    setTimeout(setupNav,200);
+    setTimeout(setupNav,100);
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
@@ -9704,11 +9705,12 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +'<button class="btn btn-outline btn-sm" onclick="openAddInquiryModal('+JSON.stringify(inq).replace(/'/g,"\\'")+')">✏️</button>'
+          +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
+          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>'
           +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
           +'</div>'
           +'</div>'
-          +(inq.notes?'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">📝 '+inq.notes+'</div>':'')
+          +(inq.notes?(function(){var lines=(inq.notes||'').split('\n');var last=lines[lines.length-1];return'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">💬 '+escQ(last)+(lines.length>1?' <span style="color:#94a3b8;">(+'+( lines.length-1)+' more)</span>':'')+'</div>';}())  :'')
           +'</div>';
       });
       html+='</div>';
@@ -9729,64 +9731,140 @@ function filterInquiryList(){
   });
 }
 
-function openAddInquiryModal(editData){
+// ---- New Inquiry modal ----
+function openAddInquiryModal(){
   var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
-  var isEdit=!!(editData&&editData.id);
   var modal=document.createElement('div');
-  modal.id='modal-add-inquiry';
-  modal.className='modal-overlay';
+  modal.id='modal-add-inquiry';modal.className='modal-overlay';
   var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var inp=function(id,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id+'" value="'+(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
-    +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Inquiry':'🔍 New Inquiry')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-header"><h2>🔍 New Inquiry</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
     +'<div class="modal-body">'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label><input type="text" id="inq-name" value="'+(isEdit?escQ(editData.customer_name||''):'')+'" placeholder="Customer name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label><input type="tel" id="inq-mobile" value="'+(isEdit?escQ(editData.mobile||''):'')+'" placeholder="Mobile" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label>'+inp('inq-name','Customer name')+'</div>'
+    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('inq-mobile','Mobile number','','tel')+'</div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label><input type="text" id="inq-address" value="'+(isEdit?escQ(editData.address||''):'')+'" placeholder="Address" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('inq-address','Address')+'</div>'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
-    +types.map(function(t){return'<option value="'+t+'"'+(isEdit&&editData.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')
-    +'</select></div>'
-    +'<div class="form-group"><label>Status</label><select id="inq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
-    +'<option value="Open"'+(isEdit&&editData.status==='Open'?' selected':'')+'>Open</option>'
-    +'<option value="In Progress"'+(isEdit&&editData.status==='In Progress'?' selected':'')+'>In Progress</option>'
-    +'<option value="Converted"'+(isEdit&&editData.status==='Converted'?' selected':'')+'>Converted</option>'
-    +'<option value="Lost"'+(isEdit&&editData.status==='Lost'?' selected':'')+'>Lost</option>'
-    +'</select></div>'
+    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>📅 Followup Date</label>'+inp('inq-followup','','','date')+'</div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Description</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.description||'':'')+'</textarea></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>📅 Followup Date</label><input type="date" id="inq-followup" value="'+(isEdit?editData.followup_date||'':'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Notes</label><textarea id="inq-notes" rows="2" placeholder="Internal notes..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.notes||'':'')+'</textarea></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-add-inquiry\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveInquiry('+(isEdit?editData.id:'null')+')">💾 Save</button>'
+    +'<button class="btn btn-primary" onclick="saveNewInquiry()">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(modal);
 }
 
-async function saveInquiry(editId){
-  var name=document.getElementById('inq-name')?.value.trim();
-  var mobile=document.getElementById('inq-mobile')?.value.trim();
-  var address=document.getElementById('inq-address')?.value.trim()||'';
+async function saveNewInquiry(){
+  var name=(document.getElementById('inq-name')?.value||'').trim();
+  var mobile=(document.getElementById('inq-mobile')?.value||'').trim();
+  var address=(document.getElementById('inq-address')?.value||'').trim();
   var type=document.getElementById('inq-type')?.value||'Other';
-  var status=document.getElementById('inq-status')?.value||'Open';
-  var desc=document.getElementById('inq-desc')?.value.trim()||'';
+  var desc=(document.getElementById('inq-desc')?.value||'').trim();
   var followup=document.getElementById('inq-followup')?.value||null;
-  var notes=document.getElementById('inq-notes')?.value.trim()||'';
   if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
   try{
-    var data={customer_name:name,mobile:mobile,address:address,inquiry_type:type,status:status,description:desc,followup_date:followup||null,notes:notes||null,updated_at:new Date().toISOString()};
-    if(editId){
-      await sb('auto_inquiries','PATCH',data,'?id=eq.'+editId);
-    }else{
-      data.created_by=currentUser?.user_id||'ENG002';
-      await sb('auto_inquiries','POST',data);
-    }
+    await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Edit Inquiry (data only — fix typos, change name/mobile/details) ----
+function openEditInquiryModal(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  if(!inq){alert('Inquiry not found');return;}
+  var existing=document.getElementById('modal-edit-inquiry');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-edit-inquiry';modal.className='modal-overlay';
+  var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var inp=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escQ(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>✏️ Edit Inquiry Details</h2><button class="close-btn" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customer nu naam, mobile, address ya description correct karo. Status change karvam ate "📝 Update" button vaapro.</div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label>'+inp('einq-name','Customer name',inq.customer_name)+'</div>'
+    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('einq-mobile','Mobile number',inq.mobile,'tel')+'</div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('einq-address','Address',inq.address)+'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveEditInquiry('+id+')">💾 Save Changes</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveEditInquiry(id){
+  var name=(document.getElementById('einq-name')?.value||'').trim();
+  var mobile=(document.getElementById('einq-mobile')?.value||'').trim();
+  if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
+  try{
+    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),updated_at:new Date().toISOString()},'?id=eq.'+id);
+    document.getElementById('modal-edit-inquiry').remove();
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Update Inquiry (status, followup, remark) ----
+function openUpdateInquiryModal(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  if(!inq){alert('Inquiry not found');return;}
+  var existing=document.getElementById('modal-update-inquiry');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-update-inquiry';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>📝 Update Inquiry</h2><button class="close-btn" onclick="document.getElementById(\'modal-update-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="font-size:13px;font-weight:600;margin-bottom:12px;">👤 '+escQ(inq.customer_name||'')+(inq.mobile?' &nbsp;📱 '+inq.mobile:'')+'</div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Status</label><select id="updinq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<option value="Open"'+(inq.status==='Open'?' selected':'')+'>Open</option>'
+    +'<option value="In Progress"'+(inq.status==='In Progress'?' selected':'')+'>In Progress</option>'
+    +'<option value="Converted"'+(inq.status==='Converted'?' selected':'')+'>✅ Converted (Won)</option>'
+    +'<option value="Lost"'+(inq.status==='Lost'?' selected':'')+'>❌ Lost</option>'
+    +'</select></div>'
+    +'<div class="form-group"><label>📅 Next Followup Date</label><input type="date" id="updinq-followup" value="'+(inq.followup_date||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>💬 Remark / Note</label><textarea id="updinq-remark" rows="3" placeholder="Aaj nu update, customer nu reply, next step..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea></div>'
+    +(inq.notes?'<div style="margin-top:10px;padding:10px;background:var(--bg-secondary);border-radius:8px;font-size:12px;color:var(--text-muted);" id="inq-notes-history"><b>Previous Notes:</b><br>'+escQ(inq.notes||'').replace(/\n/g,'<br>')+'</div>':'')
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-update-inquiry\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveUpdateInquiry('+id+')">✅ Save Update</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveUpdateInquiry(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  var status=document.getElementById('updinq-status')?.value||'Open';
+  var followup=document.getElementById('updinq-followup')?.value||null;
+  var remark=(document.getElementById('updinq-remark')?.value||'').trim();
+  try{
+    var existingNotes=inq?.notes||'';
+    var newNotes=existingNotes;
+    if(remark){
+      var ts=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      var entry='['+ts+'] '+remark;
+      newNotes=existingNotes?existingNotes+'\n'+entry:entry;
+    }
+    await sb('auto_inquiries','PATCH',{status:status,followup_date:followup||null,notes:newNotes||null,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    document.getElementById('modal-update-inquiry').remove();
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function saveInquiry(editId){
+  // Legacy alias — redirect to correct handler
+  if(editId)await saveEditInquiry(editId);else await saveNewInquiry();
 }
 
 async function deleteInquiry(id){
