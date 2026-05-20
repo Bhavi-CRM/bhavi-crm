@@ -2434,11 +2434,16 @@ function setupNav(){
 // MASTER DATA
 async function loadMasterData(){
   try{
-    [allBrands,allSubcats,allModels,allProblems,allEngineers]=await Promise.all([
+    var results=await Promise.all([
       sb('brands','GET',null,'?order=name'),sb('subcategories','GET',null,'?order=name'),
       sb('models','GET',null,'?order=model_no'),sb('problem_types','GET',null,'?is_active=eq.true&order=problem'),
-      sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name')
+      sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
+      sb('users','GET',null,'?select=user_id,name&order=name')
     ]);
+    [allBrands,allSubcats,allModels,allProblems,allEngineers]=results;
+    var allU=results[5]||[];
+    window._userNameMap={};
+    allU.forEach(function(u){if(u.user_id&&u.name)window._userNameMap[u.user_id]=u.name;});
   }catch(e){console.error('Master:',e);}
 }
 
@@ -8903,7 +8908,7 @@ async function viewSiteItems(siteId,siteName){
       +'<div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">'
       +'<button class="btn btn-primary btn-sm" onclick="openAddSiteItem(\''+siteId+'\',\''+escQ(siteName)+'\')">➕ Add Item</button>'
       +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="openDispatchModal(\''+siteId+'\',\''+escQ(siteName)+'\')">📤 Dispatch Material</button>'
-      +'<button class="btn btn-outline btn-sm" onclick="openQuotationPrint(window._currentSiteItems,window._currentSiteInfo,{paid:'+totalPaid+'})">📄 Quotation</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openTCSelector(window._currentSiteItems,window._currentSiteInfo,{paid:'+totalPaid+'})">📄 Quotation</button>'
       +'<button class="btn btn-success btn-sm" onclick="openPaymentModal(\''+siteId+'\',\''+escQ(siteName)+'\','+grandSell+','+totalPaid+')">💰 Add Payment</button>'
       +'<button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
       +'</div></div>';
@@ -9062,7 +9067,7 @@ async function viewSiteVisits(siteId,siteName){
         ddHtml+='</div>';
       }
       var matItemsForDC=matItems.length?matItems.map(function(m){return{item_name:m.item_name,qty:m.qty,unit:'pcs',note:''};}):(v.material_delivered?[{item_name:v.material_delivered,qty:1,unit:'',note:''}]:[]);
-      var loggedBy=v.created_by_name||v.created_by||'';
+      var loggedBy=v.created_by_name||(v.created_by&&window._userNameMap&&window._userNameMap[v.created_by])||v.created_by||'';
       return '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:10px;border-left:3px solid #7c3aed;">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
         +'<div>'
@@ -9436,7 +9441,7 @@ function downloadVisitExcel(){
   var data=visits.map(function(v){return{
     'Site':v.site_name,'Client':v.client_name,
     'Visit Date':fmtDate(v.visit_date),'Time':v.visit_time||'',
-    'Logged By':v.created_by_name||v.created_by||'',
+    'Logged By':v.created_by_name||(v.created_by&&window._userNameMap&&window._userNameMap[v.created_by])||v.created_by||'',
     'Kaam Karyu':v.work_done||'','Material Delivered':v.material_delivered||''
   };});
   var ws=XLSX.utils.json_to_sheet(data);
@@ -9841,6 +9846,12 @@ function printQuotationDoc(){
           </tr></tfoot>
         </table>
         <div style="background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px;margin-bottom:14px;" id="quot-payment-summary"></div>
+        <div id="quot-tc-section" style="margin-bottom:14px;display:none;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Terms and Conditions:-</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;" id="quot-tc-table">
+            <tbody id="quot-tc-body"></tbody>
+          </table>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
           <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Customer Signature<br><br><br></div>
           <div style="border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:12px;color:#64748b;">Authorised Signatory<br><br><br></div>
@@ -9848,6 +9859,49 @@ function printQuotationDoc(){
       </div>
     </div>
   </div>
+
+<!-- T&C SELECTOR MODAL -->
+<div class="modal-overlay hidden" id="modal-tc-selector" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:680px;">
+    <div class="modal-header">
+      <h2>📋 Terms &amp; Conditions</h2>
+      <button class="close-btn" onclick="document.getElementById('modal-tc-selector').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:2px solid #e5e7eb;">
+        <button id="tc-tab-select" onclick="switchTCTab('select')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:#eff6ff;color:#1a56db;border:none;cursor:pointer;border-bottom:2px solid #1a56db;">✅ Select T&amp;C</button>
+        <button id="tc-tab-lists" onclick="switchTCTab('lists')" style="flex:1;padding:10px;font-size:13px;font-weight:600;background:#f9fafb;color:#6b7280;border:none;cursor:pointer;">💾 Saved Lists</button>
+      </div>
+      <!-- Select Tab -->
+      <div id="tc-panel-select" style="padding:14px;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">Check the terms you want to include. Add custom ones at the bottom.</div>
+        <div id="tc-checklist" style="max-height:340px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px;"></div>
+        <!-- Add custom -->
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <input type="text" id="tc-custom-input" placeholder="Type a custom T&C item and press Add..." style="flex:1;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
+          <button class="btn btn-outline btn-sm" onclick="addCustomTC()">+ Add</button>
+        </div>
+        <!-- Save as list -->
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 12px;">
+          <span style="font-size:12px;color:#713f12;font-weight:600;">💾 Save selection as a list:</span>
+          <input type="text" id="tc-list-name-input" placeholder="List name (e.g. CCTV Standard)" style="flex:1;border:1px solid #fde047;border-radius:6px;padding:6px 10px;font-size:12px;outline:none;background:#fffbeb;">
+          <button class="btn btn-sm" style="background:#ca8a04;color:#fff;" onclick="saveTCList()">Save</button>
+        </div>
+      </div>
+      <!-- Saved Lists Tab -->
+      <div id="tc-panel-lists" style="display:none;padding:14px;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">Load a saved list to quickly select those T&C items.</div>
+        <div id="tc-saved-lists-body"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-tc-selector').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-primary" onclick="applyTCAndOpenQuotation()">📄 Generate Quotation →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 async function deleteSiteItem(itemId,itemName,siteId,siteName){
   if(!confirm('Remove "'+itemName+'" from this site?\n\nThis action cannot be undone.'))return;
@@ -10188,7 +10242,176 @@ function openSiteDCPrint(siteId,siteName,items,deliveryDetails){
   dcEl.classList.remove('hidden');
   setTimeout(function(){initDCSigCanvas('dc-sig-customer');initDCSigCanvas('dc-sig-manager');},100);
 }
-function openQuotationPrint(items,siteInfo,payInfo){
+// ── TERMS & CONDITIONS ──
+var _DEFAULT_TC=[
+  'All above prices are supply only Ex-Ahmedabad. Prices are subject to exchange rate fluctuations.',
+  'Warranty: The products offered carry warranty for a period of one year against all manufacturing defects as per our standard warranty clause.',
+  'Payment: 100% with firm purchase order for ex-stock items. Otherwise 50% advance with order and balance 50% against proforma before despatch of material.',
+  'Regulated and Stabilized Power should be available at the site and it is preferred to have a separate stabilized power for the above systems. All Electrical, Carpentry, Civil work will not be in our scope. You should provide required electrical powerpoints or cables at site/locations.',
+  'Delivery Period: Ex-Stock and if not please consider delivery within 4 to 5 weeks from the date of order.',
+  'Validity: 15 days from today.',
+  'Installation charges are not included unless specifically mentioned in the quotation.',
+  'Any additional cabling, conduit, or civil work required at site will be charged separately.',
+  'This quotation is for the mentioned scope of work only. Any change in scope will require a revised quotation.',
+  'All equipment remains the property of Bhavi Electronics & Automation until full payment is received.',
+  'Technical support and AMC (Annual Maintenance Contract) available on request at additional cost.',
+  'Remote configuration and commissioning charges will be billed separately if site visit is not feasible.',
+];
+
+window._tcItems=null; // will be initialized on first open
+window._tcQuotationArgs=null;
+
+function getTCItems(){
+  if(!window._tcItems){
+    var saved=localStorage.getItem('bhavi_tc_items');
+    window._tcItems=saved?JSON.parse(saved):_DEFAULT_TC.map(function(t){return{text:t,isDefault:true};});
+  }
+  return window._tcItems;
+}
+
+function saveTCItemsToStorage(){
+  localStorage.setItem('bhavi_tc_items',JSON.stringify(window._tcItems));
+}
+
+function openTCSelector(items,siteInfo,payInfo){
+  window._tcQuotationArgs={items:items,siteInfo:siteInfo,payInfo:payInfo};
+  var tcItems=getTCItems();
+  var checklist=document.getElementById('tc-checklist');
+  checklist.innerHTML=tcItems.map(function(tc,i){
+    return '<label style="display:flex;align-items:flex-start;gap:8px;padding:7px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:12px;line-height:1.5;">'
+      +'<input type="checkbox" checked data-tc-idx="'+i+'" style="margin-top:2px;flex-shrink:0;">'
+      +'<span>'+tc.text+'</span>'
+      +(tc.isDefault?'':'<button onclick="removeCustomTC('+i+')" style="margin-left:auto;flex-shrink:0;background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;" title="Remove">✕</button>')
+    +'</label>';
+  }).join('');
+  document.getElementById('tc-custom-input').value='';
+  document.getElementById('tc-list-name-input').value='';
+  switchTCTab('select');
+  document.getElementById('modal-tc-selector').classList.remove('hidden');
+}
+
+function switchTCTab(tab){
+  document.getElementById('tc-panel-select').style.display=tab==='select'?'':'none';
+  document.getElementById('tc-panel-lists').style.display=tab==='lists'?'':'none';
+  document.getElementById('tc-tab-select').style.background=tab==='select'?'#eff6ff':'#f9fafb';
+  document.getElementById('tc-tab-select').style.color=tab==='select'?'#1a56db':'#6b7280';
+  document.getElementById('tc-tab-select').style.borderBottom=tab==='select'?'2px solid #1a56db':'2px solid transparent';
+  document.getElementById('tc-tab-lists').style.background=tab==='lists'?'#eff6ff':'#f9fafb';
+  document.getElementById('tc-tab-lists').style.color=tab==='lists'?'#1a56db':'#6b7280';
+  document.getElementById('tc-tab-lists').style.borderBottom=tab==='lists'?'2px solid #1a56db':'2px solid transparent';
+  if(tab==='lists')renderTCSavedLists();
+}
+
+function addCustomTC(){
+  var val=document.getElementById('tc-custom-input').value.trim();
+  if(!val)return;
+  var tcItems=getTCItems();
+  tcItems.push({text:val,isDefault:false});
+  saveTCItemsToStorage();
+  openTCSelector(window._tcQuotationArgs.items,window._tcQuotationArgs.siteInfo,window._tcQuotationArgs.payInfo);
+  document.getElementById('tc-custom-input').value='';
+}
+
+function removeCustomTC(idx){
+  var tcItems=getTCItems();
+  if(tcItems[idx]&&!tcItems[idx].isDefault){
+    tcItems.splice(idx,1);
+    saveTCItemsToStorage();
+    openTCSelector(window._tcQuotationArgs.items,window._tcQuotationArgs.siteInfo,window._tcQuotationArgs.payInfo);
+  }
+}
+
+function saveTCList(){
+  var name=document.getElementById('tc-list-name-input').value.trim();
+  if(!name){alert('Please enter a name for this list.');return;}
+  var selected=getSelectedTCTexts();
+  if(!selected.length){alert('Please select at least one T&C item.');return;}
+  var lists=JSON.parse(localStorage.getItem('bhavi_tc_lists')||'[]');
+  var existing=lists.findIndex(function(l){return l.name===name;});
+  if(existing>=0){if(!confirm('A list named "'+name+'" already exists. Replace it?'))return;lists.splice(existing,1);}
+  lists.push({name:name,items:selected,savedAt:new Date().toLocaleDateString('en-IN')});
+  localStorage.setItem('bhavi_tc_lists',JSON.stringify(lists));
+  alert('✅ T&C list "'+name+'" saved successfully!');
+}
+
+function renderTCSavedLists(){
+  var lists=JSON.parse(localStorage.getItem('bhavi_tc_lists')||'[]');
+  var el=document.getElementById('tc-saved-lists-body');
+  if(!lists.length){el.innerHTML='<div style="text-align:center;color:#9ca3af;padding:20px;font-size:13px;">No saved lists yet.<br>Create one from the "Select T&C" tab.</div>';return;}
+  el.innerHTML=lists.map(function(l,i){
+    return '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+      +'<div><b style="font-size:13px;">'+l.name+'</b> <span style="font-size:11px;color:#9ca3af;">— Saved '+l.savedAt+' | '+l.items.length+' items</span></div>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<button class="btn btn-primary btn-sm" onclick="loadTCList('+i+')">Load</button>'
+      +'<button class="btn btn-outline btn-sm" style="color:#ef4444;" onclick="deleteTCList('+i+')">Delete</button>'
+      +'</div></div>'
+      +'<div style="font-size:11px;color:#6b7280;">'+l.items.slice(0,2).map(function(t){return '• '+t.slice(0,70)+(t.length>70?'…':'');}).join('<br>')+(l.items.length>2?'<br>… and '+(l.items.length-2)+' more':'')+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function loadTCList(listIdx){
+  var lists=JSON.parse(localStorage.getItem('bhavi_tc_lists')||'[]');
+  var list=lists[listIdx];
+  if(!list)return;
+  var tcItems=getTCItems();
+  // Uncheck all first, then check matching ones
+  switchTCTab('select');
+  setTimeout(function(){
+    var checkboxes=document.querySelectorAll('#tc-checklist input[type=checkbox]');
+    checkboxes.forEach(function(cb){cb.checked=false;});
+    list.items.forEach(function(itemText){
+      checkboxes.forEach(function(cb){
+        var label=cb.closest('label');
+        var span=label&&label.querySelector('span');
+        if(span&&span.textContent.trim()===itemText)cb.checked=true;
+      });
+    });
+    // Add any list items not already in the master list
+    list.items.forEach(function(itemText){
+      var found=tcItems.find(function(t){return t.text===itemText;});
+      if(!found){tcItems.push({text:itemText,isDefault:false});saveTCItemsToStorage();}
+    });
+    openTCSelector(window._tcQuotationArgs.items,window._tcQuotationArgs.siteInfo,window._tcQuotationArgs.payInfo);
+    // Re-apply selections after re-render
+    setTimeout(function(){
+      var cbs=document.querySelectorAll('#tc-checklist input[type=checkbox]');
+      cbs.forEach(function(cb){
+        var span=cb.closest('label')&&cb.closest('label').querySelector('span');
+        if(span)cb.checked=list.items.indexOf(span.textContent.trim())>=0;
+      });
+    },50);
+  },50);
+}
+
+function deleteTCList(listIdx){
+  if(!confirm('Delete this saved list?'))return;
+  var lists=JSON.parse(localStorage.getItem('bhavi_tc_lists')||'[]');
+  lists.splice(listIdx,1);
+  localStorage.setItem('bhavi_tc_lists',JSON.stringify(lists));
+  renderTCSavedLists();
+}
+
+function getSelectedTCTexts(){
+  var selected=[];
+  document.querySelectorAll('#tc-checklist input[type=checkbox]').forEach(function(cb){
+    if(cb.checked){
+      var span=cb.closest('label')&&cb.closest('label').querySelector('span');
+      if(span)selected.push(span.textContent.trim());
+    }
+  });
+  return selected;
+}
+
+function applyTCAndOpenQuotation(){
+  var selected=getSelectedTCTexts();
+  var args=window._tcQuotationArgs||{};
+  document.getElementById('modal-tc-selector').classList.add('hidden');
+  openQuotationPrint(args.items,args.siteInfo,args.payInfo,selected);
+}
+
+function openQuotationPrint(items,siteInfo,payInfo,tcLines){
   items=items||window._currentSiteItems||[];
   siteInfo=siteInfo||window._currentSiteInfo||{};
   payInfo=payInfo||{};
@@ -10235,6 +10458,20 @@ function openQuotationPrint(items,siteInfo,payInfo){
     var paid=payInfo.paid||0;
     if(paid){payEl.innerHTML='<b>Paid:</b> ₹'+Number(paid).toLocaleString('en-IN')+'&nbsp;&nbsp;<b style="color:#d97706;">Pending: ₹'+Number(grand-paid).toLocaleString('en-IN')+'</b>';}
     else{payEl.innerHTML='';}
+  }
+  // Render T&C section
+  var tcSection=document.getElementById('quot-tc-section');
+  var tcBody=document.getElementById('quot-tc-body');
+  if(tcLines&&tcLines.length&&tcSection&&tcBody){
+    tcBody.innerHTML=tcLines.map(function(t,i){
+      return '<tr>'
+        +'<td style="padding:4px 8px;vertical-align:top;font-weight:700;font-size:12px;width:28px;">'+(i+1)+'</td>'
+        +'<td style="padding:4px 8px;font-size:12px;line-height:1.5;border:1px solid #e5e7eb;">'+t+'</td>'
+      +'</tr>';
+    }).join('');
+    tcSection.style.display='';
+  }else if(tcSection){
+    tcSection.style.display='none';
   }
   var qtEl=document.getElementById('modal-quotation-print');
   document.body.appendChild(qtEl);
