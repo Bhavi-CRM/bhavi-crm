@@ -8848,7 +8848,10 @@ async function viewSiteItems(siteId,siteName){
     window._currentSiteItems=items;window._currentSitePayments=payments;
     var siteObj=(window._allSites||[]).find(function(s){return s.id==siteId;})||{};
     window._currentSiteInfo={name:siteName,address:siteObj.address||'',mobile:siteObj.mobile||''};
-    var modal=document.createElement('div');modal.className='modal-overlay';
+    // Remove any existing site-items modal to prevent stacking
+    var _existingSI=document.getElementById('modal-site-items');
+    if(_existingSI)_existingSI.remove();
+    var modal=document.createElement('div');modal.id='modal-site-items';modal.className='modal-overlay';
     var grandSell=items.reduce(function(a,i){return a+(i.total_price||(i.unit_price||0)*(i.qty||0));},0);
     var grandPurch=items.reduce(function(a,i){return a+(i.purchase_price||0)*(i.qty||0);},0);
     var totalPaid=payments.reduce(function(a,p){return a+parseFloat(p.amount||0);},0);
@@ -9637,7 +9640,7 @@ function printDC(){
     +(deliveryMode?'<div><b>Delivery:</b> '+deliveryMode+(courierDetail?' — '+courierDetail:'')+'</div>':'')
     +(receiver?'<div><b>Receiver:</b> '+receiver+(receiverMob?' | '+receiverMob:'')+'</div>':'')
     +'</div>'
-    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item</th><th>Qty</th><th style="text-align:left;">Note</th></tr></thead>'
+    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item / Description</th><th style="text-align:left;">Model No</th><th style="text-align:left;">Brand / Made In</th><th style="text-align:left;">Category</th><th>Unit</th><th>Qty</th><th style="text-align:left;">Note</th></tr></thead>'
     +'<tbody>'+itemsHtml+'</tbody></table>'
     +sigBlock
     +'<div style="border-top:2px solid #cc0000;margin-top:16px;padding-top:8px;text-align:center;font-size:10px;color:#555;">Bhavi Electronics &amp; Automation | Delivery Challan</div>'
@@ -9676,9 +9679,9 @@ function printQuotationDoc(){
     +(address&&address!=='—'?'<div><b>Address:</b> '+address+'</div>':'')
     +(mobile&&mobile!=='—'?'<div><b>Mobile:</b> '+mobile+'</div>':'')
     +'</div>'
-    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item</th><th>Qty</th><th style="text-align:right;">Basic Rate ₹</th><th style="text-align:center;">GST%</th><th style="text-align:right;">Total ₹ (incl. GST)</th></tr></thead>'
+    +'<table><thead><tr><th>#</th><th style="text-align:left;">Item / Description</th><th style="text-align:left;">Model No</th><th style="text-align:left;">Brand / Made In</th><th style="text-align:left;">Category</th><th>Unit</th><th>Qty</th><th style="text-align:right;">Sell Rate ₹</th><th style="text-align:center;">GST%</th><th style="text-align:right;">Total ₹ (incl. GST)</th></tr></thead>'
     +'<tbody>'+itemsHtml+'</tbody></table>'
-    +'<div style="text-align:right;font-size:14px;font-weight:800;border-top:2px solid #1a56db;padding-top:8px;margin-bottom:8px;">Grand Total: '+grandTotal+'</div>'
+    +'<div style="text-align:right;font-size:14px;font-weight:800;border-top:2px solid #1a56db;padding-top:8px;margin-bottom:8px;">Grand Total (incl. GST): '+grandTotal+'</div>'
     +(paySum?'<div style="background:#fff7ed;border-radius:6px;padding:8px;margin-bottom:12px;font-size:12px;">'+paySum+'</div>':'')
     +'<div style="border-top:2px solid #cc0000;margin-top:16px;padding-top:8px;text-align:center;font-size:10px;color:#555;">Bhavi Electronics &amp; Automation | Quotation</div>'
     +'<script>window.onload=function(){window.print();};<\/script>'
@@ -9742,7 +9745,11 @@ function printQuotationDoc(){
         <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
           <thead><tr style="background:#1a56db;color:#fff;">
             <th style="padding:8px;">#</th>
-            <th style="padding:8px;text-align:left;">Item</th>
+            <th style="padding:8px;text-align:left;">Item / Description</th>
+            <th style="padding:8px;text-align:left;">Model No</th>
+            <th style="padding:8px;text-align:left;">Brand / Made In</th>
+            <th style="padding:8px;text-align:left;">Category</th>
+            <th style="padding:8px;">Unit</th>
             <th style="padding:8px;">Qty</th>
             <th style="padding:8px;text-align:left;">Note</th>
           </tr></thead>
@@ -9808,15 +9815,19 @@ function printQuotationDoc(){
         <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
           <thead><tr style="background:#1a56db;color:#fff;">
             <th style="padding:8px;">#</th>
-            <th style="padding:8px;text-align:left;">Item</th>
-            <th style="padding:8px;">Qty</th>
-            <th style="padding:8px;text-align:right;">Basic Rate ₹</th>
+            <th style="padding:8px;text-align:left;">Item / Description</th>
+            <th style="padding:8px;text-align:left;">Model No</th>
+            <th style="padding:8px;text-align:left;">Brand / Made In</th>
+            <th style="padding:8px;text-align:left;">Category</th>
+            <th style="padding:8px;text-align:center;">Unit</th>
+            <th style="padding:8px;text-align:center;">Qty</th>
+            <th style="padding:8px;text-align:right;">Sell Rate ₹</th>
             <th style="padding:8px;text-align:center;">GST%</th>
             <th style="padding:8px;text-align:right;">Total ₹ (incl. GST)</th>
           </tr></thead>
           <tbody id="quot-items-body"></tbody>
           <tfoot><tr>
-            <td colspan="4" style="padding:8px;text-align:right;font-weight:700;">Grand Total:</td>
+            <td colspan="8" style="padding:8px;text-align:right;font-weight:700;">Grand Total:</td>
             <td style="padding:8px;text-align:right;font-weight:700;color:#1a56db;" id="quot-grand-total">₹0</td>
           </tr></tfoot>
         </table>
@@ -10060,10 +10071,22 @@ function openSiteDCPrint(siteId,siteName,items,deliveryDetails){
   var body=document.getElementById('dc-items-body');
   if(body){
     body.innerHTML=items.map(function(it,i){
-      return'<tr><td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(i+1)+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+it.item_name+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+it.qty+' '+(it.unit||'pcs')+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+(it.note||'—')+'</td>'
+      var inv=(window._autoInvItems||[]).find(function(iv){return iv.item_name===it.item_name;})||{};
+      var modelNo=it.model_no||inv.model_no||'—';
+      var desc=it.description||inv.description||'';
+      var brand=it.brand||inv.brand||'—';
+      var madeIn=it.made_in||inv.made_in||'';
+      var cat=it.category||inv.category||'—';
+      var unit=it.unit||inv.unit||'pcs';
+      return'<tr>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(i+1)+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;"><b>'+it.item_name+'</b>'+(desc?'<br><span style="font-size:11px;color:#6b7280;">'+desc+'</span>':'')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+modelNo+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+brand+(madeIn?'<br><span style="font-size:10px;color:#6b7280;">🌐 '+madeIn+'</span>':'')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+cat+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;font-size:12px;">'+unit+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;font-weight:600;">'+it.qty+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;color:#6b7280;">'+(it.note||'—')+'</td>'
         +'</tr>';
     }).join('');
   }
@@ -10088,18 +10111,29 @@ function openQuotationPrint(items,siteInfo,payInfo){
   if(body){
     body.innerHTML=items.map(function(it,i){
       var gst=it.gst_percent||0;
-      var basicTotal=(it.unit_price||0)*(it.qty||0);
-      var total=Math.round(basicTotal*(1+gst/100));
+      var sellRate=it.unit_price||0;
+      var total=Math.round(sellRate*(it.qty||0)*(1+gst/100));
       grand+=total;
+      var inv=(window._autoInvItems||[]).find(function(iv){return iv.item_name===it.item_name;})||{};
+      var modelNo=it.model_no||inv.model_no||'—';
+      var desc=it.description||inv.description||'';
+      var brand=it.brand||inv.brand||'—';
+      var madeIn=it.made_in||inv.made_in||'';
+      var cat=it.category||inv.category||'—';
+      var unit=it.unit||inv.unit||'pcs';
       return'<tr>'
         +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(i+1)+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;">'+it.item_name+(it.unit?' ('+it.unit+')':'')+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+it.qty+'</td>'
-        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">₹'+(it.unit_price||0).toLocaleString('en-IN')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;"><b>'+it.item_name+'</b>'+(desc?'<br><span style="font-size:11px;color:#6b7280;">'+desc+'</span>':'')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+modelNo+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+brand+(madeIn?'<br><span style="font-size:10px;color:#6b7280;">🌐 '+madeIn+'</span>':'')+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;font-size:12px;">'+cat+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;font-size:12px;">'+unit+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;font-weight:600;">'+it.qty+'</td>'
+        +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">₹'+Number(sellRate).toLocaleString('en-IN')+'</td>'
         +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(gst?gst+'%':'—')+'</td>'
         +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;font-weight:700;">₹'+Number(total).toLocaleString('en-IN')+'</td>'
         +'</tr>';
-    }).join('')||'<tr><td colspan="6" style="padding:12px;text-align:center;color:#6b7280;">Koi items nathi</td></tr>';
+    }).join('')||'<tr><td colspan="10" style="padding:12px;text-align:center;color:#6b7280;">Koi items nathi</td></tr>';
   }
   var grandEl=document.getElementById('quot-grand-total');
   if(grandEl)grandEl.textContent='₹'+Number(grand).toLocaleString('en-IN');
