@@ -2262,6 +2262,7 @@ async function doLogin(){
     await loadLogoFromDB();
     setupNav();
     await navigate('dashboard');
+    setTimeout(setupNav, 100);
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
@@ -2298,8 +2299,13 @@ async function tryAutoLogin(){
       loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
     }
     const session=JSON.parse(saved);
-    // Session valid for 30 days
-    if(Date.now()-session.savedAt > 30*24*60*60*1000){localStorage.removeItem('bhavi_session');return;}
+    if(Date.now()-session.savedAt > 30*24*60*60*1000){
+      localStorage.removeItem('bhavi_session');
+      // Restore login form (it was replaced with spinner above)
+      if(loginScreen){loginScreen.style.display='flex';loginScreen.innerHTML=document.getElementById('login-screen')?loginScreen.innerHTML:'';}
+      location.reload();
+      return;
+    }
     const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
     if(!res.ok){localStorage.removeItem('bhavi_session');throw new Error('Session fetch failed');}
     const users=await res.json();
@@ -2323,8 +2329,8 @@ async function tryAutoLogin(){
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
-    setupNav();
     await navigate('dashboard');
+    setTimeout(setupNav,100);
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
@@ -2438,9 +2444,14 @@ async function loadMasterData(){
 
 // NAVIGATE
 async function navigate(page){
+  if(!currentUser){
+    // Not logged in — show login screen, do not render any page
+    var ls=document.getElementById('login-screen');
+    if(ls)ls.style.display='flex';
+    return;
+  }
   currentPage=page;
-  // Ensure nav is setup
-  if(currentUser)setupNav();
+  setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
   const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent'};
@@ -2544,13 +2555,15 @@ async function validateStatusChange(ticketId, fromStatus, toStatus, role){
 async function renderDashboard(){
   const pc=document.getElementById('page-content');
   if(!pc)return;
+  if(!currentUser){
+    pc.innerHTML='<div class="alert alert-warning" style="margin:30px auto;max-width:400px;text-align:center;">Session expired. Please <a href="#" onclick="document.getElementById(\'login-screen\').style.display=\'flex\'">login again</a>.<br><button class="btn btn-primary btn-sm" onclick="document.getElementById(\'login-screen\').style.display=\'flex\'" style="margin-top:10px;">Sign In</button></div>';
+    return;
+  }
   pc.innerHTML='<div class="loading">Loading...</div>';
-  if(!currentUser){pc.innerHTML='<div class="alert alert-warning" style="margin:20px;">Session not ready. <button class="btn btn-primary btn-sm" onclick="location.reload()">🔄 Reload</button></div>';return;}
   try{
-    const _engId=currentUser.eng_id||currentUser.user_id;
-    let q=currentUser.role==='engineer'?`?assigned_to=eq.${_engId}&order=created_at.desc`:'?order=created_at.desc&limit=300';
-    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}
-    allTickets=await sb('tickets','GET',null,q);
+    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
+    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc&limit=300';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}}
+    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=300');}
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
     const closed=allTickets.filter(t=>t.status==='Closed').length;
@@ -2775,7 +2788,8 @@ async function renderDashboard(){
     }catch(ex){}
   }catch(e){
     console.error('Dashboard error:',e);
-    document.getElementById('page-content').innerHTML='<div class="alert alert-warning">Error loading dashboard: '+e.message+'<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:8px;">🔄 Retry</button></div>';
+    var pce=document.getElementById('page-content');
+    if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Dashboard load karvama error aavyo:<br><b>'+e.message+'</b><br><br>Supabase connection thapu joie. Internet check karo.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
   }
 }
 
@@ -3066,9 +3080,9 @@ async function renderTickets(){
       let wcType='ICP';
       if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
       else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
-      q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';
+      if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
     }
-    allTickets=await sb('tickets','GET',null,q);
+    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc');}
     renderTicketTable();
   }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
@@ -7912,19 +7926,23 @@ async function renderAutoInventory(){
       +'</div>'
       +'<div class="card">'
       +'<div class="table-wrap"><table id="ainv-table">'
-      +'<thead><tr><th>Brand</th><th>Item Name</th><th>Category</th><th>Unit</th><th style="text-align:right;">Purchase Price</th><th style="text-align:center;">Stock</th><th style="text-align:right;">Stock Value</th><th>Action</th></tr></thead>'
+      +'<thead><tr><th>Brand / Made In</th><th>Model No</th><th>Item Name</th><th>Category</th><th>Unit</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Sell ₹</th><th style="text-align:center;">GST</th><th style="text-align:center;">Stock</th><th style="text-align:right;">Stock Value</th><th>Action</th></tr></thead>'
       +'<tbody>';
     if(!items.length){
-      html+='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">Koi item nathi. "Add Item" thi sharu karo!</td></tr>';
+      html+='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">Koi item nathi. "Add Item" thi sharu karo!</td></tr>';
     }else{
       items.forEach(function(it){
         var sv2=(it.purchase_price||0)*(it.stock_qty||0);
-        html+='<tr data-brand="'+(it.brand||'').toLowerCase()+'" data-name="'+(it.item_name||'').toLowerCase()+'">'
-          +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+(it.brand||'—')+'</span></td>'
-          +'<td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="History dekho">'+it.item_name+'</span></td>'
+        var sellFinal=it.selling_price?Math.round(it.selling_price*(1+(it.gst_percent||0)/100)):0;
+        html+='<tr data-brand="'+(it.brand||'').toLowerCase()+'" data-name="'+(it.item_name||'').toLowerCase()+'" data-model="'+(it.model_no||'').toLowerCase()+'">'
+          +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+(it.brand||'—')+'</span>'+(it.made_in?'<br><span style="font-size:10px;color:#6b7280;">🌐 '+it.made_in+'</span>':'')+'</td>'
+          +'<td style="font-size:12px;color:#374151;font-weight:600;">'+(it.model_no||'—')+'</td>'
+          +'<td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openAutoInvHistory('+it.id+',\''+escQ(it.item_name)+'\')" title="History dekho">'+it.item_name+'</span>'+(it.description?'<br><span style="font-size:11px;color:#6b7280;">'+it.description+'</span>':'')+'</td>'
           +'<td>'+(it.category||'—')+'</td>'
-          +'<td>'+(it.unit||'pcs')+'</td>'
+          +'<td style="font-size:12px;">'+(it.unit||'pcs')+'</td>'
           +'<td style="text-align:right;font-weight:600;">₹'+Number(it.purchase_price||0).toLocaleString('en-IN')+'</td>'
+          +'<td style="text-align:right;font-weight:600;color:#065f46;">'+(it.selling_price?'₹'+Number(it.selling_price||0).toLocaleString('en-IN'):'—')+'</td>'
+          +'<td style="text-align:center;font-size:12px;color:#6b7280;">'+(it.gst_percent?it.gst_percent+'%':'—')+'</td>'
           +'<td style="text-align:center;"><span style="font-weight:700;color:'+(it.stock_qty>0?'#065f46':'#dc2626')+';">'+it.stock_qty+'</span></td>'
           +'<td style="text-align:right;color:#065f46;font-weight:600;">₹'+Number(sv2).toLocaleString('en-IN')+'</td>'
           +'<td style="white-space:nowrap;">'
@@ -7946,7 +7964,7 @@ function filterAutoInv(){
   var q=(document.getElementById('ainv-search')?.value||'').toLowerCase();
   var brand=(document.getElementById('ainv-brand-filter')?.value||'').toLowerCase();
   document.querySelectorAll('#ainv-table tbody tr').forEach(function(r){
-    var nameMatch=!q||(r.dataset.name||'').includes(q)||(r.dataset.brand||'').includes(q);
+    var nameMatch=!q||(r.dataset.name||'').includes(q)||(r.dataset.brand||'').includes(q)||(r.dataset.model||'').includes(q);
     var brandMatch=!brand||(r.dataset.brand||'')===(brand);
     r.style.display=(nameMatch&&brandMatch)?'':'none';
   });
@@ -7955,39 +7973,84 @@ function filterAutoInv(){
 function openAddInventoryModal(editData){
   var existing=document.getElementById('modal-ainv');if(existing)existing.remove();
   var isEdit=!!editData;
-  var brands=[...new Set((window._autoInvItems||[]).map(function(i){return i.brand||'';}).filter(Boolean))];
+  var items=window._autoInvItems||[];
+  var brands=[...new Set(items.map(function(i){return i.brand||'';}).filter(Boolean))];
+  var madeIns=[...new Set(items.map(function(i){return i.made_in||'';}).filter(Boolean))];
+  var units=['pcs','Each','Pair','Mtr','Rft','Roll','Set','Box','Bag','Kg','Ltr','Nos','Job','Yr'];
+  var selUnit=editData?.unit||'pcs';
+  var unitOpts=units.map(function(u){return'<option value="'+u+'"'+(selUnit===u?' selected':'')+'>'+u+'</option>';}).join('');
   var modal=document.createElement('div');
   modal.id='modal-ainv';modal.className='modal-overlay';
-  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+  modal.innerHTML='<div class="modal" style="max-width:560px;" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Item':'➕ Add Inventory Item')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-ainv\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Brand</label>'
-    +'<input type="text" id="ainv-brand" list="ainv-brand-list" value="'+(editData?.brand||'')+'" placeholder="e.g. Hikvision, CP Plus, Dahua">'
-    +'<datalist id="ainv-brand-list">'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</datalist></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Item Name <span class="req">*</span></label><input type="text" id="ainv-name" value="'+(editData?.item_name||'')+'" placeholder="e.g. 2MP Dome Camera, CAT6 Cable"></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Category</label><input type="text" id="ainv-cat" value="'+(editData?.category||'')+'" placeholder="e.g. Camera, Cable, Switch"></div>'
+    // Row 1: Brand + Made In
     +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>Purchase Price ₹ (Basic)</label><input type="number" id="ainv-price" value="'+(editData?.purchase_price||0)+'" min="0" oninput="calcAInvFinal()"></div>'
-    +'<div class="form-group"><label>Unit</label><select id="ainv-unit" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="pcs"'+(editData?.unit==='pcs'?' selected':'')+'>pcs</option><option value="Pair"'+(editData?.unit==='Pair'?' selected':'')+'>Pair</option><option value="mtr"'+(editData?.unit==='mtr'?' selected':'')+'>mtr</option><option value="roll"'+(editData?.unit==='roll'?' selected':'')+'>roll</option><option value="set"'+(editData?.unit==='set'?' selected':'')+'>set</option><option value="box"'+(editData?.unit==='box'?' selected':'')+'>box</option></select></div>'
+    +'<div class="form-group"><label>Brand</label>'
+    +'<input type="text" id="ainv-brand" list="ainv-brand-list" value="'+(editData?.brand||'')+'" placeholder="e.g. Hikvision, CP Plus" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<datalist id="ainv-brand-list">'+brands.map(function(b){return'<option>'+b+'</option>';}).join('')+'</datalist></div>'
+    +'<div class="form-group"><label>Made In (Country)</label>'
+    +'<input type="text" id="ainv-made-in" list="ainv-madein-list" value="'+(editData?.made_in||'')+'" placeholder="e.g. China, India, Taiwan" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<datalist id="ainv-madein-list"><option>China</option><option>India</option><option>Taiwan</option><option>Japan</option><option>South Korea</option><option>USA</option>'+madeIns.map(function(m){return'<option>'+m+'</option>';}).join('')+'</datalist></div>'
     +'</div>'
-    +'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="'+(editData?.stock_qty||0)+'" min="0"></div>'
+    // Row 2: Model No (with auto-fill)
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Model No <small style="color:#6b7280;">(same model no thi auto-fill)</small></label>'
+    +'<input type="text" id="ainv-model" list="ainv-model-list" value="'+(editData?.model_no||'')+'" placeholder="e.g. DS-2CD2143G2-I, CP-UNR-4K" oninput="onInvModelNoChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<datalist id="ainv-model-list">'+[...new Set(items.map(function(i){return i.model_no||'';}).filter(Boolean))].map(function(m){return'<option>'+m+'</option>';}).join('')+'</datalist></div>'
+    // Row 3: Item Name + Category
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Item Name <span class="req">*</span></label><input type="text" id="ainv-name" value="'+(editData?.item_name||'')+'" placeholder="e.g. 2MP Dome Camera, CAT6 Cable" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Category</label><input type="text" id="ainv-cat" value="'+(editData?.category||'')+'" placeholder="e.g. Camera, Cable, Switch" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    // Row 4: Description
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Description</label>'
+    +'<input type="text" id="ainv-desc" value="'+(editData?.description||'')+'" placeholder="Product detail, specification..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    // Row 5: Unit + Opening Stock
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Unit</label><select id="ainv-unit" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+unitOpts+'</select></div>'
+    +(isEdit?'':'<div class="form-group"><label>Opening Stock</label><input type="number" id="ainv-stock" value="0" min="0" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>')
     +'</div>'
     +(isEdit?'':'<div class="form-grid" style="margin-bottom:10px;">'
     +'<div class="form-group"><label>Dealer / Supplier</label><input type="text" id="ainv-dealer" placeholder="e.g. Rashmi Traders" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'<div class="form-group"><label>Purchase Date</label><input type="date" id="ainv-pdate" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'</div>')
     +'<hr class="divider" style="margin:10px 0;">'
+    +'<p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">💰 Pricing</p>'
+    // Row 6: Purchase + GST + Final Purchase
     +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>GST %</label><select id="ainv-gst" onchange="calcAInvFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="0"'+(!(editData?.gst_percent)?'selected':'')+'>No GST</option><option value="5"'+(editData?.gst_percent==5?' selected':'')+'>5%</option><option value="12"'+(editData?.gst_percent==12?' selected':'')+'>12%</option><option value="18"'+(editData?.gst_percent==18?' selected':'')+'>18%</option></select></div>'
-    +'<div class="form-group"><label>Final Purchase (after GST) ₹</label><input type="number" id="ainv-final-price" readonly style="background:#f0f9ff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-weight:700;outline:none;" value="'+Math.round((editData?.purchase_price||0)*(1+(editData?.gst_percent||0)/100))+'"></div>'
+    +'<div class="form-group"><label>Purchase Price ₹ (Basic, excl. GST)</label><input type="number" id="ainv-price" value="'+(editData?.purchase_price||0)+'" min="0" oninput="calcAInvFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>GST %</label><select id="ainv-gst" onchange="calcAInvFinal();calcAInvSellingFinal();" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="0"'+(!editData?.gst_percent?' selected':'')+'>No GST (0%)</option><option value="5"'+(editData?.gst_percent==5?' selected':'')+'>5%</option><option value="12"'+(editData?.gst_percent==12?' selected':'')+'>12%</option><option value="18"'+(editData?.gst_percent==18?' selected':'')+'>18%</option><option value="28"'+(editData?.gst_percent==28?' selected':'')+'>28%</option></select></div>'
+    +'<div class="form-group"><label>Final Purchase (with GST) ₹</label><input type="number" id="ainv-final-price" readonly style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-weight:700;outline:none;" value="'+Math.round((editData?.purchase_price||0)*(1+(editData?.gst_percent||0)/100))+'"></div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Selling Price ₹ (Basic, before GST)</label><input type="number" id="ainv-selling" value="'+(editData?.selling_price||0)+'" min="0" oninput="calcAInvSellingFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    // Row 7: Sell Price + Final Sell Price
+    +'<div class="form-grid" style="margin-bottom:4px;">'
+    +'<div class="form-group"><label>Sell Price ₹ (Basic, excl. GST) <small style="color:#059669;">Customer ko</small></label><input type="number" id="ainv-selling" value="'+(editData?.selling_price||0)+'" min="0" oninput="calcAInvSellingFinal()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Final Sell (with GST) ₹ <small style="color:#059669;">Auto</small></label><input type="number" id="ainv-final-sell" readonly style="background:#f0fff4;border:1px solid #059669;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-weight:700;outline:none;" value="'+Math.round((editData?.selling_price||0)*(1+(editData?.gst_percent||0)/100))+'"></div>'
+    +'</div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-ainv\').remove()">Cancel</button>'
     +'<button class="btn btn-primary" onclick="saveAutoInventoryItem('+(isEdit?editData.id:'null')+')">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(modal);
+}
+
+function onInvModelNoChange(){
+  var modelNo=(document.getElementById('ainv-model')?.value||'').trim().toLowerCase();
+  if(!modelNo)return;
+  var match=(window._autoInvItems||[]).find(function(i){return (i.model_no||'').toLowerCase()===modelNo;});
+  if(!match)return;
+  var set=function(id,val){var el=document.getElementById(id);if(el&&val!==undefined&&val!==null)el.value=val;};
+  set('ainv-brand',match.brand||'');
+  set('ainv-made-in',match.made_in||'');
+  set('ainv-name',match.item_name||'');
+  set('ainv-cat',match.category||'');
+  set('ainv-desc',match.description||'');
+  set('ainv-unit',match.unit||'pcs');
+  set('ainv-price',match.purchase_price||0);
+  set('ainv-selling',match.selling_price||0);
+  var gstEl=document.getElementById('ainv-gst');if(gstEl)gstEl.value=match.gst_percent||0;
+  calcAInvFinal();calcAInvSellingFinal();
 }
 
 async function openEditInventoryModal(id){
@@ -7997,24 +8060,26 @@ async function openEditInventoryModal(id){
 }
 
 async function saveAutoInventoryItem(editId){
-  var brand=document.getElementById('ainv-brand').value.trim();
-  var name=document.getElementById('ainv-name').value.trim();
-  var cat=document.getElementById('ainv-cat').value.trim();
-  var price=parseFloat(document.getElementById('ainv-price').value)||0;
-  var unit=document.getElementById('ainv-unit').value;
-  var stock=parseFloat(document.getElementById('ainv-stock').value)||0;
+  var brand=document.getElementById('ainv-brand')?.value.trim()||'';
+  var madeIn=document.getElementById('ainv-made-in')?.value.trim()||'';
+  var modelNo=document.getElementById('ainv-model')?.value.trim()||'';
+  var name=document.getElementById('ainv-name')?.value.trim()||'';
+  var cat=document.getElementById('ainv-cat')?.value.trim()||'';
+  var desc=document.getElementById('ainv-desc')?.value.trim()||'';
+  var price=parseFloat(document.getElementById('ainv-price')?.value)||0;
+  var unit=document.getElementById('ainv-unit')?.value||'pcs';
+  var stock=parseFloat(document.getElementById('ainv-stock')?.value)||0;
   if(!name){alert('Item name required!');return;}
   try{
     var gst=parseFloat(document.getElementById('ainv-gst')?.value)||0;
     var selling=parseFloat(document.getElementById('ainv-selling')?.value)||0;
     var data={brand:brand||null,item_name:name,category:cat||null,purchase_price:price,unit:unit,updated_at:new Date().toISOString()};
-    // Try with gst/selling columns first; fall back without if schema error
-    var dataFull=Object.assign({},data,{gst_percent:gst,selling_price:selling});
+    var dataFull=Object.assign({},data,{gst_percent:gst,selling_price:selling,made_in:madeIn||null,model_no:modelNo||null,description:desc||null});
     if(editId){
       var r=await fetch(SB_URL+'/rest/v1/auto_inventory?id=eq.'+editId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataFull)});
       if(!r.ok){
         var txt=await r.text();
-        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price')||txt.includes('made_in')||txt.includes('model_no')||txt.includes('description'))){
           var r2=await fetch(SB_URL+'/rest/v1/auto_inventory?id=eq.'+editId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(data)});
           if(!r2.ok)throw new Error(await r2.text());
         }else{throw new Error(txt);}
@@ -8024,7 +8089,7 @@ async function saveAutoInventoryItem(editId){
       var r=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataFull)});
       if(!r.ok){
         var txt=await r.text();
-        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+        if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price')||txt.includes('made_in')||txt.includes('model_no')||txt.includes('description'))){
           var dataBase=Object.assign({},data,{stock_qty:stock});
           var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dataBase)});
           if(!r2.ok)throw new Error(await r2.text());
@@ -8052,35 +8117,35 @@ function calcAInvFinal(){
   var pp=parseFloat(document.getElementById('ainv-price')?.value)||0;
   var gst=parseFloat(document.getElementById('ainv-gst')?.value)||0;
   var el=document.getElementById('ainv-final-price');
-  if(el)el.value=Math.round(pp*(1+gst/100));
+  if(el)el.value=(pp*(1+gst/100)).toFixed(2);
 }
-function calcAInvSellingFinal(){}
+function calcAInvSellingFinal(){
+  var sp=parseFloat(document.getElementById('ainv-selling')?.value)||0;
+  var gst=parseFloat(document.getElementById('ainv-gst')?.value)||0;
+  var el=document.getElementById('ainv-final-sell');
+  if(el)el.value=(sp*(1+gst/100)).toFixed(2);
+}
 
 function downloadInventoryTemplate(){
-  try{
-    if(!window.XLSX){alert('XLSX library not loaded. Page reload karo.');return;}
-    var ws=XLSX.utils.aoa_to_sheet([
-      ['Brand','Item Name','Category','Purchase Price (Basic)','GST %','Selling Price (Basic)','Unit','Opening Stock'],
-      ['DLS Speaker','Flatbox XL-BLK','Speaker',35040,18,20000,'Pair',1],
-      ['Russound','In-Ceiling IC-610','Speaker',13081,18,15000,'pcs',1]
-    ]);
-    ws['!cols']=[{wch:15},{wch:25},{wch:15},{wch:20},{wch:8},{wch:20},{wch:8},{wch:12}];
-    var wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,'Inventory',ws);
-    var wbout=XLSX.write(wb,{bookType:'xlsx',type:'binary'});
-    var buf=new ArrayBuffer(wbout.length);
-    var view=new Uint8Array(buf);
-    for(var i=0;i<wbout.length;i++)view[i]=wbout.charCodeAt(i)&0xFF;
-    var blob=new Blob([buf],{type:'application/octet-stream'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');a.href=url;a.download='auto_inventory_template.xlsx';
-    document.body.appendChild(a);a.click();
-    setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
-  }catch(e){alert('Template download error: '+e.message);}
+  // CSV format — works without XLSX write, opens directly in Excel
+  var rows=[
+    ['Brand','Made In','Model No','Item Name','Category','Description','Unit','Purchase Price (Basic)','GST %','Selling Price (Basic)','Opening Stock'],
+    ['Hikvision','China','DS-2CD2143G2-I','4MP AcuSense Camera','Camera','Fixed dome IR 40m','pcs',3500,18,5500,2],
+    ['CP Plus','China','CP-UNC-DA21PL3-MH','2MP HD Camera','Camera','Dome night vision','pcs',1800,18,3200,5],
+    ['Legrand','India','','CAT6 UTP Cable','Cable','305m roll','Roll',2200,18,3800,3]
+  ];
+  var csv=rows.map(function(r){
+    return r.map(function(c){return'"'+String(c===null||c===undefined?'':c).replace(/"/g,'""')+'"';}).join(',');
+  }).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='auto_inventory_template.csv';
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
 }
 
 function importInventoryExcel(){
-  if(!window.XLSX){alert('XLSX library not loaded. Page reload karo.');return;}
+  if(typeof XLSX==='undefined'){alert('XLSX library load nathi thayo. Page reload karo (Ctrl+Shift+R).');return;}
   var input=document.createElement('input');
   input.type='file';input.accept='.xlsx,.xls,.csv';
   input.onchange=async function(e){
@@ -8092,12 +8157,17 @@ function importInventoryExcel(){
         var ws=wb.Sheets[wb.SheetNames[0]];
         var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
         var items=rows.map(function(r){return{
-          brand:r['Brand']||null,item_name:String(r['Item Name']||'').trim(),
+          brand:r['Brand']||null,
+          made_in:r['Made In']||null,
+          model_no:r['Model No']||null,
+          item_name:String(r['Item Name']||'').trim(),
           category:r['Category']||null,
+          description:r['Description']||null,
+          unit:r['Unit']||'pcs',
           purchase_price:parseFloat(r['Purchase Price (Basic)'])||0,
           gst_percent:parseFloat(r['GST %'])||0,
           selling_price:parseFloat(r['Selling Price (Basic)'])||0,
-          unit:r['Unit']||'pcs',stock_qty:parseFloat(r['Opening Stock'])||0
+          stock_qty:parseFloat(r['Opening Stock'])||0
         };}).filter(function(i){return i.item_name;});
         if(!items.length){alert('Koi valid rows nathi. Template format check karo.');return;}
         if(!confirm(items.length+' items import karva chhe?'))return;
@@ -8107,7 +8177,7 @@ function importInventoryExcel(){
           var r=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(itm)});
           if(!r.ok){
             var txt=await r.text();
-            if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price'))){
+            if(txt.includes('column')&&(txt.includes('gst_percent')||txt.includes('selling_price')||txt.includes('made_in')||txt.includes('model_no')||txt.includes('description'))){
               var base={brand:itm.brand,item_name:itm.item_name,category:itm.category,purchase_price:itm.purchase_price,unit:itm.unit,stock_qty:itm.stock_qty};
               var r2=await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(base)});
               if(r2.ok)ok++;else failed++;
@@ -9097,24 +9167,26 @@ function addVisitMaterialRow(siteId){
   // Build options from site items
   var options='<option value="">-- Item Select Karo --</option>'
     +siteItems.map(function(it){
-      return'<option value="'+it.id+'" data-pp="'+(it.purchase_price||0)+'" data-sp="'+(it.unit_price||0)+'" data-name="'+escQ(it.item_name)+'">'
-        +it.item_name+' (Purchase: ₹'+(it.purchase_price||0)+' | Selling: ₹'+(it.unit_price||0)+')</option>';
+      return'<option value="'+it.id+'" data-pp="'+(it.purchase_price||0)+'" data-sp="'+(it.unit_price||0)+'" data-gst="'+(it.gst_percent||0)+'" data-name="'+escQ(it.item_name)+'">'
+        +it.item_name+' — Sell ₹'+(it.unit_price||0)+(it.gst_percent?' +'+it.gst_percent+'%GST':'')+'</option>';
     }).join('');
 
   var row=document.createElement('div');
   row.id='vmi-row-'+idx;
   row.style.cssText='background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:8px;';
-  row.innerHTML='<div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">'
+  row.innerHTML='<div style="display:grid;grid-template-columns:3fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">'
     +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Item (Site thi)</label>'
     +'<select id="vmi-item-'+idx+'" onchange="onVisitItemSelect(this,\''+idx+'\')" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+options+'</select>'
     +'</div>'
-    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Purchase ₹</label>'
-    +'<input type="number" id="vmi-pp-'+idx+'" readonly style="width:100%;background:#f0f9ff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" placeholder="Auto"></div>'
-    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Selling ₹</label>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Sell ₹/unit</label>'
     +'<input type="number" id="vmi-sp-'+idx+'" readonly style="width:100%;background:#f0fff4;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;" placeholder="Auto"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Discount %</label>'
+    +'<input type="number" id="vmi-disc-'+idx+'" value="0" min="0" max="100" step="0.5" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" oninput="calcVisitItemTotal(\''+idx+'\')"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Final ₹/unit <small>(+GST)</small></label>'
+    +'<input type="number" id="vmi-final-'+idx+'" readonly style="width:100%;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;" placeholder="Auto"></div>'
     +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Qty <span class="req">*</span></label>'
-    +'<input type="number" id="vmi-qty-'+idx+'" value="1" min="0.1" step="0.1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" onchange="calcVisitItemTotal(\''+idx+'\')"></div>'
-    +'<button onclick="this.closest(\'[id^=vmi-row-]\').remove();calcVisitGrandTotal(\''+listId+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:6px 10px;cursor:pointer;height:36px;margin-top:18px;">✕</button>'
+    +'<input type="number" id="vmi-qty-'+idx+'" value="1" min="0.1" step="0.1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;" oninput="calcVisitItemTotal(\''+idx+'\')"></div>'
+    +'<button onclick="this.closest(\'[id^=vmi-row-]\').remove()" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:6px 10px;cursor:pointer;height:36px;margin-top:18px;">✕</button>'
     +'</div>'
     +'<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;" id="vmi-total-'+idx+'"></div>';
   list.appendChild(row);
@@ -9124,23 +9196,36 @@ function onVisitItemSelect(sel,idx){
   var opt=sel.selectedOptions[0];
   var pp=opt?parseFloat(opt.getAttribute('data-pp')||0):0;
   var sp=opt?parseFloat(opt.getAttribute('data-sp')||0):0;
+  var gst=opt?parseFloat(opt.getAttribute('data-gst')||0):0;
   var ppEl=document.getElementById('vmi-pp-'+idx);if(ppEl)ppEl.value=pp||'';
   var spEl=document.getElementById('vmi-sp-'+idx);if(spEl)spEl.value=sp||'';
+  var discEl=document.getElementById('vmi-disc-'+idx);if(discEl)discEl.value=0;
+  sel.setAttribute('data-gst-val',gst);
   calcVisitItemTotal(idx);
 }
 
 function calcVisitItemTotal(idx){
+  var sel=document.getElementById('vmi-item-'+idx);
   var pp=parseFloat(document.getElementById('vmi-pp-'+idx)?.value)||0;
   var sp=parseFloat(document.getElementById('vmi-sp-'+idx)?.value)||0;
+  var disc=parseFloat(document.getElementById('vmi-disc-'+idx)?.value)||0;
   var qty=parseFloat(document.getElementById('vmi-qty-'+idx)?.value)||0;
+  var gst=parseFloat(sel?.getAttribute('data-gst-val')||0);
+  // discounted sell (before GST) — this is what gets stored as selling_price
+  var discountedSp=sp*(1-disc/100);
+  // final per unit = discounted sell + GST
+  var finalPerUnit=discountedSp*(1+gst/100);
+  var finalEl=document.getElementById('vmi-final-'+idx);
+  if(finalEl)finalEl.value=finalPerUnit?finalPerUnit.toFixed(2):'';
   var el=document.getElementById('vmi-total-'+idx);
   if(!el)return;
   if(sp&&qty){
-    var total=sp*qty;
+    var totalFinal=finalPerUnit*qty;
     var pTotal=pp*qty;
-    var margin=total-pTotal;
-    el.innerHTML='<span style="color:#065f46;font-weight:700;">Selling: ₹'+Number(total).toLocaleString('en-IN')+'</span>'
-      +'<span style="color:#6b7280;font-size:11px;">Purchase: ₹'+Number(pTotal).toLocaleString('en-IN')+' | Margin: ₹'+Number(margin).toLocaleString('en-IN')+'</span>';
+    var margin=(discountedSp-pp)*qty;
+    el.innerHTML='<span style="color:#d97706;font-weight:700;">Total (with GST): ₹'+Number(totalFinal).toFixed(0)+'</span>'
+      +(disc?'<span style="font-size:11px;color:#6b7280;margin-left:8px;">After '+disc+'% disc: ₹'+discountedSp.toFixed(2)+'/unit'+(gst?' + '+gst+'% GST':'')+'</span>':'')
+      +'<span style="font-size:11px;color:#6b7280;float:right;">Purchase: ₹'+Number(pTotal).toFixed(0)+' | Margin: ₹'+Number(margin).toFixed(0)+'</span>';
   }else{el.innerHTML='';}
 }
 
@@ -9161,13 +9246,17 @@ async function saveVisitWithMaterial(siteId,btn){
     var opt=sel.selectedOptions[0];
     var pp=parseFloat(document.getElementById('vmi-pp-'+idx)?.value)||0;
     var sp=parseFloat(document.getElementById('vmi-sp-'+idx)?.value)||0;
+    var disc=parseFloat(document.getElementById('vmi-disc-'+idx)?.value)||0;
+    var gst=parseFloat(sel.getAttribute('data-gst-val')||0);
     var qty=parseFloat(document.getElementById('vmi-qty-'+idx)?.value)||1;
-    var name=opt?.getAttribute('data-name')||opt?.text?.split(' (')[0]||'';
-    materials.push({site_item_id:parseInt(sel.value),item_name:name,purchase_price:pp,selling_price:sp,qty:qty,total:sp*qty});
-    totalSelling+=sp*qty;
+    var discountedSp=sp*(1-disc/100);
+    var finalWithGst=discountedSp*(1+gst/100);
+    var name=opt?.getAttribute('data-name')||opt?.text?.split(' —')[0]||'';
+    materials.push({site_item_id:parseInt(sel.value),item_name:name,purchase_price:pp,selling_price:discountedSp,discount_pct:disc,gst_percent:gst,qty:qty,total:Math.round(finalWithGst*qty)});
+    totalSelling+=finalWithGst*qty;
   });
 
-  var matText=materials.length?materials.map(function(m){return m.qty+'x '+m.item_name+' @₹'+m.selling_price;}).join(', '):'';
+  var matText=materials.length?materials.map(function(m){return m.qty+'x '+m.item_name+' @₹'+m.selling_price.toFixed(2)+(m.discount_pct?' ('+m.discount_pct+'%disc)':'');}).join(', '):'';
 
   var deliveryMode=document.getElementById('av-delivery-mode-'+siteId)?.value||'';
   var deliveryDetails=null;
@@ -9824,9 +9913,9 @@ function calcASITotal(){
 function filterASIDropdown(){
   var q=(document.getElementById('asi-search')?.value||'').toLowerCase();
   var items=window._asiInvItems||[];
-  var filtered=q?items.filter(function(i){return(i.item_name||'').toLowerCase().includes(q)||(i.brand||'').toLowerCase().includes(q);}):items;
+  var filtered=q?items.filter(function(i){return(i.item_name||'').toLowerCase().includes(q)||(i.brand||'').toLowerCase().includes(q)||(i.model_no||'').toLowerCase().includes(q)||(i.description||'').toLowerCase().includes(q);}):items;
   renderASIDropdown(filtered);
-  document.getElementById('asi-dropdown').style.display=filtered.length?'':'none';
+  document.getElementById('asi-dropdown').style.display=filtered.length||q?'':'none';
 }
 function showASIDropdown(){
   var items=window._asiInvItems||[];
@@ -9842,9 +9931,16 @@ function renderASIDropdown(items){
   if(!el)return;
   el.innerHTML=items.slice(0,50).map(function(i){
     return'<div onclick="selectASIItem('+i.id+',\''+escQ(i.item_name||'')+'\',\''+escQ(i.brand||'')+'\','+(i.purchase_price||0)+','+(i.selling_price||0)+','+(i.gst_percent||0)+',\''+escQ(i.unit||'pcs')+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;" onmouseenter="this.style.background=\'#f0f4ff\'" onmouseleave="this.style.background=\'\'">'
-      +(i.brand?'<span style="font-size:11px;color:#6b7280;margin-right:6px;">'+i.brand+'</span>':'')
+      +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+      +'<div>'+(i.brand?'<span style="font-size:10px;color:#6b7280;margin-right:4px;background:#f3f4f6;padding:1px 5px;border-radius:4px;">'+i.brand+'</span>':'')
+      +(i.model_no?'<span style="font-size:10px;color:#7c3aed;margin-right:4px;">'+i.model_no+'</span>':'')
       +'<b>'+i.item_name+'</b>'
-      +'<span style="float:right;font-size:11px;color:#059669;">₹'+Number(i.purchase_price||0).toLocaleString('en-IN')+'</span>'
+      +(i.description?'<div style="font-size:10px;color:#9ca3af;margin-top:1px;">'+i.description+'</div>':'')
+      +'</div>'
+      +'<div style="text-align:right;flex-shrink:0;margin-left:8px;">'
+      +(i.selling_price?'<span style="font-size:11px;color:#059669;font-weight:700;">Sell ₹'+Number(i.selling_price||0).toLocaleString('en-IN')+'</span><br>':'')
+      +'<span style="font-size:10px;color:#9ca3af;">Buy ₹'+Number(i.purchase_price||0).toLocaleString('en-IN')+(i.gst_percent?' +'+i.gst_percent+'%GST':'')+'</span>'
+      +'</div></div>'
       +'</div>';
   }).join('')
   +(items.length>50?'<div style="padding:8px;font-size:11px;color:#6b7280;text-align:center;">Type more to narrow down ('+items.length+' items)</div>':'')
@@ -10288,8 +10384,8 @@ async function renderInquiries(){
     if(followupToday.length){
       html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
         +'<span style="font-size:20px;">🔔</span><div>'
-        +'<b style="color:#92400e;">'+followupToday.length+' Follow-up'+(followupToday.length>1?'s':'')+' Due Today</b><br>'
-        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(' &nbsp;·&nbsp; ')+'</span>'
+        +'<b style="color:#92400e;">Aaj '+followupToday.length+' inquiry(s) na followup chhe!</b><br>'
+        +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(', ')+'</span>'
         +'</div></div>';
     }
     html+='<div class="filter-bar" style="margin-bottom:14px;">'
@@ -10316,11 +10412,12 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiry('+inq.id+')">✏️</button>'
+          +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
+          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>'
           +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
           +'</div>'
           +'</div>'
-          +(inq.notes?'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">📝 '+inq.notes+'</div>':'')
+          +(inq.notes?(function(){var lines=(inq.notes||'').split('\n');var last=lines[lines.length-1];return'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">💬 '+escQ(last)+(lines.length>1?' <span style="color:#94a3b8;">(+'+( lines.length-1)+' more)</span>':'')+'</div>';}())  :'')
           +'</div>';
       });
       html+='</div>';
@@ -10341,67 +10438,84 @@ function filterInquiryList(){
   });
 }
 
-function openEditInquiry(id){
-  var inq=(window._inqCache||[]).find(function(i){return i.id==id;});
-  if(!inq){alert('Inquiry not found');return;}
-  openAddInquiryModal(inq);
-}
-function openAddInquiryModal(editData){
+// ---- New Inquiry modal ----
+function openAddInquiryModal(){
   var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
-  var isEdit=!!(editData&&editData.id);
   var modal=document.createElement('div');
-  modal.id='modal-add-inquiry';
-  modal.className='modal-overlay';
+  modal.id='modal-add-inquiry';modal.className='modal-overlay';
   var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var inp=function(id,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id+'" value="'+(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
-    +'<div class="modal-header"><h2>'+(isEdit?'✏️ Edit Inquiry':'🔍 New Inquiry')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-header"><h2>🔍 New Inquiry</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
     +'<div class="modal-body">'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label><input type="text" id="inq-name" value="'+(isEdit?escQ(editData.customer_name||''):'')+'" placeholder="Customer name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label><input type="tel" id="inq-mobile" value="'+(isEdit?escQ(editData.mobile||''):'')+'" placeholder="Mobile" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label>'+inp('inq-name','Customer name')+'</div>'
+    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('inq-mobile','Mobile number','','tel')+'</div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label><input type="text" id="inq-address" value="'+(isEdit?escQ(editData.address||''):'')+'" placeholder="Address" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('inq-address','Address')+'</div>'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
-    +types.map(function(t){return'<option value="'+t+'"'+(isEdit&&editData.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')
-    +'</select></div>'
-    +'<div class="form-group"><label>Status</label><select id="inq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
-    +'<option value="Open"'+(isEdit&&editData.status==='Open'?' selected':'')+'>Open</option>'
-    +'<option value="In Progress"'+(isEdit&&editData.status==='In Progress'?' selected':'')+'>In Progress</option>'
-    +'<option value="Converted"'+(isEdit&&editData.status==='Converted'?' selected':'')+'>Converted</option>'
-    +'<option value="Lost"'+(isEdit&&editData.status==='Lost'?' selected':'')+'>Lost</option>'
-    +'</select></div>'
+    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>📅 Followup Date</label>'+inp('inq-followup','','','date')+'</div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Description</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.description||'':'')+'</textarea></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>📅 Followup Date</label><input type="date" id="inq-followup" value="'+(isEdit?editData.followup_date||'':'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
-    +'<div class="form-group"><label>Notes</label><textarea id="inq-notes" rows="2" placeholder="Internal notes..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+(isEdit?editData.notes||'':'')+'</textarea></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-add-inquiry\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveInquiry('+(isEdit?editData.id:'null')+')">💾 Save</button>'
+    +'<button class="btn btn-primary" onclick="saveNewInquiry()">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(modal);
 }
 
-async function saveInquiry(editId){
-  var name=document.getElementById('inq-name')?.value.trim();
-  var mobile=document.getElementById('inq-mobile')?.value.trim();
-  var address=document.getElementById('inq-address')?.value.trim()||'';
+async function saveNewInquiry(){
+  var name=(document.getElementById('inq-name')?.value||'').trim();
+  var mobile=(document.getElementById('inq-mobile')?.value||'').trim();
+  var address=(document.getElementById('inq-address')?.value||'').trim();
   var type=document.getElementById('inq-type')?.value||'Other';
-  var status=document.getElementById('inq-status')?.value||'Open';
-  var desc=document.getElementById('inq-desc')?.value.trim()||'';
+  var desc=(document.getElementById('inq-desc')?.value||'').trim();
   var followup=document.getElementById('inq-followup')?.value||null;
-  var notes=document.getElementById('inq-notes')?.value.trim()||'';
   if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
   try{
-    var data={customer_name:name,mobile:mobile,address:address,inquiry_type:type,status:status,description:desc,followup_date:followup||null,notes:notes||null,updated_at:new Date().toISOString()};
-    if(editId){
-      await sb('auto_inquiries','PATCH',data,'?id=eq.'+editId);
-    }else{
-      data.created_by=currentUser?.user_id||'ENG002';
-      await sb('auto_inquiries','POST',data);
-    }
+    await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Edit Inquiry (data only — fix typos, change name/mobile/details) ----
+function openEditInquiryModal(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  if(!inq){alert('Inquiry not found');return;}
+  var existing=document.getElementById('modal-edit-inquiry');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-edit-inquiry';modal.className='modal-overlay';
+  var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var inp=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escQ(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>✏️ Edit Inquiry Details</h2><button class="close-btn" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customer nu naam, mobile, address ya description correct karo. Status change karvam ate "📝 Update" button vaapro.</div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Customer Name <span class="req">*</span></label>'+inp('einq-name','Customer name',inq.customer_name)+'</div>'
+    +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('einq-mobile','Mobile number',inq.mobile,'tel')+'</div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('einq-address','Address',inq.address)+'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveEditInquiry('+id+')">💾 Save Changes</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveEditInquiry(id){
+  var name=(document.getElementById('einq-name')?.value||'').trim();
+  var mobile=(document.getElementById('einq-mobile')?.value||'').trim();
+  if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
+  try{
+    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),updated_at:new Date().toISOString()},'?id=eq.'+id);
+    document.getElementById('modal-edit-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
 }
@@ -10412,6 +10526,60 @@ async function deleteInquiry(id){
     await sb('auto_inquiries','DELETE',null,'?id=eq.'+id);
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Update Inquiry (status, followup, remark) ----
+function openUpdateInquiryModal(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  if(!inq){alert('Inquiry not found');return;}
+  var existing=document.getElementById('modal-update-inquiry');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-update-inquiry';modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>📝 Update Inquiry</h2><button class="close-btn" onclick="document.getElementById(\'modal-update-inquiry\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="font-size:13px;font-weight:600;margin-bottom:12px;">👤 '+escQ(inq.customer_name||'')+(inq.mobile?' &nbsp;📱 '+inq.mobile:'')+'</div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Status</label><select id="updinq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
+    +'<option value="Open"'+(inq.status==='Open'?' selected':'')+'>Open</option>'
+    +'<option value="In Progress"'+(inq.status==='In Progress'?' selected':'')+'>In Progress</option>'
+    +'<option value="Converted"'+(inq.status==='Converted'?' selected':'')+'>✅ Converted (Won)</option>'
+    +'<option value="Lost"'+(inq.status==='Lost'?' selected':'')+'>❌ Lost</option>'
+    +'</select></div>'
+    +'<div class="form-group"><label>📅 Next Followup Date</label><input type="date" id="updinq-followup" value="'+(inq.followup_date||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>💬 Remark / Note</label><textarea id="updinq-remark" rows="3" placeholder="Aaj nu update, customer nu reply, next step..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea></div>'
+    +(inq.notes?'<div style="margin-top:10px;padding:10px;background:var(--bg-secondary);border-radius:8px;font-size:12px;color:var(--text-muted);" id="inq-notes-history"><b>Previous Notes:</b><br>'+escQ(inq.notes||'').replace(/\n/g,'<br>')+'</div>':'')
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-update-inquiry\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveUpdateInquiry('+id+')">✅ Save Update</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+async function saveUpdateInquiry(id){
+  var inq=(window._allInquiries||[]).find(function(i){return i.id===id;});
+  var status=document.getElementById('updinq-status')?.value||'Open';
+  var followup=document.getElementById('updinq-followup')?.value||null;
+  var remark=(document.getElementById('updinq-remark')?.value||'').trim();
+  try{
+    var existingNotes=inq?.notes||'';
+    var newNotes=existingNotes;
+    if(remark){
+      var ts=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      var entry='['+ts+'] '+remark;
+      newNotes=existingNotes?existingNotes+'\n'+entry:entry;
+    }
+    await sb('auto_inquiries','PATCH',{status:status,followup_date:followup||null,notes:newNotes||null,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    document.getElementById('modal-update-inquiry').remove();
+    renderInquiries();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function saveInquiry(editId){
+  // Legacy alias — redirect to correct handler
+  if(editId)await saveEditInquiry(editId);else await saveNewInquiry();
 }
 
 // ─── VIRTUAL AI AGENT ────────────────────────────────────────────────────────
