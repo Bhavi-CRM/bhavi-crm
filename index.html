@@ -8879,6 +8879,7 @@ async function viewSiteItems(siteId,siteName){
         +'<td style="white-space:nowrap;">'
         +'<button class="btn-icon" onclick="editSiteItem('+it.id+','+siteId+',\''+escQ(siteName)+'\')" title="Edit">✏️</button>'
         +(ds!=='delivered'?'<button class="btn-icon" style="background:#dcfce7;" onclick="markItemDelivered('+it.id+','+siteId+',\''+escQ(siteName)+'\','+it.qty+')" title="Mark Delivered">📦</button>':'')
+        +'<button class="btn-icon" style="color:var(--danger);" onclick="deleteSiteItem('+it.id+',\''+escQ(it.item_name)+'\','+siteId+',\''+escQ(siteName)+'\')" title="Remove Item">🗑️</button>'
         +'</td>'
         +'</tr>';
     }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No items added</td></tr>';
@@ -9848,6 +9849,13 @@ function printQuotationDoc(){
     </div>
   </div>
 <script>
+async function deleteSiteItem(itemId,itemName,siteId,siteName){
+  if(!confirm('Remove "'+itemName+'" from this site?\n\nThis action cannot be undone.'))return;
+  try{
+    await sb('auto_site_items','DELETE',null,'?id=eq.'+itemId);
+    viewSiteItems(siteId,siteName);
+  }catch(e){alert('Error removing item: '+e.message);}
+}
 async function openAddSiteItem(siteId,siteName){
   var existing=document.getElementById('modal-add-site-item');
   if(existing)existing.remove();
@@ -9882,13 +9890,23 @@ async function openAddSiteItem(siteId,siteName){
     +'📊 % of Invoice Total (Auto Calculate)'
     +'</label>'
     +'<div id="asi-pct-section" style="display:none;margin-top:10px;">'
+    +'<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;">'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#92400e;cursor:pointer;">'
+    +'<input type="radio" name="asi-pct-base" id="asi-pct-base-basic" value="basic" checked onchange="calcASIPctOfInvoice()" style="cursor:pointer;">'
+    +'% on Basic Price <span style="font-weight:400;color:#6b7280;">(excl. GST)</span>'
+    +'</label>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#92400e;cursor:pointer;">'
+    +'<input type="radio" name="asi-pct-base" id="asi-pct-base-total" value="total" onchange="calcASIPctOfInvoice()" style="cursor:pointer;">'
+    +'% on Total Price <span style="font-weight:400;color:#6b7280;">(incl. GST)</span>'
+    +'</label>'
+    +'</div>'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
     +'<div style="flex:1;min-width:120px;">'
     +'<label style="font-size:11px;color:#92400e;font-weight:600;">Percentage %</label>'
     +'<input type="number" id="asi-pct-value" value="15" min="0" max="100" step="0.5" oninput="calcASIPctOfInvoice()" style="border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:14px;font-weight:700;width:100%;outline:none;background:#fffbeb;">'
     +'</div>'
     +'<div style="flex:2;min-width:160px;">'
-    +'<label style="font-size:11px;color:#6b7280;">Invoice Total (Products + GST)</label>'
+    +'<label style="font-size:11px;color:#6b7280;" id="asi-pct-base-label">Invoice Basic Total (Products, excl. GST)</label>'
     +'<input type="text" id="asi-invoice-total-display" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f0f9ff;outline:none;">'
     +'</div>'
     +'<div style="flex:2;min-width:160px;">'
@@ -9921,36 +9939,39 @@ function toggleASIPct(){
   var sec=document.getElementById('asi-pct-section');
   if(sec)sec.style.display=on?'':'none';
   if(on){
-    // Calculate current invoice total from site items
     var items=window._currentSiteItems||[];
-    var invTotal=items.reduce(function(sum,it){
-      var sp=it.unit_price||0;
-      var gst=it.gst_percent||0;
-      var qty=it.qty||0;
+    var basicTotal=items.reduce(function(sum,it){
+      var sp=it.unit_price||0;var qty=it.qty||0;return sum+sp*qty;
+    },0);
+    var grandTotal=items.reduce(function(sum,it){
+      var sp=it.unit_price||0;var gst=it.gst_percent||0;var qty=it.qty||0;
       return sum+Math.round(sp*qty*(1+gst/100));
     },0);
-    var dispEl=document.getElementById('asi-invoice-total-display');
-    if(dispEl)dispEl.value='₹'+Number(invTotal).toLocaleString('en-IN');
-    window._asiInvTotal=invTotal;
+    window._asiBasicTotal=basicTotal;
+    window._asiGrandTotal=grandTotal;
     calcASIPctOfInvoice();
   }
 }
 
 function calcASIPctOfInvoice(){
   var pct=parseFloat(document.getElementById('asi-pct-value')?.value)||0;
-  var invTotal=window._asiInvTotal||0;
-  var amount=Math.round(invTotal*pct/100);
+  var useTotal=document.getElementById('asi-pct-base-total')?.checked;
+  var base=useTotal?(window._asiGrandTotal||0):(window._asiBasicTotal||0);
+  var baseLabel=document.getElementById('asi-pct-base-label');
+  if(baseLabel)baseLabel.textContent=useTotal?'Invoice Grand Total (Products, incl. GST)':'Invoice Basic Total (Products, excl. GST)';
+  var dispEl=document.getElementById('asi-invoice-total-display');
+  if(dispEl)dispEl.value='₹'+Number(base).toLocaleString('en-IN');
+  var amount=Math.round(base*pct/100);
   var el=document.getElementById('asi-pct-amount-display');
-  if(el)el.value='₹'+Number(amount).toLocaleString('en-IN')+' ('+pct+'% of ₹'+Number(invTotal).toLocaleString('en-IN')+')';
+  if(el)el.value='₹'+Number(amount).toLocaleString('en-IN')+' ('+pct+'% of ₹'+Number(base).toLocaleString('en-IN')+')';
   window._asiPctAmount=amount;
 }
 
 function applyASIPctAmount(){
   var amount=window._asiPctAmount||0;
-  if(!amount){alert('Pehela % enter karo');return;}
+  if(!amount){alert('Please enter a percentage value first.');return;}
   var spEl=document.getElementById('asi-sp');
   if(spEl){spEl.value=amount;calcASITotal();}
-  // Also set qty=1, unit=job for clean display
   var qtyEl=document.getElementById('asi-qty');if(qtyEl)qtyEl.value=1;
   var unitEl=document.getElementById('asi-unit');if(unitEl)unitEl.value='job';
   document.getElementById('asi-pct-toggle').checked=false;
