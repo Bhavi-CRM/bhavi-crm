@@ -6311,12 +6311,15 @@ async function saveDailyReport(){
 }
 
 function formatDailyReportWA(d){
+  function arr(v){if(!v)return[];if(typeof v==='string'){try{return JSON.parse(v);}catch(e){return[];}}return Array.isArray(v)?v:[];}
   var lines=[];
   var dateStr=d.report_date?new Date(d.report_date).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):d.report_date;
   lines.push('📋 *Daily Report*');
   lines.push('👷 *'+d.eng_name+'*');
   lines.push('📅 '+dateStr);
   lines.push('');
+  var sv=arr(d.site_visits);var ow=arr(d.office_work);var pm=arr(d.payments);var gr=arr(d.google_reviews);
+  d.site_visits=sv;d.office_work=ow;d.payments=pm;d.google_reviews=gr;
 
   // Site Visits
   if(d.site_visits&&d.site_visits.length){
@@ -6464,16 +6467,17 @@ async function openPastReports(){
 function showPastReportShare(id){
   var r=window._pastReports&&window._pastReports.find(function(x){return x.id==id;});
   if(!r)return;
+  function parseJ(v){if(!v)return[];if(typeof v==='string'){try{return JSON.parse(v);}catch(e){return[];}}return Array.isArray(v)?v:[];}
   document.getElementById('past-reports-panel').remove();
   showDailyReportShare({
     eng_name:r.eng_name,
     report_date:r.report_date,
-    site_visits:r.site_visits||[],
-    office_work:r.office_work||[],
-    payments:r.payment_details||[],
+    site_visits:parseJ(r.site_visits),
+    office_work:parseJ(r.office_work),
+    payments:parseJ(r.payment_details),
     total_amount:r.total_amount||0,
     petrol_km:r.petrol_km||0,
-    google_reviews:r.google_reviews||[],
+    google_reviews:parseJ(r.google_reviews),
     remarks:r.remarks||''
   });
 }
@@ -8366,6 +8370,7 @@ async function renderWorkLog(){
   const toDef=sidx>=0?slots[Math.min(sidx+2,slots.length-1)]:slots[2];
   var logs=[];
   try{logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+today+'&order=from_time');}catch(e){}
+  window._todayWorkLogs=logs;window._todayWorkDate=today;
   function logsHtml(items){
     if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 આજ નો કોઈ log નથી</div>';
     return items.map(function(l){
@@ -8400,7 +8405,7 @@ async function renderWorkLog(){
     +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Log ઉમેરો</button>'
     +'</div>'
     // Today logs
-    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 આજના Logs</h2><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span></div>'
+    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 આજના Logs</h2><div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span>'+(logs.length?'<button onclick="shareWorkLogsWA(window._todayWorkDate,window._todayWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>':'')+'</div></div>'
     +'<div id="wl-list">'+logsHtml(logs)+'</div></div>'
     // Past logs search section
     +'<div class="card">'
@@ -8440,6 +8445,58 @@ async function saveWorkLog(){
   }catch(e){alert('Error: '+e.message+'\n\nNote: Supabase ma "work_logs" table banavo jaruri chhe.');}
 }
 
+function formatWorkLogWA(date, logs, name){
+  var lines=[];
+  var dateStr=new Date(date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  lines.push('🕐 *Work Log*');
+  lines.push('👷 *'+(name||'')+'*');
+  lines.push('📅 '+dateStr);
+  lines.push('');
+  var totalMins=0;
+  logs.forEach(function(l,i){
+    var isOpen=l.to_time==='OPEN';
+    var timeLabel=l.from_time+' – '+(isOpen?'ચાલુ':l.to_time);
+    if(!isOpen){
+      var f=l.from_time.split(':');var t=l.to_time.split(':');
+      totalMins+=(parseInt(t[0])*60+parseInt(t[1]))-(parseInt(f[0])*60+parseInt(f[1]));
+    }
+    lines.push((i+1)+'. *'+timeLabel+'*');
+    lines.push('   '+l.task_description);
+  });
+  lines.push('');
+  if(totalMins>0){
+    var h=Math.floor(totalMins/60);var m=totalMins%60;
+    lines.push('⏱ *Total: '+(h?h+'h ':'')+m+'min*');
+  }
+  lines.push('_Sent via Bhavi CRM_');
+  return lines.join('\n');
+}
+
+function shareWorkLogsWA(date, logs, name){
+  if(!logs||!logs.length){alert('Share karva koi log nathi');return;}
+  var text=formatWorkLogWA(date,logs,name);
+  var old=document.getElementById('dr-share-panel');if(old)old.remove();
+  var panel=document.createElement('div');
+  panel.id='dr-share-panel';
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  panel.innerHTML=
+    '<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
+    +'<div style="padding:16px 18px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">'
+    +'<span style="font-size:16px;font-weight:700;">🕐 Work Log Share</span>'
+    +'<button onclick="document.getElementById(\'dr-share-panel\').remove();" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
+    +'</div>'
+    +'<div style="padding:14px 18px;flex:1;overflow-y:auto;">'
+    +'<pre id="dr-share-text" style="white-space:pre-wrap;font-size:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:0;font-family:inherit;line-height:1.6;max-height:320px;overflow-y:auto;"></pre>'
+    +'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #e5e7eb;display:flex;gap:10px;">'
+    +'<button id="dr-copy-btn" onclick="drCopyReport()" style="flex:1;background:#f3f4f6;color:#374151;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copy</button>'
+    +'<a id="dr-wa-btn" href="'+('https://wa.me/?text='+encodeURIComponent(text))+'" target="_blank" style="flex:2;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;">📲 WhatsApp Share</a>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(panel);
+  document.getElementById('dr-share-text').textContent=text;
+}
+
 async function deleteWorkLog(id){
   if(!confirm('Delete this entry?'))return;
   try{await sb('work_logs','DELETE',null,'?id=eq.'+id);renderWorkLog();}
@@ -8462,7 +8519,11 @@ async function searchMyWorkLogs(){
     }
     var dObj=new Date(date+'T00:00:00');
     var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    var html='<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+' — '+logs.length+' entries</div>';
+    window._searchWorkLogs=logs;window._searchWorkDate=date;
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--primary);padding:4px 10px;background:#eff6ff;border-radius:6px;">📅 '+dLabel+' — '+logs.length+' entries</div>'
+      +'<button onclick="shareWorkLogsWA(window._searchWorkDate,window._searchWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>'
+      +'</div>';
     logs.forEach(function(l){
       html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--primary);">'
         +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:#4c1d95;background:#ede9fe;padding:3px 8px;border-radius:99px;white-space:nowrap;">'+l.from_time+'–'+l.to_time+'</div>'
