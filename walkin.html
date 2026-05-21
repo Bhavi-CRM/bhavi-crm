@@ -258,41 +258,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
   <div class="body">
     <button class="back-btn" onclick="goPage('pg-subcategory')">&#8592; <span id="lbl-back-subcat"></span></button>
-    <div class="inp-group" id="warranty-group">
-      <label id="lbl-warranty"></label>
-      <div class="warranty-row">
-        <div class="w-btn" id="wbtn-warranty" onclick="selectWarranty('In Warranty')">
-          <span class="w-icon">✅</span><span id="lbl-w-yes"></span>
-        </div>
-        <div class="w-btn" id="wbtn-nonwarranty" onclick="selectWarranty('Out of Warranty')">
-          <span class="w-icon">⚠️</span><span id="lbl-w-no"></span>
-        </div>
-        <div class="w-btn" id="wbtn-other" onclick="selectWarranty('Other')">
-          <span class="w-icon">❓</span><span id="lbl-w-other"></span>
-        </div>
+    <!-- Other purchase remark (no product needed) -->
+    <div id="other-remark-group" style="display:none;">
+      <div class="inp-group">
+        <label id="lbl-other-remark"></label>
+        <input class="inp" type="text" id="inp-other-remark">
       </div>
     </div>
-    <div class="inp-group" id="brand-group">
-      <label id="lbl-brand"></label>
-      <select class="inp" id="inp-brand" onchange="onBrandChange()">
-        <option value="">— Select Brand —</option>
-      </select>
-    </div>
-    <div class="inp-group" id="model-group" style="position:relative;">
-      <label id="lbl-model"></label>
-      <input class="inp" type="text" id="inp-model" placeholder="Type to search or enter model..." autocomplete="off"
-        oninput="filterModelSuggestions(this.value)" onfocus="filterModelSuggestions(this.value)" onblur="setTimeout(function(){document.getElementById('model-suggestions').style.display='none';},200)">
-      <div id="model-suggestions" style="display:none;position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;"></div>
-    </div>
-    <div class="inp-group" id="problem-group">
-      <label id="lbl-problem"></label>
-      <textarea class="inp" id="inp-problem" rows="3"></textarea>
-    </div>
-    <div class="inp-group" id="other-remark-group" style="display:none;">
-      <label id="lbl-other-remark"></label>
-      <input class="inp" type="text" id="inp-other-remark">
-    </div>
-    <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:20px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
+    <!-- Dynamic product cards -->
+    <div id="wi-products-wrap"></div>
+    <button id="btn-add-product" onclick="addProductCard()" style="display:none;width:100%;background:#eff6ff;color:#1a56db;border:1.5px dashed #93c5fd;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">+ Add Another Product</button>
+    <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:16px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
   </div>
 </div>
 
@@ -352,9 +328,9 @@ var T={
     wait_msg:'🙏 કૃપા કરી બેઠક ગ્રહણ કરો. અમારી ટીમ આપનો ટોકન નંબર બોલાવશે ત્યારે પધારો.',
     summary_title:'નોંધણી સારાંશ',new_entry:'નવી નોંધણી',
     back:'પાછળ',next:'આગળ',continue:'ચાલુ રાખો',
-    err_mobile:'કૃપા કરીને 10 અંકનો માન્ય મોબાઇલ નંبر દાખલ કરો',
+    err_mobile:'કૃપા કરીને 10 અંકનો માન્ય મોબાઇલ નંબર દાખલ કરો',
     err_name:'નામ ફરજિયાત છે',err_subcat:'કૃપા કરીને એક વિકલ્પ પસંદ કરો',
-    err_warranty:'કૃપા કરીને વૉરન્ટી સ્થિتિ પસં� करो',err_model:'મૉडेल নंबर ফরজিয়াத छे',
+    err_warranty:'કૃપા કરીને વૉરન્ટી સ્થિતિ પસંદ કરો',err_model:'મૉડેલ નંબર ફરજિયાત છે',
   },
   hi:{
     mobile_hdr:'आपका स्वागत है',mobile_sub:'कृपया आगे बढ़ने के लिए अपना मोबाइल नंबर दर्ज करें',
@@ -415,19 +391,19 @@ var T={
 var SUBCATS={
   camera:{
     en:['Problem in Product — Submit for Repair','Service / Cleaning Required','Product Collection'],
-    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ / ક્લિનિંગ જોઈએ','ઉत्पादन कलेक्शन'],
+    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ / ક્લિનિંગ જોઈએ','ઉત્પાદ કલેકશન'],
     hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस / सफाई चाहिए','उत्पाद संग्रह'],
     types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
   },
   printer:{
     en:['Problem in Product — Submit for Repair','Service Required','Product Collection'],
-    gu:['ઉત્પાদनमां ખামी — સমारकाम маटे સोंपो','સर्विस जोईए','ઉत्पादन कलेक्शन'],
+    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ જોઈએ','ઉત્પાદ કલેકશન'],
     hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस चाहिए','उत्पाद संग्रह'],
     types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
   },
   other:{
     en:['Ink Purchase','Accessories Purchase','Other Purchase (please specify)'],
-    gu:['ઇन्क ખรीदी','Accessories ખрідी','અন્ય ખріді (વิગत ભрो)'],
+    gu:['ઇન્ક ખરીદી','Accessories ખરીદી','અન્ય ખરીદી (વિગત ભરો)'],
     hi:['स्याही खरीद','Accessories खरीद','अन्य खरीद (विवरण दें)'],
     types:['Other','Other','Other'],needsProduct:[false,false,false]
   }
@@ -565,40 +541,111 @@ function selectSubcat(idx){
 function submitSubcategory(){
   if(state.subcatIdx<0){alert(t('err_subcat'));return;}
   var sc=SUBCATS[state.category];
-  state.warranty='';state.brand='';state.model='';state.problem='';state.otherRemark='';
-  document.querySelectorAll('.w-btn').forEach(function(b){b.classList.remove('selected');});
-  document.getElementById('inp-model').value='';
-  document.getElementById('inp-problem').value='';
-  document.getElementById('inp-other-remark').value='';
+  state.otherRemark='';
+  state.products=[{warranty:'',brand:'',model:'',problem:''}];
   var needsProd=sc.needsProduct[state.subcatIdx];
   var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
+  document.getElementById('other-remark-group').style.display=isOtherSpec?'':'none';
+  document.getElementById('wi-products-wrap').innerHTML='';
+  document.getElementById('btn-add-product').style.display='none';
+  document.getElementById('inp-other-remark').value='';
   if(needsProd){
-    var brands=BRANDS_BY_CAT[state.category]||['Canon','Other'];
-    document.getElementById('inp-brand').innerHTML='<option value="">— '+t('lbl_brand')+' —</option>'
-      +brands.map(function(b){return'<option>'+b+'</option>';}).join('');
-    document.getElementById('warranty-group').style.display='';
-    document.getElementById('brand-group').style.display='';
-    document.getElementById('model-group').style.display='';
-    document.getElementById('problem-group').style.display='';
-    document.getElementById('other-remark-group').style.display='none';
+    renderProductCards();
+    document.getElementById('btn-add-product').style.display='';
     goPage('pg-product');
   } else if(isOtherSpec){
-    document.getElementById('warranty-group').style.display='none';
-    document.getElementById('brand-group').style.display='none';
-    document.getElementById('model-group').style.display='none';
-    document.getElementById('problem-group').style.display='none';
-    document.getElementById('other-remark-group').style.display='';
     goPage('pg-product');
   } else {
     submitEntry();
   }
 }
 
-function selectWarranty(val){
-  state.warranty=val;
-  document.getElementById('wbtn-warranty').classList.toggle('selected',val==='In Warranty');
-  document.getElementById('wbtn-nonwarranty').classList.toggle('selected',val==='Out of Warranty');
-  document.getElementById('wbtn-other').classList.toggle('selected',val==='Other');
+function renderProductCards(){
+  var brands=BRANDS_BY_CAT[state.category]||[];
+  var brandOpts='<option value="">— '+t('lbl_brand')+' —</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('');
+  var wrap=document.getElementById('wi-products-wrap');
+  wrap.innerHTML=state.products.map(function(p,i){
+    return'<div class="product-card-wi" id="pcard-'+i+'" style="border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;background:#fafcff;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      +'<span style="font-weight:700;font-size:13px;color:var(--primary);">📦 '+t('lbl_brand').replace(/BRAND/i,'')+'Product '+(i+1)+'</span>'
+      +(state.products.length>1?'<button onclick="removeProductCard('+i+')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:18px;line-height:1;">✕</button>':'')
+      +'</div>'
+      // Warranty
+      +'<div class="inp-group"><label>'+t('lbl_warranty')+'</label>'
+      +'<div class="warranty-row">'
+      +'<div class="w-btn'+(p.warranty==='In Warranty'?' selected':'')+'" onclick="setProdWarranty('+i+',\'In Warranty\')"><span class="w-icon">✅</span><span>'+t('w_yes')+'</span></div>'
+      +'<div class="w-btn'+(p.warranty==='Out of Warranty'?' selected':'')+'" onclick="setProdWarranty('+i+',\'Out of Warranty\')"><span class="w-icon">⚠️</span><span>'+t('w_no')+'</span></div>'
+      +'<div class="w-btn'+(p.warranty==='Other'?' selected':'')+'" onclick="setProdWarranty('+i+',\'Other\')"><span class="w-icon">❓</span><span>'+t('w_other')+'</span></div>'
+      +'</div></div>'
+      // Brand
+      +(brands.length?'<div class="inp-group"><label>'+t('lbl_brand')+'</label>'
+      +'<select class="inp" id="pb-brand-'+i+'" onchange="setProdBrand('+i+',this.value)">'+brandOpts+'</select></div>':'')
+      // Model
+      +'<div class="inp-group" style="position:relative;"><label>'+t('lbl_model')+'</label>'
+      +'<input class="inp" type="text" id="pb-model-'+i+'" value="'+(p.model||'')+'" placeholder="'+t('lbl_model')+'..." autocomplete="off"'
+      +' oninput="filterProdModel('+i+',this.value)" onfocus="filterProdModel('+i+',this.value)"'
+      +' onblur="setTimeout(function(){var s=document.getElementById(\'pms-'+i+'\');if(s)s.style.display=\'none\';},200)">'
+      +'<div id="pms-'+i+'" style="display:none;position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:180px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;"></div>'
+      +'</div>'
+      // Problem
+      +'<div class="inp-group"><label>'+t('lbl_problem')+'</label>'
+      +'<textarea class="inp" id="pb-prob-'+i+'" rows="2" placeholder="'+t('problem_ph')+'"></textarea>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function setProdWarranty(i,val){
+  state.products[i].warranty=val;
+  var card=document.getElementById('pcard-'+i);
+  if(!card)return;
+  card.querySelectorAll('.w-btn').forEach(function(b,bi){
+    var vals=['In Warranty','Out of Warranty','Other'];
+    b.classList.toggle('selected',vals[bi]===val);
+  });
+}
+
+function setProdBrand(i,val){
+  state.products[i].brand=val;
+  filterProdModel(i,document.getElementById('pb-model-'+i)?document.getElementById('pb-model-'+i).value:'');
+}
+
+function filterProdModel(i,query){
+  var brand=state.products[i]?state.products[i].brand:'';
+  var brandObj=window._wiAllBrands&&window._wiAllBrands.find(function(b){return b.name===brand;});
+  var models=window._wiAllModels||[];
+  if(brandObj)models=models.filter(function(m){return m.brand_id===brandObj.id;});
+  var q=(query||'').toLowerCase().trim();
+  var filtered=q?models.filter(function(m){return(m.model_no||'').toLowerCase().indexOf(q)>=0||(m.model_name||'').toLowerCase().indexOf(q)>=0;}):models;
+  var sug=document.getElementById('pms-'+i);
+  if(!sug)return;
+  if(!filtered.length){sug.style.display='none';return;}
+  sug.innerHTML=filtered.slice(0,20).map(function(m){
+    var display=m.model_no+(m.model_name?' — '+m.model_name:'');
+    var safe=(m.model_no||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return'<div style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmousedown="selectProdModel('+i+',\''+safe+'\')">'+display+'</div>';
+  }).join('');
+  sug.style.display='';
+}
+
+function selectProdModel(i,val){
+  var inp=document.getElementById('pb-model-'+i);
+  if(inp)inp.value=val;
+  var sug=document.getElementById('pms-'+i);
+  if(sug)sug.style.display='none';
+}
+
+function addProductCard(){
+  state.products.push({warranty:'',brand:'',model:'',problem:''});
+  renderProductCards();
+  // Scroll to new card
+  var wrap=document.getElementById('wi-products-wrap');
+  if(wrap)wrap.lastElementChild.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function removeProductCard(i){
+  state.products.splice(i,1);
+  renderProductCards();
 }
 
 function submitProductDetails(){
@@ -606,12 +653,15 @@ function submitProductDetails(){
   var needsProd=sc.needsProduct[state.subcatIdx];
   var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
   if(needsProd){
-    if(!state.warranty){alert(t('err_warranty'));return;}
-    var model=document.getElementById('inp-model').value.trim();
-    if(!model){alert(t('err_model'));return;}
-    state.brand=document.getElementById('inp-brand').value||'';
-    state.model=model;
-    state.problem=document.getElementById('inp-problem').value.trim();
+    // Collect all products from DOM
+    for(var i=0;i<state.products.length;i++){
+      if(!state.products[i].warranty){alert(t('err_warranty')+' (Product '+(i+1)+')');return;}
+      var modelVal=(document.getElementById('pb-model-'+i)||{}).value||'';
+      if(!modelVal.trim()){alert(t('err_model')+' (Product '+(i+1)+')');return;}
+      state.products[i].model=modelVal.trim();
+      state.products[i].brand=(document.getElementById('pb-brand-'+i)||{}).value||'';
+      state.products[i].problem=((document.getElementById('pb-prob-'+i)||{}).value||'').trim();
+    }
   } else if(isOtherSpec){
     state.otherRemark=document.getElementById('inp-other-remark').value.trim();
   }
@@ -622,10 +672,11 @@ async function submitEntry(){
   var sc=SUBCATS[state.category];
   var subcatLabel=(sc['en']||[])[state.subcatIdx]||'';
   var wiType=(sc.types||[])[state.subcatIdx]||'Other';
-  var wcId=getWcId(state.category,state.brand);
+  var firstBrand=(state.products&&state.products[0]&&state.products[0].brand)||'';
+  var wcId=getWcId(state.category,firstBrand);
   var wcName=getWcName(wcId);
   var catLabel=state.category==='printer'?'Printer (CSP)':state.category==='camera'?(wcId==='SELF_CHECKIN_CSP'?'Camera - Fujifilm (CSP)':'Camera (ICP)'):'Other';
-  var remarks=[catLabel,subcatLabel,state.problem,state.otherRemark].filter(Boolean).join(' | ');
+  var remarks=[catLabel,subcatLabel,state.otherRemark].filter(Boolean).join(' | ');
   var now=new Date();
   var arrivalTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var today=now.toLocaleDateString('en-CA');
@@ -636,12 +687,15 @@ async function submitEntry(){
     var rows=await sbGet('walkin_log','?visit_date=gte.'+monthStart+'&select=token_no&order=token_no.desc.nullslast&limit=1');
     tokenNum=((rows&&rows.length&&rows[0].token_no)||0)+1;
   }catch(e){tokenNum=Math.floor(100+Math.random()*900);}
+  var allProducts=state.products.map(function(p){
+    return{brand:p.brand||catLabel,model:p.model||subcatLabel,type:wiType,warranty:p.warranty||'Other',remarks:(p.problem||remarks)};
+  });
   try{
     await sbPost('walkin_log',{
       wc_id:wcId,wc_name:wcName,visit_date:today,mobile:state.mobile,
       customer_name:state.name,arrival_time:arrivalTime,departure_time:null,
-      products:[{brand:state.brand||catLabel,model:state.model||subcatLabel,type:wiType,warranty:state.warranty||'Other',remarks:remarks}],
-      product_count:1,token_no:tokenNum,created_at:now.toISOString()
+      products:allProducts,product_count:allProducts.length,
+      token_no:tokenNum,created_at:now.toISOString()
     });
     document.getElementById('token-number').textContent=tokenNum;
     document.getElementById('lbl-token-time').textContent=arrivalTime+' · '+today.split('-').reverse().join('-');
@@ -651,10 +705,13 @@ async function submitEntry(){
       {icon:'🏷️',label:'Category',val:catLabel},
       {icon:'📋',label:'Purpose',val:subcatLabel},
     ];
-    if(state.brand)rows.push({icon:'🔖',label:t('lbl_brand'),val:state.brand+(state.model?' — '+state.model:'')});
-    if(state.warranty)rows.push({icon:'🛡️',label:t('lbl_warranty'),val:state.warranty});
-    if(state.problem)rows.push({icon:'🔧',label:t('lbl_problem'),val:state.problem});
     if(state.otherRemark)rows.push({icon:'📝',label:t('lbl_other_remark'),val:state.otherRemark});
+    state.products.forEach(function(p,i){
+      var pLabel=state.products.length>1?'Product '+(i+1):'Product';
+      var pVal=(p.brand?p.brand+' — ':'')+p.model+(p.warranty?' ('+p.warranty+')':'');
+      rows.push({icon:'🔖',label:pLabel,val:pVal});
+      if(p.problem)rows.push({icon:'🔧',label:'Problem',val:p.problem});
+    });
     document.getElementById('summary-box').innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">'+t('summary_title')+'</div>'
       +rows.map(function(r){return'<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';}).join('');
     goPage('pg-success');
@@ -662,7 +719,7 @@ async function submitEntry(){
 }
 
 function startOver(){
-  state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
+  state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true,products:[{warranty:'',brand:'',model:'',problem:''}]};
   document.getElementById('inp-mobile').value='';
   goPage('pg-lang');
 }
