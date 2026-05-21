@@ -6355,10 +6355,10 @@ async function renderWalkIn(){
       _wiSelfIds=(_isCSP?'SELF_CHECKIN_CSP':'SELF_CHECKIN_ICP')+',wc_id.eq.SELF_CHECKIN_OTHER';
     }
     try{
-      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=token_no.asc.nullslast,arrival_time.asc');
+      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=token_no.desc.nullsfirst,arrival_time.desc');
     }catch(e){
       // Fallback if token_no column not yet added
-      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=arrival_time.asc');
+      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=arrival_time.desc');
     }
     window._todayWILogs=todayLogs;
   }catch(e){}
@@ -6383,6 +6383,12 @@ async function renderWalkIn(){
       <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
         <button class="btn btn-primary" onclick="callNextToken()" style="padding:12px 20px;font-size:14px;font-weight:700;">▶ Call Next</button>
         <button class="btn btn-outline" onclick="callAgainToken()" style="padding:10px 20px;font-size:13px;">🔁 Call Again</button>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-bottom:3px;">🔊 Voice</div>
+          <select id="wi-voice-sel" onchange="setTokenVoice(this.value)" style="font-size:11px;border:1.5px solid var(--border);border-radius:7px;padding:4px 6px;outline:none;max-width:140px;cursor:pointer;">
+            <option value="">Loading voices...</option>
+          </select>
+        </div>
       </div>
       <div style="flex:2;min-width:180px;max-height:110px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px;">
         <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">TODAY'S QUEUE (${tokenList.length} customers)</div>
@@ -6456,6 +6462,9 @@ async function renderWalkIn(){
   // Set current time as arrival
   var now=new Date();
   document.getElementById('wi-arrival').value=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
+  // Populate voice dropdown now that the element exists in DOM
+  populateVoiceDropdown();
 
   // Add first product row
   addWalkInProduct();
@@ -6875,13 +6884,38 @@ function updateTokenDisplay(token,logs){
   }
   renderWalkIn();
 }
+function populateVoiceDropdown(){
+  var sel=document.getElementById('wi-voice-sel');
+  if(!sel)return;
+  var voices=window.speechSynthesis.getVoices();
+  var enVoices=voices.filter(function(v){return v.lang.toLowerCase().startsWith('en');});
+  if(!enVoices.length)enVoices=voices;
+  if(!enVoices.length){sel.innerHTML='<option value="">Default voice</option>';return;}
+  var saved=localStorage.getItem('wi_token_voice_name')||'';
+  sel.innerHTML=enVoices.map(function(v){
+    var label=v.name+(v.lang?' ('+v.lang+')':'');
+    return'<option value="'+v.name+'"'+(v.name===saved?' selected':'')+'>'+label+'</option>';
+  }).join('');
+  if(!saved&&enVoices.length){localStorage.setItem('wi_token_voice_name',enVoices[0].name);sel.value=enVoices[0].name;}
+}
+if('speechSynthesis' in window){
+  window.speechSynthesis.onvoiceschanged=populateVoiceDropdown;
+  setTimeout(populateVoiceDropdown,400);
+}
+function setTokenVoice(name){
+  localStorage.setItem('wi_token_voice_name',name);
+}
 function announceToken(num){
-  if('speechSynthesis' in window){
-    window.speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance('Token number '+num+'. Token number '+num+', please proceed to the counter.');
-    u.lang='en-IN';u.rate=0.9;
-    window.speechSynthesis.speak(u);
+  if(!('speechSynthesis' in window))return;
+  window.speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance('Token number '+num+'. Token number '+num+', please proceed to the service counter.');
+  u.lang='en-IN';u.rate=0.88;
+  var savedName=localStorage.getItem('wi_token_voice_name')||'';
+  if(savedName){
+    var match=(window.speechSynthesis.getVoices()||[]).find(function(v){return v.name===savedName;});
+    if(match)u.voice=match;
   }
+  window.speechSynthesis.speak(u);
 }
 
 // ===== WALK-IN QR CODE =====
