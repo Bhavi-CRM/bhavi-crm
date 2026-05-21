@@ -187,8 +187,31 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <input class="inp" type="text" id="inp-name" autocomplete="name">
       </div>
       <div class="inp-group">
-        <label id="lbl-city-field"></label>
-        <input class="inp" type="text" id="inp-city" autocomplete="address-level2">
+        <label id="lbl-state-field"></label>
+        <select class="inp" id="wi-state" onchange="wiOnStateChange()">
+          <option value="">— State —</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="inp-group">
+          <label id="lbl-city-field"></label>
+          <select class="inp" id="wi-city" onchange="wiOnCityChange()">
+            <option value="">— City —</option>
+          </select>
+        </div>
+        <div class="inp-group">
+          <label id="lbl-pin-field"></label>
+          <input class="inp" type="tel" id="wi-pin" maxlength="6" autocomplete="postal-code" list="wi-pin-list" placeholder="Pin...">
+          <datalist id="wi-pin-list"></datalist>
+        </div>
+      </div>
+      <div class="inp-group">
+        <label id="lbl-area-field"></label>
+        <input class="inp" type="text" id="inp-area" autocomplete="address-line2">
+      </div>
+      <div class="inp-group">
+        <label id="lbl-address-field"></label>
+        <input class="inp" type="text" id="inp-address" autocomplete="street-address">
       </div>
     </div>
     <button class="btn-primary" onclick="submitCustomer()" style="margin-top:20px;"><span id="lbl-confirm">Confirm & Continue →</span></button>
@@ -310,7 +333,7 @@ var T={
     lbl_mobile:'મોબાઇલ નંબર',mobile_hint:'અમે આ નંબર ઓળખ પ્રક્રિયા માટે ઉપયોગ કરીશું',
     customer_hdr:'આપની માહિતી',customer_sub:'કૃપા કરીને આપની વિગત પ્રમાણિત કરો',
     lbl_found:'આપને આવકાર છે! અમારી પાસે આપની નોંધ છે:',
-    lbl_name:'પૂરું નામ',lbl_city:'શહેર',
+    lbl_name:'પૂરું નામ',lbl_state:'રાજ્ય',lbl_city:'શહેર',lbl_pin:'પિન કોડ',lbl_area:'વિસ્તાર / સોસાયટી',lbl_address:'સરનામું',
     confirm:'પ્રમાણિત કરો અને આગળ વધો →',
     category_hdr:'આપની મુલાકાતનો હેતુ',category_sub:'ઉત્પાદન અથવા સેવા વિભાગ પસંદ કરો',
     cat_camera:'કૅમેરા (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
@@ -320,6 +343,7 @@ var T={
     lbl_warranty:'વૉરન્ટી સ્થિતિ',
     w_yes:'વૉરન્ટી હેઠળ',w_no:'વૉરન્ટી બહાર',w_other:'જાણ નથી',
     lbl_brand:'બ્રાન્ડ',lbl_model:'મૉડેલ નંબર',
+    lbl_serial:'સીરિઅલ નંબર (જો ખ્યાલ હોય)',serial_ph:'ઉત્પાદ પર લખ્યો હશે...',
     lbl_problem:'સમસ્યા / ફરિયાદ',problem_ph:'ઉત્પાદનની સમસ્યા જણાવો...',
     lbl_other_remark:'વધુ વિગત',
     submit:'ચેક-ઇન પૂર્ણ કરો ✓',
@@ -337,7 +361,7 @@ var T={
     lbl_mobile:'मोबाइल नंबर',mobile_hint:'हम इस नंबर का उपयोग आपकी पहचान के लिए करेंगे',
     customer_hdr:'आपकी जानकारी',customer_sub:'कृपया अपनी जानकारी की पुष्टि करें',
     lbl_found:'आपका स्वागत है! हमारे पास आपकी जानकारी उपलब्ध है:',
-    lbl_name:'पूरा नाम',lbl_city:'शहर',
+    lbl_name:'पूरा नाम',lbl_state:'राज्य',lbl_city:'शहर',lbl_pin:'पिन कोड',lbl_area:'क्षेत्र / सोसायटी',lbl_address:'पता',
     confirm:'पुष्टि करें और आगे बढ़ें →',
     category_hdr:'आपके आने का उद्देश्य',category_sub:'उत्पाद या सेवा श्रेणी चुनें',
     cat_camera:'कैमरा (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
@@ -347,6 +371,7 @@ var T={
     lbl_warranty:'वारंटी स्थिति',
     w_yes:'वारंटी में',w_no:'वारंटी से बाहर',w_other:'ज्ञात नहीं',
     lbl_brand:'ब्रांड',lbl_model:'मॉडल नंबर',
+    lbl_serial:'Serial No (यदि मालूम हो)',serial_ph:'उत्पाद पर लिखा होगा...',
     lbl_problem:'समस्या / शिकायत',problem_ph:'उत्पाद की समस्या बताएं...',
     lbl_other_remark:'अतिरिक्त विवरण',
     submit:'चेक-इन पूर्ण करें ✓',
@@ -364,7 +389,7 @@ var T={
     lbl_mobile:'Mobile Number',mobile_hint:'We will use this to retrieve your details if available',
     customer_hdr:'Your Details',customer_sub:'Please confirm or complete your information',
     lbl_found:'Welcome back! We found your details:',
-    lbl_name:'Full Name',lbl_city:'City',
+    lbl_name:'Full Name',lbl_state:'State',lbl_city:'City',lbl_pin:'Pin Code',lbl_area:'Area / Society',lbl_address:'Address',
     confirm:'Confirm &amp; Continue →',
     category_hdr:'Purpose of Visit',category_sub:'Select the product or service category',
     cat_camera:'Camera (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
@@ -374,6 +399,7 @@ var T={
     lbl_warranty:'Warranty Status',
     w_yes:'In Warranty',w_no:'Out of Warranty',w_other:'Not Sure',
     lbl_brand:'Brand',lbl_model:'Model Number',
+    lbl_serial:'Serial No (if known)',serial_ph:'Found on product label or box...',
     lbl_problem:'Problem / Complaint',problem_ph:'Please describe the issue with your product...',
     lbl_other_remark:'Additional Details',
     submit:'Complete Check-in ✓',
@@ -430,7 +456,7 @@ function getWcName(wcId){
 }
 
 var lang='en';
-var state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
+var state={mobile:'',name:'',state:'',city:'',pin:'',area:'',address:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
 
 function t(key){return(T[lang]&&T[lang][key])||T['en'][key]||key;}
 
@@ -438,7 +464,7 @@ function applyLang(){
   var ids={
     'hdr-mobile':'mobile_hdr','hdr-mobile-sub':'mobile_sub','lbl-mobile':'lbl_mobile',
     'lbl-mobile-hint':'mobile_hint','hdr-customer':'customer_hdr','hdr-customer-sub':'customer_sub',
-    'lbl-found-msg':'lbl_found','lbl-name-field':'lbl_name','lbl-city-field':'lbl_city',
+    'lbl-found-msg':'lbl_found','lbl-name-field':'lbl_name','lbl-state-field':'lbl_state','lbl-city-field':'lbl_city','lbl-pin-field':'lbl_pin','lbl-area-field':'lbl_area','lbl-address-field':'lbl_address',
     'lbl-confirm':'confirm','hdr-category':'category_hdr','hdr-category-sub':'category_sub',
     'cat-camera':'cat_camera','cat-camera-sub':'cat_camera_sub','cat-printer':'cat_printer',
     'cat-printer-sub':'cat_printer_sub','cat-other':'cat_other','cat-other-sub':'cat_other_sub',
@@ -513,7 +539,12 @@ function submitCustomer(){
   if(!state.isNewCustomer){goPage('pg-category');return;}
   var name=document.getElementById('inp-name').value.trim();
   if(!name){alert(t('err_name'));return;}
-  state.name=name;state.city=document.getElementById('inp-city').value.trim();
+  state.name=name;
+  state.state=(document.getElementById('wi-state')||{}).value||'';
+  state.city=(document.getElementById('wi-city')||{}).value||'';
+  state.pin=(document.getElementById('wi-pin')||{}).value||'';
+  state.area=(document.getElementById('inp-area')||{}).value||'';
+  state.address=(document.getElementById('inp-address')||{}).value||'';
   goPage('pg-category');
 }
 
@@ -693,7 +724,9 @@ async function submitEntry(){
   try{
     await sbPost('walkin_log',{
       wc_id:wcId,wc_name:wcName,visit_date:today,mobile:state.mobile,
-      customer_name:state.name,arrival_time:arrivalTime,departure_time:null,
+      customer_name:state.name,state:state.state||null,city:state.city||null,pin:state.pin||null,
+      area:state.area||null,address:state.address||null,
+      arrival_time:arrivalTime,departure_time:null,
       products:allProducts,product_count:allProducts.length,
       token_no:tokenNum,created_at:now.toISOString()
     });
@@ -710,6 +743,7 @@ async function submitEntry(){
       var pLabel=state.products.length>1?'Product '+(i+1):'Product';
       var pVal=(p.brand?p.brand+' — ':'')+p.model+(p.warranty?' ('+p.warranty+')':'');
       rows.push({icon:'🔖',label:pLabel,val:pVal});
+      if(p.serial)rows.push({icon:'🔢',label:'Serial No',val:p.serial});
       if(p.problem)rows.push({icon:'🔧',label:'Problem',val:p.problem});
     });
     document.getElementById('summary-box').innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">'+t('summary_title')+'</div>'
@@ -719,7 +753,7 @@ async function submitEntry(){
 }
 
 function startOver(){
-  state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true,products:[{warranty:'',brand:'',model:'',problem:''}]};
+  state={mobile:'',name:'',state:'',city:'',pin:'',area:'',address:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true,products:[{warranty:'',brand:'',model:'',problem:''}]};
   document.getElementById('inp-mobile').value='';
   goPage('pg-lang');
 }
@@ -778,6 +812,155 @@ function selectWiModel(val){
   document.getElementById('inp-model').value=val;
   document.getElementById('model-suggestions').style.display='none';
 }
+
+const INDIA_ADDR = {
+  'Gujarat': {
+    'Ahmedabad': ['380001','380002','380003','380004','380005','380006','380007','380008','380009','380013','380014','380015','380016','380018','380019','380021','380022','380023','380024','380025','380026','380027','380028','380050','380051','380052','380054','380055','380058','380059','380060','380061','380063'],
+    'Surat': ['395001','395002','395003','395004','395005','395006','395007','395008','395009','395010','395011','395012','395017','395023'],
+    'Vadodara': ['390001','390002','390003','390004','390005','390006','390007','390008','390009','390010','390011','390012','390013','390014','390015','390016','390017','390018','390019','390020','390021','390022','390023','390024','390025'],
+    'Rajkot': ['360001','360002','360003','360004','360005','360006','360007'],
+    'Gandhinagar': ['382001','382002','382006','382007','382010','382011','382016','382020','382021','382023','382024','382025','382028','382029','382030'],
+    'Bhavnagar': ['364001','364002','364003','364004','364005','364006'],
+    'Jamnagar': ['361001','361002','361003','361004','361005','361006','361007'],
+    'Junagadh': ['362001','362002','362003','362004','362005','362006'],
+    'Anand': ['388001','388002','388003','388004','388005','388006','388007'],
+    'Mehsana': ['384001','384002','384003','384004','384005'],
+    'Nadiad': ['387001','387002','387003'],
+    'Surendranagar': ['363001','363002','363003','363004'],
+    'Bharuch': ['392001','392002','392010','392011','392012','392015'],
+    'Valsad': ['396001','396002','396003','396004','396005'],
+    'Navsari': ['396445','396450','396451','396460'],
+    'Morbi': ['363641','363642','363650'],
+    'Palanpur': ['385001','385002','385003','385004'],
+    'Himmatnagar': ['383001','383002','383003'],
+    'Amreli': ['365601','365602','365603'],
+    'Botad': ['364710','364720','364730'],
+    'Dahod': ['389151','389152','389155'],
+    'Patan': ['384265','384266','384267'],
+    'Modasa': ['383315','383316','383317'],
+    'Porbandar': ['360575','360576','360577'],
+    'Veraval': ['362265','362266','362267'],
+    'Gondal': ['360311','360312','360313'],
+    'Wadhwan': ['363030','363031','363032'],
+  },
+  'Rajasthan': {
+    'Jaipur': ['302001','302002','302003','302004','302005','302006','302007','302008','302009','302010','302011','302012','302013','302014','302015','302016','302017','302018','302019','302020','302021','302022','302023','302024','302025','302026','302027','302028','302029','302031','302033','302034','302036','302039'],
+    'Jodhpur': ['342001','342002','342003','342004','342005','342006','342007','342008','342009','342010','342011','342012','342013','342014','342015'],
+    'Udaipur': ['313001','313002','313003','313004','313005','313006','313007','313008'],
+    'Kota': ['324001','324002','324003','324004','324005','324006','324007','324008','324009','324010'],
+    'Ajmer': ['305001','305002','305003','305004','305005','305006','305007','305008','305009'],
+    'Bikaner': ['334001','334002','334003','334004','334005','334006'],
+    'Alwar': ['301001','301002','301003','301004','301005','301006'],
+    'Bharatpur': ['321001','321002','321003','321004','321005'],
+    'Sikar': ['332001','332002','332003','332004','332005'],
+    'Sri Ganganagar': ['335001','335002','335003','335004','335005'],
+    'Tonk': ['304001','304002','304003','304004'],
+    'Bhilwara': ['311001','311002','311003','311004'],
+    'Pali': ['306001','306002','306003','306004'],
+    'Barmer': ['344001','344002','344003','344004'],
+    'Nagaur': ['341001','341002','341003','341004'],
+    'Dausa': ['303303','303304','303305'],
+    'Sawai Madhopur': ['322001','322002','322003'],
+    'Dholpur': ['328001','328002','328003'],
+    'Bundi': ['323001','323002','323003'],
+    'Chittorgarh': ['312001','312002','312003'],
+  },
+  'Maharashtra': {
+    'Mumbai': ['400001','400002','400003','400004','400005','400006','400007','400008','400009','400010','400011','400012','400013','400014','400015','400016','400017','400018','400019','400020','400021','400022','400023','400024','400025','400026','400027','400028','400029','400030','400031','400032','400033','400034','400035','400036','400037','400038','400039','400040','400041','400042','400043','400044','400045','400046','400047','400048','400049','400050','400051','400052','400053','400054','400055','400056','400057','400058','400059','400060','400061','400062','400063','400064','400065','400066','400067','400068','400069','400070','400071','400072','400073','400074','400075','400076','400077','400078','400079','400080','400081','400082','400083','400084','400085','400086','400087','400088','400089','400090','400091','400092','400093','400094','400095','400096','400097','400098','400099','400100','400101','400102','400103','400104','400105'],
+    'Pune': ['411001','411002','411003','411004','411005','411006','411007','411008','411009','411010','411011','411012','411013','411014','411015','411016','411017','411018','411019','411020','411021','411022','411023','411024','411025','411026','411027','411028','411029','411030','411031','411032','411033','411034','411035','411036','411037','411038','411039','411040','411041','411042','411043','411044','411045','411046','411047','411048','411049','411050','411051','411052','411053','411054','411055','411056','411057','411058','411059','411060','411061','411062'],
+    'Nagpur': ['440001','440002','440003','440004','440005','440006','440007','440008','440009','440010','440011','440012','440013','440014','440015','440016','440017','440018','440019','440020','440021','440022','440023','440024','440025','440026','440027','440028','440029','440030','440032','440033','440034','440035','440036'],
+    'Nashik': ['422001','422002','422003','422004','422005','422006','422007','422008','422009','422010','422011','422012','422013','422014','422015'],
+    'Aurangabad': ['431001','431002','431003','431004','431005','431006','431007','431008','431009','431010'],
+    'Solapur': ['413001','413002','413003','413004','413005','413006','413007','413008'],
+    'Amravati': ['444601','444602','444603','444604','444605','444606','444607'],
+    'Kolhapur': ['416001','416002','416003','416004','416005','416006','416007','416008'],
+    'Thane': ['400601','400602','400603','400604','400605','400606','400607','400608','400609','400610','400611','400612','400613','400614','400615','400616','400617','400618','400619','400620','400621'],
+    'Navi Mumbai': ['400701','400702','400703','400704','400705','400706','400707','400708','400709','400710','400711','400712','400713','400714','400715','400716','400717','400718','400719','400720','400721','400722','400723','400724','400725','400726','400727','400728','400729','400730','400731'],
+    'Nanded': ['431601','431602','431603','431604','431605'],
+    'Akola': ['444001','444002','444003','444004','444005'],
+    'Latur': ['413512','413513','413514','413515','413516'],
+    'Dhule': ['424001','424002','424003','424004','424005'],
+    'Jalgaon': ['425001','425002','425003','425004','425005'],
+    'Sangli': ['416416','416417','416418','416419','416420'],
+    'Satara': ['415001','415002','415003','415004','415005'],
+    'Ratnagiri': ['415612','415613','415614','415615','415616'],
+    'Chandrapur': ['442401','442402','442403','442404','442405'],
+    'Yavatmal': ['445001','445002','445003','445004','445005'],
+  }
+};
+
+const PIN_AREAS={
+  '380001':'Lal Darwaja','380002':'Kalupur','380003':'Dariyapur','380004':'Khanpur',
+  '380005':'Paldi','380006':'Navrangpura','380007':'Ellis Bridge','380008':'Maninagar',
+  '380009':'Vatva','380013':'Bapunagar','380014':'Naroda','380015':'Ambawadi',
+  '380016':'Satellite','380018':'Isanpur','380019':'Odhav','380021':'Rakhial',
+  '380022':'Shahibaug','380023':'Chandkheda','380024':'Gota','380025':'Ghatlodiya',
+  '380026':'Nikol','380027':'Naranpura','380028':'Thaltej','380050':'Bopal',
+  '380051':'Ghatlodia','380052':'Ranip','380054':'Sabarmati','380055':'Motera',
+  '380058':'Vastral','380059':'Bavla','380060':'Vejalpur','380061':'Jodhpur',
+  '380063':'Sarkhej',
+  '395001':'Surat City','395002':'Athwa','395003':'Katargam','395004':'Varachha',
+  '395005':'Rander','395006':'Udhna','395007':'Piplod','395008':'Adajan',
+  '390001':'Vadodara City','390002':'Alkapuri','390003':'Sayajigunj','390004':'Manjalpur',
+  '390005':'Gotri','390007':'Waghodia Road','390008':'Nizampura','390010':'Akota',
+  '360001':'Rajkot City','360002':'Aji Road','360003':'Kalawad Road','360004':'150 Feet Ring Road',
+  '302001':'Jaipur City','302002':'Bani Park','302003':'Civil Lines','302004':'Gopalpura',
+  '302005':'Vaishali Nagar','302006':'Malviya Nagar','302007':'C Scheme','302012':'Mansarovar',
+  '302015':'Pratap Nagar','302017':'Jagatpura','302019':'Sanganer','302020':'Sitapura',
+  '400001':'Fort','400002':'Mandvi','400003':'Masjid','400004':'Girgaon','400005':'Malabar Hill',
+  '400006':'Breach Candy','400007':'Grant Road','400008':'Kalbadevi','400009':'Marine Lines',
+  '400010':'Worli','400011':'Prabhadevi','400012':'Dadar','400013':'Sion','400014':'Mahim',
+  '400015':'Sewri','400016':'Wadala','400017':'Matunga','400018':'Dharavi','400019':'Chembur',
+  '400020':'Colaba','400021':'Cuffe Parade','400050':'Bandra','400051':'Santacruz',
+  '400052':'Vile Parle','400053':'Andheri','400054':'Jogeshwari','400055':'Goregaon',
+  '400056':'Malad','400057':'Kandivali','400058':'Borivali','400059':'Dahisar',
+  '400060':'Mulund','400061':'Bhandup','400062':'Kanjurmarg','400063':'Vikhroli',
+  '400064':'Ghatkopar','400065':'Kurla','400066':'Chembur East','400067':'Govandi',
+  '400068':'Mankhurd','400069':'Trombay','400070':'Deonar','400071':'Tilaknagar',
+  '400072':'Tilak Nagar','400073':'Chunabhatti','400074':'King Circle','400075':'Parel',
+  '400076':'Lower Parel','400077':'Elphinstone','400080':'Thane','400081':'Dombivli',
+  '400086':'Powai','400087':'Chandivali','400088':'Vikhroli West','400089':'Kanjurmarg',
+  '400093':'Navi Mumbai','400094':'Vashi','400095':'Belapur','400096':'Airoli',
+  '400097':'Ghansoli','400098':'Mahape','400099':'Turbhe',
+  '411001':'Pune Camp','411002':'Sadashiv Peth','411003':'Shivajinagar','411004':'Deccan',
+  '411005':'Kothrud','411006':'Karve Nagar','411007':'Sinhagad Road','411008':'Warje',
+  '411009':'Dhankawadi','411014':'Aundh','411015':'Baner','411016':'Balewadi',
+  '411017':'Wakad','411018':'Pimple Nilakh','411019':'Pimple Saudagar',
+  '411020':'Pimple Gurav','411021':'Chinchwad','411022':'Akurdi','411023':'Nigdi',
+  '411024':'Pimpri','411025':'Bhosari','411026':'Moshi','411027':'Chakan',
+  '411028':'Ravet','411029':'Hinjewadi','411030':'Bavdhan',
+  '440001':'Nagpur City','440002':'Dharampeth','440003':'Sitabuldi','440010':'Gandhibagh',
+  '440012':'Sadar','440013':'Ramdaspeth','440015':'Byramji Town','440016':'Pratapnagar',
+};
+
+function wiGetCities(s){return Object.keys(INDIA_ADDR[s]||{});}
+function wiGetPins(s,c){return(INDIA_ADDR[s]||{})[c]||[];}
+
+function wiOnStateChange(){
+  var s=document.getElementById('wi-state').value;
+  var cityEl=document.getElementById('wi-city');
+  cityEl.innerHTML='<option value="">— City —</option>'+wiGetCities(s).map(function(c){return'<option>'+c+'</option>';}).join('');
+  document.getElementById('wi-pin').value='';
+  document.getElementById('wi-pin-list').innerHTML='';
+}
+function wiOnCityChange(){
+  var s=document.getElementById('wi-state').value;
+  var c=document.getElementById('wi-city').value;
+  var pins=wiGetPins(s,c);
+  var dl=document.getElementById('wi-pin-list');
+  dl.innerHTML=pins.map(function(p){var a=PIN_AREAS[p]||'';return'<option value="'+p+'">'+(a?a+' — '+p:p)+'</option>';}).join('');
+}
+// Populate state dropdown on page load
+(function initWiStateDropdown(){
+  var sel=document.getElementById('wi-state');
+  if(!sel)return;
+  var states=Object.keys(INDIA_ADDR);
+  sel.innerHTML='<option value="">— State —</option>'+states.map(function(s){return'<option'+(s==='Gujarat'?' selected':'')+'>'+s+'</option>';}).join('');
+  // Pre-select Gujarat and populate cities
+  sel.value='Gujarat';
+  wiOnStateChange();
+})();
+
 </script>
 </body>
 </html>

@@ -6775,10 +6775,12 @@ async function createJobFromWalkIn(wiId){
       }
     }
   }
-  // Set model
+  // Set model and serial
   setTimeout(function(){
     var modelEl=document.getElementById('call-model');
     if(modelEl&&firstProd.model)modelEl.value=firstProd.model;
+    var serialEl=document.getElementById('call-serial');
+    if(serialEl&&firstProd.serial)serialEl.value=firstProd.serial;
   },100);
 
   // Call type from warranty
@@ -6800,16 +6802,30 @@ async function createJobFromWalkIn(wiId){
     probEl.value=probText||firstProd.remarks;
   }
 
-  // Lookup customer full details from customers table by mobile
+  // Fill address from walk-in entry first (customer filled at check-in)
+  if(l.address){var addrEl=document.getElementById('call-address');if(addrEl)addrEl.value=l.address;}
+  if(l.area){var areaEl=document.getElementById('call-area');if(areaEl)areaEl.value=l.area;}
+  if(l.city&&!l.pin){
+    // city only — set city as text in pin placeholder
+    var cityFill=document.getElementById('call-city');
+    if(cityFill&&cityFill.tagName==='SELECT'){
+      // try to match option
+      var cityOpt=Array.from(cityFill.options).find(function(o){return o.value.toLowerCase()===l.city.toLowerCase();});
+      if(cityOpt)cityFill.value=cityOpt.value;
+    }
+  }
+  if(l.pin||l.city||l.state)setAddressDropdowns(l.state||'Gujarat',l.city||'',l.pin||'');
+
+  // Fallback: Lookup from customers table (fills alt mobile + state if walk-in had no address)
   if(l.mobile){
     try{
       var custs=await sb('customers','GET',null,'?mobile=eq.'+encodeURIComponent(l.mobile)+'&order=updated_at.desc&limit=1');
       if(custs&&custs.length){
         var c=custs[0];
-        if(c.address){var addrEl=document.getElementById('call-address');if(addrEl)addrEl.value=c.address;}
-        if(c.area){var areaEl=document.getElementById('call-area');if(areaEl)areaEl.value=c.area;}
+        if(!l.address&&c.address){var addrEl2=document.getElementById('call-address');if(addrEl2)addrEl2.value=c.address;}
+        if(!l.area&&c.area){var areaEl2=document.getElementById('call-area');if(areaEl2)areaEl2.value=c.area;}
         if(c.alt_mobile){var altEl=document.getElementById('call-alt');if(altEl)altEl.value=c.alt_mobile;}
-        if(c.state)setAddressDropdowns(c.state,c.city||'',c.pin||'');
+        if(c.state&&(!l.city&&!l.pin))setAddressDropdowns(c.state,c.city||'',c.pin||'');
       }
     }catch(e){}
 
