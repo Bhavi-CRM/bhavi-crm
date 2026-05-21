@@ -3241,6 +3241,8 @@ async function openNewCall(){
   document.getElementById('call-brand-name').value='';
   document.getElementById('customer-search-results').innerHTML='';
   document.getElementById('search-customer-q').value='';
+  window._fromWalkInId=null;
+  var oldBanner=document.getElementById('wi-source-banner');if(oldBanner)oldBanner.remove();
   openModal('modal-call');
 }
 
@@ -3395,8 +3397,15 @@ async function saveCall(){
       const id=await generateTicketNo();data.id=id;data.job_sheet=id;
       await sb('tickets','POST',data);
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
+      // Link job to walk-in entry if created from walk-in
+      if(window._fromWalkInId){
+        try{await sb('walkin_log','PATCH',{job_id:id},'?id=eq.'+window._fromWalkInId);}catch(e){}
+        // Update in-memory list so badge shows immediately
+        if(window._todayWILogs){var wi=window._todayWILogs.find(function(x){return x.id==window._fromWalkInId;});if(wi)wi.job_id=id;}
+        window._fromWalkInId=null;
+      }
     }
-    closeModal('modal-call');if(currentPage==='tickets')renderTickets();else renderDashboard();
+    closeModal('modal-call');if(currentPage==='walk-in')renderWalkIn();else if(currentPage==='tickets')renderTickets();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
 }
 async function generateTicketNo(){
@@ -6688,17 +6697,23 @@ function renderWalkInList(logs){
   if(!logs||!logs.length)return'<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">📭 આજ કોઈ walk-in નથી</div>';
   return logs.map(function(l){
     var products=l.products||[];
+    var hasInward=products.some(function(p){return p.type==='Inward';});
     var depBtn=!l.departure_time
       ?'<button onclick="updateWIDeparture(\''+l.id+'\')" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">⏰ Set Departure</button>'
       :'<span style="font-size:11px;color:#065f46;background:#d1fae5;padding:3px 8px;border-radius:99px;">Out: '+l.departure_time+'</span>';
     var tokenBadge=l.token_no?'<span style="background:#1a56db;color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;margin-right:8px;">#'+l.token_no+'</span>':'';
-    return '<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--primary);">'
+    var jobBadge=l.job_id?'<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">✅ '+l.job_id+'</span>':'';
+    var createJobBtn=hasInward&&!l.job_id
+      ?'<button onclick="createJobFromWalkIn(\''+l.id+'\')" style="background:#1a56db;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">🔧 Create Job</button>'
+      :'';
+    return '<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+(hasInward?'#1a56db':'#0e9f6e')+';">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
       +'<div>'
-      +'<div style="font-weight:600;font-size:14px;">'+tokenBadge+l.customer_name+' <span style="font-size:12px;color:var(--text-muted);">'+l.mobile+'</span></div>'
+      +'<div style="font-weight:600;font-size:14px;">'+tokenBadge+l.customer_name+' <span style="font-size:12px;color:var(--text-muted);">'+l.mobile+'</span> '+jobBadge+'</div>'
       +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🕐 In: <b>'+l.arrival_time+'</b>'+(l.departure_time?' &nbsp;|&nbsp; Out: <b>'+l.departure_time+'</b>':' &nbsp;|&nbsp; <span style="color:#f59e0b;">Still in office</span>')+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
+      +createJobBtn
       +'<button onclick="editWalkIn(\''+l.id+'\')" style="background:#e0f2fe;color:#1a56db;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">✏️ Edit</button>'
       +depBtn
       +'</div>'
@@ -6718,6 +6733,117 @@ function renderWalkInList(logs){
       +'</div>'
       +'</div>';
   }).join('');
+}
+
+// ── CREATE JOB FROM WALK-IN ──
+window._fromWalkInId=null;
+async function createJobFromWalkIn(wiId){
+  var logs=window._todayWILogs||[];
+  var l=logs.find(function(x){return x.id==wiId;});
+  if(!l){try{var r=await sb('walkin_log','GET',null,'?id=eq.'+wiId);l=r&&r[0];}catch(e){}}
+  if(!l){alert('Entry not found');return;}
+
+  await openNewCall();
+
+  // Walk-in source banner inside modal
+  var banner=document.createElement('div');
+  banner.id='wi-source-banner';
+  banner.style.cssText='background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:center;gap:10px;';
+  banner.innerHTML='<span style="font-size:18px;">🚶</span><div><b>Walk-in Entry se Create ho raha hai</b> — Token #'+(l.token_no||'—')+' &nbsp;|&nbsp; In: '+(l.arrival_time||'')+'<br><span style="font-size:11px;color:#1a56db;">Customer ki details auto-fill ho gayi hai. Serial No aur Problem verify karke Save karein.</span></div>';
+  var modalBody=document.querySelector('#modal-call .modal-body');
+  if(modalBody)modalBody.insertBefore(banner,modalBody.firstChild);
+
+  // Fill customer name & mobile
+  var nameEl=document.getElementById('call-cname');
+  var mobEl=document.getElementById('call-mobile');
+  if(nameEl)nameEl.value=l.customer_name||'';
+  if(mobEl)mobEl.value=l.mobile||'';
+
+  // Auto-fill first inward product
+  var products=l.products||[];
+  var inwardProds=products.filter(function(p){return p.type==='Inward';});
+  var firstProd=inwardProds[0]||products[0]||{};
+
+  // Set brand
+  if(firstProd.brand){
+    var brandDrop=document.getElementById('call-brand-input');
+    if(brandDrop&&brandDrop.tagName==='SELECT'){
+      var matchOpt=Array.from(brandDrop.options).find(function(o){return o.text.toLowerCase()===firstProd.brand.toLowerCase();});
+      if(matchOpt){
+        brandDrop.value=matchOpt.value;
+        selectBrandFromDrop(matchOpt.value,matchOpt.text);
+      }
+    }
+  }
+  // Set model
+  setTimeout(function(){
+    var modelEl=document.getElementById('call-model');
+    if(modelEl&&firstProd.model)modelEl.value=firstProd.model;
+  },100);
+
+  // Call type from warranty
+  var callTypeEl=document.getElementById('call-type');
+  if(callTypeEl){
+    if(firstProd.warranty==='In Warranty')callTypeEl.value='Warranty';
+    else if(firstProd.warranty==='Out of Warranty')callTypeEl.value='Non-Warranty';
+    handleCallTypeChange();
+  }
+  // Service type = Carry In (customer walked in)
+  var stEl=document.getElementById('call-service-type');
+  if(stEl)stEl.value='Carry In';
+
+  // Fill problem from remarks
+  var probEl=document.getElementById('call-problem');
+  if(probEl&&firstProd.remarks){
+    // strip category prefix like "Camera (ICP) | Problem in Product — Submit for Repair | "
+    var probText=firstProd.remarks.split('|').pop().trim();
+    probEl.value=probText||firstProd.remarks;
+  }
+
+  // Lookup customer full details from customers table by mobile
+  if(l.mobile){
+    try{
+      var custs=await sb('customers','GET',null,'?mobile=eq.'+encodeURIComponent(l.mobile)+'&order=updated_at.desc&limit=1');
+      if(custs&&custs.length){
+        var c=custs[0];
+        if(c.address){var addrEl=document.getElementById('call-address');if(addrEl)addrEl.value=c.address;}
+        if(c.area){var areaEl=document.getElementById('call-area');if(areaEl)areaEl.value=c.area;}
+        if(c.alt_mobile){var altEl=document.getElementById('call-alt');if(altEl)altEl.value=c.alt_mobile;}
+        if(c.state)setAddressDropdowns(c.state,c.city||'',c.pin||'');
+      }
+    }catch(e){}
+
+    // Show customer's previous jobs for reference
+    try{
+      var prevTickets=await sb('tickets','GET',null,'?mobile=eq.'+encodeURIComponent(l.mobile)+'&order=created_at.desc&limit=5');
+      if(prevTickets&&prevTickets.length){
+        var prevDiv=document.createElement('div');
+        prevDiv.style.cssText='background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:14px;';
+        prevDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px;">📋 Previous Jobs ('+prevTickets.length+')</div>'
+          +prevTickets.map(function(t){
+            return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #fde68a;display:flex;gap:8px;align-items:center;">'
+              +'<span style="font-weight:700;color:#1a56db;">'+t.id+'</span>'
+              +'<span style="color:#64748b;">'+t.model+' — '+t.problem+'</span>'
+              +'<span style="margin-left:auto;font-size:11px;background:#f1f5f9;padding:1px 6px;border-radius:99px;">'+t.status+'</span>'
+              +'</div>';
+          }).join('');
+        if(modalBody)modalBody.insertBefore(prevDiv,banner.nextSibling);
+      }
+    }catch(e){}
+  }
+
+  // Multi-product: show all inward products if >1
+  if(inwardProds.length>1){
+    var multiDiv=document.createElement('div');
+    multiDiv.style.cssText='background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:14px;';
+    multiDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">📦 Walk-in ma '+inwardProds.length+' products chhe — Product 1 auto-filled. Baaki manually add karo:</div>'
+      +inwardProds.slice(1).map(function(p,i){
+        return '<div style="font-size:12px;padding:3px 0;color:#166534;">• '+(p.brand?p.brand+' ':'')+p.model+' ('+(p.warranty||'?')+')'+(p.remarks?' — '+p.remarks:'')+'</div>';
+      }).join('');
+    if(modalBody)modalBody.insertBefore(multiDiv,banner.nextSibling);
+  }
+
+  window._fromWalkInId=wiId;
 }
 
 async function editWalkIn(id){
