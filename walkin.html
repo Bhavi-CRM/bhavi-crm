@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bhavi Electronics — Customer Check-in</title>
+<link rel="icon" href="icon-192.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--primary:#1a3fa8;--primary-light:#2563eb;--accent:#e63946;--success:#059669;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+.page{display:none;width:100%;max-width:500px;min-height:100vh;background:var(--card);flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.08);}
+.page.active{display:flex;}
+
+/* HEADER */
+.header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:22px 20px 18px;text-align:center;position:relative;}
+.header-logo{width:68px;height:68px;border-radius:16px;margin:0 auto 10px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+.header-logo-placeholder{width:68px;height:68px;border-radius:16px;margin:0 auto 10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;}
+.header h1{font-size:18px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
+.header .tagline{font-size:11px;opacity:.75;margin-top:4px;font-weight:400;letter-spacing:.4px;}
+.header .step-badge{display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
+
+/* BODY */
+.body{flex:1;padding:22px 20px;overflow-y:auto;}
+.section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;text-align:center;}
+
+/* LANGUAGE BUTTONS */
+.lang-grid{display:flex;flex-direction:column;gap:10px;}
+.lang-btn{display:flex;align-items:center;gap:16px;padding:16px 18px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;transition:all .18s;width:100%;}
+.lang-btn:hover,.lang-btn.selected{border-color:var(--primary-light);background:#eff6ff;box-shadow:0 2px 12px rgba(37,99,235,.12);}
+.lang-badge{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;letter-spacing:0;}
+.lang-gu .lang-badge{background:#fff3e0;color:#e65100;}
+.lang-hi .lang-badge{background:#fce4ec;color:#c62828;}
+.lang-en .lang-badge{background:#e3f2fd;color:#1565c0;}
+.lang-name{font-size:16px;font-weight:700;color:var(--text);display:block;}
+.lang-sub{font-size:12px;color:var(--muted);display:block;margin-top:2px;}
+.lang-arrow{margin-left:auto;color:var(--muted);font-size:18px;}
+
+/* FORM */
+.inp-group{margin-bottom:18px;}
+.inp-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.6px;}
+.inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;transition:border .18s;background:#fafcff;}
+.inp:focus{border-color:var(--primary-light);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.08);}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+
+/* OPTION CARDS */
+.option-card{display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;margin-bottom:10px;transition:all .18s;background:var(--card);}
+.option-card:hover,.option-card.active{border-color:var(--primary-light);background:#eff6ff;box-shadow:0 2px 12px rgba(37,99,235,.1);}
+.option-card .oc-icon{width:44px;height:44px;border-radius:11px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.option-card.active .oc-icon{background:#dbeafe;}
+.option-card .title{font-size:14px;font-weight:700;color:var(--text);}
+.option-card .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.option-card .oc-arr{margin-left:auto;color:var(--muted);font-size:16px;}
+
+/* SUB OPTIONS */
+.sub-option{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:9px;transition:all .18s;background:var(--card);}
+.sub-option:hover,.sub-option.selected{border-color:var(--primary-light);background:#eff6ff;}
+.sub-option .so-radio{width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .18s;}
+.sub-option.selected .so-radio{border-color:var(--primary-light);background:var(--primary-light);}
+.sub-option.selected .so-radio::after{content:'';width:7px;height:7px;border-radius:50%;background:#fff;}
+.sub-option .text{font-size:14px;font-weight:600;color:var(--text);}
+
+/* WARRANTY */
+.warranty-row{display:flex;gap:8px;margin-top:6px;}
+.w-btn{flex:1;padding:13px 6px;border:1.5px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .18s;font-size:12px;font-weight:600;color:var(--muted);}
+.w-btn .w-icon{font-size:20px;display:block;margin-bottom:4px;}
+.w-btn.selected{border-color:var(--primary-light);background:#eff6ff;color:var(--primary);}
+
+/* CUSTOMER CARD */
+.customer-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:var(--radius);padding:16px;margin-bottom:18px;}
+.customer-card .cname{font-size:17px;font-weight:800;color:#166534;}
+.customer-card .cmob{font-size:13px;color:#16a34a;margin-top:3px;}
+
+/* BUTTONS */
+.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(26,63,168,.25);}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(26,63,168,.35);}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
+.btn-outline{width:100%;background:#fff;color:var(--primary);border:1.5px solid var(--primary-light);border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px;}
+.back-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:20px;}
+.back-btn:hover{color:var(--primary);}
+
+/* TOKEN / SUCCESS */
+.token-box{background:linear-gradient(135deg,#0f2d7a,#2563eb);color:#fff;border-radius:18px;padding:30px 20px;text-align:center;margin-bottom:18px;box-shadow:0 8px 24px rgba(26,63,168,.3);}
+.token-num{font-size:64px;font-weight:900;letter-spacing:4px;line-height:1;}
+.token-label{font-size:13px;opacity:.8;margin-bottom:8px;font-weight:500;letter-spacing:.5px;}
+.token-time{font-size:12px;opacity:.65;margin-top:8px;}
+.summary-box{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
+.summary-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.summary-row:last-child{border-bottom:none;}
+.summary-row .sr-icon{width:20px;text-align:center;flex-shrink:0;}
+.summary-row .sr-label{color:var(--muted);font-weight:600;width:90px;flex-shrink:0;}
+.summary-row .sr-val{color:var(--text);font-weight:500;}
+.wait-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;text-align:center;font-size:14px;color:#1e40af;font-weight:600;line-height:1.6;}
+
+/* FOOTER */
+.footer{padding:16px 20px;border-top:1px solid var(--border);background:#f9fafb;}
+.error-msg{color:#dc2626;font-size:13px;margin-bottom:10px;display:none;padding:10px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;}
+
+/* SPINNER */
+.spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.fade{animation:fadeIn .22s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* DIVIDER */
+.divider{border:none;border-top:1px solid var(--border);margin:18px 0;}
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: LANGUAGE -->
+<div class="page active fade" id="pg-lang">
+  <div class="header" style="padding-bottom:24px;">
+    <div id="header-logo-wrap">
+      <div class="header-logo-placeholder" id="logo-placeholder">BE</div>
+    </div>
+    <h1>Bhavi Electronics &amp; Automation</h1>
+    <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
+    <div class="step-badge">Customer Self Check-in</div>
+  </div>
+  <div class="body">
+    <div class="section-title">Select Language &nbsp;/&nbsp; ભાષા પસંદ કરો &nbsp;/&nbsp; भाषा चुनें</div>
+    <div class="lang-grid">
+      <button class="lang-btn lang-gu" onclick="setLang('gu')">
+        <div class="lang-badge">ગુ</div>
+        <div><span class="lang-name">ગુજરાતી</span><span class="lang-sub">Gujarati</span></div>
+        <span class="lang-arrow">›</span>
+      </button>
+      <button class="lang-btn lang-hi" onclick="setLang('hi')">
+        <div class="lang-badge">हि</div>
+        <div><span class="lang-name">हिन्दी</span><span class="lang-sub">Hindi</span></div>
+        <span class="lang-arrow">›</span>
+      </button>
+      <button class="lang-btn lang-en" onclick="setLang('en')">
+        <div class="lang-badge">EN</div>
+        <div><span class="lang-name">English</span><span class="lang-sub">English</span></div>
+        <span class="lang-arrow">›</span>
+      </button>
+    </div>
+  </div>
+  <div style="padding:16px 20px;text-align:center;">
+    <div style="font-size:11px;color:#9ca3af;">© Bhavi Electronics &amp; Automation</div>
+  </div>
+</div>
+
+<!-- PAGE 2: MOBILE -->
+<div class="page fade" id="pg-mobile">
+  <div class="header">
+    <h1 id="hdr-mobile">Welcome</h1>
+    <div class="tagline" id="hdr-mobile-sub">Enter your mobile number to proceed</div>
+    <div class="step-badge">Step 1 of 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-lang')">&#8592; <span id="lbl-back-lang"></span></button>
+    <div class="inp-group">
+      <label id="lbl-mobile"></label>
+      <input class="inp" type="tel" id="inp-mobile" maxlength="10" inputmode="numeric" placeholder="e.g. 9876543210" oninput="this.value=this.value.replace(/\D/g,'')">
+    </div>
+    <div class="error-msg" id="mobile-error"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:-8px;" id="lbl-mobile-hint"></div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" id="btn-mobile-next" onclick="submitMobile()">
+      <span id="lbl-next-mob"></span>
+    </button>
+  </div>
+</div>
+
+<!-- PAGE 3: CUSTOMER DETAILS -->
+<div class="page fade" id="pg-customer">
+  <div class="header">
+    <h1 id="hdr-customer">Your Details</h1>
+    <div class="tagline" id="hdr-customer-sub">Please confirm or fill in your information</div>
+    <div class="step-badge">Step 2 of 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-mobile')">&#8592; <span id="lbl-back-mob"></span></button>
+    <div id="found-customer-card" style="display:none;" class="customer-card fade">
+      <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;" id="lbl-found-msg"></div>
+      <div class="cname" id="found-name"></div>
+      <div class="cmob" id="found-mob"></div>
+    </div>
+    <div id="new-customer-fields" class="fade">
+      <div class="inp-group">
+        <label id="lbl-name-field"></label>
+        <input class="inp" type="text" id="inp-name" autocomplete="name">
+      </div>
+      <div class="inp-group">
+        <label id="lbl-city-field"></label>
+        <input class="inp" type="text" id="inp-city" autocomplete="address-level2">
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" onclick="submitCustomer()"><span id="lbl-confirm"></span></button>
+  </div>
+</div>
+
+<!-- PAGE 4: CATEGORY -->
+<div class="page fade" id="pg-category">
+  <div class="header">
+    <h1 id="hdr-category">Purpose of Visit</h1>
+    <div class="tagline" id="hdr-category-sub">Select the product or service category</div>
+    <div class="step-badge">Step 3 of 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-customer')">&#8592; <span id="lbl-back-cust"></span></button>
+    <div class="option-card" onclick="selectCategory('camera')">
+      <div class="oc-icon">📷</div>
+      <div>
+        <div class="title" id="cat-camera">Camera (ICP)</div>
+        <div class="sub" id="cat-camera-sub">Canon, Panasonic, Godox, Fujifilm</div>
+      </div>
+      <span class="oc-arr">›</span>
+    </div>
+    <div class="option-card" onclick="selectCategory('printer')">
+      <div class="oc-icon">🖨️</div>
+      <div>
+        <div class="title" id="cat-printer">Printer (CSP)</div>
+        <div class="sub" id="cat-printer-sub">Canon Printers &amp; Scanners</div>
+      </div>
+      <span class="oc-arr">›</span>
+    </div>
+    <div class="option-card" onclick="selectCategory('other')">
+      <div class="oc-icon">🛍️</div>
+      <div>
+        <div class="title" id="cat-other">Other</div>
+        <div class="sub" id="cat-other-sub">Ink, Accessories &amp; Other Purchases</div>
+      </div>
+      <span class="oc-arr">›</span>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 5: SUB-CATEGORY -->
+<div class="page fade" id="pg-subcategory">
+  <div class="header">
+    <h1 id="hdr-subcat">Select Purpose</h1>
+    <div class="tagline" id="hdr-subcat-sub"></div>
+    <div class="step-badge">Step 3 of 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-category')">&#8592; <span id="lbl-back-cat"></span></button>
+    <div id="subcategory-options"></div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" id="btn-subcat-next" onclick="submitSubcategory()" disabled>
+      <span id="lbl-subcat-next">Continue</span>
+    </button>
+  </div>
+</div>
+
+<!-- PAGE 6: PRODUCT DETAILS -->
+<div class="page fade" id="pg-product">
+  <div class="header">
+    <h1 id="hdr-product">Product Information</h1>
+    <div class="tagline" id="hdr-product-sub">Please provide your product details</div>
+    <div class="step-badge">Step 4 of 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-subcategory')">&#8592; <span id="lbl-back-subcat"></span></button>
+    <div class="inp-group" id="warranty-group">
+      <label id="lbl-warranty"></label>
+      <div class="warranty-row">
+        <div class="w-btn" id="wbtn-warranty" onclick="selectWarranty('In Warranty')">
+          <span class="w-icon">✅</span><span id="lbl-w-yes"></span>
+        </div>
+        <div class="w-btn" id="wbtn-nonwarranty" onclick="selectWarranty('Out of Warranty')">
+          <span class="w-icon">⚠️</span><span id="lbl-w-no"></span>
+        </div>
+        <div class="w-btn" id="wbtn-other" onclick="selectWarranty('Other')">
+          <span class="w-icon">❓</span><span id="lbl-w-other"></span>
+        </div>
+      </div>
+    </div>
+    <div class="inp-group" id="brand-group">
+      <label id="lbl-brand"></label>
+      <select class="inp" id="inp-brand" onchange="onBrandChange()">
+        <option value="">— Select Brand —</option>
+      </select>
+    </div>
+    <div class="inp-group" id="model-group" style="position:relative;">
+      <label id="lbl-model"></label>
+      <input class="inp" type="text" id="inp-model" placeholder="Type to search or enter model..." autocomplete="off"
+        oninput="filterModelSuggestions(this.value)" onfocus="filterModelSuggestions(this.value)" onblur="setTimeout(function(){document.getElementById('model-suggestions').style.display='none';},200)">
+      <div id="model-suggestions" style="display:none;position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;"></div>
+    </div>
+    <div class="inp-group" id="problem-group">
+      <label id="lbl-problem"></label>
+      <textarea class="inp" id="inp-problem" rows="3"></textarea>
+    </div>
+    <div class="inp-group" id="other-remark-group" style="display:none;">
+      <label id="lbl-other-remark"></label>
+      <input class="inp" type="text" id="inp-other-remark">
+    </div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" onclick="submitProductDetails()"><span id="lbl-submit"></span></button>
+  </div>
+</div>
+
+<!-- PAGE 7: SUCCESS -->
+<div class="page fade" id="pg-success">
+  <div class="header" style="background:linear-gradient(160deg,#064e3b,#059669,#10b981);">
+    <div style="font-size:36px;margin-bottom:8px;">✅</div>
+    <h1 id="hdr-success">Check-in Successful!</h1>
+    <div class="tagline" id="hdr-success-sub">Our team will assist you shortly</div>
+  </div>
+  <div class="body">
+    <div class="token-box">
+      <div class="token-label" id="lbl-token-label">Your Token Number</div>
+      <div class="token-num" id="token-number">—</div>
+      <div class="token-time" id="lbl-token-time"></div>
+    </div>
+    <div class="summary-box" id="summary-box"></div>
+    <div class="wait-box" id="lbl-wait-msg"></div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" style="background:linear-gradient(135deg,#064e3b,#059669);" onclick="startOver()">
+      <span id="lbl-new-entry">New Check-in</span>
+    </button>
+  </div>
+</div>
+
+<script>
+var SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
+var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
+
+async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbPost(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
+
+// Load logo from DB
+(async function(){
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/users?role=eq.admin&select=company_logo&limit=1',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(res.ok){var data=await res.json();var logo=data&&data[0]&&data[0].company_logo;
+      if(logo){
+        var wrap=document.getElementById('header-logo-wrap');
+        wrap.innerHTML='<img src="'+logo+'" class="header-logo" alt="Bhavi Logo" onerror="this.style.display=\'none\'">';
+      }
+    }
+  }catch(e){}
+})();
+
+// ── TRANSLATIONS ──
+var T={
+  gu:{
+    mobile_hdr:'સ્વાગત છે',mobile_sub:'આગળ વધવા માટે કૃપા કરીને આપનો મોબાઇલ નંબર દાખલ કરો',
+    lbl_mobile:'મોબાઇલ નંબર',mobile_hint:'અમે આ નંબર ઓળખ પ્રક્રિયા માટે ઉપયોગ કરીશું',
+    customer_hdr:'આપની માહિતી',customer_sub:'કૃપા કરીને આપની વિગત પ્રમાણિત કરો',
+    lbl_found:'આપને આવકાર છે! અમારી પાસે આપની નોંધ છે:',
+    lbl_name:'પૂરું નામ',lbl_city:'શહેર',
+    confirm:'પ્રમાણિત કરો અને આગળ વધો →',
+    category_hdr:'આપની મુલાકાતનો હેતુ',category_sub:'ઉત્પાદન અથવા સેવા વિભાગ પસંદ કરો',
+    cat_camera:'કૅમેરા (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
+    cat_printer:'પ્રિન્ટર (CSP)',cat_printer_sub:'Canon Printers & Scanners',
+    cat_other:'અન્ય',cat_other_sub:'ઇન્ક, Accessories અને અન્ય ખરીદી',
+    subcat_hdr:'હેતુ પસંદ કરો',
+    lbl_warranty:'વૉરન્ટી સ્થિતિ',
+    w_yes:'વૉરન્ટી હેઠળ',w_no:'વૉરન્ટી બહાર',w_other:'જાણ નથી',
+    lbl_brand:'બ્રાન્ડ',lbl_model:'મૉડેલ નંબર',
+    lbl_problem:'સમસ્યા / ફરિયાદ',problem_ph:'ઉત્પાદનની સમસ્યા જણાવો...',
+    lbl_other_remark:'વધુ વિગત',
+    submit:'ચેક-ઇન પૂર્ણ કરો ✓',
+    success_hdr:'ચેક-ઇન સફળ!',success_sub:'અમારી ટીમ ટૂંક સમયમાં આપની સહાય કરશે',
+    token_label:'આપનો ટોકન નંબર',
+    wait_msg:'🙏 કૃપા કરી બેઠક ગ્રહણ કરો. અમારી ટીમ આપનો ટોકન નંબર બોલાવશે ત્યારે પધારો.',
+    summary_title:'નોંધણી સારાંશ',new_entry:'નવી નોંધણી',
+    back:'પાછળ',next:'આગળ',continue:'ચાલુ રાખો',
+    err_mobile:'કૃપા કરીને 10 અંકનો માન્ય મોબાઇલ નંبر દાખલ કરો',
+    err_name:'નામ ફરજિયાત છે',err_subcat:'કૃપા કરીને એક વિકલ્પ પસંદ કરો',
+    err_warranty:'કૃપા કરીને વૉરન્ટી સ્થિتિ પસં� करो',err_model:'મૉडेल নंबर ফরজিয়াத छे',
+  },
+  hi:{
+    mobile_hdr:'आपका स्वागत है',mobile_sub:'कृपया आगे बढ़ने के लिए अपना मोबाइल नंबर दर्ज करें',
+    lbl_mobile:'मोबाइल नंबर',mobile_hint:'हम इस नंबर का उपयोग आपकी पहचान के लिए करेंगे',
+    customer_hdr:'आपकी जानकारी',customer_sub:'कृपया अपनी जानकारी की पुष्टि करें',
+    lbl_found:'आपका स्वागत है! हमारे पास आपकी जानकारी उपलब्ध है:',
+    lbl_name:'पूरा नाम',lbl_city:'शहर',
+    confirm:'पुष्टि करें और आगे बढ़ें →',
+    category_hdr:'आपके आने का उद्देश्य',category_sub:'उत्पाद या सेवा श्रेणी चुनें',
+    cat_camera:'कैमरा (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
+    cat_printer:'प्रिंटर (CSP)',cat_printer_sub:'Canon Printers & Scanners',
+    cat_other:'अन्य',cat_other_sub:'स्याही, Accessories एवं अन्य खरीदारी',
+    subcat_hdr:'उद्देश्य चुनें',
+    lbl_warranty:'वारंटी स्थिति',
+    w_yes:'वारंटी में',w_no:'वारंटी से बाहर',w_other:'ज्ञात नहीं',
+    lbl_brand:'ब्रांड',lbl_model:'मॉडल नंबर',
+    lbl_problem:'समस्या / शिकायत',problem_ph:'उत्पाद की समस्या बताएं...',
+    lbl_other_remark:'अतिरिक्त विवरण',
+    submit:'चेक-इन पूर्ण करें ✓',
+    success_hdr:'चेक-इन सफल रहा!',success_sub:'हमारी टीम शीघ्र ही आपकी सहायता करेगी',
+    token_label:'आपका टोकन नंबर',
+    wait_msg:'🙏 कृपया बैठें। हमारी टीम आपका टोकन नंबर बुलाए तब पधारें।',
+    summary_title:'पंजीकरण सारांश',new_entry:'नई प्रविष्टि',
+    back:'वापस',next:'आगे',continue:'जारी रखें',
+    err_mobile:'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें',
+    err_name:'नाम आवश्यक है',err_subcat:'कृपया एक विकल्प चुनें',
+    err_warranty:'कृपया वारंटी स्थिति चुनें',err_model:'मॉडल नंबर आवश्यक है',
+  },
+  en:{
+    mobile_hdr:'Welcome',mobile_sub:'Please enter your mobile number to proceed',
+    lbl_mobile:'Mobile Number',mobile_hint:'We will use this to retrieve your details if available',
+    customer_hdr:'Your Details',customer_sub:'Please confirm or complete your information',
+    lbl_found:'Welcome back! We found your details:',
+    lbl_name:'Full Name',lbl_city:'City',
+    confirm:'Confirm &amp; Continue →',
+    category_hdr:'Purpose of Visit',category_sub:'Select the product or service category',
+    cat_camera:'Camera (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
+    cat_printer:'Printer (CSP)',cat_printer_sub:'Canon Printers &amp; Scanners',
+    cat_other:'Other',cat_other_sub:'Ink, Accessories &amp; Other Purchases',
+    subcat_hdr:'Select Purpose',
+    lbl_warranty:'Warranty Status',
+    w_yes:'In Warranty',w_no:'Out of Warranty',w_other:'Not Sure',
+    lbl_brand:'Brand',lbl_model:'Model Number',
+    lbl_problem:'Problem / Complaint',problem_ph:'Please describe the issue with your product...',
+    lbl_other_remark:'Additional Details',
+    submit:'Complete Check-in ✓',
+    success_hdr:'Check-in Successful!',success_sub:'Our team will assist you shortly',
+    token_label:'Your Token Number',
+    wait_msg:'🙏 Please be seated. Our team will call your token number shortly.',
+    summary_title:'Registration Summary',new_entry:'New Check-in',
+    back:'Back',next:'Next',continue:'Continue',
+    err_mobile:'Please enter a valid 10-digit mobile number',
+    err_name:'Full name is required',err_subcat:'Please select an option',
+    err_warranty:'Please select warranty status',err_model:'Model number is required',
+  }
+};
+
+var SUBCATS={
+  camera:{
+    en:['Problem in Product — Submit for Repair','Service / Cleaning Required','Product Collection'],
+    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ / ક્લિનિંગ જોઈએ','ઉत्पादन कलेक्शन'],
+    hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस / सफाई चाहिए','उत्पाद संग्रह'],
+    types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
+  },
+  printer:{
+    en:['Problem in Product — Submit for Repair','Service Required','Product Collection'],
+    gu:['ઉત્પાদनमां ખামी — સমारकाम маटे સोंपो','સर्विस जोईए','ઉत्पादन कलेक्शन'],
+    hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस चाहिए','उत्पाद संग्रह'],
+    types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
+  },
+  other:{
+    en:['Ink Purchase','Accessories Purchase','Other Purchase (please specify)'],
+    gu:['ઇन्क ખรीदी','Accessories ખрідी','અন્ય ખріді (વิગत ભрो)'],
+    hi:['स्याही खरीद','Accessories खरीद','अन्य खरीद (विवरण दें)'],
+    types:['Other','Other','Other'],needsProduct:[false,false,false]
+  }
+};
+
+var BRANDS_BY_CAT={
+  camera:['Canon','Panasonic','Godox','Fujifilm','Sony','Nikon','Other'],
+  printer:['Canon','Epson','HP','Brother','Other'],
+  other:[]
+};
+
+var CSP_CAMERA_BRANDS=['fujifilm'];
+
+function getWcId(category,brand){
+  if(category==='printer')return 'SELF_CHECKIN_CSP';
+  if(category==='camera'){
+    if(CSP_CAMERA_BRANDS.indexOf((brand||'').toLowerCase().trim())>=0)return 'SELF_CHECKIN_CSP';
+    return 'SELF_CHECKIN_ICP';
+  }
+  return 'SELF_CHECKIN_OTHER';
+}
+function getWcName(wcId){
+  return wcId==='SELF_CHECKIN_ICP'?'Self Check-in (ICP)':wcId==='SELF_CHECKIN_CSP'?'Self Check-in (CSP)':'Self Check-in (Other)';
+}
+
+var lang='en';
+var state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
+
+function t(key){return(T[lang]&&T[lang][key])||T['en'][key]||key;}
+
+function applyLang(){
+  var ids={
+    'hdr-mobile':'mobile_hdr','hdr-mobile-sub':'mobile_sub','lbl-mobile':'lbl_mobile',
+    'lbl-mobile-hint':'mobile_hint','hdr-customer':'customer_hdr','hdr-customer-sub':'customer_sub',
+    'lbl-found-msg':'lbl_found','lbl-name-field':'lbl_name','lbl-city-field':'lbl_city',
+    'lbl-confirm':'confirm','hdr-category':'category_hdr','hdr-category-sub':'category_sub',
+    'cat-camera':'cat_camera','cat-camera-sub':'cat_camera_sub','cat-printer':'cat_printer',
+    'cat-printer-sub':'cat_printer_sub','cat-other':'cat_other','cat-other-sub':'cat_other_sub',
+    'hdr-subcat':'subcat_hdr','lbl-subcat-next':'continue','lbl-warranty':'lbl_warranty',
+    'lbl-w-yes':'w_yes','lbl-w-no':'w_no','lbl-w-other':'w_other',
+    'lbl-brand':'lbl_brand','lbl-model':'lbl_model','lbl-problem':'lbl_problem',
+    'lbl-other-remark':'lbl_other_remark','lbl-submit':'submit',
+    'hdr-success':'success_hdr','hdr-success-sub':'success_sub','lbl-token-label':'token_label',
+    'lbl-wait-msg':'wait_msg','lbl-new-entry':'new_entry'
+  };
+  Object.keys(ids).forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.innerHTML=t(ids[id]);
+  });
+  ['lbl-back-lang','lbl-back-mob','lbl-back-cust','lbl-back-cat','lbl-back-subcat'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.textContent=t('back');
+  });
+  var ph=document.getElementById('inp-problem');
+  if(ph)ph.placeholder=t('problem_ph');
+}
+
+function setLang(l){lang=l;applyLang();goPage('pg-mobile');document.getElementById('inp-mobile').focus();}
+
+function goPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  var pg=document.getElementById(id);pg.classList.add('active','fade');window.scrollTo(0,0);
+}
+
+async function submitMobile(){
+  var mob=document.getElementById('inp-mobile').value.trim();
+  var errEl=document.getElementById('mobile-error');errEl.style.display='none';
+  if(!/^\d{10}$/.test(mob)){errEl.textContent=t('err_mobile');errEl.style.display='';return;}
+  state.mobile=mob;
+  var btn=document.getElementById('btn-mobile-next');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    var logs=await sbGet('walkin_log','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=customer_name,mobile');
+    if(logs&&logs.length&&logs[0].customer_name){
+      state.name=logs[0].customer_name;state.isNewCustomer=false;
+      document.getElementById('found-customer-card').style.display='';
+      document.getElementById('found-name').textContent=state.name;
+      document.getElementById('found-mob').textContent='📱 '+mob;
+      document.getElementById('new-customer-fields').style.display='none';
+    } else {
+      state.isNewCustomer=true;
+      document.getElementById('found-customer-card').style.display='none';
+      document.getElementById('new-customer-fields').style.display='';
+      document.getElementById('inp-name').value='';document.getElementById('inp-city').value='';
+    }
+    goPage('pg-customer');
+  }catch(e){
+    state.isNewCustomer=true;
+    document.getElementById('found-customer-card').style.display='none';
+    document.getElementById('new-customer-fields').style.display='';
+    goPage('pg-customer');
+  }finally{btn.disabled=false;btn.innerHTML='<span>'+t('next')+' &rarr;</span>';}
+}
+
+function submitCustomer(){
+  if(!state.isNewCustomer){goPage('pg-category');return;}
+  var name=document.getElementById('inp-name').value.trim();
+  if(!name){alert(t('err_name'));return;}
+  state.name=name;state.city=document.getElementById('inp-city').value.trim();
+  goPage('pg-category');
+}
+
+function selectCategory(cat){
+  state.category=cat;state.subcatIdx=-1;
+  var sc=SUBCATS[cat];
+  document.getElementById('hdr-subcat-sub').textContent=t('cat_'+cat);
+  var opts=sc[lang]||sc['en'];
+  document.getElementById('subcategory-options').innerHTML=opts.map(function(label,i){
+    return '<div class="sub-option" id="subopt-'+i+'" onclick="selectSubcat('+i+')">'
+      +'<div class="so-radio" id="sorad-'+i+'"></div>'
+      +'<span class="text">'+label+'</span>'
+    +'</div>';
+  }).join('');
+  document.getElementById('btn-subcat-next').disabled=true;
+  goPage('pg-subcategory');
+}
+
+function selectSubcat(idx){
+  state.subcatIdx=idx;
+  document.querySelectorAll('.sub-option').forEach(function(el,i){el.classList.toggle('selected',i===idx);});
+  document.getElementById('btn-subcat-next').disabled=false;
+}
+
+function submitSubcategory(){
+  if(state.subcatIdx<0){alert(t('err_subcat'));return;}
+  var sc=SUBCATS[state.category];
+  state.warranty='';state.brand='';state.model='';state.problem='';state.otherRemark='';
+  document.querySelectorAll('.w-btn').forEach(function(b){b.classList.remove('selected');});
+  document.getElementById('inp-model').value='';
+  document.getElementById('inp-problem').value='';
+  document.getElementById('inp-other-remark').value='';
+  var needsProd=sc.needsProduct[state.subcatIdx];
+  var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
+  if(needsProd){
+    var brands=BRANDS_BY_CAT[state.category]||['Canon','Other'];
+    document.getElementById('inp-brand').innerHTML='<option value="">— '+t('lbl_brand')+' —</option>'
+      +brands.map(function(b){return'<option>'+b+'</option>';}).join('');
+    document.getElementById('warranty-group').style.display='';
+    document.getElementById('brand-group').style.display='';
+    document.getElementById('model-group').style.display='';
+    document.getElementById('problem-group').style.display='';
+    document.getElementById('other-remark-group').style.display='none';
+    goPage('pg-product');
+  } else if(isOtherSpec){
+    document.getElementById('warranty-group').style.display='none';
+    document.getElementById('brand-group').style.display='none';
+    document.getElementById('model-group').style.display='none';
+    document.getElementById('problem-group').style.display='none';
+    document.getElementById('other-remark-group').style.display='';
+    goPage('pg-product');
+  } else {
+    submitEntry();
+  }
+}
+
+function selectWarranty(val){
+  state.warranty=val;
+  document.getElementById('wbtn-warranty').classList.toggle('selected',val==='In Warranty');
+  document.getElementById('wbtn-nonwarranty').classList.toggle('selected',val==='Out of Warranty');
+  document.getElementById('wbtn-other').classList.toggle('selected',val==='Other');
+}
+
+function submitProductDetails(){
+  var sc=SUBCATS[state.category];
+  var needsProd=sc.needsProduct[state.subcatIdx];
+  var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
+  if(needsProd){
+    if(!state.warranty){alert(t('err_warranty'));return;}
+    var model=document.getElementById('inp-model').value.trim();
+    if(!model){alert(t('err_model'));return;}
+    state.brand=document.getElementById('inp-brand').value||'';
+    state.model=model;
+    state.problem=document.getElementById('inp-problem').value.trim();
+  } else if(isOtherSpec){
+    state.otherRemark=document.getElementById('inp-other-remark').value.trim();
+  }
+  submitEntry();
+}
+
+async function submitEntry(){
+  var sc=SUBCATS[state.category];
+  var subcatLabel=(sc['en']||[])[state.subcatIdx]||'';
+  var wiType=(sc.types||[])[state.subcatIdx]||'Other';
+  var wcId=getWcId(state.category,state.brand);
+  var wcName=getWcName(wcId);
+  var catLabel=state.category==='printer'?'Printer (CSP)':state.category==='camera'?(wcId==='SELF_CHECKIN_CSP'?'Camera - Fujifilm (CSP)':'Camera (ICP)'):'Other';
+  var remarks=[catLabel,subcatLabel,state.problem,state.otherRemark].filter(Boolean).join(' | ');
+  var now=new Date();
+  var arrivalTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var today=now.toLocaleDateString('en-CA');
+  // Sequential token: count all entries this month + 1
+  var tokenNum=1;
+  try{
+    var monthStart=today.substring(0,8)+'01';
+    var rows=await sbGet('walkin_log','?visit_date=gte.'+monthStart+'&select=token_no&order=token_no.desc.nullslast&limit=1');
+    tokenNum=((rows&&rows.length&&rows[0].token_no)||0)+1;
+  }catch(e){tokenNum=Math.floor(100+Math.random()*900);}
+  try{
+    await sbPost('walkin_log',{
+      wc_id:wcId,wc_name:wcName,visit_date:today,mobile:state.mobile,
+      customer_name:state.name,arrival_time:arrivalTime,departure_time:null,
+      products:[{brand:state.brand||catLabel,model:state.model||subcatLabel,type:wiType,warranty:state.warranty||'Other',remarks:remarks}],
+      product_count:1,token_no:tokenNum,created_at:now.toISOString()
+    });
+    document.getElementById('token-number').textContent=tokenNum;
+    document.getElementById('lbl-token-time').textContent=arrivalTime+' · '+today.split('-').reverse().join('-');
+    var rows=[
+      {icon:'👤',label:t('lbl_name'),val:state.name+(state.city?' ('+state.city+')':'')},
+      {icon:'📱',label:t('lbl_mobile'),val:state.mobile},
+      {icon:'🏷️',label:'Category',val:catLabel},
+      {icon:'📋',label:'Purpose',val:subcatLabel},
+    ];
+    if(state.brand)rows.push({icon:'🔖',label:t('lbl_brand'),val:state.brand+(state.model?' — '+state.model:'')});
+    if(state.warranty)rows.push({icon:'🛡️',label:t('lbl_warranty'),val:state.warranty});
+    if(state.problem)rows.push({icon:'🔧',label:t('lbl_problem'),val:state.problem});
+    if(state.otherRemark)rows.push({icon:'📝',label:t('lbl_other_remark'),val:state.otherRemark});
+    document.getElementById('summary-box').innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">'+t('summary_title')+'</div>'
+      +rows.map(function(r){return'<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';}).join('');
+    goPage('pg-success');
+  }catch(e){alert('Submission failed. Please ask our staff for assistance.\nError: '+e.message);}
+}
+
+function startOver(){
+  state={mobile:'',name:'',city:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
+  document.getElementById('inp-mobile').value='';
+  goPage('pg-lang');
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){var pg=document.querySelector('.page.active');if(pg&&pg.id==='pg-mobile')submitMobile();}
+});
+
+// ── SEARCHABLE MODEL DROPDOWN ──
+window._wiAllModels=[];
+window._wiAllBrands=[];
+window._wiModels=[];
+
+(async function loadWiModelData(){
+  try{
+    var res=await Promise.all([
+      sbGet('brands','?order=name&select=id,name'),
+      sbGet('models','?order=model_no&select=id,brand_id,model_no,model_name')
+    ]);
+    window._wiAllBrands=res[0]||[];
+    window._wiAllModels=res[1]||[];
+  }catch(e){window._wiAllModels=[];window._wiAllBrands=[];}
+})();
+
+function onBrandChange(){
+  var brand=document.getElementById('inp-brand').value;
+  document.getElementById('inp-model').value='';
+  document.getElementById('model-suggestions').style.display='none';
+  if(brand){
+    var bObj=null;
+    for(var i=0;i<window._wiAllBrands.length;i++){if(window._wiAllBrands[i].name===brand){bObj=window._wiAllBrands[i];break;}}
+    window._wiModels=bObj?window._wiAllModels.filter(function(m){return m.brand_id===bObj.id;}):window._wiAllModels.slice();
+  }else{
+    window._wiModels=window._wiAllModels.slice();
+  }
+}
+
+function filterModelSuggestions(query){
+  var sug=document.getElementById('model-suggestions');
+  var models=window._wiModels.length?window._wiModels:window._wiAllModels;
+  var q=(query||'').toLowerCase().trim();
+  var filtered=q?models.filter(function(m){
+    return(m.model_no||'').toLowerCase().indexOf(q)>=0||(m.model_name||'').toLowerCase().indexOf(q)>=0;
+  }):models;
+  if(!filtered.length){sug.style.display='none';return;}
+  sug.innerHTML=filtered.slice(0,20).map(function(m){
+    var display=m.model_no+(m.model_name?' — '+m.model_name:'');
+    var safe=(m.model_no||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return'<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;" '
+      +'onmousedown="selectWiModel(\''+safe+'\')">'+display+'</div>';
+  }).join('');
+  sug.style.display='';
+}
+
+function selectWiModel(val){
+  document.getElementById('inp-model').value=val;
+  document.getElementById('model-suggestions').style.display='none';
+}
+</script>
+</body>
+</html>
