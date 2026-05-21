@@ -112,7 +112,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div class="page active fade" id="pg-lang">
   <div class="header" style="padding-bottom:24px;">
     <div id="header-logo-wrap">
-      <div class="header-logo-placeholder" id="logo-placeholder">BE</div>
+      <img src="icon-192.png" class="header-logo" alt="Bhavi Electronics"
+        onerror="this.outerHTML='<div class=\'header-logo-placeholder\' style=\'background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);\'>BE</div>'">
     </div>
     <h1>Bhavi Electronics &amp; Automation</h1>
     <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
@@ -154,14 +155,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <button class="back-btn" onclick="goPage('pg-lang')">&#8592; <span id="lbl-back-lang"></span></button>
     <div class="inp-group">
       <label id="lbl-mobile"></label>
-      <input class="inp" type="tel" id="inp-mobile" maxlength="10" inputmode="numeric" placeholder="e.g. 9876543210" oninput="this.value=this.value.replace(/\D/g,'')">
+      <input class="inp" type="tel" id="inp-mobile" maxlength="10" inputmode="numeric" placeholder="e.g. 9876543210"
+        oninput="this.value=this.value.replace(/\D/g,'')"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();submitMobile();}">
     </div>
     <div class="error-msg" id="mobile-error"></div>
     <div style="font-size:12px;color:var(--muted);margin-top:-8px;" id="lbl-mobile-hint"></div>
-  </div>
-  <div class="footer">
-    <button class="btn-primary" id="btn-mobile-next" onclick="submitMobile()">
-      <span id="lbl-next-mob"></span>
+    <button class="btn-primary" id="btn-mobile-next" onclick="submitMobile()" style="margin-top:20px;">
+      <span id="lbl-next-mob">Next →</span>
     </button>
   </div>
 </div>
@@ -190,9 +191,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <input class="inp" type="text" id="inp-city" autocomplete="address-level2">
       </div>
     </div>
-  </div>
-  <div class="footer">
-    <button class="btn-primary" onclick="submitCustomer()"><span id="lbl-confirm"></span></button>
+    <button class="btn-primary" onclick="submitCustomer()" style="margin-top:20px;"><span id="lbl-confirm">Confirm & Continue →</span></button>
   </div>
 </div>
 
@@ -293,9 +292,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <label id="lbl-other-remark"></label>
       <input class="inp" type="text" id="inp-other-remark">
     </div>
-  </div>
-  <div class="footer">
-    <button class="btn-primary" onclick="submitProductDetails()"><span id="lbl-submit"></span></button>
+    <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:20px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
   </div>
 </div>
 
@@ -329,24 +326,6 @@ var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbPost(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
 
-// Load logo — localStorage first (shared with CRM on same origin), then Supabase fallback
-(async function(){
-  function applyWiLogo(src){
-    if(!src)return;
-    var wrap=document.getElementById('header-logo-wrap');
-    wrap.innerHTML='<img src="'+src+'" class="header-logo" alt="Bhavi Logo" onerror="this.style.display=\'none\'">';
-  }
-  // Try localStorage (set by CRM on same origin)
-  var cached=localStorage.getItem('bhavi_logo');
-  if(cached){applyWiLogo(cached);return;}
-  // Fallback: fetch from Supabase
-  try{
-    var res=await fetch(SB_URL+'/rest/v1/users?role=eq.admin&select=company_logo&limit=1',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    if(res.ok){var data=await res.json();var logo=data&&data[0]&&data[0].company_logo;
-      if(logo){localStorage.setItem('bhavi_logo',logo);applyWiLogo(logo);}
-    }
-  }catch(e){}
-})();
 
 // ── TRANSLATIONS ──
 var T={
@@ -520,14 +499,26 @@ async function submitMobile(){
   var btn=document.getElementById('btn-mobile-next');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    var logs=await sbGet('walkin_log','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=customer_name,mobile');
-    if(logs&&logs.length&&logs[0].customer_name){
-      state.name=logs[0].customer_name;state.isNewCustomer=false;
+    var foundName='',foundCity='';
+    // Check customers table first (master data)
+    try{
+      var custs=await sbGet('customers','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=name,city');
+      if(custs&&custs.length&&custs[0].name){foundName=custs[0].name;foundCity=custs[0].city||'';}
+    }catch(e1){}
+    // Fallback: check walkin_log
+    if(!foundName){
+      try{
+        var logs=await sbGet('walkin_log','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=customer_name');
+        if(logs&&logs.length&&logs[0].customer_name)foundName=logs[0].customer_name;
+      }catch(e2){}
+    }
+    if(foundName){
+      state.name=foundName;state.city=foundCity;state.isNewCustomer=false;
       document.getElementById('found-customer-card').style.display='';
-      document.getElementById('found-name').textContent=state.name;
+      document.getElementById('found-name').textContent=foundName;
       document.getElementById('found-mob').textContent='📱 '+mob;
       document.getElementById('new-customer-fields').style.display='none';
-    } else {
+    }else{
       state.isNewCustomer=true;
       document.getElementById('found-customer-card').style.display='none';
       document.getElementById('new-customer-fields').style.display='';
