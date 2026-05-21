@@ -3174,7 +3174,7 @@ async function renderMyCalls(){
           <div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="openTaskUpdate('${t.id}')">📝 Update</button></div>
         </div>`).join('')}
       </div>`:''}
-      <div class="card"><div class="section-header"><h2>My Calls</h2><button class="btn btn-primary btn-sm" onclick="openDailyReport()">📋 Daily Report</button></div>
+      <div class="card"><div class="section-header"><h2>My Calls</h2><div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="openPastReports()">🕐 Past Reports</button><button class="btn btn-primary btn-sm" onclick="openDailyReport()">📋 Daily Report</button></div></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Problem</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
           <tbody>${tickets.map(t=>`<tr>
@@ -6405,6 +6405,76 @@ function drCopyReport(){
   navigator.clipboard.writeText(t).then(function(){
     var btn=document.getElementById('dr-copy-btn');
     if(btn){btn.textContent='✅ Copied!';setTimeout(function(){btn.textContent='📋 Copy';},2000);}
+  });
+}
+
+async function openPastReports(){
+  var old=document.getElementById('past-reports-panel');if(old)old.remove();
+  var panel=document.createElement('div');
+  panel.id='past-reports-panel';
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  panel.innerHTML=
+    '<div style="background:#fff;border-radius:16px;width:100%;max-width:460px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
+    +'<div style="padding:16px 18px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">'
+    +'<span style="font-size:16px;font-weight:700;">🕐 Past Daily Reports</span>'
+    +'<button onclick="document.getElementById(\'past-reports-panel\').remove();" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
+    +'</div>'
+    +'<div id="past-reports-list" style="flex:1;overflow-y:auto;padding:12px 18px;">'
+    +'<div style="text-align:center;color:#6b7280;padding:24px;">Loading...</div>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(panel);
+
+  try{
+    var engId=currentUser.eng_id||currentUser.user_id;
+    var reports=await sb('daily_reports','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&order=report_date.desc&limit=30');
+    var list=document.getElementById('past-reports-list');
+    if(!list)return;
+    if(!reports||!reports.length){
+      list.innerHTML='<div style="text-align:center;color:#6b7280;padding:24px;">Koi report madi nahi</div>';
+      return;
+    }
+    list.innerHTML=reports.map(function(r){
+      var dateStr=new Date(r.report_date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+      var siteCount=(r.site_visits&&r.site_visits.length)||r.total_site_visits||0;
+      var officeCount=(r.office_work&&r.office_work.length)||r.total_office_work||0;
+      var amt=r.total_amount||0;
+      var reviews=r.total_reviews||0;
+      return '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;hover:background:#f9fafb;" onclick="showPastReportShare('+r.id+')" id="pr-row-'+r.id+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        +'<span style="font-weight:600;font-size:14px;">📅 '+dateStr+'</span>'
+        +'<span style="background:#25D366;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;">📲 Share</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">'
+        +(siteCount?'<span style="font-size:12px;color:#1a56db;">🏢 '+siteCount+' Sites</span>':'')
+        +(officeCount?'<span style="font-size:12px;color:#5b21b6;">💼 '+officeCount+' Office</span>':'')
+        +(amt>0?'<span style="font-size:12px;color:#065f46;">💰 ₹'+amt+'</span>':'')
+        +(reviews>0?'<span style="font-size:12px;color:#92400e;">⭐ '+reviews+' Reviews</span>':'')
+        +'</div>'
+        +'</div>';
+    }).join('');
+    // store reports for lookup
+    window._pastReports=reports;
+  }catch(e){
+    var list2=document.getElementById('past-reports-list');
+    if(list2)list2.innerHTML='<div style="color:red;padding:16px;">Error: '+e.message+'</div>';
+  }
+}
+
+function showPastReportShare(id){
+  var r=window._pastReports&&window._pastReports.find(function(x){return x.id==id;});
+  if(!r)return;
+  document.getElementById('past-reports-panel').remove();
+  showDailyReportShare({
+    eng_name:r.eng_name,
+    report_date:r.report_date,
+    site_visits:r.site_visits||[],
+    office_work:r.office_work||[],
+    payments:r.payment_details||[],
+    total_amount:r.total_amount||0,
+    petrol_km:r.petrol_km||0,
+    google_reviews:r.google_reviews||[],
+    remarks:r.remarks||''
   });
 }
 
