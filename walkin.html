@@ -329,15 +329,21 @@ var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbPost(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
 
-// Load logo from DB
+// Load logo — localStorage first (shared with CRM on same origin), then Supabase fallback
 (async function(){
+  function applyWiLogo(src){
+    if(!src)return;
+    var wrap=document.getElementById('header-logo-wrap');
+    wrap.innerHTML='<img src="'+src+'" class="header-logo" alt="Bhavi Logo" onerror="this.style.display=\'none\'">';
+  }
+  // Try localStorage (set by CRM on same origin)
+  var cached=localStorage.getItem('bhavi_logo');
+  if(cached){applyWiLogo(cached);return;}
+  // Fallback: fetch from Supabase
   try{
     var res=await fetch(SB_URL+'/rest/v1/users?role=eq.admin&select=company_logo&limit=1',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
     if(res.ok){var data=await res.json();var logo=data&&data[0]&&data[0].company_logo;
-      if(logo){
-        var wrap=document.getElementById('header-logo-wrap');
-        wrap.innerHTML='<img src="'+logo+'" class="header-logo" alt="Bhavi Logo" onerror="this.style.display=\'none\'">';
-      }
+      if(logo){localStorage.setItem('bhavi_logo',logo);applyWiLogo(logo);}
     }
   }catch(e){}
 })();

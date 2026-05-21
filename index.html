@@ -5841,10 +5841,8 @@ async function printJobSheet(){
         <div class="field"><label>Fault Code</label><div class="val">${t.fault_code||''}</div></div>
       </div>
       <div class="field"><label>Description</label><div class="val" style="min-height:18px;">${t.description||''}</div></div>
-      <div class="row2" style="margin-top:4px;">
-        <div class="field"><label>Cause</label><div class="val" style="min-height:18px;">${t.cause||''}</div></div>
-        <div class="field"><label>Action Taken</label><div class="val" style="min-height:18px;">${t.work_done||''}</div></div>
-      </div>
+      <div class="field" style="margin-top:4px;"><label>Cause</label><div class="val" style="min-height:18px;">${t.cause||''}</div></div>
+      <div class="field" style="margin-top:6px;"><label>Action Taken</label><div class="val" style="min-height:36px;border-top:1px solid #e5e7eb;padding-top:4px;">${t.work_done||''}</div></div>
     </div></div>
     ${t.service_type==='On Site'?`<div class="section"><div class="sec-title">Visit Details</div><div class="sec-body row3">
       <div class="field"><label>Date</label><div class="val">${t.visit_date||''}</div></div>
@@ -6330,6 +6328,7 @@ function cleanModelNo(s){
 async function renderWalkIn(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
+  var _isAdm=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
 
   // Load models and brands if not already loaded
   try{
@@ -6348,14 +6347,19 @@ async function renderWalkIn(){
   var todayLogs=[];
   try{
     var _wiSelfIds='SELF_CHECKIN_OTHER';
-    if(isAdmin){_wiSelfIds='SELF_CHECKIN_ICP,wc_id.eq.SELF_CHECKIN_CSP,wc_id.eq.SELF_CHECKIN_OTHER';}
+    if(_isAdm){_wiSelfIds='SELF_CHECKIN_ICP,wc_id.eq.SELF_CHECKIN_CSP,wc_id.eq.SELF_CHECKIN_OTHER';}
     else{
       var _wcN=(currentUser.name||'').toUpperCase();
       var _wcU=(currentUser.user_id||'').toUpperCase();
       var _isCSP=_wcN.includes('CSP')||_wcU.includes('CSP');
       _wiSelfIds=(_isCSP?'SELF_CHECKIN_CSP':'SELF_CHECKIN_ICP')+',wc_id.eq.SELF_CHECKIN_OTHER';
     }
-    todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=token_no.asc.nullslast,arrival_time.asc');
+    try{
+      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=token_no.asc.nullslast,arrival_time.asc');
+    }catch(e){
+      // Fallback if token_no column not yet added
+      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=arrival_time.asc');
+    }
     window._todayWILogs=todayLogs;
   }catch(e){}
 
@@ -6397,6 +6401,15 @@ async function renderWalkIn(){
     <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <h2>🚶 Walk-in Customer Entry</h2>
     </div>
+
+    ${_isAdm?`<div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Route To Work Center</label>
+      <select id="wi-route" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;max-width:320px;">
+        <option value="ICP">📷 ICP — Camera Service</option>
+        <option value="CSP">🖨️ CSP — Printer / Fujifilm Service</option>
+        <option value="self">🧑 My Queue (Admin)</option>
+      </select>
+    </div>`:''}
 
     <div class="form-grid" style="margin-bottom:10px;">
       <div class="form-group">
@@ -6618,11 +6631,20 @@ async function saveWalkIn(){
   }
 
   var today=new Date().toLocaleDateString('en-CA');
+  // Determine routing wc_id
+  var saveWcId=currentUser.user_id,saveWcName=currentUser.name;
+  var _isSaveAdm=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+  if(_isSaveAdm){
+    var routeSel=document.getElementById('wi-route');
+    var routeVal=routeSel?routeSel.value:'self';
+    if(routeVal==='ICP'){saveWcId='SELF_CHECKIN_ICP';saveWcName='Self Check-in (ICP)';}
+    else if(routeVal==='CSP'){saveWcId='SELF_CHECKIN_CSP';saveWcName='Self Check-in (CSP)';}
+  }
   try{
     var tokenNo=await getNextWalkInToken(today);
     await sb('walkin_log','POST',{
-      wc_id:currentUser.user_id,
-      wc_name:currentUser.name,
+      wc_id:saveWcId,
+      wc_name:saveWcName,
       visit_date:today,
       mobile,
       customer_name:name,
@@ -6868,6 +6890,7 @@ function showWalkInQR(){
   var existing=document.getElementById('modal-walkin-qr');
   if(existing)existing.remove();
   var url=_WALKIN_URL;
+  var qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data='+encodeURIComponent(url);
   var modal=document.createElement('div');
   modal.id='modal-walkin-qr';
   modal.className='modal-overlay';
@@ -6877,8 +6900,8 @@ function showWalkInQR(){
     +'<button class="close-btn" onclick="document.getElementById(\'modal-walkin-qr\').remove()">✕</button></div>'
     +'<div class="modal-body" style="padding:20px;">'
     +'<div style="background:#f0f9ff;border-radius:12px;padding:16px;margin-bottom:14px;">'
-    +'<div id="qr-canvas-wrap" style="display:flex;justify-content:center;margin-bottom:12px;">'
-    +'<canvas id="qr-canvas" width="220" height="220"></canvas>'
+    +'<div style="display:flex;justify-content:center;margin-bottom:12px;">'
+    +'<img id="qr-img" src="'+qrSrc+'" width="220" height="220" style="border-radius:8px;border:1px solid #e5e7eb;" onerror="this.outerHTML=\'<div style=&quot;font-size:13px;color:#6b7280;padding:20px;&quot;>QR load failed.<br>Use the link below.</div>\'">'
     +'</div>'
     +'<div style="font-size:12px;color:#6b7280;word-break:break-all;">'+url+'</div>'
     +'</div>'
@@ -6889,25 +6912,11 @@ function showWalkInQR(){
     +'</div>'
     +'</div></div>';
   document.body.appendChild(modal);
-  // Draw QR using a simple JS QR library loaded from CDN
-  var script=document.createElement('script');
-  script.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-  script.onload=function(){
-    QRCode.toCanvas(document.getElementById('qr-canvas'),url,{width:220,margin:1},function(err){
-      if(err)document.getElementById('qr-canvas-wrap').innerHTML='<div style="font-size:13px;color:#6b7280;">QR generation failed.<br>Use the link below.</div>';
-    });
-  };
-  script.onerror=function(){
-    document.getElementById('qr-canvas-wrap').innerHTML='<div style="font-size:13px;color:#6b7280;">QR library not loaded.<br>Use the link below to share.</div>';
-  };
-  document.head.appendChild(script);
 }
 
 function printWalkInQR(){
-  var canvas=document.getElementById('qr-canvas');
-  if(!canvas){alert('QR code not generated yet. Please wait a moment and try again.');return;}
-  var imgData=canvas.toDataURL('image/png');
-  var win=window.open('','_blank','width=400,height=500');
+  var qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data='+encodeURIComponent(_WALKIN_URL);
+  var win=window.open('','_blank','width=420,height=560');
   win.document.write('<!DOCTYPE html><html><head><title>Bhavi Electronics — Self Check-in QR</title>'
     +'<style>body{font-family:Arial,sans-serif;text-align:center;padding:30px;background:#fff;}'
     +'h2{color:#1a3fa8;font-size:18px;margin-bottom:4px;}'
@@ -6917,11 +6926,10 @@ function printWalkInQR(){
     +'</style></head><body>'
     +'<h2>Bhavi Electronics &amp; Automation</h2>'
     +'<p style="font-size:11px;color:#888;letter-spacing:.5px;">WHERE CUSTOMER DELIGHT IS FIRST</p>'
-    +'<div style="margin:16px 0;"><img src="'+imgData+'" width="220" height="220"></div>'
+    +'<div style="margin:16px 0;"><img src="'+qrSrc+'" width="280" height="280" onload="window.print();"></div>'
     +'<p style="font-size:14px;font-weight:700;color:#1a3fa8;">📱 Scan to Self Check-in</p>'
     +'<p>Scan the QR code above with your mobile camera<br>to register your visit without waiting in queue.</p>'
     +'<p style="font-size:10px;color:#9ca3af;margin-top:16px;">'+_WALKIN_URL+'</p>'
-    +'<script>window.onload=function(){window.print();};<\/script>'
     +'</body></html>');
   win.document.close();
 }
