@@ -790,48 +790,36 @@ tr:hover td{background:#f8fafc;}
     </div>
     <div class="modal-body">
       <div style="background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-        <div><b id="dr-eng-name">Engineer</b> <span style="font-size:12px;color:var(--text-muted);">Daily Report</span></div>
+        <div><b id="dr-eng-name">Engineer</b> <span style="font-size:12px;color:var(--text-muted);">Daily Site Visit Report</span></div>
         <div class="form-group" style="margin-bottom:0;">
           <input type="date" id="dr-date" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
         </div>
       </div>
 
-      <!-- Section 1: Warranty Calls -->
+      <!-- Section 1: Site Visits -->
       <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #1a56db;">
-        <h3 style="font-size:14px;font-weight:700;color:#1a56db;margin-bottom:10px;">1. Printer Warranty Calls</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>* Installation Call <span class="req">*</span></label>
-            <input type="number" id="dr-w-install" min="0" value="" placeholder="0" oninput="autoSumCalls()">
-          </div>
-          <div class="form-group">
-            <label>* Breakdown Call <span class="req">*</span></label>
-            <input type="number" id="dr-w-breakdown" min="0" value="" placeholder="0" oninput="autoSumCalls()">
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <h3 style="font-size:14px;font-weight:700;color:#1a56db;">1. 🏢 Site Visits</h3>
+          <span style="font-size:12px;color:#1a56db;font-weight:600;">Total: <span id="dr-site-count">0</span></span>
         </div>
+        <div id="dr-site-rows"></div>
+        <button class="btn btn-outline btn-sm" onclick="addSiteVisitRow()" style="margin-top:8px;">+ Add Site Visit</button>
       </div>
 
-      <!-- Section 2: Out Warranty Calls -->
-      <div style="background:#fff7ed;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ff9800;">
-        <h3 style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px;">2. Out Warranty Calls</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>* Breakdown Call <span class="req">*</span></label>
-            <input type="number" id="dr-ow-breakdown" min="0" value="" placeholder="0" oninput="autoSumCalls()">
-          </div>
-          <div class="form-group">
-            <label>* Other Calls <span class="req">*</span></label>
-            <input type="number" id="dr-ow-other" min="0" value="" placeholder="0" oninput="autoSumCalls()">
-          </div>
+      <!-- Section 2: Office / Remote Work -->
+      <div style="background:#f5f3ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #7c3aed;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <h3 style="font-size:14px;font-weight:700;color:#5b21b6;">2. 💼 Office / Remote Work</h3>
+          <span style="font-size:12px;color:#5b21b6;font-weight:600;">Total: <span id="dr-office-count">0</span></span>
         </div>
+        <div id="dr-office-rows"></div>
+        <button class="btn btn-outline btn-sm" onclick="addOfficeWorkRow()" style="margin-top:8px;">+ Add Office Work</button>
       </div>
 
       <!-- Section 3: Payment Details -->
       <div style="background:#f0fdf4;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #0e9f6e;">
-        <h3 style="font-size:14px;font-weight:700;color:#065f46;margin-bottom:10px;">3. Party-wise Payment Details</h3>
-        <div id="payment-rows">
-          <!-- Dynamic rows -->
-        </div>
+        <h3 style="font-size:14px;font-weight:700;color:#065f46;margin-bottom:10px;">3. 💰 Party-wise Payment Details</h3>
+        <div id="payment-rows"></div>
         <button class="btn btn-outline btn-sm" onclick="addPaymentRow()" style="margin-top:8px;">+ Add Customer</button>
         <div style="margin-top:10px;background:#fff;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-weight:700;font-size:14px;">Total Amount:</span>
@@ -839,35 +827,26 @@ tr:hover td{background:#f8fafc;}
         </div>
       </div>
 
-      <!-- Section 4 & 5 -->
-      <div class="form-grid">
-        <div style="background:#faf5ff;border-radius:10px;padding:14px;border-left:4px solid #7c3aed;">
-          <h3 style="font-size:14px;font-weight:700;color:#7c3aed;margin-bottom:10px;">4. Total Calls</h3>
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Total Calls Today (Auto)</label>
-            <input type="number" id="dr-total-calls" min="0" value="" placeholder="0" readonly style="background:#f0f4ff;font-weight:700;">
-          </div>
-        </div>
-        <div style="background:#fff0f0;border-radius:10px;padding:14px;border-left:4px solid #f05252;">
-          <h3 style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px;">5. Travel Details</h3>
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Petrol / KM <span class="req">*</span></label>
-            <input type="number" id="dr-petrol-km" min="0" step="0.1" value="" placeholder="0.0 KM">
-          </div>
+      <!-- Section 4: Travel -->
+      <div style="background:#fff0f0;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #f05252;">
+        <h3 style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px;">4. 🚗 Travel Details</h3>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Petrol / KM</label>
+          <input type="number" id="dr-petrol-km" min="0" step="0.1" value="" placeholder="0.0 KM">
         </div>
       </div>
 
-      <!-- Section 6: Google Reviews -->
-      <div style="background:#fff8e1;border-radius:10px;padding:14px;margin-top:12px;border-left:4px solid #f59e0b;">
+      <!-- Section 5: Google Reviews -->
+      <div style="background:#fff8e1;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #f59e0b;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <h3 style="font-size:14px;font-weight:700;color:#92400e;">6. ⭐ Google Reviews</h3>
+          <h3 style="font-size:14px;font-weight:700;color:#92400e;">5. ⭐ Google Reviews</h3>
           <span style="font-size:12px;color:#92400e;font-weight:600;">Total: <span id="dr-total-reviews">0</span></span>
         </div>
         <div id="dr-reviews-container"></div>
         <button class="btn btn-outline btn-sm" onclick="addDRReviewRow()" style="margin-top:4px;">+ Add Review</button>
       </div>
 
-      <div class="form-group" style="margin-top:12px;">
+      <div class="form-group" style="margin-top:4px;">
         <label>Remarks</label>
         <textarea id="dr-remarks" rows="2" placeholder="Any additional notes..."></textarea>
       </div>
@@ -6023,13 +6002,16 @@ function refreshPage(){
 function openDailyReport(){
   document.getElementById('dr-eng-name').textContent=currentUser.name;
   document.getElementById('dr-date').value=new Date().toLocaleDateString('en-CA');
-  document.getElementById('dr-w-install').value='';
-  document.getElementById('dr-w-breakdown').value='';
-  document.getElementById('dr-ow-breakdown').value='';
-  document.getElementById('dr-ow-other').value='';
-  document.getElementById('dr-total-calls').value='';
   document.getElementById('dr-petrol-km').value='';
   document.getElementById('dr-remarks').value='';
+  // Init site visit rows
+  var sr=document.getElementById('dr-site-rows');
+  if(sr){sr.innerHTML='';addSiteVisitRow();}
+  updateSiteCount();
+  // Init office work rows
+  var or2=document.getElementById('dr-office-rows');
+  if(or2)or2.innerHTML='';
+  updateOfficeCount();
   // Init payment rows
   var pr=document.getElementById('payment-rows');
   pr.innerHTML='';
@@ -6167,13 +6149,64 @@ async function saveWCDailyReport(){
   }catch(e){alert('Error: '+e.message);}
 }
 
-function autoSumCalls(){
-  var a=parseInt(document.getElementById('dr-w-install')?.value)||0;
-  var b=parseInt(document.getElementById('dr-w-breakdown')?.value)||0;
-  var c=parseInt(document.getElementById('dr-ow-breakdown')?.value)||0;
-  var d=parseInt(document.getElementById('dr-ow-other')?.value)||0;
-  var el=document.getElementById('dr-total-calls');
-  if(el)el.value=a+b+c+d;
+function addSiteVisitRow(){
+  var rows=document.getElementById('dr-site-rows');
+  if(!rows)return;
+  var div=document.createElement('div');
+  div.className='dr-site-row';
+  div.style.cssText='background:#fff;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #bfdbfe;';
+  var uid='sv'+(Date.now()%1000000);
+  div.innerHTML=
+    '<div style="display:grid;grid-template-columns:2fr 1.5fr auto;gap:8px;margin-bottom:6px;align-items:center;">'
+    +'<input type="text" class="sv-site-name" placeholder="Site Name *" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'<input type="text" class="sv-area" placeholder="Area" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'<button onclick="this.closest(\'.dr-site-row\').remove();updateSiteCount();" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;white-space:nowrap;">✕</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-bottom:6px;">'
+    +'<div>'
+    +'<input class="sv-problem" list="sv-prob-list-'+uid+'" placeholder="Problem Type" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'<datalist id="sv-prob-list-'+uid+'">'
+    +'<option value="Automation"><option value="CCTV"><option value="Home Theater"><option value="Network"><option value="Access Control"><option value="Solar"><option value="IT Support"><option value="Other">'
+    +'</datalist>'
+    +'</div>'
+    +'<input type="text" class="sv-remark" placeholder="Remark / Work Done" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'</div>';
+  rows.appendChild(div);
+  updateSiteCount();
+}
+
+function updateSiteCount(){
+  var count=document.querySelectorAll('#dr-site-rows .dr-site-row').length;
+  var el=document.getElementById('dr-site-count');
+  if(el)el.textContent=count;
+}
+
+function addOfficeWorkRow(){
+  var rows=document.getElementById('dr-office-rows');
+  if(!rows)return;
+  var div=document.createElement('div');
+  div.className='dr-office-row';
+  div.style.cssText='background:#fff;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #ddd6fe;';
+  var uid='ow'+(Date.now()%1000000);
+  div.innerHTML=
+    '<div style="display:grid;grid-template-columns:1.5fr 2fr auto;gap:8px;align-items:center;">'
+    +'<div>'
+    +'<input class="ow-type" list="ow-type-list-'+uid+'" placeholder="Work Type *" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'<datalist id="ow-type-list-'+uid+'">'
+    +'<option value="Remote Support"><option value="Configuration"><option value="Estimation"><option value="Documentation"><option value="Follow-up Call"><option value="Billing / Invoice"><option value="Stock / Inventory"><option value="Training"><option value="Other">'
+    +'</datalist>'
+    +'</div>'
+    +'<input type="text" class="ow-remark" placeholder="Party Name / Remark" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
+    +'<button onclick="this.closest(\'.dr-office-row\').remove();updateOfficeCount();" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;">✕</button>'
+    +'</div>';
+  rows.appendChild(div);
+  updateOfficeCount();
+}
+
+function updateOfficeCount(){
+  var count=document.querySelectorAll('#dr-office-rows .dr-office-row').length;
+  var el=document.getElementById('dr-office-count');
+  if(el)el.textContent=count;
 }
 function addPaymentRow(){
   var pr=document.getElementById('payment-rows');
@@ -6202,18 +6235,28 @@ function updatePaymentTotal(){
 
 async function saveDailyReport(){
   var date=document.getElementById('dr-date').value;
-  var wInstall=parseInt(document.getElementById('dr-w-install').value)||0;
-  var wBreak=parseInt(document.getElementById('dr-w-breakdown').value)||0;
-  var owBreak=parseInt(document.getElementById('dr-ow-breakdown').value)||0;
-  var owOther=parseInt(document.getElementById('dr-ow-other').value)||0;
-  var totalCalls=parseInt(document.getElementById('dr-total-calls').value)||0;
   var petrolKm=parseFloat(document.getElementById('dr-petrol-km').value)||0;
   var remarks=document.getElementById('dr-remarks').value;
 
   if(!date){alert('Date select karo');return;}
-  if(totalCalls===0&&wInstall===0&&wBreak===0&&owBreak===0&&owOther===0){
-    alert('Kem se kem ek field bharvo');return;
-  }
+
+  // Collect site visits
+  var siteVisits=[];
+  document.querySelectorAll('#dr-site-rows .dr-site-row').forEach(function(row){
+    var siteName=row.querySelector('.sv-site-name')?.value?.trim()||'';
+    var area=row.querySelector('.sv-area')?.value?.trim()||'';
+    var problem=row.querySelector('.sv-problem')?.value?.trim()||'';
+    var remark=row.querySelector('.sv-remark')?.value?.trim()||'';
+    if(siteName)siteVisits.push({site_name:siteName,area:area,problem:problem,remark:remark});
+  });
+
+  // Collect office work
+  var officeWork=[];
+  document.querySelectorAll('#dr-office-rows .dr-office-row').forEach(function(row){
+    var type=row.querySelector('.ow-type')?.value?.trim()||'';
+    var remark=row.querySelector('.ow-remark')?.value?.trim()||'';
+    if(type)officeWork.push({work_type:type,remark:remark});
+  });
 
   // Collect payment details
   var payments=[];
@@ -6241,19 +6284,128 @@ async function saveDailyReport(){
       eng_id:currentUser.eng_id||currentUser.user_id,
       eng_name:currentUser.name,
       report_date:date,
-      warranty_installation:wInstall,
-      warranty_breakdown:wBreak,
-      outwarranty_breakdown:owBreak,
-      outwarranty_other:owOther,
+      site_visits:siteVisits,
+      total_site_visits:siteVisits.length,
+      office_work:officeWork,
+      total_office_work:officeWork.length,
       payment_details:payments,
       total_amount:totalAmt,
-      total_calls:totalCalls,
       petrol_km:petrolKm,
+      google_reviews:googleReviews,
+      total_reviews:googleReviews.length,
       remarks:remarks
     });
     closeModal('modal-daily-report');
-    alert('✅ Daily Report submitted!');
+    showDailyReportShare({
+      eng_name:currentUser.name,
+      report_date:date,
+      site_visits:siteVisits,
+      office_work:officeWork,
+      payments:payments,
+      total_amount:totalAmt,
+      petrol_km:petrolKm,
+      google_reviews:googleReviews,
+      remarks:remarks
+    });
   }catch(e){alert('Error: '+e.message);}
+}
+
+function formatDailyReportWA(d){
+  var lines=[];
+  var dateStr=d.report_date?new Date(d.report_date).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):d.report_date;
+  lines.push('📋 *Daily Report*');
+  lines.push('👷 *'+d.eng_name+'*');
+  lines.push('📅 '+dateStr);
+  lines.push('');
+
+  // Site Visits
+  if(d.site_visits&&d.site_visits.length){
+    lines.push('🏢 *Site Visits ('+d.site_visits.length+')*');
+    d.site_visits.forEach(function(v,i){
+      var line=(i+1)+'. *'+v.site_name+'*';
+      if(v.area)line+=' — '+v.area;
+      if(v.problem)line+='\n    📌 '+v.problem;
+      if(v.remark)line+='\n    ✅ '+v.remark;
+      lines.push(line);
+    });
+    lines.push('');
+  }
+
+  // Office Work
+  if(d.office_work&&d.office_work.length){
+    lines.push('💼 *Office / Remote Work ('+d.office_work.length+')*');
+    d.office_work.forEach(function(w,i){
+      var line=(i+1)+'. *'+w.work_type+'*';
+      if(w.remark)line+=' — '+w.remark;
+      lines.push(line);
+    });
+    lines.push('');
+  }
+
+  // Payments
+  if(d.payments&&d.payments.length){
+    lines.push('💰 *Payment Collected*');
+    d.payments.forEach(function(p){
+      if(p.customer||p.amount>0)
+        lines.push('• '+p.customer+' — ₹'+p.amount+' ('+p.mode+')');
+    });
+    lines.push('💵 *Total: ₹'+d.total_amount+'*');
+    lines.push('');
+  }
+
+  // Petrol
+  if(d.petrol_km>0){
+    lines.push('🚗 *Travel: '+d.petrol_km+' KM*');
+    lines.push('');
+  }
+
+  // Reviews
+  if(d.google_reviews&&d.google_reviews.length){
+    lines.push('⭐ *Google Reviews ('+d.google_reviews.length+')*');
+    d.google_reviews.forEach(function(r){
+      var stars='⭐'.repeat(parseInt(r.stars)||5);
+      lines.push('• '+r.customer+' '+stars);
+    });
+    lines.push('');
+  }
+
+  if(d.remarks){lines.push('📝 *Remarks:* '+d.remarks);lines.push('');}
+  lines.push('_Sent via Bhavi CRM_');
+  return lines.join('\n');
+}
+
+function showDailyReportShare(d){
+  var old=document.getElementById('dr-share-panel');if(old)old.remove();
+  var text=formatDailyReportWA(d);
+  var panel=document.createElement('div');
+  panel.id='dr-share-panel';
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  panel.innerHTML=
+    '<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
+    +'<div style="padding:16px 18px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">'
+    +'<span style="font-size:16px;font-weight:700;">✅ Report Submitted!</span>'
+    +'<button onclick="document.getElementById(\'dr-share-panel\').remove();" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
+    +'</div>'
+    +'<div style="padding:14px 18px;flex:1;overflow-y:auto;">'
+    +'<p style="font-size:12px;color:#6b7280;margin-bottom:8px;">WhatsApp ma share karva niche nu message copy thase:</p>'
+    +'<pre id="dr-share-text" style="white-space:pre-wrap;font-size:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:0;font-family:inherit;line-height:1.6;max-height:320px;overflow-y:auto;"></pre>'
+    +'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #e5e7eb;display:flex;gap:10px;">'
+    +'<button id="dr-copy-btn" onclick="drCopyReport()" style="flex:1;background:#f3f4f6;color:#374151;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copy</button>'
+    +'<a id="dr-wa-btn" href="" target="_blank" style="flex:2;background:#25D366;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;">📲 WhatsApp Share</a>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(panel);
+  document.getElementById('dr-share-text').textContent=text;
+  document.getElementById('dr-wa-btn').href='https://wa.me/?text='+encodeURIComponent(text);
+}
+
+function drCopyReport(){
+  var t=document.getElementById('dr-share-text')?.textContent||'';
+  navigator.clipboard.writeText(t).then(function(){
+    var btn=document.getElementById('dr-copy-btn');
+    if(btn){btn.textContent='✅ Copied!';setTimeout(function(){btn.textContent='📋 Copy';},2000);}
+  });
 }
 
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
