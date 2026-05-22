@@ -7324,7 +7324,7 @@ var _amcAll=[];
 var _amcFilter='all';
 
 async function renderAMC(){
-  const content=document.getElementById('content');
+  const content=document.getElementById('page-content');
   content.innerHTML=`
   <div style="padding:20px;max-width:1100px;margin:0 auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
@@ -7627,7 +7627,7 @@ async function deleteAMC(id){
 
 // ===== MODULE 4: CUSTOMER FEEDBACK =====
 async function renderFeedback(){
-  var content=document.getElementById('content');
+  var content=document.getElementById('page-content');
   content.innerHTML='<div style="padding:20px;max-width:1000px;margin:0 auto;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
     +'<h2 style="margin:0;font-size:20px;">⭐ Customer Feedback</h2></div>'
@@ -7742,7 +7742,7 @@ window.submitFeedback=async function(ticketId){
 
 // ===== MODULE 5: FOLLOW-UP TRACKER =====
 async function renderFollowup(){
-  var content=document.getElementById('content');
+  var content=document.getElementById('page-content');
   content.innerHTML='<div style="padding:20px;max-width:1000px;margin:0 auto;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
     +'<h2 style="margin:0;font-size:20px;">📞 Follow-up Tracker</h2></div>'
@@ -7846,7 +7846,7 @@ async function setFollowUp(ticketId){
 
 // ===== MODULE 6: PROFIT DASHBOARD =====
 async function renderProfit(){
-  var content=document.getElementById('content');
+  var content=document.getElementById('page-content');
   var now=new Date();
   var months=[];for(var i=5;i>=0;i--){var d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(d.toLocaleDateString('en-CA').slice(0,7));}
   content.innerHTML='<div style="padding:20px;max-width:1100px;margin:0 auto;">'
@@ -7914,7 +7914,7 @@ async function loadProfit(){
 
 // ===== MODULE 7: PARTS REORDER ALERT =====
 async function renderReorder(){
-  var content=document.getElementById('content');
+  var content=document.getElementById('page-content');
   content.innerHTML='<div style="padding:20px;max-width:900px;margin:0 auto;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
     +'<h2 style="margin:0;font-size:20px;">📦 Parts Reorder Alert</h2>'
