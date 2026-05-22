@@ -223,6 +223,8 @@ tr:hover td{background:#f8fafc;}
   #sidebar{transform:none!important;}
 }
 </style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -266,6 +268,8 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
     <div class="nav-item" onclick="navigate('walk-in-report')" id="nav-walk-in-report"><span class="icon">🚶</span><span>Walk-in Report</span></div>
     <div class="nav-item" onclick="navigate('courier-report')" id="nav-courier-report"><span class="icon">📦</span><span>Courier Register</span></div>
+    <div class="nav-item hidden" onclick="navigate('live-map')" id="nav-live-map"><span class="icon">📍</span><span>Live Map</span></div>
+    <div class="nav-item hidden" onclick="navigate('attendance')" id="nav-attendance"><span class="icon">🗓️</span><span>Attendance</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -2259,7 +2263,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call'].forEach(function(id){
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2386,7 +2390,7 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
-      sv('nav-ai-agent',true);
+      sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2407,6 +2411,12 @@ function setupNav(){
       if(autoSec)autoSec.style.display='';
       if(aiSec)aiSec.style.display='';
     }
+  // Auto-restart location tracking if engineer is punched in
+  if(isEng&&!_locInterval){
+    var pKey='punch_'+currentUser.user_id;
+    var pData=JSON.parse(localStorage.getItem(pKey)||'null');
+    if(pData&&pData.punched_in)startLocationTracking();
+  }
   }catch(e){console.error('setupNav:',e);}
 }
 
@@ -2438,9 +2448,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2779,10 +2789,10 @@ async function renderDashboard(){
 
 // PUNCH IN/OUT - Point 4
 async function doPunchIn(){
-  const key=`punch_${currentUser.user_id}`;
+  const key='punch_'+currentUser.user_id;
   const today=new Date().toLocaleDateString('en-CA');
   try{
-    const existing=await sb('punch_logs','GET',null,`?eng_id=eq.${currentUser.eng_id||currentUser.user_id}&punch_in_date=eq.${today}&status=eq.active&limit=1`);
+    const existing=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&punch_in_date=eq.'+today+'&status=eq.active&limit=1');
     if(existing&&existing.length>0){
       const ex=existing[0];
       const ps={punched_in:true,punch_in_time:ex.punch_in_time,punch_in_date:ex.punch_in_date,start_meter:ex.start_meter||'',end_meter:''};
@@ -2792,6 +2802,119 @@ async function doPunchIn(){
       return;
     }
   }catch(e){console.log('Punch check error:',e);}
+
+  // Remove any existing modal
+  var exModal=document.getElementById('punch-in-modal');if(exModal)exModal.remove();
+  window._punchSelfieIn=null;
+
+  // Build modal
+  var overlay=document.createElement('div');
+  overlay.id='punch-in-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;padding:20px;width:360px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);';
+
+  // Header with live time
+  var now=new Date();
+  var liveTime=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+  hdr.innerHTML='<h3 style="font-weight:700;font-size:16px;">▶ Punch In</h3><span id="pin-live-time" style="font-size:18px;font-weight:700;color:#1a56db;">'+liveTime+'</span>';
+  box.appendChild(hdr);
+
+  // Live time updater
+  var _pinTimer=setInterval(function(){var t=document.getElementById('pin-live-time');if(t)t.textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});else clearInterval(_pinTimer);},10000);
+
+  // GPS
+  var gpsDiv=document.createElement('div');
+  gpsDiv.style.cssText='font-size:12px;color:#64748b;margin-bottom:10px;';
+  gpsDiv.id='pin-gps-text';
+  gpsDiv.textContent='Getting location...';
+  box.appendChild(gpsDiv);
+
+  // Camera video
+  var vid=document.createElement('video');
+  vid.id='pin-video';
+  vid.autoplay=true;vid.muted=true;vid.setAttribute('playsinline','');
+  vid.style.cssText='width:100%;max-height:260px;border-radius:10px;transform:scaleX(-1);background:#000;display:block;';
+  box.appendChild(vid);
+
+  // Selfie preview
+  var prevDiv=document.createElement('div');
+  prevDiv.id='pin-selfie-preview';
+  box.appendChild(prevDiv);
+
+  // Capture/Retake buttons
+  var camBtnRow=document.createElement('div');
+  camBtnRow.style.cssText='display:flex;gap:8px;margin-top:10px;margin-bottom:12px;';
+
+  var captureBtn=document.createElement('button');
+  captureBtn.id='pin-capture-btn';
+  captureBtn.textContent='📸 Take Selfie';
+  captureBtn.style.cssText='flex:1;padding:8px;background:#1a56db;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;';
+  captureBtn.onclick=function(){capturePunchSelfie('pin-video','pin-selfie-preview',captureBtn,retakeBtn,submitBtn);};
+
+  var retakeBtn=document.createElement('button');
+  retakeBtn.id='pin-retake-btn';
+  retakeBtn.textContent='🔄 Retake';
+  retakeBtn.style.cssText='flex:1;padding:8px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;display:none;';
+  retakeBtn.onclick=function(){
+    window._punchSelfieIn=null;
+    prevDiv.innerHTML='';
+    captureBtn.style.display='';
+    retakeBtn.style.display='none';
+    submitBtn.disabled=true;
+    startPunchCamera('pin-video');
+  };
+
+  camBtnRow.appendChild(captureBtn);
+  camBtnRow.appendChild(retakeBtn);
+  box.appendChild(camBtnRow);
+
+  // Action buttons
+  var btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:10px;justify-content:flex-end;';
+
+  var cancelBtn=document.createElement('button');
+  cancelBtn.textContent='Cancel';
+  cancelBtn.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;';
+  cancelBtn.onclick=function(){clearInterval(_pinTimer);stopPunchCamera();overlay.remove();};
+
+  var submitBtn=document.createElement('button');
+  submitBtn.id='pin-submit-btn';
+  submitBtn.textContent='✅ Punch In';
+  submitBtn.disabled=true;
+  submitBtn.style.cssText='padding:8px 16px;background:#0e9f6e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;';
+  submitBtn.onclick=function(){
+    clearInterval(_pinTimer);
+    // Get stored loc from closure
+    doSavePunchIn(window._pinLocCache||null);
+    overlay.remove();
+  };
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(submitBtn);
+  box.appendChild(btnRow);
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Start camera
+  startPunchCamera('pin-video');
+
+  // Get GPS
+  window._pinLocCache=null;
+  getLocation().then(function(loc){
+    window._pinLocCache=loc;
+    var gEl=document.getElementById('pin-gps-text');
+    if(gEl)gEl.textContent=loc?('📍 '+loc.lat.toFixed(5)+', '+loc.lng.toFixed(5)):'Location unavailable';
+  });
+}
+
+async function doSavePunchIn(loc){
+  const key='punch_'+currentUser.user_id;
+  const today=new Date().toLocaleDateString('en-CA');
   const now=new Date();
   const ps={punched_in:true,punch_in_time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),punch_in_date:today,start_meter:'',end_meter:''};
   localStorage.setItem(key,JSON.stringify(ps));
@@ -2801,9 +2924,15 @@ async function doPunchIn(){
       eng_name:currentUser.name,
       punch_in_time:ps.punch_in_time,
       punch_in_date:ps.punch_in_date,
-      status:'active'
+      status:'active',
+      punch_in_photo:window._punchSelfieIn||null,
+      punch_in_lat:loc?loc.lat:null,
+      punch_in_lng:loc?loc.lng:null
     });
   }catch(e){console.log('Punch log save error:',e);}
+  saveLocationEvent('punch_in');
+  startLocationTracking();
+  stopPunchCamera();
   alert('Punch In successful! ✅\nTime: '+ps.punch_in_time);
   navigate('dashboard');
 }
@@ -2882,6 +3011,49 @@ function showPunchOutModal(ps,key){
   info.textContent='Punch In: '+ps.punch_in_time+' | Date: '+ps.punch_in_date;
   box.appendChild(info);
   
+  // --- Selfie Camera Section ---
+  window._punchSelfieOut=null;
+  var selfieLabel=document.createElement('div');
+  selfieLabel.style.cssText='font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;';
+  selfieLabel.textContent='Selfie at Punch Out';
+  box.appendChild(selfieLabel);
+
+  var poutVid=document.createElement('video');
+  poutVid.id='pout-selfie-video';
+  poutVid.autoplay=true;poutVid.muted=true;poutVid.setAttribute('playsinline','');
+  poutVid.style.cssText='width:100%;max-height:200px;border-radius:10px;transform:scaleX(-1);background:#000;display:block;';
+  box.appendChild(poutVid);
+
+  var poutPrev=document.createElement('div');
+  poutPrev.id='pout-selfie-preview';
+  box.appendChild(poutPrev);
+
+  var poutCamRow=document.createElement('div');
+  poutCamRow.style.cssText='display:flex;gap:8px;margin-top:8px;margin-bottom:14px;';
+
+  var poutCapBtn=document.createElement('button');
+  poutCapBtn.id='pout-selfie-capture-btn';
+  poutCapBtn.textContent='📸 Take Selfie';
+  poutCapBtn.style.cssText='flex:1;padding:7px;background:#1a56db;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;';
+  poutCapBtn.onclick=function(){capturePunchOutSelfie();};
+
+  var poutRetBtn=document.createElement('button');
+  poutRetBtn.id='pout-selfie-retake-btn';
+  poutRetBtn.textContent='🔄 Retake';
+  poutRetBtn.style.cssText='flex:1;padding:7px;background:#64748b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;display:none;';
+  poutRetBtn.onclick=function(){
+    window._punchSelfieOut=null;
+    poutPrev.innerHTML='';
+    poutCapBtn.style.display='';
+    poutRetBtn.style.display='none';
+    startPunchCamera('pout-selfie-video');
+  };
+
+  poutCamRow.appendChild(poutCapBtn);
+  poutCamRow.appendChild(poutRetBtn);
+  box.appendChild(poutCamRow);
+  // --- End Selfie Section ---
+
   // Meter reading
   var mLabel=document.createElement('label');
   mLabel.style.cssText='font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;';
@@ -2941,6 +3113,8 @@ function showPunchOutModal(ps,key){
   
   overlay.appendChild(box);
   document.body.appendChild(overlay);
+  // Start punch-out selfie camera after modal is in DOM
+  setTimeout(function(){startPunchCamera('pout-selfie-video');},200);
 }
 function previewPunchPhoto(input){
   const f=input.files[0];if(!f)return;
@@ -2957,6 +3131,9 @@ async function savePunchOut(key){
   if(!meter && !photoInput?.dataset.base64){
     alert('Enter meter reading OR upload meter photo — at least one required!');return;
   }
+
+  // Get punch-out GPS location
+  var outLoc=await getLocation();
 
   // Get punch data — try localStorage first, then Supabase
   let ps=JSON.parse(localStorage.getItem(key)||'null');
@@ -3006,6 +3183,21 @@ async function savePunchOut(key){
   ps.is_late=isLatePunchOut;
   localStorage.setItem(key,JSON.stringify(ps));
 
+  // Calculate working hours
+  var shiftSettings=null;
+  try{
+    var ss=await sb('shift_settings','GET',null,'?emp_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&limit=1');
+    if(ss&&ss.length)shiftSettings=ss[0];
+  }catch(e){}
+  var workMins=0;var otMins=0;
+  if(ps.punch_in_time&&punchOutTime){
+    function toMins(t){var p=(t||'').split(':');return(parseInt(p[0])||0)*60+(parseInt(p[1])||0);}
+    var inM=toMins(ps.punch_in_time);var outM=toMins(punchOutTime);
+    workMins=outM-inM;if(workMins<0)workMins+=1440;
+    var shiftMins=shiftSettings?toMins(shiftSettings.shift_end)-toMins(shiftSettings.shift_start):480;
+    otMins=Math.max(0,workMins-shiftMins);
+  }
+
   // Save to Supabase
   try{
     const updateData={
@@ -3017,6 +3209,11 @@ async function savePunchOut(key){
       is_late:isLatePunchOut,
       late_remark:lateRemark||'',
       is_next_day:isNextDay,
+      punch_out_photo:window._punchSelfieOut||null,
+      punch_out_lat:outLoc?outLoc.lat:null,
+      punch_out_lng:outLoc?outLoc.lng:null,
+      working_minutes:workMins,
+      overtime_minutes:otMins,
       updated_at:new Date().toISOString()
     };
     if(activePunchLog){
@@ -3039,6 +3236,9 @@ async function savePunchOut(key){
     localStorage.removeItem(key);
   }catch(e){console.log('Punch out save error:',e);}
 
+  saveLocationEvent('punch_out');
+  stopLocationTracking();
+  stopPunchCamera();
   var pm=document.getElementById('punch-out-modal');if(pm)pm.remove();
 
   if(isNextDay){
@@ -4092,6 +4292,7 @@ async function saveEngUpdate(){
         // No auto traveling — engineer will manually Visit Start next call
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
+    if(status==='Closed')saveLocationEvent('ticket_close',id);
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
@@ -5543,6 +5744,10 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 async function renderSettings(){
   const engineers=await sb('users','GET',null,'?role=eq.engineer&order=name');
   document.getElementById('page-content').innerHTML=`
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-header"><h2>⏰ Shift / Working Hours Settings</h2><button class="btn btn-outline btn-sm" onclick="renderShiftSettings()">🔄 Load</button></div>
+      <div id="shift-settings-content"><div style="color:var(--text-muted);font-size:13px;">Click Load to view employee shift settings</div></div>
+    </div>
     <div class="tabs">
       <button class="tab active" onclick="switchSettings('engineers',this)">👷 Engineers</button>
       <button class="tab" onclick="switchSettings('wc',this)">🎯 Work Controllers</button>
@@ -5992,7 +6197,7 @@ async function doWorkStart(ticketId){
 
 // HELPERS
 
-function closePunchOutModal(){var el=document.getElementById("punch-out-modal");if(el)el.remove();}
+function closePunchOutModal(){stopPunchCamera();var el=document.getElementById("punch-out-modal");if(el)el.remove();}
 function refreshPage(){
   // Refresh current page data without full reload
   navigate(currentPage);
@@ -6312,68 +6517,83 @@ async function saveDailyReport(){
 
 function formatDailyReportWA(d){
   function arr(v){if(!v)return[];if(typeof v==='string'){try{return JSON.parse(v);}catch(e){return[];}}return Array.isArray(v)?v:[];}
+  var DIV='━━━━━━━━━━━━━━━━━━━━━';
   var lines=[];
   var dateStr=d.report_date?new Date(d.report_date).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):d.report_date;
-  lines.push('📋 *Daily Report*');
+  var sv=arr(d.site_visits);var ow=arr(d.office_work);var pm=arr(d.payments);var gr=arr(d.google_reviews);
+
+  lines.push(DIV);
+  lines.push('📋 *DAILY REPORT*');
+  lines.push(DIV);
   lines.push('👷 *'+d.eng_name+'*');
   lines.push('📅 '+dateStr);
   lines.push('');
-  var sv=arr(d.site_visits);var ow=arr(d.office_work);var pm=arr(d.payments);var gr=arr(d.google_reviews);
-  d.site_visits=sv;d.office_work=ow;d.payments=pm;d.google_reviews=gr;
 
   // Site Visits
-  if(d.site_visits&&d.site_visits.length){
-    lines.push('🏢 *Site Visits ('+d.site_visits.length+')*');
-    d.site_visits.forEach(function(v,i){
-      var line=(i+1)+'. *'+v.site_name+'*';
-      if(v.area)line+=' — '+v.area;
-      if(v.problem)line+='\n    📌 '+v.problem;
-      if(v.remark)line+='\n    ✅ '+v.remark;
-      lines.push(line);
+  if(sv.length){
+    lines.push('🏢 *SITE VISITS*  ('+sv.length+')');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    sv.forEach(function(v,i){
+      lines.push('  '+(i+1)+'. *'+v.site_name+'*'+(v.area?' │ 📍'+v.area:''));
+      if(v.problem)lines.push('      🔧 '+v.problem);
+      if(v.remark) lines.push('      ✅ '+v.remark);
+      if(i<sv.length-1)lines.push('');
     });
     lines.push('');
   }
 
   // Office Work
-  if(d.office_work&&d.office_work.length){
-    lines.push('💼 *Office / Remote Work ('+d.office_work.length+')*');
-    d.office_work.forEach(function(w,i){
-      var line=(i+1)+'. *'+w.work_type+'*';
-      if(w.remark)line+=' — '+w.remark;
-      lines.push(line);
+  if(ow.length){
+    lines.push('💼 *OFFICE / REMOTE WORK*  ('+ow.length+')');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    ow.forEach(function(w,i){
+      lines.push('  '+(i+1)+'. *'+w.work_type+'*'+(w.remark?' — '+w.remark:''));
     });
     lines.push('');
   }
 
   // Payments
-  if(d.payments&&d.payments.length){
-    lines.push('💰 *Payment Collected*');
-    d.payments.forEach(function(p){
-      if(p.customer||p.amount>0)
-        lines.push('• '+p.customer+' — ₹'+p.amount+' ('+p.mode+')');
+  var pmFiltered=pm.filter(function(p){return p.customer||p.amount>0;});
+  if(pmFiltered.length){
+    lines.push('💰 *PAYMENT COLLECTED*');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    pmFiltered.forEach(function(p){
+      var modeIcon=p.mode==='Cash'?'💵':p.mode==='Online'?'📲':'🏦';
+      lines.push('  ▸ '+p.customer+' → *₹'+p.amount+'*  '+modeIcon+' '+p.mode);
     });
-    lines.push('💵 *Total: ₹'+d.total_amount+'*');
+    lines.push('  ─────────────────────');
+    lines.push('  💵 *Total: ₹'+d.total_amount+'*');
     lines.push('');
   }
 
   // Petrol
   if(d.petrol_km>0){
-    lines.push('🚗 *Travel: '+d.petrol_km+' KM*');
+    lines.push('🚗 *TRAVEL*');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    lines.push('  '+d.petrol_km+' KM');
     lines.push('');
   }
 
   // Reviews
-  if(d.google_reviews&&d.google_reviews.length){
-    lines.push('⭐ *Google Reviews ('+d.google_reviews.length+')*');
-    d.google_reviews.forEach(function(r){
-      var stars='⭐'.repeat(parseInt(r.stars)||5);
-      lines.push('• '+r.customer+' '+stars);
+  if(gr.length){
+    lines.push('⭐ *GOOGLE REVIEWS*  ('+gr.length+')');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    gr.forEach(function(r){
+      var stars='⭐'.repeat(Math.min(parseInt(r.stars)||5,5));
+      lines.push('  ▸ '+r.customer+'  '+stars);
     });
     lines.push('');
   }
 
-  if(d.remarks){lines.push('📝 *Remarks:* '+d.remarks);lines.push('');}
-  lines.push('_Sent via Bhavi CRM_');
+  if(d.remarks){
+    lines.push('📝 *REMARKS*');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    lines.push('  '+d.remarks);
+    lines.push('');
+  }
+
+  lines.push(DIV);
+  lines.push('_Bhavi Electronics — CRM_');
   return lines.join('\n');
 }
 
@@ -6443,7 +6663,7 @@ async function openPastReports(){
       var officeCount=(r.office_work&&r.office_work.length)||r.total_office_work||0;
       var amt=r.total_amount||0;
       var reviews=r.total_reviews||0;
-      return '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;hover:background:#f9fafb;" onclick="showPastReportShare('+r.id+')" id="pr-row-'+r.id+'">'
+      return '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;" onclick="showPastReportShare(\''+r.id+'\')" id="pr-row-'+r.id+'">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;">'
         +'<span style="font-weight:600;font-size:14px;">📅 '+dateStr+'</span>'
         +'<span style="background:#25D366;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;">📲 Share</span>'
@@ -6480,6 +6700,180 @@ function showPastReportShare(id){
     google_reviews:parseJ(r.google_reviews),
     remarks:r.remarks||''
   });
+}
+
+// ===== LOCATION TRACKING =====
+function getLocation(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      function(p){resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)});},
+      function(){resolve(null);},
+      {timeout:8000,maximumAge:30000,enableHighAccuracy:true}
+    );
+  });
+}
+
+async function saveLocationEvent(eventType, ticketId){
+  var loc=await getLocation();
+  if(!loc)return null;
+  try{
+    await sb('engineer_locations','POST',{
+      eng_id:currentUser.eng_id||currentUser.user_id,
+      eng_name:currentUser.name,
+      lat:loc.lat,
+      lng:loc.lng,
+      accuracy:loc.accuracy,
+      event_type:eventType,
+      ticket_id:ticketId||null,
+      session_date:new Date().toLocaleDateString('en-CA'),
+      recorded_at:new Date().toISOString()
+    });
+  }catch(e){console.log('Location save error:',e);}
+  return loc;
+}
+
+var _locInterval=null;
+function startLocationTracking(){
+  if(_locInterval)return;
+  saveLocationEvent('track');
+  _locInterval=setInterval(function(){saveLocationEvent('track');},5*60*1000);
+}
+function stopLocationTracking(){
+  if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
+}
+
+// ===== CAMERA SELFIE UTILITIES =====
+var _punchCamStream=null;
+function stopPunchCamera(){if(_punchCamStream){_punchCamStream.getTracks().forEach(function(t){t.stop();});_punchCamStream=null;}}
+async function startPunchCamera(videoId){
+  stopPunchCamera();
+  try{
+    _punchCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:480},height:{ideal:480}},audio:false});
+    var vid=document.getElementById(videoId);
+    if(vid){vid.srcObject=_punchCamStream;vid.play();}
+    return true;
+  }catch(e){console.log('Camera error:',e);return false;}
+}
+function capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn){
+  var vid=document.getElementById(videoId);if(!vid)return;
+  var canvas=document.createElement('canvas');canvas.width=400;canvas.height=400;
+  var ctx=canvas.getContext('2d');
+  ctx.translate(400,0);ctx.scale(-1,1);
+  ctx.drawImage(vid,0,0,400,400);
+  var dataUrl=canvas.toDataURL('image/jpeg',0.65);
+  window._punchSelfieIn=dataUrl;
+  var prev=document.getElementById(previewId);
+  if(prev)prev.innerHTML='<img src="'+dataUrl+'" style="width:100%;border-radius:10px;margin-top:8px;">';
+  if(captureBtn)captureBtn.style.display='none';
+  if(retakeBtn)retakeBtn.style.display='';
+  if(submitBtn)submitBtn.disabled=false;
+}
+function capturePunchOutSelfie(){
+  var vid=document.getElementById('pout-selfie-video');if(!vid)return;
+  var canvas=document.createElement('canvas');canvas.width=400;canvas.height=400;
+  var ctx=canvas.getContext('2d');ctx.translate(400,0);ctx.scale(-1,1);
+  ctx.drawImage(vid,0,0,400,400);
+  var dataUrl=canvas.toDataURL('image/jpeg',0.65);
+  window._punchSelfieOut=dataUrl;
+  var prev=document.getElementById('pout-selfie-preview');
+  if(prev)prev.innerHTML='<img src="'+dataUrl+'" style="width:100%;border-radius:10px;margin-top:8px;">';
+  var capBtn=document.getElementById('pout-selfie-capture-btn');
+  var retBtn=document.getElementById('pout-selfie-retake-btn');
+  if(capBtn)capBtn.style.display='none';
+  if(retBtn)retBtn.style.display='';
+}
+
+// ===== ADMIN LIVE MAP =====
+async function renderLiveMap(){
+  var pc=document.getElementById('page-content');
+  var today=new Date().toLocaleDateString('en-CA');
+  pc.innerHTML=
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">'
+    +'<div class="form-group" style="margin-bottom:0;"><label>Date</label>'
+    +'<input type="date" id="lm-date" value="'+today+'" onchange="renderLiveMap()" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;">'
+    +'</div>'
+    +'<button class="btn btn-primary btn-sm" onclick="renderLiveMap()" style="margin-top:18px;">🔄 Refresh</button>'
+    +'</div>'
+    +'<div id="lm-map" style="width:100%;height:460px;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#e8f4f8;"></div>'
+    +'<div id="lm-legend" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;"></div>'
+    +'<div id="lm-route-info" style="margin-top:12px;"></div>';
+
+  var selDate=document.getElementById('lm-date')?.value||today;
+  var locs=[];
+  try{
+    locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+selDate+'&order=recorded_at.asc&limit=2000');
+  }catch(e){pc.innerHTML+='<div class="alert alert-warning">Table nathi — SQL run karo</div>';return;}
+
+  if(typeof L==='undefined'){pc.innerHTML+='<div class="alert alert-warning">Map library load nathi thayun — internet check karo</div>';return;}
+
+  var mapEl=document.getElementById('lm-map');
+  if(!mapEl)return;
+  if(window._liveMap){try{window._liveMap.remove();}catch(e){}}
+  var map=L.map('lm-map').setView([23.0225,72.5714],11);
+  window._liveMap=map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+
+  // Group by engineer
+  var engMap={};
+  locs.forEach(function(l){
+    if(!engMap[l.eng_id])engMap[l.eng_id]={name:l.eng_name,points:[],latest:null};
+    engMap[l.eng_id].points.push([l.lat,l.lng,l.event_type,l.recorded_at,l.ticket_id]);
+    engMap[l.eng_id].latest=l;
+  });
+
+  var colors=['#1a56db','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2c3e50'];
+  var colorIdx=0;
+  var bounds=[];
+  var legendHtml='';
+
+  Object.keys(engMap).forEach(function(eid){
+    var eng=engMap[eid];
+    var color=colors[colorIdx%colors.length];colorIdx++;
+
+    // Draw route polyline
+    var pts=eng.points.map(function(p){return[p[0],p[1]];});
+    if(pts.length>1)L.polyline(pts,{color:color,weight:3,opacity:0.6}).addTo(map);
+
+    // Event markers
+    eng.points.forEach(function(p){
+      var evtIcon=p[2]==='punch_in'?'🟢':p[2]==='punch_out'?'🔴':p[2]==='ticket_close'?'✅':'📍';
+      var size=p[2]==='track'?8:14;
+      var circleOpts={radius:size,fillColor:color,color:'#fff',weight:2,opacity:1,fillOpacity:0.85};
+      var circle=L.circleMarker([p[0],p[1]],circleOpts).addTo(map);
+      var time=p[3]?new Date(p[3]).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
+      circle.bindPopup('<b>'+eng.name+'</b><br>'+evtIcon+' '+p[2]+(p[4]?'<br>Ticket: '+p[4]:'')+'<br>🕐 '+time);
+      bounds.push([p[0],p[1]]);
+    });
+
+    // Latest position — larger named marker
+    if(eng.latest){
+      var latestTime=new Date(eng.latest.recorded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      var divIcon=L.divIcon({className:'',html:'<div style="background:'+color+';color:#fff;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);">👷 '+eng.name+'</div>',iconAnchor:[0,0]});
+      L.marker([eng.latest.lat,eng.latest.lng],{icon:divIcon}).addTo(map)
+        .bindPopup('<b>'+eng.name+'</b><br>Last seen: '+latestTime+'<br>'+eng.points.length+' location points');
+    }
+
+    legendHtml+='<span style="background:'+color+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">👷 '+eng.name+' ('+eng.points.length+')</span>';
+  });
+
+  if(bounds.length)map.fitBounds(bounds,{padding:[30,30]});
+  else{pc.innerHTML+='';map.setView([23.0225,72.5714],11);}
+
+  document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — Koi location data nathi</span>';
+
+  // Summary table
+  var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary</h2></div>'
+    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Engineer</th><th style="padding:8px;">Points</th><th style="padding:8px;">First Seen</th><th style="padding:8px;">Last Seen</th><th style="padding:8px;">Ticket Closes</th></tr></thead><tbody>';
+  Object.values(engMap).forEach(function(eng){
+    var closes=eng.points.filter(function(p){return p[2]==='ticket_close';}).length;
+    var first=eng.points[0]?new Date(eng.points[0][3]).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
+    var last=eng.latest?new Date(eng.latest.recorded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
+    summaryHtml+='<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;font-weight:600;">'+eng.name+'</td><td style="padding:8px;text-align:center;">'+eng.points.length+'</td><td style="padding:8px;text-align:center;">'+first+'</td><td style="padding:8px;text-align:center;">'+last+'</td><td style="padding:8px;text-align:center;">'+(closes||'-')+'</td></tr>';
+  });
+  summaryHtml+='</tbody></table></div></div>';
+  document.getElementById('lm-route-info').innerHTML=summaryHtml;
 }
 
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
@@ -8446,29 +8840,38 @@ async function saveWorkLog(){
 }
 
 function formatWorkLogWA(date, logs, name){
+  var DIV='━━━━━━━━━━━━━━━━━━━━━';
   var lines=[];
   var dateStr=new Date(date+'T00:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  lines.push('🕐 *Work Log*');
+  var totalMins=0;
+  lines.push(DIV);
+  lines.push('🕐 *WORK LOG*');
+  lines.push(DIV);
   lines.push('👷 *'+(name||'')+'*');
   lines.push('📅 '+dateStr);
   lines.push('');
-  var totalMins=0;
+  lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
   logs.forEach(function(l,i){
     var isOpen=l.to_time==='OPEN';
-    var timeLabel=l.from_time+' – '+(isOpen?'ચાલુ':l.to_time);
-    if(!isOpen){
+    var timeLabel=l.from_time+' → '+(isOpen?'ચાલુ ⏳':l.to_time);
+    if(!isOpen&&l.from_time&&l.to_time){
       var f=l.from_time.split(':');var t=l.to_time.split(':');
-      totalMins+=(parseInt(t[0])*60+parseInt(t[1]))-(parseInt(f[0])*60+parseInt(f[1]));
+      var diff=(parseInt(t[0])*60+parseInt(t[1]))-(parseInt(f[0])*60+parseInt(f[1]));
+      if(diff>0)totalMins+=diff;
     }
-    lines.push((i+1)+'. *'+timeLabel+'*');
-    lines.push('   '+l.task_description);
+    lines.push('  '+(i+1)+'. *'+timeLabel+'*');
+    lines.push('      '+l.task_description);
+    if(i<logs.length-1)lines.push('');
   });
+  lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
   lines.push('');
   if(totalMins>0){
     var h=Math.floor(totalMins/60);var m=totalMins%60;
-    lines.push('⏱ *Total: '+(h?h+'h ':'')+m+'min*');
+    lines.push('⏱ *Total Time: '+(h?h+' hr ':'')+m+' min*');
+    lines.push('');
   }
-  lines.push('_Sent via Bhavi CRM_');
+  lines.push(DIV);
+  lines.push('_Bhavi Electronics — CRM_');
   return lines.join('\n');
 }
 
@@ -12589,6 +12992,170 @@ function clearTrash(){
   if(!confirm('Clear all '+_sessionTrash.length+' items from trash? They cannot be restored after this.'))return;
   _sessionTrash=[];
   openTrash();
+}
+
+// ===== ATTENDANCE REPORT =====
+async function renderAttendanceReport(){
+  var pc=document.getElementById('page-content');
+  var today=new Date().toLocaleDateString('en-CA');
+  var firstOfMonth=today.substring(0,8)+'01';
+  pc.innerHTML='<div class="card">'
+    +'<div class="section-header"><h2>🗓️ Attendance Report</h2>'
+    +'<button class="btn btn-primary btn-sm" onclick="downloadAttendanceExcel()">⬇ Download Excel</button></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
+    +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="att-from" value="'+firstOfMonth+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="att-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>Employee</label><select id="att-emp" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"><option value="">All</option></select></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="loadAttendanceReport()" style="margin-bottom:0;height:36px;">🔍 Search</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="attQuick(\'week\')" style="margin-bottom:0;height:36px;">This Week</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="attQuick(\'month\')" style="margin-bottom:0;height:36px;">This Month</button>'
+    +'</div>'
+    +'<div id="att-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>'
+    +'<div id="att-table-wrap" style="overflow-x:auto;"></div>'
+    +'</div>';
+  // Load employees for filter
+  try{
+    var emps=await sb('users','GET',null,'?order=name');
+    var sel=document.getElementById('att-emp');
+    if(sel)emps.forEach(function(e){var o=document.createElement('option');o.value=e.user_id;o.textContent=e.name+(e.role==='engineer'?' (Eng)':' (WC)');sel.appendChild(o);});
+  }catch(e){}
+  loadAttendanceReport();
+}
+
+function attQuick(type){
+  var today=new Date();
+  var from,to=today.toLocaleDateString('en-CA');
+  if(type==='week'){var d=new Date(today);d.setDate(today.getDate()-today.getDay()+1);from=d.toLocaleDateString('en-CA');}
+  else{from=today.toLocaleDateString('en-CA').substring(0,8)+'01';}
+  var fi=document.getElementById('att-from');var ti=document.getElementById('att-to');
+  if(fi)fi.value=from;if(ti)ti.value=to;
+  loadAttendanceReport();
+}
+
+async function loadAttendanceReport(){
+  var from=document.getElementById('att-from')?.value||'';
+  var to=document.getElementById('att-to')?.value||'';
+  var emp=document.getElementById('att-emp')?.value||'';
+  var wrap=document.getElementById('att-table-wrap');
+  var sumDiv=document.getElementById('att-summary');
+  if(!wrap)return;
+  wrap.innerHTML='<div class="loading">Loading...</div>';
+  var q='?order=punch_in_date.desc,created_at.desc';
+  if(from)q+='&punch_in_date=gte.'+from;
+  if(to)q+='&punch_in_date=lte.'+to;
+  if(emp)q+='&eng_id=eq.'+encodeURIComponent(emp);
+  try{
+    var logs=await sb('punch_logs','GET',null,q);
+    window._attLogs=logs;
+    // Summary KPIs
+    var totalDays=logs.length;
+    var totalWorkMins=logs.reduce(function(a,l){return a+(l.working_minutes||0);},0);
+    var totalOTMins=logs.reduce(function(a,l){return a+(l.overtime_minutes||0);},0);
+    var lateCount=logs.filter(function(l){return l.is_late;}).length;
+    function fmtH(m){return Math.floor(m/60)+'h '+(m%60)+'m';}
+    if(sumDiv)sumDiv.innerHTML=
+      '<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1a56db;">'+totalDays+'</div><div style="font-size:11px;color:#64748b;">Days Present</div></div>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#065f46;">'+fmtH(totalWorkMins)+'</div><div style="font-size:11px;color:#64748b;">Total Work</div></div>'
+      +'<div style="background:#fff8e1;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#92400e;">'+fmtH(totalOTMins)+'</div><div style="font-size:11px;color:#64748b;">Overtime</div></div>'
+      +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>';
+    // Table
+    if(!logs.length){wrap.innerHTML='<div class="alert alert-info">Koi record nathi</div>';return;}
+    var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px;">'
+      +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
+      +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
+      +'<th style="padding:8px;">Punch Out</th><th style="padding:8px;">Out Selfie</th>'
+      +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th></tr></thead><tbody>';
+    logs.forEach(function(l){
+      function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
+      var photoIn=l.punch_in_photo?'<img src="'+l.punch_in_photo+'" style="width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')">':'-';
+      var photoOut=l.punch_out_photo?'<img src="'+l.punch_out_photo+'" style="width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')">':'-';
+      var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1a56db;font-size:11px;">📍 Map</a>':'-';
+      var statusBadge2=l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
+      html+='<tr style="border-bottom:1px solid var(--border);">'
+        +'<td style="padding:8px;font-weight:600;">'+l.eng_name+'</td>'
+        +'<td style="padding:8px;white-space:nowrap;">'+l.punch_in_date+'</td>'
+        +'<td style="padding:8px;white-space:nowrap;">'+(l.punch_in_time||'-')+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+photoIn+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+locIn+'</td>'
+        +'<td style="padding:8px;white-space:nowrap;">'+(l.punch_out_time||'<span style="color:#dc2626;">—</span>')+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+photoOut+'</td>'
+        +'<td style="padding:8px;text-align:center;font-weight:600;color:#065f46;">'+fmtM(l.working_minutes)+'</td>'
+        +'<td style="padding:8px;text-align:center;color:'+(l.overtime_minutes>0?'#dc2626':'#64748b')+';">'+fmtM(l.overtime_minutes)+'</td>'
+        +'<td style="padding:8px;">'+statusBadge2+'</td>'
+        +'</tr>';
+    });
+    html+='</tbody></table>';
+    wrap.innerHTML=html;
+  }catch(e){wrap.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function showPhotoFull(encodedSrc){
+  var src=decodeURIComponent(encodedSrc);
+  var ol=document.createElement('div');
+  ol.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  ol.onclick=function(){ol.remove();};
+  ol.innerHTML='<img src="'+src+'" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">';
+  document.body.appendChild(ol);
+}
+
+async function downloadAttendanceExcel(){
+  var logs=window._attLogs||[];
+  if(!logs.length){alert('Pehla search karo');return;}
+  function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
+  var data=logs.map(function(l){return{
+    'Employee':l.eng_name,'Date':l.punch_in_date,
+    'Punch In':l.punch_in_time||'-','Punch Out':l.punch_out_time||'-',
+    'Work Time':fmtM(l.working_minutes),'Overtime':fmtM(l.overtime_minutes),
+    'Start Meter':l.start_meter||'-','End Meter':l.end_meter||'-',
+    'In Location':(l.punch_in_lat&&l.punch_in_lng)?l.punch_in_lat+','+l.punch_in_lng:'-',
+    'Status':l.is_late?'Late':l.status||'-'
+  };});
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Attendance');
+  XLSX.writeFile(wb,'attendance_report_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
+}
+
+// ===== SHIFT SETTINGS =====
+async function renderShiftSettings(){
+  var pc=document.getElementById('shift-settings-content');if(!pc)return;
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var users=await sb('users','GET',null,'?is_active=eq.true&order=name');
+    var shifts=await sb('shift_settings','GET',null,'?order=emp_id');
+    var shiftMap={};shifts.forEach(function(s){shiftMap[s.emp_id]=s;});
+    var html='<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Shift Start</th><th style="padding:8px;">Shift End</th><th style="padding:8px;">Weekly Off</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
+    users.forEach(function(u){
+      var s=shiftMap[u.user_id]||{shift_start:'09:30',shift_end:'18:30',weekly_off:'Sunday'};
+      html+='<tr style="border-bottom:1px solid var(--border);" id="shift-row-'+u.user_id+'">'
+        +'<td style="padding:8px;font-weight:600;">'+u.name+'<br><span style="font-size:11px;color:#64748b;">'+u.role+'</span></td>'
+        +'<td style="padding:8px;"><input type="time" class="ss-start" value="'+s.shift_start+'" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;outline:none;"></td>'
+        +'<td style="padding:8px;"><input type="time" class="ss-end" value="'+s.shift_end+'" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;outline:none;"></td>'
+        +'<td style="padding:8px;"><select class="ss-off" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;outline:none;">'
+        +['Sunday','Saturday','Sunday,Saturday','None'].map(function(d){return'<option value="'+d+'"'+(s.weekly_off===d?' selected':'')+'>'+d+'</option>';}).join('')
+        +'</select></td>'
+        +'<td style="padding:8px;"><button onclick="saveShiftSetting(\''+u.user_id+'\',\''+u.name+'\',\''+u.role+'\')" class="btn btn-primary btn-sm">Save</button></td>'
+        +'</tr>';
+    });
+    html+='</tbody></table>';
+    pc.innerHTML=html;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br>SQL run karo: CREATE TABLE shift_settings...</div>';}
+}
+
+async function saveShiftSetting(empId, empName, empRole){
+  var row=document.getElementById('shift-row-'+empId);if(!row)return;
+  var start=row.querySelector('.ss-start')?.value||'09:30';
+  var end=row.querySelector('.ss-end')?.value||'18:30';
+  var off=row.querySelector('.ss-off')?.value||'Sunday';
+  try{
+    await sb('shift_settings','POST',{emp_id:empId,emp_name:empName,emp_role:empRole,shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()});
+    alert('✅ Shift saved!');
+  }catch(e){
+    // Try PATCH if POST fails (duplicate key)
+    try{await sb('shift_settings','PATCH',{shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()},'?emp_id=eq.'+encodeURIComponent(empId));alert('✅ Shift updated!');}
+    catch(e2){alert('Error: '+e2.message);}
+  }
 }
 </script>
 </body>
