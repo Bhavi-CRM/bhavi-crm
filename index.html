@@ -270,6 +270,8 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('courier-report')" id="nav-courier-report"><span class="icon">📦</span><span>Courier Register</span></div>
     <div class="nav-item hidden" onclick="navigate('live-map')" id="nav-live-map"><span class="icon">📍</span><span>Live Map</span></div>
     <div class="nav-item hidden" onclick="navigate('attendance')" id="nav-attendance"><span class="icon">🗓️</span><span>Attendance</span></div>
+    <div class="nav-item hidden" onclick="navigate('targets')" id="nav-targets"><span class="icon">🎯</span><span>Targets</span></div>
+    <div class="nav-item hidden" onclick="navigate('amc')" id="nav-amc"><span class="icon">🔄</span><span>AMC</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -837,6 +839,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group" style="margin-bottom:0;">
           <label>Petrol / KM</label>
           <input type="number" id="dr-petrol-km" min="0" step="0.1" value="" placeholder="0.0 KM">
+          <div id="dr-km-hint" style="font-size:11px;color:#7c3aed;margin-top:3px;"></div>
         </div>
       </div>
 
@@ -1900,6 +1903,21 @@ document.addEventListener('keydown',function(e){
 // Try auto-login from saved session
 setTimeout(tryAutoLogin, 100);
 
+function saveCompanyInfo(){
+  var ci={
+    name:document.getElementById('ci-name')?.value||'Bhavi Electronics',
+    phone:document.getElementById('ci-phone')?.value||'',
+    email:document.getElementById('ci-email')?.value||'',
+    gst:document.getElementById('ci-gst')?.value||'',
+    addr1:document.getElementById('ci-addr1')?.value||'',
+    addr2:document.getElementById('ci-addr2')?.value||'',
+    web:document.getElementById('ci-web')?.value||'',
+    terms:document.getElementById('ci-terms')?.value||''
+  };
+  localStorage.setItem('bhavi_company',JSON.stringify(ci));
+  alert('✅ Company info saved!');
+}
+
 async function removeLogo(){
   if(!confirm('Remove logo?'))return;
   localStorage.removeItem('bhavi_logo');
@@ -2263,7 +2281,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance'].forEach(function(id){
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2390,7 +2408,7 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
-      sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);
+      sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2448,9 +2466,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2826,12 +2844,12 @@ async function doPunchIn(){
   // Live time updater
   var _pinTimer=setInterval(function(){var t=document.getElementById('pin-live-time');if(t)t.textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});else clearInterval(_pinTimer);},10000);
 
-  // GPS
-  var gpsDiv=document.createElement('div');
-  gpsDiv.style.cssText='font-size:12px;color:#64748b;margin-bottom:10px;';
-  gpsDiv.id='pin-gps-text';
-  gpsDiv.textContent='Getting location...';
-  box.appendChild(gpsDiv);
+  // Status chips (GPS + Selfie)
+  var statusRow=document.createElement('div');
+  statusRow.style.cssText='display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;';
+  statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 GPS aawe chhe...</span>'
+    +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie baaki chhe</span>';
+  box.appendChild(statusRow);
 
   // Camera video
   var vid=document.createElement('video');
@@ -2865,6 +2883,8 @@ async function doPunchIn(){
     captureBtn.style.display='';
     retakeBtn.style.display='none';
     submitBtn.disabled=true;
+    var sEl3=document.getElementById('pin-selfie-status');
+    if(sEl3){sEl3.style.background='#fef3c7';sEl3.style.color='#92400e';sEl3.textContent='📸 Selfie baaki chhe';}
     startPunchCamera('pin-video');
   };
 
@@ -2903,12 +2923,18 @@ async function doPunchIn(){
   // Start camera
   startPunchCamera('pin-video');
 
-  // Get GPS
+  // Get GPS (mandatory)
   window._pinLocCache=null;
+  window._pinGpsReady=false;
   getLocation().then(function(loc){
     window._pinLocCache=loc;
-    var gEl=document.getElementById('pin-gps-text');
-    if(gEl)gEl.textContent=loc?('📍 '+loc.lat.toFixed(5)+', '+loc.lng.toFixed(5)):'Location unavailable';
+    window._pinGpsReady=!!loc;
+    var gEl=document.getElementById('pin-gps-status');
+    if(gEl){
+      if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
+      else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS meli nathi';}
+    }
+    if(loc&&window._punchSelfieIn){var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;}
   });
 }
 
@@ -3046,12 +3072,22 @@ function showPunchOutModal(ps,key){
     poutPrev.innerHTML='';
     poutCapBtn.style.display='';
     poutRetBtn.style.display='none';
+    var sEl2=document.getElementById('pout-selfie-status');
+    if(sEl2){sEl2.style.background='#fef3c7';sEl2.style.color='#92400e';sEl2.textContent='📸 Selfie baaki chhe';}
+    var cb2=document.getElementById('pout-confirm-btn');if(cb2){cb2.disabled=true;cb2.style.opacity='0.5';}
     startPunchCamera('pout-selfie-video');
   };
 
   poutCamRow.appendChild(poutCapBtn);
   poutCamRow.appendChild(poutRetBtn);
   box.appendChild(poutCamRow);
+
+  // Status chips
+  var poutStatusRow=document.createElement('div');
+  poutStatusRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
+  poutStatusRow.innerHTML='<span id="pout-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 GPS aawe chhe...</span>'
+    +'<span id="pout-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie baaki chhe</span>';
+  box.appendChild(poutStatusRow);
   // --- End Selfie Section ---
 
   // Meter reading
@@ -3103,8 +3139,10 @@ function showPunchOutModal(ps,key){
   cancelBtn.onclick=function(){overlay.remove();};
   
   var confirmBtn=document.createElement('button');
+  confirmBtn.id='pout-confirm-btn';
   confirmBtn.textContent='⏹ Confirm Punch Out';
-  confirmBtn.style.cssText='padding:8px 16px;background:#f05252;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;';
+  confirmBtn.disabled=true;
+  confirmBtn.style.cssText='padding:8px 16px;background:#f05252;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;opacity:0.5;';
   confirmBtn.onclick=function(){savePunchOut(key);};
   
   btnRow.appendChild(cancelBtn);
@@ -3114,7 +3152,25 @@ function showPunchOutModal(ps,key){
   overlay.appendChild(box);
   document.body.appendChild(overlay);
   // Start punch-out selfie camera after modal is in DOM
-  setTimeout(function(){startPunchCamera('pout-selfie-video');},200);
+  window._poutLocCache=null;
+  window._poutGpsReady=false;
+  setTimeout(function(){
+    startPunchCamera('pout-selfie-video');
+    // Pre-fetch GPS (mandatory)
+    getLocation().then(function(loc){
+      window._poutLocCache=loc;
+      window._poutGpsReady=!!loc;
+      var gEl=document.getElementById('pout-gps-status');
+      if(gEl){
+        if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
+        else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS meli nathi';}
+      }
+      if(loc&&window._punchSelfieOut){
+        var cb=document.getElementById('pout-confirm-btn');
+        if(cb){cb.disabled=false;cb.style.opacity='1';}
+      }
+    });
+  },200);
 }
 function previewPunchPhoto(input){
   const f=input.files[0];if(!f)return;
@@ -3126,14 +3182,9 @@ function previewPunchPhoto(input){
   r.readAsDataURL(f);
 }
 async function savePunchOut(key){
-  const meter=document.getElementById('pout-meter')?.value;
-  const photoInput=document.getElementById('pout-photo-input');
-  if(!meter && !photoInput?.dataset.base64){
-    alert('Enter meter reading OR upload meter photo — at least one required!');return;
-  }
-
-  // Get punch-out GPS location
-  var outLoc=await getLocation();
+  if(!window._punchSelfieOut){alert('📸 Selfie farjiyat chhe! Pehela selfie lo.');return;}
+  if(!window._poutLocCache){alert('📍 GPS Location farjiyat chhe! Location meli nathi, try karo.');return;}
+  var outLoc=window._poutLocCache;
 
   // Get punch data — try localStorage first, then Supabase
   let ps=JSON.parse(localStorage.getItem(key)||'null');
@@ -3374,6 +3425,7 @@ async function renderMyCalls(){
           <div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="openTaskUpdate('${t.id}')">📝 Update</button></div>
         </div>`).join('')}
       </div>`:''}
+      <div id="my-target-card"></div>
       <div class="card"><div class="section-header"><h2>My Calls</h2><div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="openPastReports()">🕐 Past Reports</button><button class="btn btn-primary btn-sm" onclick="openDailyReport()">📋 Daily Report</button></div></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Problem</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
@@ -3391,6 +3443,8 @@ async function renderMyCalls(){
           </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>'}</tbody>
         </table></div>
       </div>`;
+    // Load target widget async (non-blocking)
+    loadMyTargetWidget(tickets);
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 
@@ -3662,6 +3716,7 @@ async function viewTicket(id,autoPrint=false){
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
+      <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
     </div>`;
   }
 
@@ -3700,6 +3755,177 @@ async function viewTicket(id,autoPrint=false){
     ${tlHtml}
     ${adminActions}`;
   openModal('modal-ticket');if(autoPrint)setTimeout(printJobSheet,500);
+}
+
+async function generateInvoice(id){
+  let t;
+  try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0]||allTickets.find(x=>x.id===id);}
+  catch(e){t=allTickets.find(x=>x.id===id);}
+  if(!t)return;
+
+  const logo=localStorage.getItem('bhavi_logo')||'';
+  const ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  const coName=ci.name||'Bhavi Electronics';
+  const coPhone=ci.phone||'';
+  const coEmail=ci.email||'';
+  const coGst=ci.gst||'';
+  const coAddr1=ci.addr1||'';
+  const coAddr2=ci.addr2||'';
+  const coWeb=ci.web||'bhavi-crm.github.io/bhavi-crm';
+  const coTerms=(ci.terms||'• Warranty on repaired parts: 90 days\n• No warranty on physical/liquid damage\n• Uncollected products after 30 days attract storage charges').split('\n').join('<br>');
+  const spares=t.spares||[];
+  const labor=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
+  const other=parseFloat(t.other_charge)||0;
+  const partsTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
+  const finalCharge=parseFloat(t.final_charges)||0;
+  const grandTotal=finalCharge>0?finalCharge:(labor+partsTotal+other);
+  const invoiceNo='INV-'+t.id;
+  const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
+  const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
+
+  const partsRows=spares.length?spares.map(function(s,i){
+    return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:right;">₹${((s.qty||1)*(s.price||0)).toFixed(2)}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" style="text-align:center;color:#888;padding:12px;">No parts used</td></tr>';
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${invoiceNo}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#222;font-size:13px;background:#fff;padding:0;}
+.page{width:210mm;min-height:297mm;padding:14mm 16mm;margin:0 auto;}
+.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a56db;padding-bottom:14px;margin-bottom:16px;}
+.company h1{font-size:22px;color:#1a56db;font-weight:800;margin-bottom:2px;}
+.company p{font-size:11px;color:#555;line-height:1.6;}
+.logo img{max-height:70px;max-width:160px;object-fit:contain;}
+.inv-meta{display:flex;justify-content:space-between;margin-bottom:16px;gap:20px;}
+.meta-box{flex:1;background:#f8fafc;border-radius:8px;padding:10px 14px;border:1px solid #e5e7eb;}
+.meta-box h4{font-size:10px;text-transform:uppercase;color:#888;letter-spacing:.5px;margin-bottom:6px;}
+.meta-box p{font-size:12px;line-height:1.7;color:#222;}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+.badge-warranty{background:#d1fae5;color:#065f46;}
+.badge-nonw{background:#fee2e2;color:#991b1b;}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+thead tr{background:#1a56db;color:#fff;}
+thead th{padding:8px 10px;text-align:left;font-size:12px;}
+tbody tr:nth-child(even){background:#f8fafc;}
+tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
+.totals{width:260px;margin-left:auto;}
+.totals td{padding:5px 10px;font-size:13px;}
+.totals .grand{font-size:15px;font-weight:700;color:#1a56db;border-top:2px solid #1a56db;}
+.footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:flex-end;}
+.sig{text-align:center;font-size:12px;color:#555;}
+.sig div{margin-top:40px;border-top:1px solid #888;padding-top:4px;}
+.terms{font-size:10px;color:#888;margin-top:14px;line-height:1.6;}
+@media print{
+  body{padding:0;}
+  .page{padding:10mm 12mm;}
+  .no-print{display:none!important;}
+}
+</style></head><body>
+<div style="text-align:center;padding:10px;background:#1a56db;color:#fff;font-size:13px;font-weight:600;" class="no-print">
+  <button onclick="window.print()" style="background:#fff;color:#1a56db;border:none;border-radius:6px;padding:6px 20px;font-weight:700;cursor:pointer;margin-right:10px;">🖨️ Print / Save PDF</button>
+  <button onclick="shareInvoiceWA()" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:6px 20px;font-weight:700;cursor:pointer;">📲 Share on WhatsApp</button>
+  <button onclick="window.close()" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:6px;padding:6px 16px;cursor:pointer;margin-left:10px;">✕ Close</button>
+</div>
+<div class="page">
+  <div class="header">
+    <div class="company">
+      <h1>${coName}</h1>
+      <p>Service Center | Authorized Repair${coPhone?'<br>📞 '+coPhone:''}${coEmail?' | ✉️ '+coEmail:''}${coAddr1?'<br>'+coAddr1:''}${coAddr2?' '+coAddr2:''}${coGst?'<br>GST: '+coGst:''}${coWeb?'<br>🌐 '+coWeb:''}</p>
+    </div>
+    <div style="text-align:right;">
+      ${logo?`<div class="logo"><img src="${logo}"></div>`:''}
+      <div style="margin-top:6px;">
+        <div style="font-size:20px;font-weight:800;color:#1a56db;">TAX INVOICE</div>
+        <div style="font-size:12px;color:#555;">No: <b>${invoiceNo}</b></div>
+        <div style="font-size:12px;color:#555;">Date: <b>${invoiceDate}</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inv-meta">
+    <div class="meta-box">
+      <h4>Bill To</h4>
+      <p><b>${t.cname||'-'}</b><br>
+      📞 ${t.mobile||'-'}${t.alt_mobile?' | '+t.alt_mobile:''}<br>
+      ${t.address||''}${t.area?', '+t.area:''}<br>
+      ${t.city||''}${t.pin?' - '+t.pin:''}${t.state?', '+t.state:''}</p>
+    </div>
+    <div class="meta-box">
+      <h4>Job Details</h4>
+      <p>Ticket: <b>${t.id}</b><br>
+      Type: <span class="badge ${isWarranty?'badge-warranty':'badge-nonw'}">${t.call_type||'-'}</span><br>
+      Service: ${t.service_type||'-'}<br>
+      Status: ${t.status||'-'}</p>
+    </div>
+    <div class="meta-box">
+      <h4>Product</h4>
+      <p>Brand: <b>${t.brand_name||'-'}</b><br>
+      Model: <b>${t.model||'-'}</b><br>
+      Serial: ${t.serial||'-'}<br>
+      Problem: ${t.problem||'-'}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Part / Item</th><th>Part Code</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr>
+    </thead>
+    <tbody>
+      ${partsRows}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tbody>
+      <tr><td>Parts Total</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
+      <tr><td>Labor / Service</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>
+      ${other>0?`<tr><td>Other Charges</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>`:''}
+      ${isWarranty?`<tr><td colspan="2" style="color:#065f46;font-weight:600;text-align:center;">✅ Under Warranty — No Charge</td></tr>`:''}
+      <tr class="grand"><td>GRAND TOTAL</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
+    </tbody>
+  </table>
+
+  ${t.eng_remarks||t.work_done?`<div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:14px;border-left:3px solid #1a56db;font-size:12px;"><b>Work Done:</b> ${t.work_done||t.eng_remarks||''}</div>`:''}
+
+  <div class="footer">
+    <div class="terms">
+      <b>Terms & Conditions:</b><br>
+      ${coTerms}
+    </div>
+    <div class="sig">
+      <div>Authorized Signature</div>
+      <div style="margin-top:4px;font-size:11px;color:#888;">Bhavi Electronics</div>
+    </div>
+  </div>
+</div>
+<script>
+var _invData=${JSON.stringify({id:t.id,cname:t.cname,mobile:t.mobile,model:t.model,brand:t.brand_name,labor:labor,partsTotal:partsTotal,other:other,grandTotal:grandTotal,invoiceNo:invoiceNo,invoiceDate:invoiceDate,isWarranty:isWarranty})};
+function shareInvoiceWA(){
+  var d=_invData;
+  var txt='━━━━━━━━━━━━━━━━━━━━━\\n'
+    +'🧾 *INVOICE — '+d.invoiceNo+'*\\n'
+    +'━━━━━━━━━━━━━━━━━━━━━\\n'
+    +'👤 *'+d.cname+'*\\n'
+    +'📱 '+d.mobile+'\\n'
+    +'📅 Date: '+d.invoiceDate+'\\n\\n'
+    +'🔧 *Product: '+d.brand+' '+d.model+'*\\n\\n'
+    +'▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\\n'
+    +(d.partsTotal>0?'  Parts Total   → ₹'+d.partsTotal.toFixed(2)+'\\n':'')
+    +'  Labor/Service → ₹'+d.labor.toFixed(2)+'\\n'
+    +(d.other>0?'  Other         → ₹'+d.other.toFixed(2)+'\\n':'')
+    +'▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\\n'
+    +'  💵 *Total: ₹'+d.grandTotal.toFixed(2)+'*\\n'
+    +'━━━━━━━━━━━━━━━━━━━━━\\n'
+    +(d.isWarranty?'✅ Under Warranty — No Charge\\n':'')
+    +'_Bhavi Electronics — Service Center_';
+  window.open('https://wa.me/91'+d.mobile.replace(/\\D/g,'')+'?text='+encodeURIComponent(txt),'_blank');
+}
+</script>
+</body></html>`;
+
+  const win=window.open('','_blank','width=900,height=700');
+  if(win){win.document.write(html);win.document.close();}
+  else{alert('Popup blocked — browser ma popup allow karo');}
 }
 
 async function voidWarranty(id){
@@ -5753,6 +5979,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('wc',this)">🎯 Work Controllers</button>
       <button class="tab" onclick="switchSettings('admin',this)">👑 Admin Profile</button>
       <button class="tab" onclick="switchSettings('logo',this)">🖼️ Logo</button>
+      <button class="tab" onclick="switchSettings('company',this)">🏢 Company Info</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -5761,6 +5988,23 @@ function switchSettings(tab,el){
   if(tab==='engineers')sb('users','GET',null,'?role=eq.engineer&order=name').then(e=>document.getElementById('settings-content').innerHTML=renderEngTab(e));
   else if(tab==='wc')sb('users','GET',null,'?role_type=eq.work_controller&order=name').then(wcs=>document.getElementById('settings-content').innerHTML=renderWCTab(wcs));
   else if(tab==='admin') renderAdminTab();
+  else if(tab==='company'){
+    var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+    document.getElementById('settings-content').innerHTML=`<div class="card">
+      <h3 style="font-weight:700;margin-bottom:14px;">🏢 Company Info (Invoice par dekhase)</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Company Name</label><input id="ci-name" value="${ci.name||'Bhavi Electronics'}"></div>
+        <div class="form-group"><label>Phone</label><input id="ci-phone" value="${ci.phone||''}"></div>
+        <div class="form-group"><label>Email</label><input id="ci-email" value="${ci.email||''}"></div>
+        <div class="form-group"><label>GST No</label><input id="ci-gst" value="${ci.gst||''}"></div>
+        <div class="form-group"><label>Address Line 1</label><input id="ci-addr1" value="${ci.addr1||''}"></div>
+        <div class="form-group"><label>City / State / PIN</label><input id="ci-addr2" value="${ci.addr2||''}"></div>
+        <div class="form-group"><label>Website</label><input id="ci-web" value="${ci.web||''}"></div>
+        <div class="form-group"><label>Invoice Terms (invoice par show thase)</label><textarea id="ci-terms" rows="3">${ci.terms||'• Warranty on repaired parts: 90 days\n• No warranty on physical/liquid damage\n• Uncollected products after 30 days attract storage charges'}</textarea></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveCompanyInfo()">💾 Save Company Info</button>
+    </div>`;
+  }
   else{
     const currentLogo=localStorage.getItem('bhavi_logo')||logoData||'';
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -6208,6 +6452,24 @@ function openDailyReport(){
   document.getElementById('dr-eng-name').textContent=currentUser.name;
   document.getElementById('dr-date').value=new Date().toLocaleDateString('en-CA');
   document.getElementById('dr-petrol-km').value='';
+  // Auto-fill GPS KM from today's location tracking
+  (async function(){
+    try{
+      var today=new Date().toLocaleDateString('en-CA');
+      var engId=currentUser.eng_id||currentUser.user_id;
+      var locs=await sb('engineer_locations','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&session_date=eq.'+today+'&order=recorded_at.asc&limit=500');
+      if(locs&&locs.length>1){
+        function hkm(la1,ln1,la2,ln2){var R=6371;var dL=(la2-la1)*Math.PI/180;var dN=(ln2-ln1)*Math.PI/180;var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+        var km=0;for(var i=1;i<locs.length;i++){var d=hkm(locs[i-1].lat,locs[i-1].lng,locs[i].lat,locs[i].lng);if(d>=0.1&&d<5)km+=d;}
+        km=Math.round(km*10)/10;
+        var el=document.getElementById('dr-petrol-km');
+        if(el&&km>0){el.value=km;el.style.borderColor='#7c3aed';el.title='Auto-filled from GPS tracking ('+locs.length+' points)';
+          var hint=document.getElementById('dr-km-hint');
+          if(hint)hint.textContent='📍 GPS thi auto: '+km+' km (edit kari shako)';}
+      }
+    }catch(e){console.log('GPS KM autofill error:',e);}
+  })();
+  var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
   // Init site visit rows
   var sr=document.getElementById('dr-site-rows');
@@ -6767,7 +7029,10 @@ function capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn){
   if(prev)prev.innerHTML='<img src="'+dataUrl+'" style="width:100%;border-radius:10px;margin-top:8px;">';
   if(captureBtn)captureBtn.style.display='none';
   if(retakeBtn)retakeBtn.style.display='';
-  if(submitBtn)submitBtn.disabled=false;
+  var sEl=document.getElementById('pin-selfie-status');
+  if(sEl){sEl.style.background='#d1fae5';sEl.style.color='#065f46';sEl.textContent='📸 Selfie Done ✅';}
+  // Enable submit only when GPS is also ready
+  if(submitBtn)submitBtn.disabled=!window._pinGpsReady;
 }
 function capturePunchOutSelfie(){
   var vid=document.getElementById('pout-selfie-video');if(!vid)return;
@@ -6782,6 +7047,11 @@ function capturePunchOutSelfie(){
   var retBtn=document.getElementById('pout-selfie-retake-btn');
   if(capBtn)capBtn.style.display='none';
   if(retBtn)retBtn.style.display='';
+  var sEl=document.getElementById('pout-selfie-status');
+  if(sEl){sEl.style.background='#d1fae5';sEl.style.color='#065f46';sEl.textContent='📸 Selfie Done ✅';}
+  // Enable confirm only when GPS is also ready
+  var cb=document.getElementById('pout-confirm-btn');
+  if(cb){cb.disabled=!window._poutGpsReady;cb.style.opacity=window._poutGpsReady?'1':'0.5';}
 }
 
 // ===== ADMIN LIVE MAP =====
@@ -6827,13 +7097,29 @@ async function renderLiveMap(){
   var bounds=[];
   var legendHtml='';
 
+  // Haversine distance in km between two GPS coords
+  function haversineKm(lat1,lng1,lat2,lng2){
+    var R=6371;var dLat=(lat2-lat1)*Math.PI/180;var dLng=(lng2-lng1)*Math.PI/180;
+    var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
   Object.keys(engMap).forEach(function(eid){
     var eng=engMap[eid];
     var color=colors[colorIdx%colors.length];colorIdx++;
 
+    // Calculate total KM: only count if moved >100m (ignore GPS drift) and <5km (ignore GPS error jumps)
+    var totalKm=0;
+    for(var i=1;i<eng.points.length;i++){
+      var d=haversineKm(eng.points[i-1][0],eng.points[i-1][1],eng.points[i][0],eng.points[i][1]);
+      if(d>=0.1&&d<5)totalKm+=d;
+    }
+    eng.totalKm=Math.round(totalKm*10)/10;
+
     // Draw route polyline
     var pts=eng.points.map(function(p){return[p[0],p[1]];});
-    if(pts.length>1)L.polyline(pts,{color:color,weight:3,opacity:0.6}).addTo(map);
+    if(pts.length>1)L.polyline(pts,{color:color,weight:3,opacity:0.6}).addTo(map)
+      .bindPopup('<b>'+eng.name+'</b><br>🛣️ Total: <b>'+eng.totalKm+' km</b><br>📍 '+eng.points.length+' points');
 
     // Event markers
     eng.points.forEach(function(p){
@@ -6854,7 +7140,7 @@ async function renderLiveMap(){
         .bindPopup('<b>'+eng.name+'</b><br>Last seen: '+latestTime+'<br>'+eng.points.length+' location points');
     }
 
-    legendHtml+='<span style="background:'+color+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">👷 '+eng.name+' ('+eng.points.length+')</span>';
+    legendHtml+='<span style="background:'+color+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">👷 '+eng.name+' &nbsp;🛣️ '+eng.totalKm+' km</span>';
   });
 
   if(bounds.length)map.fitBounds(bounds,{padding:[30,30]});
@@ -6863,18 +7149,474 @@ async function renderLiveMap(){
   document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — Koi location data nathi</span>';
 
   // Summary table
-  var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary</h2></div>'
+  var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary — '+selDate+'</h2></div>'
     +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-    +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Engineer</th><th style="padding:8px;">Points</th><th style="padding:8px;">First Seen</th><th style="padding:8px;">Last Seen</th><th style="padding:8px;">Ticket Closes</th></tr></thead><tbody>';
+    +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Engineer</th><th style="padding:8px;">🛣️ GPS KM</th><th style="padding:8px;">Points</th><th style="padding:8px;">First Seen</th><th style="padding:8px;">Last Seen</th><th style="padding:8px;">Ticket Closes</th></tr></thead><tbody>';
   Object.values(engMap).forEach(function(eng){
     var closes=eng.points.filter(function(p){return p[2]==='ticket_close';}).length;
     var first=eng.points[0]?new Date(eng.points[0][3]).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
     var last=eng.latest?new Date(eng.latest.recorded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
-    summaryHtml+='<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;font-weight:600;">'+eng.name+'</td><td style="padding:8px;text-align:center;">'+eng.points.length+'</td><td style="padding:8px;text-align:center;">'+first+'</td><td style="padding:8px;text-align:center;">'+last+'</td><td style="padding:8px;text-align:center;">'+(closes||'-')+'</td></tr>';
+    summaryHtml+='<tr style="border-bottom:1px solid var(--border);">'
+      +'<td style="padding:8px;font-weight:600;">'+eng.name+'</td>'
+      +'<td style="padding:8px;text-align:center;font-weight:700;color:#7c3aed;">'+eng.totalKm+' km</td>'
+      +'<td style="padding:8px;text-align:center;">'+eng.points.length+'</td>'
+      +'<td style="padding:8px;text-align:center;">'+first+'</td>'
+      +'<td style="padding:8px;text-align:center;">'+last+'</td>'
+      +'<td style="padding:8px;text-align:center;">'+(closes||'-')+'</td></tr>';
   });
-  summaryHtml+='</tbody></table></div></div>';
+  summaryHtml+='</tbody></table></div>'
+    +'<div style="padding:10px 16px 14px;font-size:12px;color:#9ca3af;">⚠️ GPS KM = GPS tracking thi auto-calculated. Actual road distance thodi vadhi hoi shake. Daily Report ma manual KM entry pan available chhe.</div>'
+    +'</div>';
   document.getElementById('lm-route-info').innerHTML=summaryHtml;
 }
+
+// ===== TARGET MODULE =====
+async function loadMyTargetWidget(tickets){
+  var card=document.getElementById('my-target-card');if(!card)return;
+  var now=new Date();
+  var month=now.toLocaleDateString('en-CA').substring(0,7); // YYYY-MM
+  var monthLabel=now.toLocaleString('en-IN',{month:'long',year:'numeric'});
+  var engId=currentUser.eng_id||currentUser.user_id;
+  try{
+    var rows=await sb('engineer_targets','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&month=eq.'+month+'&limit=1');
+    if(!rows||!rows.length){card.innerHTML='';return;}
+    var tgt=rows[0];
+    var targetCalls=parseInt(tgt.target_calls)||0;
+    if(!targetCalls){card.innerHTML='';return;}
+    var closedThisMonth=tickets.filter(function(t){
+      return t.status==='Closed'&&t.updated_at&&t.updated_at.substring(0,7)===month;
+    }).length;
+    var pct=Math.min(100,Math.round(closedThisMonth/targetCalls*100));
+    var barColor=pct>=80?'#0e9f6e':pct>=50?'#f59e0b':'#f05252';
+    var emoji=pct>=100?'🏆':pct>=80?'🔥':pct>=50?'💪':'🎯';
+    card.innerHTML='<div class="card" style="margin-bottom:14px;border-left:4px solid '+barColor+';">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+      +'<h3 style="font-size:14px;font-weight:700;">'+emoji+' '+monthLabel+' Target</h3>'
+      +'<span style="font-size:20px;font-weight:800;color:'+barColor+';">'+closedThisMonth+' / '+targetCalls+'</span>'
+      +'</div>'
+      +'<div style="background:#f1f5f9;border-radius:99px;height:14px;overflow:hidden;">'
+      +'<div style="background:'+barColor+';height:100%;width:'+pct+'%;border-radius:99px;transition:width 0.6s;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">'
+      +(pct>15?'<span style="font-size:10px;color:#fff;font-weight:700;">'+pct+'%</span>':'')
+      +'</div></div>'
+      +'<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--text-muted);">'
+      +'<span>Closed this month</span><span>Target: '+targetCalls+' calls</span>'
+      +'</div>'
+      +(tgt.target_amount?'<div style="margin-top:8px;font-size:12px;color:#065f46;font-weight:600;">💰 Revenue Target: ₹'+tgt.target_amount+'</div>':'')
+      +'</div>';
+  }catch(e){card.innerHTML='';}
+}
+
+async function renderTargets(){
+  var pc=document.getElementById('page-content');
+  var now=new Date();
+  var thisMonth=now.toLocaleDateString('en-CA').substring(0,7);
+  pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
+    +'<div class="section-header"><h2>🎯 Engineer Targets</h2>'
+    +'<div style="display:flex;gap:8px;align-items:center;">'
+    +'<input type="month" id="tgt-month" value="'+thisMonth+'" onchange="loadTargetReport()" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;outline:none;">'
+    +'<button class="btn btn-primary btn-sm" onclick="loadTargetReport()">🔄 Load</button>'
+    +'</div></div>'
+    +'<div id="tgt-set-area" style="margin-bottom:16px;"></div>'
+    +'</div>'
+    +'<div id="tgt-report-area"></div>';
+  loadTargetReport();
+}
+
+async function loadTargetReport(){
+  var month=document.getElementById('tgt-month')?.value||new Date().toLocaleDateString('en-CA').substring(0,7);
+  var setArea=document.getElementById('tgt-set-area');
+  var repArea=document.getElementById('tgt-report-area');
+  if(!setArea||!repArea)return;
+  setArea.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var[engineers,targets,allT]=await Promise.all([
+      sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
+      sb('engineer_targets','GET',null,'?month=eq.'+month),
+      sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+month+'-01T00:00:00&updated_at=lt.'+getNextMonth(month)+'-01T00:00:00&select=id,assigned_to,labor,other_charge,final_charges,spares')
+    ]);
+    var tgtMap={};targets.forEach(function(t){tgtMap[t.eng_id]=t;});
+    var closedMap={};var revenueMap={};
+    allT.forEach(function(t){
+      closedMap[t.assigned_to]=(closedMap[t.assigned_to]||0)+1;
+      var rev=(parseFloat(t.final_charges)||0)||(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0)+((t.spares||[]).reduce(function(a,s){return a+(s.qty||1)*(s.price||0);},0));
+      revenueMap[t.assigned_to]=(revenueMap[t.assigned_to]||0)+rev;
+    });
+    // Set targets UI
+    var setHtml='<h4 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:10px;">⚙️ Set Monthly Targets — '+month+'</h4>'
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Engineer</th><th style="padding:8px;">Call Target</th><th style="padding:8px;">Revenue Target (₹)</th><th style="padding:8px;">Save</th></tr></thead><tbody>';
+    engineers.forEach(function(e){
+      var t=tgtMap[e.eng_id||e.user_id]||{};
+      var eid=e.eng_id||e.user_id;
+      setHtml+='<tr style="border-bottom:1px solid var(--border);" id="tgt-row-'+eid+'">'
+        +'<td style="padding:8px;font-weight:600;">'+e.name+'</td>'
+        +'<td style="padding:8px;"><input type="number" class="tgt-calls" value="'+(t.target_calls||'')+'" min="0" placeholder="e.g. 30" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;width:90px;font-size:13px;outline:none;"></td>'
+        +'<td style="padding:8px;"><input type="number" class="tgt-revenue" value="'+(t.target_amount||'')+'" min="0" placeholder="e.g. 50000" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;width:120px;font-size:13px;outline:none;"></td>'
+        +'<td style="padding:8px;"><button onclick="saveEngTarget(\''+eid+'\',\''+e.name+'\',\''+month+'\')" class="btn btn-primary btn-sm">Save</button></td>'
+        +'</tr>';
+    });
+    setHtml+='</tbody></table></div>';
+    setArea.innerHTML=setHtml;
+    // Achievement report
+    var repHtml='<div class="card"><div class="section-header"><h2>📊 Achievement Report — '+month+'</h2></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
+    engineers.forEach(function(e){
+      var eid=e.eng_id||e.user_id;
+      var tgt2=tgtMap[eid]||{};
+      var closed=closedMap[eid]||0;
+      var revenue=revenueMap[eid]||0;
+      var callTarget=parseInt(tgt2.target_calls)||0;
+      var revTarget=parseFloat(tgt2.target_amount)||0;
+      var callPct=callTarget?Math.min(100,Math.round(closed/callTarget*100)):0;
+      var revPct=revTarget?Math.min(100,Math.round(revenue/revTarget*100)):0;
+      var barC=callPct>=80?'#0e9f6e':callPct>=50?'#f59e0b':'#f05252';
+      var emoji=callPct>=100?'🏆':callPct>=80?'🔥':callPct>=50?'💪':'🎯';
+      repHtml+='<div style="background:#fff;border-radius:12px;padding:14px;border:1px solid var(--border);box-shadow:var(--shadow);">'
+        +'<div style="font-weight:700;font-size:15px;margin-bottom:10px;">'+emoji+' '+e.name+'</div>'
+        +'<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Calls Closed</div>'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+        +'<span style="font-weight:700;font-size:18px;color:'+barC+';">'+closed+'</span>'
+        +'<span style="font-size:13px;color:#64748b;">'+(callTarget?'/ '+callTarget:' — no target set')+'</span>'
+        +'</div>'
+        +(callTarget?'<div style="background:#f1f5f9;border-radius:99px;height:10px;overflow:hidden;margin-bottom:8px;"><div style="background:'+barC+';height:100%;width:'+callPct+'%;border-radius:99px;"></div></div>':'')
+        +(revTarget?'<div style="font-size:12px;color:#64748b;margin-bottom:4px;">Revenue</div>'
+          +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+          +'<span style="font-weight:700;font-size:15px;color:#065f46;">₹'+Math.round(revenue).toLocaleString()+'</span>'
+          +'<span style="font-size:12px;color:#64748b;">/ ₹'+revTarget.toLocaleString()+'</span>'
+          +'</div>'
+          +'<div style="background:#f1f5f9;border-radius:99px;height:10px;overflow:hidden;"><div style="background:#0e9f6e;height:100%;width:'+revPct+'%;border-radius:99px;"></div></div>':'')
+        +'</div>';
+    });
+    repHtml+='</div></div>';
+    repArea.innerHTML=repHtml;
+  }catch(e){setArea.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br><b>SQL run karo:</b> CREATE TABLE engineer_targets...</div>';repArea.innerHTML='';}
+}
+
+function getNextMonth(ym){
+  var p=ym.split('-');var y=parseInt(p[0]);var m=parseInt(p[1]);
+  m++;if(m>12){m=1;y++;}
+  return y+'-'+(m<10?'0':'')+m;
+}
+
+async function saveEngTarget(engId,engName,month){
+  var row=document.getElementById('tgt-row-'+engId);if(!row)return;
+  var calls=parseInt(row.querySelector('.tgt-calls')?.value)||0;
+  var revenue=parseFloat(row.querySelector('.tgt-revenue')?.value)||0;
+  try{
+    await sb('engineer_targets','POST',{eng_id:engId,eng_name:engName,month:month,target_calls:calls,target_amount:revenue,updated_at:new Date().toISOString()});
+    alert('✅ Target saved!');
+  }catch(e){
+    try{await sb('engineer_targets','PATCH',{target_calls:calls,target_amount:revenue,updated_at:new Date().toISOString()},'?eng_id=eq.'+encodeURIComponent(engId)+'&month=eq.'+month);alert('✅ Target updated!');}
+    catch(e2){alert('Error: '+e2.message);}
+  }
+}
+
+// ===== AMC MODULE =====
+function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+var _amcAll=[];
+var _amcFilter='all';
+
+async function renderAMC(){
+  const content=document.getElementById('content');
+  content.innerHTML=`
+  <div style="padding:20px;max-width:1100px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+      <h2 style="margin:0;font-size:20px;">🔄 AMC Contracts</h2>
+      <button onclick="openAMCForm(null)" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:600;">+ New AMC</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      <button id="amcf-all" onclick="amcFilter('all')" style="padding:7px 16px;border-radius:20px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">All</button>
+      <button id="amcf-active" onclick="amcFilter('active')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">Active</button>
+      <button id="amcf-expiring" onclick="amcFilter('expiring')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">⚠️ Expiring (30d)</button>
+      <button id="amcf-expired" onclick="amcFilter('expired')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">🔴 Expired</button>
+      <input id="amc-search" type="text" placeholder="Search customer / mobile..." oninput="amcSearch()" style="padding:7px 14px;border:1px solid #e2e8f0;border-radius:20px;font-size:13px;min-width:200px;outline:none;">
+    </div>
+    <div id="amc-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>
+    <div id="amc-list">Loading...</div>
+  </div>
+  <div id="amc-form-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
+      <h3 id="amc-form-title" style="margin:0 0 18px;font-size:17px;">New AMC Contract</h3>
+      <input id="amc-id" type="hidden">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="grid-column:1/-1;">
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Customer Name *</label>
+          <input id="amc-customer" type="text" placeholder="Full name" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Mobile *</label>
+          <input id="amc-mobile" type="tel" placeholder="9876543210" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Product / System</label>
+          <input id="amc-product" type="text" placeholder="e.g. CCTV System" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Serial / Model No.</label>
+          <input id="amc-serial" type="text" placeholder="Optional" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">AMC Start Date *</label>
+          <input id="amc-start" type="date" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">AMC End Date *</label>
+          <input id="amc-end" type="date" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">AMC Amount (₹)</label>
+          <input id="amc-amount" type="number" placeholder="0" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">AMC Type</label>
+          <select id="amc-type" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+            <option>Comprehensive</option>
+            <option>Non-Comprehensive</option>
+            <option>Labour Only</option>
+            <option>Parts Only</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Visits Included</label>
+          <input id="amc-visits" type="number" placeholder="0 = unlimited" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Address</label>
+          <input id="amc-address" type="text" placeholder="Installation address" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:12px;color:#6b7280;font-weight:600;">Notes</label>
+          <textarea id="amc-notes" rows="2" placeholder="Any additional notes..." style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button onclick="saveAMC()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Save AMC</button>
+        <button onclick="closeAMCForm()" style="padding:10px 20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+  await loadAMCList('all');
+}
+
+async function loadAMCList(filter){
+  _amcFilter=filter||'all';
+  document.getElementById('amc-list').innerHTML='<div style="text-align:center;padding:30px;color:#9ca3af;">Loading...</div>';
+  try{
+    var data=await sb('amc_contracts','GET','?order=amc_end.asc&limit=500');
+    _amcAll=data||[];
+    var today=new Date();today.setHours(0,0,0,0);
+    var in30=new Date(today);in30.setDate(in30.getDate()+30);
+    // Summary cards
+    var total=_amcAll.length;
+    var active=_amcAll.filter(function(r){return new Date(r.amc_end)>=today;}).length;
+    var expiring=_amcAll.filter(function(r){var e=new Date(r.amc_end);return e>=today&&e<=in30;}).length;
+    var expired=_amcAll.filter(function(r){return new Date(r.amc_end)<today;}).length;
+    var revenue=_amcAll.reduce(function(s,r){return s+(parseFloat(r.amc_amount)||0);},0);
+    document.getElementById('amc-summary').innerHTML=[
+      {label:'Total',val:total,color:'#6366f1',icon:'📋'},
+      {label:'Active',val:active,color:'#10b981',icon:'✅'},
+      {label:'Expiring Soon',val:expiring,color:'#f59e0b',icon:'⚠️'},
+      {label:'Expired',val:expired,color:'#ef4444',icon:'🔴'},
+      {label:'Total Revenue',val:'₹'+revenue.toLocaleString('en-IN'),color:'#7c3aed',icon:'💰'}
+    ].map(function(c){
+      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;min-width:120px;">'
+        +'<span style="font-size:22px;">'+c.icon+'</span>'
+        +'<div><div style="font-size:18px;font-weight:700;color:'+c.color+';">'+c.val+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+c.label+'</div></div></div>';
+    }).join('');
+    amcRender(_amcAll,_amcFilter,today,in30);
+  }catch(e){
+    document.getElementById('amc-list').innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';
+  }
+}
+
+function amcFilter(f){
+  _amcFilter=f;
+  ['all','active','expiring','expired'].forEach(function(k){
+    var btn=document.getElementById('amcf-'+k);
+    if(!btn)return;
+    if(k===f){btn.style.background='#7c3aed';btn.style.color='#fff';btn.style.borderColor='#7c3aed';}
+    else{btn.style.background='#fff';btn.style.color='#374151';btn.style.borderColor='#e2e8f0';}
+  });
+  var today=new Date();today.setHours(0,0,0,0);
+  var in30=new Date(today);in30.setDate(in30.getDate()+30);
+  amcRender(_amcAll,f,today,in30);
+}
+
+function amcSearch(){
+  var q=(document.getElementById('amc-search').value||'').toLowerCase();
+  var today=new Date();today.setHours(0,0,0,0);
+  var in30=new Date(today);in30.setDate(in30.getDate()+30);
+  var filtered=q?_amcAll.filter(function(r){
+    return (r.customer_name||'').toLowerCase().includes(q)||(r.mobile||'').includes(q)||(r.product||'').toLowerCase().includes(q);
+  }):_amcAll;
+  amcRender(filtered,_amcFilter,today,in30);
+}
+
+function amcRender(rows,filter,today,in30){
+  var filtered=rows;
+  if(filter==='active') filtered=rows.filter(function(r){return new Date(r.amc_end)>=today;});
+  else if(filter==='expiring') filtered=rows.filter(function(r){var e=new Date(r.amc_end);return e>=today&&e<=in30;});
+  else if(filter==='expired') filtered=rows.filter(function(r){return new Date(r.amc_end)<today;});
+  var q=(document.getElementById('amc-search')?document.getElementById('amc-search').value||'':'').toLowerCase();
+  if(q) filtered=filtered.filter(function(r){return (r.customer_name||'').toLowerCase().includes(q)||(r.mobile||'').includes(q)||(r.product||'').toLowerCase().includes(q);});
+  if(!filtered.length){
+    document.getElementById('amc-list').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;font-size:15px;">No AMC contracts found.</div>';
+    return;
+  }
+  var html='<div style="display:grid;gap:12px;">';
+  filtered.forEach(function(r){
+    var endDate=new Date(r.amc_end);
+    var isExpired=endDate<today;
+    var isExpiring=!isExpired&&endDate<=in30;
+    var daysLeft=Math.ceil((endDate-today)/(1000*60*60*24));
+    var statusColor=isExpired?'#ef4444':isExpiring?'#f59e0b':'#10b981';
+    var statusLabel=isExpired?'Expired':isExpiring?'Expiring in '+daysLeft+'d':'Active';
+    var statusBg=isExpired?'#fef2f2':isExpiring?'#fffbeb':'#f0fdf4';
+    html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;border-left:4px solid '+statusColor+';">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+      +'<div><div style="font-size:16px;font-weight:700;color:#1f2937;">'+escHtml(r.customer_name||'')+'</div>'
+      +'<div style="font-size:13px;color:#6b7280;margin-top:2px;">📱 '+escHtml(r.mobile||'')+' &nbsp;|&nbsp; '+(r.product?'🔧 '+escHtml(r.product):'')+' &nbsp;|&nbsp; '+escHtml(r.amc_type||'Comprehensive')+'</div>'
+      +(r.address?'<div style="font-size:12px;color:#9ca3af;margin-top:2px;">📍 '+escHtml(r.address)+'</div>':'')+'</div>'
+      +'<span style="background:'+statusBg+';color:'+statusColor+';font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;">'+statusLabel+'</span>'
+      +'</div>'
+      +'<div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap;">'
+      +'<div><div style="font-size:11px;color:#9ca3af;">START</div><div style="font-size:13px;font-weight:600;">'+r.amc_start+'</div></div>'
+      +'<div><div style="font-size:11px;color:#9ca3af;">END</div><div style="font-size:13px;font-weight:600;color:'+statusColor+';">'+r.amc_end+'</div></div>'
+      +'<div><div style="font-size:11px;color:#9ca3af;">AMOUNT</div><div style="font-size:13px;font-weight:600;">₹'+(parseFloat(r.amc_amount)||0).toLocaleString('en-IN')+'</div></div>'
+      +(r.visits_included?'<div><div style="font-size:11px;color:#9ca3af;">VISITS</div><div style="font-size:13px;font-weight:600;">'+r.visits_included+'</div></div>':'')
+      +'</div>'
+      +(r.notes?'<div style="margin-top:8px;font-size:12px;color:#6b7280;background:#f9fafb;padding:6px 10px;border-radius:6px;">'+escHtml(r.notes)+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'
+      +'<button onclick="openAMCForm(\''+r.id+'\')" style="padding:6px 14px;border:1px solid #7c3aed;border-radius:6px;color:#7c3aed;background:#fff;cursor:pointer;font-size:13px;">✏️ Edit</button>'
+      +'<button onclick="renewAMC(\''+r.id+'\')" style="padding:6px 14px;border:1px solid #10b981;border-radius:6px;color:#10b981;background:#fff;cursor:pointer;font-size:13px;">🔄 Renew</button>'
+      +'<button onclick="amcWhatsApp(\''+r.id+'\')" style="padding:6px 14px;border:1px solid #25d366;border-radius:6px;color:#25d366;background:#fff;cursor:pointer;font-size:13px;">📲 WhatsApp</button>'
+      +'<button onclick="deleteAMC(\''+r.id+'\')" style="padding:6px 14px;border:1px solid #ef4444;border-radius:6px;color:#ef4444;background:#fff;cursor:pointer;font-size:13px;">🗑️ Delete</button>'
+      +'</div></div>';
+  });
+  html+='</div>';
+  document.getElementById('amc-list').innerHTML=html;
+}
+
+function openAMCForm(idOrData){
+  document.getElementById('amc-form-overlay').classList.remove('hidden');
+  if(!idOrData){
+    document.getElementById('amc-form-title').textContent='New AMC Contract';
+    document.getElementById('amc-id').value='';
+    ['customer','mobile','product','serial','start','end','amount','visits','address','notes'].forEach(function(f){
+      var el=document.getElementById('amc-'+f);if(el)el.value='';
+    });
+    document.getElementById('amc-type').value='Comprehensive';
+    return;
+  }
+  var r=_amcAll.find(function(x){return String(x.id)===String(idOrData);});
+  if(!r)return;
+  document.getElementById('amc-form-title').textContent='Edit AMC Contract';
+  document.getElementById('amc-id').value=r.id;
+  document.getElementById('amc-customer').value=r.customer_name||'';
+  document.getElementById('amc-mobile').value=r.mobile||'';
+  document.getElementById('amc-product').value=r.product||'';
+  document.getElementById('amc-serial').value=r.serial_no||'';
+  document.getElementById('amc-start').value=r.amc_start||'';
+  document.getElementById('amc-end').value=r.amc_end||'';
+  document.getElementById('amc-amount').value=r.amc_amount||'';
+  document.getElementById('amc-type').value=r.amc_type||'Comprehensive';
+  document.getElementById('amc-visits').value=r.visits_included||'';
+  document.getElementById('amc-address').value=r.address||'';
+  document.getElementById('amc-notes').value=r.notes||'';
+}
+
+function closeAMCForm(){
+  document.getElementById('amc-form-overlay').classList.add('hidden');
+}
+
+async function saveAMC(){
+  var id=document.getElementById('amc-id').value;
+  var customer=document.getElementById('amc-customer').value.trim();
+  var mobile=document.getElementById('amc-mobile').value.trim();
+  var start=document.getElementById('amc-start').value;
+  var end=document.getElementById('amc-end').value;
+  if(!customer||!mobile||!start||!end){alert('Please fill Customer Name, Mobile, Start and End dates.');return;}
+  var payload={
+    customer_name:customer,
+    mobile:mobile,
+    product:document.getElementById('amc-product').value.trim(),
+    serial_no:document.getElementById('amc-serial').value.trim(),
+    amc_start:start,
+    amc_end:end,
+    amc_amount:parseFloat(document.getElementById('amc-amount').value)||0,
+    amc_type:document.getElementById('amc-type').value,
+    visits_included:parseInt(document.getElementById('amc-visits').value)||0,
+    address:document.getElementById('amc-address').value.trim(),
+    notes:document.getElementById('amc-notes').value.trim(),
+    created_by:window._currentUser?window._currentUser.name:'',
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(id){await sb('amc_contracts','PATCH',payload,'?id=eq.'+id);}
+    else{await sb('amc_contracts','POST',payload);}
+    closeAMCForm();
+    alert('✅ AMC saved successfully!');
+    await loadAMCList(_amcFilter);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function amcWhatsApp(id){
+  var r=_amcAll.find(function(x){return String(x.id)===String(id);});
+  if(!r)return;
+  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  var endDate=new Date(r.amc_end);
+  var today=new Date();today.setHours(0,0,0,0);
+  var daysLeft=Math.ceil((endDate-today)/(1000*60*60*24));
+  var statusText=daysLeft<0?'has expired on '+r.amc_end:daysLeft===0?'expires today!':'expires in '+daysLeft+' days ('+r.amc_end+')';
+  var msg='Dear '+r.customer_name+',\n\n'
+    +'This is a reminder from *'+(ci.name||'Bhavi Electronics')+'*.\n\n'
+    +'Your AMC contract '+statusText+'.\n\n'
+    +'📋 *AMC Details:*\n'
+    +'• Product: '+(r.product||'—')+'\n'
+    +(r.serial_no?'• Serial No: '+r.serial_no+'\n':'')
+    +'• Type: '+(r.amc_type||'Comprehensive')+'\n'
+    +'• Valid: '+r.amc_start+' to '+r.amc_end+'\n'
+    +(parseFloat(r.amc_amount)?'• Amount: ₹'+parseFloat(r.amc_amount).toLocaleString('en-IN')+'\n':'\n')
+    +'\nTo renew your AMC or for service support, please contact us:\n'
+    +(ci.phone?'📞 '+ci.phone+'\n':'')
+    +(ci.email?'📧 '+ci.email+'\n':'')
+    +'\nThank you for choosing '+(ci.name||'Bhavi Electronics')+'!';
+  var mob=r.mobile.replace(/\D/g,'');
+  if(mob.length===10)mob='91'+mob;
+  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function renewAMC(id){
+  var r=_amcAll.find(function(x){return String(x.id)===String(id);});
+  if(!r)return;
+  openAMCForm(null);
+  document.getElementById('amc-form-title').textContent='Renew AMC — '+r.customer_name;
+  document.getElementById('amc-customer').value=r.customer_name||'';
+  document.getElementById('amc-mobile').value=r.mobile||'';
+  document.getElementById('amc-product').value=r.product||'';
+  document.getElementById('amc-serial').value=r.serial_no||'';
+  document.getElementById('amc-type').value=r.amc_type||'Comprehensive';
+  document.getElementById('amc-visits').value=r.visits_included||'';
+  document.getElementById('amc-address').value=r.address||'';
+  document.getElementById('amc-amount').value=r.amc_amount||'';
+  // Pre-fill start = old end + 1 day, end = +1 year
+  var oldEnd=new Date(r.amc_end);
+  var newStart=new Date(oldEnd);newStart.setDate(newStart.getDate()+1);
+  var newEnd=new Date(newStart);newEnd.setFullYear(newEnd.getFullYear()+1);newEnd.setDate(newEnd.getDate()-1);
+  document.getElementById('amc-start').value=newStart.toISOString().slice(0,10);
+  document.getElementById('amc-end').value=newEnd.toISOString().slice(0,10);
+  document.getElementById('amc-notes').value='Renewed from previous AMC ('+(r.amc_start||'')+' to '+(r.amc_end||'')+')';
+}
+
+async function deleteAMC(id){
+  if(!confirm('Delete this AMC contract? This cannot be undone.'))return;
+  try{
+    await sb('amc_contracts','DELETE',null,'?id=eq.'+id);
+    await loadAMCList(_amcFilter);
+  }catch(e){alert('Error: '+e.message);}
+}
+// ===== END AMC MODULE =====
 
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
