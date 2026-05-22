@@ -272,6 +272,10 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('attendance')" id="nav-attendance"><span class="icon">🗓️</span><span>Attendance</span></div>
     <div class="nav-item hidden" onclick="navigate('targets')" id="nav-targets"><span class="icon">🎯</span><span>Targets</span></div>
     <div class="nav-item hidden" onclick="navigate('amc')" id="nav-amc"><span class="icon">🔄</span><span>AMC</span></div>
+    <div class="nav-item hidden" onclick="navigate('feedback')" id="nav-feedback"><span class="icon">⭐</span><span>Feedback</span></div>
+    <div class="nav-item hidden" onclick="navigate('followup')" id="nav-followup"><span class="icon">📞</span><span>Follow-up</span></div>
+    <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit"><span class="icon">💰</span><span>Profit</span></div>
+    <div class="nav-item hidden" onclick="navigate('reorder')" id="nav-reorder"><span class="icon">📦</span><span>Reorder</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -2281,7 +2285,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc'].forEach(function(id){
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-followup','nav-profit','nav-reorder'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2409,6 +2413,7 @@ function setupNav(){
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
+      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2466,9 +2471,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -3185,6 +3190,7 @@ async function savePunchOut(key){
   if(!window._punchSelfieOut){alert('📸 Selfie farjiyat chhe! Pehela selfie lo.');return;}
   if(!window._poutLocCache){alert('📍 GPS Location farjiyat chhe! Location meli nathi, try karo.');return;}
   var outLoc=window._poutLocCache;
+  const meter=document.getElementById('pout-meter')?.value||'';
 
   // Get punch data — try localStorage first, then Supabase
   let ps=JSON.parse(localStorage.getItem(key)||'null');
@@ -3717,6 +3723,7 @@ async function viewTicket(id,autoPrint=false){
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
+      ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
     </div>`;
   }
 
@@ -7617,6 +7624,370 @@ async function deleteAMC(id){
   }catch(e){alert('Error: '+e.message);}
 }
 // ===== END AMC MODULE =====
+
+// ===== MODULE 4: CUSTOMER FEEDBACK =====
+async function renderFeedback(){
+  var content=document.getElementById('content');
+  content.innerHTML='<div style="padding:20px;max-width:1000px;margin:0 auto;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<h2 style="margin:0;font-size:20px;">⭐ Customer Feedback</h2></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    +'<select id="fb-eng-filter" onchange="loadFeedback()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<option value="">All Engineers</option></select>'
+    +'<input type="month" id="fb-month" value="'+new Date().toLocaleDateString('en-CA').slice(0,7)+'" onchange="loadFeedback()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'</div>'
+    +'<div id="fb-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>'
+    +'<div id="fb-list">Loading...</div></div>';
+  try{
+    var engs=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&select=user_id,name&order=name');
+    var sel=document.getElementById('fb-eng-filter');
+    if(sel)(engs||[]).forEach(function(e){sel.innerHTML+='<option value="'+e.user_id+'">'+e.name+'</option>';});
+  }catch(e){}
+  await loadFeedback();
+}
+async function loadFeedback(){
+  var month=document.getElementById('fb-month')?.value||'';
+  var engId=document.getElementById('fb-eng-filter')?.value||'';
+  var q='?order=created_at.desc&limit=300';
+  if(month)q+='&created_at=gte.'+month+'-01&created_at=lt.'+getNextMonth(month)+'-01';
+  if(engId)q+='&eng_id=eq.'+encodeURIComponent(engId);
+  try{
+    var rows=await sb('customer_feedback','GET',null,q);
+    var total=(rows||[]).length;
+    var avg=total?((rows.reduce(function(s,r){return s+(r.rating||0);},0)/total).toFixed(1)):'-';
+    var dist=[0,0,0,0,0];
+    (rows||[]).forEach(function(r){if(r.rating>=1&&r.rating<=5)dist[r.rating-1]++;});
+    document.getElementById('fb-summary').innerHTML=[
+      {icon:'📋',label:'Total',val:total,color:'#6366f1'},
+      {icon:'⭐',label:'Avg Rating',val:avg+'/5',color:'#f59e0b'},
+      {icon:'😊',label:'5 Star',val:dist[4],color:'#10b981'},
+      {icon:'😐',label:'3-4 Star',val:dist[2]+dist[3],color:'#3b82f6'},
+      {icon:'😞',label:'1-2 Star',val:dist[0]+dist[1],color:'#ef4444'}
+    ].map(function(c){return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">'
+      +'<span style="font-size:22px;">'+c.icon+'</span><div><div style="font-size:18px;font-weight:700;color:'+c.color+';">'+c.val+'</div>'
+      +'<div style="font-size:11px;color:#6b7280;">'+c.label+'</div></div></div>';}).join('');
+    if(!rows||!rows.length){document.getElementById('fb-list').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">No feedback found for selected period.</div>';return;}
+    var html='<div style="display:grid;gap:10px;">';
+    rows.forEach(function(r){
+      var stars='⭐'.repeat(r.rating||0)+'☆'.repeat(5-(r.rating||0));
+      html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">'
+        +'<div><div style="font-size:15px;font-weight:700;">'+escHtml(r.customer_name||'Customer')+'</div>'
+        +'<div style="font-size:12px;color:#6b7280;">'+escHtml(r.mobile||'')+(r.eng_name?' &nbsp;|&nbsp; 👷 '+escHtml(r.eng_name):'')+'</div></div>'
+        +'<div style="text-align:right;"><div style="font-size:18px;">'+stars+'</div>'
+        +'<div style="font-size:11px;color:#9ca3af;">'+(r.created_at?r.created_at.slice(0,10):'')+'</div></div></div>'
+        +(r.comment?'<div style="margin-top:8px;font-size:13px;color:#374151;background:#f9fafb;padding:8px 10px;border-radius:6px;">💬 '+escHtml(r.comment)+'</div>':'')
+        +(r.ticket_id?'<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Ticket: '+r.ticket_id+'</div>':'')
+        +'</div>';
+    });
+    html+='</div>';
+    document.getElementById('fb-list').innerHTML=html;
+  }catch(e){document.getElementById('fb-list').innerHTML='<div style="color:red;padding:20px;">Error loading feedback: '+e.message+'<br><small>SQL: Create customer_feedback table first</small></div>';}
+}
+function sendFeedbackWA(ticketId,customerName,mobile,engName){
+  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  var fbUrl=window.location.href.split('?')[0]+'?feedback='+ticketId;
+  var msg='Dear '+customerName+',\n\n'
+    +'Thank you for choosing *'+(ci.name||'Bhavi Electronics')+'*! 🙏\n\n'
+    +'Your service request has been completed by '+engName+'.\n\n'
+    +'We value your feedback! Please rate our service (1-5 stars):\n'
+    +fbUrl+'\n\n'
+    +'Your feedback helps us serve you better.\n\n'
+    +(ci.phone?'📞 '+ci.phone:'');
+  var mob=(mobile||'').replace(/\D/g,'');
+  if(mob.length===10)mob='91'+mob;
+  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+}
+// Public feedback form (shown when ?feedback=ticketId in URL)
+(function(){
+  var params=new URLSearchParams(window.location.search);
+  var fbTicket=params.get('feedback');
+  if(!fbTicket)return;
+  window.addEventListener('DOMContentLoaded',function(){
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#1e2a3a,#1a56db);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML='<div style="background:#fff;border-radius:16px;padding:28px;width:340px;max-width:95vw;text-align:center;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">⭐</div>'
+      +'<h2 style="margin:0 0 6px;font-size:18px;">Rate Your Experience</h2>'
+      +'<p style="color:#6b7280;font-size:13px;margin-bottom:16px;">How was our service? Your feedback matters!</p>'
+      +'<div id="fb-stars" style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">'
+      +[1,2,3,4,5].map(function(n){return '<span data-r="'+n+'" onclick="setFbStar('+n+')" style="font-size:36px;cursor:pointer;transition:transform 0.1s;">☆</span>';}).join('')
+      +'</div>'
+      +'<input id="fb-name" type="text" placeholder="Your name" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">'
+      +'<textarea id="fb-comment" rows="3" placeholder="Any comments? (optional)" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:14px;box-sizing:border-box;resize:none;"></textarea>'
+      +'<button onclick="submitFeedback(\''+fbTicket+'\')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;cursor:pointer;">Submit Feedback</button>'
+      +'<div id="fb-result" style="margin-top:10px;font-size:13px;"></div>'
+      +'</div>';
+    document.body.appendChild(overlay);
+    window._fbOverlay=overlay;
+    window._fbRating=0;
+  });
+})();
+window.setFbStar=function(n){
+  window._fbRating=n;
+  document.querySelectorAll('#fb-stars span').forEach(function(s,i){s.textContent=i<n?'⭐':'☆';});
+};
+window.submitFeedback=async function(ticketId){
+  var name=(document.getElementById('fb-name')?.value||'').trim()||'Customer';
+  var comment=(document.getElementById('fb-comment')?.value||'').trim();
+  if(!window._fbRating){document.getElementById('fb-result').textContent='Please select a star rating!';return;}
+  try{
+    await sb('customer_feedback','POST',{ticket_id:ticketId,customer_name:name,rating:window._fbRating,comment:comment,created_at:new Date().toISOString()});
+    if(window._fbOverlay)window._fbOverlay.innerHTML='<div style="background:#fff;border-radius:16px;padding:40px;text-align:center;width:300px;">'
+      +'<div style="font-size:48px;">🎉</div><h2 style="color:#10b981;">Thank You!</h2>'
+      +'<p style="color:#6b7280;">Your feedback has been submitted successfully.</p></div>';
+  }catch(e){document.getElementById('fb-result').style.color='red';document.getElementById('fb-result').textContent='Error: '+e.message;}
+};
+// ===== END MODULE 4 =====
+
+// ===== MODULE 5: FOLLOW-UP TRACKER =====
+async function renderFollowup(){
+  var content=document.getElementById('content');
+  content.innerHTML='<div style="padding:20px;max-width:1000px;margin:0 auto;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<h2 style="margin:0;font-size:20px;">📞 Follow-up Tracker</h2></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    +'<button id="fu-f-overdue" onclick="fuFilter(\'overdue\')" style="padding:7px 16px;border-radius:20px;border:2px solid #ef4444;background:#ef4444;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">🔴 Overdue</button>'
+    +'<button id="fu-f-today" onclick="fuFilter(\'today\')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">📅 Today</button>'
+    +'<button id="fu-f-upcoming" onclick="fuFilter(\'upcoming\')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">⏰ Upcoming</button>'
+    +'<button id="fu-f-all" onclick="fuFilter(\'all\')" style="padding:7px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#374151;cursor:pointer;font-size:13px;">All</button>'
+    +'</div>'
+    +'<div id="fu-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>'
+    +'<div id="fu-list">Loading...</div></div>';
+  await loadFollowup('overdue');
+}
+var _fuAll=[];var _fuFilter='overdue';
+async function loadFollowup(filter){
+  _fuFilter=filter||'overdue';
+  try{
+    var data=await sb('tickets','GET',null,'?follow_up_date=not.is.null&status=neq.Closed&order=follow_up_date.asc&limit=500');
+    _fuAll=data||[];
+    var today=new Date().toLocaleDateString('en-CA');
+    var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);var tomStr=tomorrow.toLocaleDateString('en-CA');
+    var overdue=_fuAll.filter(function(r){return r.follow_up_date<today;});
+    var todayList=_fuAll.filter(function(r){return r.follow_up_date===today;});
+    var upcoming=_fuAll.filter(function(r){return r.follow_up_date>today;});
+    document.getElementById('fu-summary').innerHTML=[
+      {icon:'🔴',label:'Overdue',val:overdue.length,color:'#ef4444'},
+      {icon:'📅',label:'Today',val:todayList.length,color:'#f59e0b'},
+      {icon:'⏰',label:'Upcoming',val:upcoming.length,color:'#3b82f6'},
+      {icon:'📋',label:'Total Open',val:_fuAll.length,color:'#6366f1'}
+    ].map(function(c){return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">'
+      +'<span style="font-size:22px;">'+c.icon+'</span><div><div style="font-size:18px;font-weight:700;color:'+c.color+';">'+c.val+'</div>'
+      +'<div style="font-size:11px;color:#6b7280;">'+c.label+'</div></div></div>';}).join('');
+    fuRender(_fuAll,_fuFilter,today);
+  }catch(e){document.getElementById('fu-list').innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'<br><small>Add follow_up_date column: ALTER TABLE tickets ADD COLUMN IF NOT EXISTS follow_up_date DATE;</small></div>';}
+}
+function fuFilter(f){
+  _fuFilter=f;
+  ['overdue','today','upcoming','all'].forEach(function(k){
+    var btn=document.getElementById('fu-f-'+k);if(!btn)return;
+    var colors={'overdue':'#ef4444','today':'#f59e0b','upcoming':'#3b82f6','all':'#6366f1'};
+    if(k===f){btn.style.background=colors[k]||'#6366f1';btn.style.color='#fff';btn.style.borderColor=colors[k]||'#6366f1';}
+    else{btn.style.background='#fff';btn.style.color='#374151';btn.style.borderColor='#e2e8f0';}
+  });
+  fuRender(_fuAll,f,new Date().toLocaleDateString('en-CA'));
+}
+function fuRender(rows,filter,today){
+  var filtered=rows;
+  if(filter==='overdue')filtered=rows.filter(function(r){return r.follow_up_date<today;});
+  else if(filter==='today')filtered=rows.filter(function(r){return r.follow_up_date===today;});
+  else if(filter==='upcoming')filtered=rows.filter(function(r){return r.follow_up_date>today;});
+  if(!filtered.length){document.getElementById('fu-list').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">No follow-ups in this category.</div>';return;}
+  var html='<div style="display:grid;gap:10px;">';
+  filtered.forEach(function(r){
+    var isOverdue=r.follow_up_date<today;var isToday=r.follow_up_date===today;
+    var badge=isOverdue?'<span style="background:#fef2f2;color:#dc2626;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;">🔴 Overdue</span>'
+      :isToday?'<span style="background:#fffbeb;color:#d97706;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;">📅 Today</span>'
+      :'<span style="background:#eff6ff;color:#3b82f6;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;">⏰ '+r.follow_up_date+'</span>';
+    html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;border-left:4px solid '+(isOverdue?'#ef4444':isToday?'#f59e0b':'#3b82f6')+'">'
+      +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+      +'<div><div style="font-size:15px;font-weight:700;">'+escHtml(r.cname||'')+'</div>'
+      +'<div style="font-size:12px;color:#6b7280;">📱 '+escHtml(r.mobile||'')+' &nbsp;|&nbsp; 🔧 '+escHtml(r.model||'')+' — '+escHtml(r.problem||'')+'</div>'
+      +(r.eng_name?'<div style="font-size:12px;color:#9ca3af;margin-top:2px;">👷 '+escHtml(r.eng_name)+'</div>':'')
+      +'</div>'+badge+'</div>'
+      +(r.follow_up_note?'<div style="margin-top:8px;font-size:12px;color:#374151;background:#f9fafb;padding:6px 10px;border-radius:6px;">📝 '+escHtml(r.follow_up_note)+'</div>':'')
+      +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
+      +'<button onclick="fuWhatsApp(\''+r.id+'\')" style="padding:5px 12px;border:1px solid #25d366;border-radius:6px;color:#25d366;background:#fff;cursor:pointer;font-size:12px;">📲 WA Remind</button>'
+      +'<button onclick="fuDone(\''+r.id+'\')" style="padding:5px 12px;border:1px solid #10b981;border-radius:6px;color:#10b981;background:#fff;cursor:pointer;font-size:12px;">✅ Mark Done</button>'
+      +'<button onclick="fuSnooze(\''+r.id+'\')" style="padding:5px 12px;border:1px solid #f59e0b;border-radius:6px;color:#f59e0b;background:#fff;cursor:pointer;font-size:12px;">⏰ Snooze 1d</button>'
+      +'</div></div>';
+  });
+  html+='</div>';
+  document.getElementById('fu-list').innerHTML=html;
+}
+function fuWhatsApp(id){
+  var r=_fuAll.find(function(x){return String(x.id)===String(id);});if(!r)return;
+  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  var msg='Dear '+r.cname+',\n\nThis is a follow-up from *'+(ci.name||'Bhavi Electronics')+'*.\n\nRegarding your service request for: *'+r.model+'*\nIssue: '+r.problem+'\n\nPlease contact us to schedule the service.\n\n'+(ci.phone?'📞 '+ci.phone:'');
+  var mob=(r.mobile||'').replace(/\D/g,'');if(mob.length===10)mob='91'+mob;
+  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+}
+async function fuDone(id){
+  if(!confirm('Mark this follow-up as done?'))return;
+  try{await sb('tickets','PATCH',{follow_up_date:null,follow_up_note:null,updated_at:new Date().toISOString()},'?id=eq.'+id);await loadFollowup(_fuFilter);}
+  catch(e){alert('Error: '+e.message);}
+}
+async function fuSnooze(id){
+  var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);
+  var newDate=tomorrow.toLocaleDateString('en-CA');
+  try{await sb('tickets','PATCH',{follow_up_date:newDate,updated_at:new Date().toISOString()},'?id=eq.'+id);await loadFollowup(_fuFilter);}
+  catch(e){alert('Error: '+e.message);}
+}
+// Set follow-up from ticket update modal
+async function setFollowUp(ticketId){
+  var d=prompt('Follow-up date set karo (YYYY-MM-DD):',new Date().toLocaleDateString('en-CA'));
+  if(!d)return;
+  var note=prompt('Note (optional):');
+  try{await sb('tickets','PATCH',{follow_up_date:d,follow_up_note:note||null,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);alert('✅ Follow-up set: '+d);}
+  catch(e){alert('Error: '+e.message);}
+}
+// ===== END MODULE 5 =====
+
+// ===== MODULE 6: PROFIT DASHBOARD =====
+async function renderProfit(){
+  var content=document.getElementById('content');
+  var now=new Date();
+  var months=[];for(var i=5;i>=0;i--){var d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(d.toLocaleDateString('en-CA').slice(0,7));}
+  content.innerHTML='<div style="padding:20px;max-width:1100px;margin:0 auto;">'
+    +'<h2 style="margin:0 0 16px;font-size:20px;">💰 Profit Dashboard</h2>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'
+    +'<select id="pr-month" onchange="loadProfit()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +months.map(function(m){return '<option value="'+m+'"'+(m===months[months.length-1]?' selected':'')+'>'+m+'</option>';}).join('')
+    +'</select>'
+    +'<button onclick="loadProfit()" style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;">🔄 Load</button>'
+    +'</div>'
+    +'<div id="pr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;" id="pr-charts"></div>'
+    +'<div id="pr-detail" style="margin-top:16px;"></div></div>';
+  await loadProfit();
+}
+async function loadProfit(){
+  var month=document.getElementById('pr-month')?.value||new Date().toLocaleDateString('en-CA').slice(0,7);
+  var nextM=getNextMonth(month);
+  try{
+    var [tickets,reports]=await Promise.all([
+      sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+month+'-01&updated_at=lt.'+nextM+'-01&select=id,labor,total_amount,eng_id,eng_name,updated_at&limit=1000'),
+      sb('daily_reports','GET',null,'?report_date=gte.'+month+'-01&report_date=lt.'+nextM+'-01&select=eng_name,total_amount,petrol_km&limit=500')
+    ]);
+    var revenue=(tickets||[]).reduce(function(s,t){return s+(parseFloat(t.total_amount)||0);},0);
+    var labor=(tickets||[]).reduce(function(s,t){return s+(parseFloat(t.labor)||0);},0);
+    var collected=(reports||[]).reduce(function(s,r){return s+(parseFloat(r.total_amount)||0);},0);
+    var totalKm=(reports||[]).reduce(function(s,r){return s+(parseFloat(r.petrol_km)||0);},0);
+    var closed=(tickets||[]).length;
+    document.getElementById('pr-cards').innerHTML=[
+      {icon:'🎫',label:'Tickets Closed',val:closed,color:'#6366f1'},
+      {icon:'💰',label:'Total Revenue',val:'₹'+revenue.toLocaleString('en-IN'),color:'#10b981'},
+      {icon:'💵',label:'Cash Collected',val:'₹'+collected.toLocaleString('en-IN'),color:'#f59e0b'},
+      {icon:'🔧',label:'Labor Revenue',val:'₹'+labor.toLocaleString('en-IN'),color:'#3b82f6'},
+      {icon:'🚗',label:'Total KM',val:totalKm+' km',color:'#8b5cf6'},
+      {icon:'📊',label:'Avg/Ticket',val:closed?'₹'+Math.round(revenue/closed):'-',color:'#ec4899'}
+    ].map(function(c){return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;">'
+      +'<div style="font-size:28px;margin-bottom:4px;">'+c.icon+'</div>'
+      +'<div style="font-size:20px;font-weight:800;color:'+c.color+';">'+c.val+'</div>'
+      +'<div style="font-size:11px;color:#6b7280;margin-top:2px;">'+c.label+'</div></div>';}).join('');
+    // Engineer-wise breakdown
+    var engMap={};
+    (tickets||[]).forEach(function(t){
+      var k=t.eng_name||'Unknown';
+      if(!engMap[k])engMap[k]={name:k,closed:0,revenue:0};
+      engMap[k].closed++;engMap[k].revenue+=parseFloat(t.total_amount)||0;
+    });
+    var engRows=Object.values(engMap).sort(function(a,b){return b.revenue-a.revenue;});
+    var maxRev=engRows.length?engRows[0].revenue:1;
+    var engHtml='<div class="card" style="grid-column:1/-1;"><div class="section-header"><h2>👷 Engineer Performance</h2></div>'
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Engineer</th><th style="padding:8px;text-align:center;">Closed</th><th style="padding:8px;text-align:right;">Revenue</th><th style="padding:8px;">Progress</th></tr></thead><tbody>';
+    engRows.forEach(function(e){
+      var pct=maxRev>0?Math.round(e.revenue/maxRev*100):0;
+      engHtml+='<tr style="border-bottom:1px solid var(--border);">'
+        +'<td style="padding:8px;font-weight:600;">'+escHtml(e.name)+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+e.closed+'</td>'
+        +'<td style="padding:8px;text-align:right;font-weight:700;color:#10b981;">₹'+e.revenue.toLocaleString('en-IN')+'</td>'
+        +'<td style="padding:8px;min-width:120px;"><div style="background:#f1f5f9;border-radius:4px;height:8px;"><div style="background:#7c3aed;height:8px;border-radius:4px;width:'+pct+'%;"></div></div></td></tr>';
+    });
+    engHtml+='</tbody></table></div></div>';
+    document.getElementById('pr-charts').innerHTML=engHtml;
+  }catch(e){document.getElementById('pr-cards').innerHTML='<div style="color:red;padding:20px;grid-column:1/-1;">Error loading data: '+e.message+'</div>';}
+}
+// ===== END MODULE 6 =====
+
+// ===== MODULE 7: PARTS REORDER ALERT =====
+async function renderReorder(){
+  var content=document.getElementById('content');
+  content.innerHTML='<div style="padding:20px;max-width:900px;margin:0 auto;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<h2 style="margin:0;font-size:20px;">📦 Parts Reorder Alert</h2>'
+    +'<button onclick="shareReorderList()" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">📲 Share Reorder List</button>'
+    +'</div>'
+    +'<div id="ro-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>'
+    +'<div id="ro-list">Loading...</div></div>';
+  await loadReorder();
+}
+async function loadReorder(){
+  try{
+    var parts=await sb('inventory','GET',null,'?order=item_name.asc&limit=1000');
+    var all=parts||[];
+    var critical=all.filter(function(p){var min=parseInt(p.min_stock)||0;return min>0&&(parseInt(p.qty_in_stock)||0)<=min;});
+    var low=all.filter(function(p){var min=parseInt(p.min_stock)||0;return min>0&&(parseInt(p.qty_in_stock)||0)>min&&(parseInt(p.qty_in_stock)||0)<=min*2;});
+    var noMin=all.filter(function(p){return !parseInt(p.min_stock);});
+    document.getElementById('ro-summary').innerHTML=[
+      {icon:'🔴',label:'Critical (≤ min)',val:critical.length,color:'#ef4444'},
+      {icon:'🟡',label:'Low (≤ 2× min)',val:low.length,color:'#f59e0b'},
+      {icon:'✅',label:'OK',val:all.length-critical.length-low.length,color:'#10b981'},
+      {icon:'⚙️',label:'No Min Set',val:noMin.length,color:'#9ca3af'}
+    ].map(function(c){return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">'
+      +'<span style="font-size:22px;">'+c.icon+'</span><div><div style="font-size:18px;font-weight:700;color:'+c.color+';">'+c.val+'</div>'
+      +'<div style="font-size:11px;color:#6b7280;">'+c.label+'</div></div></div>';}).join('');
+    var reorderList=critical.concat(low);
+    if(!reorderList.length){document.getElementById('ro-list').innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;">✅ All parts are adequately stocked!</div>';return;}
+    var html='<div style="display:grid;gap:8px;">';
+    reorderList.forEach(function(p){
+      var qty=parseInt(p.qty_in_stock)||0;var min=parseInt(p.min_stock)||0;
+      var isCritical=qty<=min;
+      var pct=min>0?Math.min(100,Math.round(qty/(min*2)*100)):50;
+      html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;border-left:4px solid '+(isCritical?'#ef4444':'#f59e0b')+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        +'<div><div style="font-size:14px;font-weight:700;">'+escHtml(p.item_name||p.part_name||'')+'</div>'
+        +'<div style="font-size:12px;color:#6b7280;">'+(p.part_code?'Code: '+p.part_code+' &nbsp;|&nbsp; ':'')+(p.category?escHtml(p.category):'')+'</div></div>'
+        +'<div style="text-align:right;">'
+        +'<span style="background:'+(isCritical?'#fef2f2':'#fffbeb')+';color:'+(isCritical?'#dc2626':'#d97706')+';font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;">'+(isCritical?'🔴 Critical':'🟡 Low')+'</span></div></div>'
+        +'<div style="margin-top:10px;display:flex;gap:24px;align-items:center;">'
+        +'<div><span style="font-size:11px;color:#9ca3af;">STOCK</span><div style="font-size:18px;font-weight:800;color:'+(isCritical?'#ef4444':'#f59e0b')+';">'+qty+'</div></div>'
+        +'<div><span style="font-size:11px;color:#9ca3af;">MIN</span><div style="font-size:18px;font-weight:800;color:#374151;">'+min+'</div></div>'
+        +'<div style="flex:1;"><div style="background:#f1f5f9;border-radius:4px;height:10px;"><div style="background:'+(isCritical?'#ef4444':'#f59e0b')+';height:10px;border-radius:4px;width:'+pct+'%;transition:width 0.3s;"></div></div>'
+        +'<div style="font-size:10px;color:#9ca3af;margin-top:2px;">'+pct+'% of reorder level</div></div></div>'
+        +(p.supplier?'<div style="margin-top:6px;font-size:12px;color:#6b7280;">🏪 '+escHtml(p.supplier)+'</div>':'')
+        +'<button onclick="setMinStock(\''+p.id+'\',\''+escHtml(p.item_name||p.part_name||'')+'\','+min+')" style="margin-top:8px;padding:4px 10px;border:1px solid #7c3aed;border-radius:6px;color:#7c3aed;background:#fff;cursor:pointer;font-size:12px;">⚙️ Set Min Stock</button>'
+        +'</div>';
+    });
+    html+='</div>';
+    document.getElementById('ro-list').innerHTML=html;
+    window._reorderList=reorderList;
+  }catch(e){document.getElementById('ro-list').innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
+}
+async function setMinStock(id,name,current){
+  var val=prompt('Set minimum stock for '+name+':\n(Current min: '+current+')',current||'5');
+  if(val===null)return;
+  var num=parseInt(val);if(isNaN(num)||num<0){alert('Invalid number');return;}
+  try{
+    await sb('inventory','PATCH',{min_stock:num},'?id=eq.'+id);
+    await loadReorder();
+  }catch(e){alert('Error: '+e.message);}
+}
+function shareReorderList(){
+  var list=window._reorderList||[];
+  if(!list.length){alert('No reorder needed!');return;}
+  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  var msg='📦 *Parts Reorder List*\n'+(ci.name?'*'+ci.name+'*\n':'')+'📅 '+new Date().toLocaleDateString('en-IN')+'\n\n';
+  var critical=list.filter(function(p){return (parseInt(p.quantity)||0)<=(parseInt(p.min_stock)||0);});
+  var low=list.filter(function(p){return (parseInt(p.quantity)||0)>(parseInt(p.min_stock)||0);});
+  if(critical.length){msg+='🔴 *CRITICAL — Order Immediately:*\n';critical.forEach(function(p){msg+='• '+(p.item_name||p.part_name||'')+' (Stock: '+(p.qty_in_stock||0)+', Min: '+(p.min_stock||0)+')\n';});}
+  if(low.length){msg+='\n🟡 *LOW STOCK — Order Soon:*\n';low.forEach(function(p){msg+='• '+(p.item_name||p.part_name||'')+' (Stock: '+(p.qty_in_stock||0)+', Min: '+(p.min_stock||0)+')\n';});}
+  msg+='\nTotal items to reorder: '+list.length;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+// ===== END MODULE 7 =====
 
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
