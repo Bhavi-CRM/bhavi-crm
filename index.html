@@ -90,7 +90,7 @@ tr:hover td{background:#f8fafc;}
 .tab.active{background:#fff;color:var(--primary);box-shadow:var(--shadow);}
 .clickable-phone{color:var(--primary);text-decoration:none;font-weight:600;}
 /* LOGIN */
-#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1e2a3a 0%,#1a56db 100%);display:flex;align-items:center;justify-content:center;z-index:9999;}
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1e2a3a 0%,#1a56db 100%);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;z-index:9999;}
 .login-card{background:#fff;border-radius:20px;padding:36px;width:380px;box-shadow:0 30px 80px rgba(0,0,0,0.3);}
 .login-logo{text-align:center;margin-bottom:24px;}
 .login-logo .company{font-size:17px;font-weight:800;}
@@ -276,6 +276,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('followup')" id="nav-followup"><span class="icon">📞</span><span>Follow-up</span></div>
     <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit"><span class="icon">💰</span><span>Profit</span></div>
     <div class="nav-item hidden" onclick="navigate('reorder')" id="nav-reorder"><span class="icon">📦</span><span>Reorder</span></div>
+    <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -362,7 +363,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Priority</label><select id="call-priority"><option>Normal</option><option>High</option><option>Low</option></select></div>
         <div class="form-group" id="call-service-charges-row" style="display:none;">
           <label>💰 Service / Labour Charges (₹)</label>
-          <input type="number" id="call-service-charges" min="0" step="50" value="300" placeholder="300">
+          <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="0">
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts add thashhe to ae upar add thashe</div>
         </div>
       </div>
@@ -1913,6 +1914,7 @@ function saveCompanyInfo(){
     phone:document.getElementById('ci-phone')?.value||'',
     email:document.getElementById('ci-email')?.value||'',
     gst:document.getElementById('ci-gst')?.value||'',
+    gst_pct:parseFloat(document.getElementById('ci-gst-pct')?.value)||0,
     addr1:document.getElementById('ci-addr1')?.value||'',
     addr2:document.getElementById('ci-addr2')?.value||'',
     web:document.getElementById('ci-web')?.value||'',
@@ -2285,7 +2287,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-followup','nav-profit','nav-reorder'].forEach(function(id){
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-followup','nav-profit','nav-reorder','nav-weekly'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2413,7 +2415,7 @@ function setupNav(){
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
-      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);
+      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2471,9 +2473,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2993,21 +2995,11 @@ function showPunchOutModal(ps,key){
   // Create overlay
   var overlay=document.createElement('div');
   overlay.id='punch-out-modal';
-  overlay.style.position='fixed';
-  overlay.style.inset='0';
-  overlay.style.background='rgba(0,0,0,0.6)';
-  overlay.style.zIndex='9999';
-  overlay.style.display='flex';
-  overlay.style.alignItems='center';
-  overlay.style.justifyContent='center';
-  
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+
   // Create box
   var box=document.createElement('div');
-  box.style.background='#fff';
-  box.style.borderRadius='14px';
-  box.style.padding='24px';
-  box.style.width='420px';
-  box.style.boxShadow='0 20px 60px rgba(0,0,0,0.3)';
+  box.style.cssText='background:#fff;border-radius:14px;padding:20px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.3);margin:auto;';
   
   // Header
   var header=document.createElement('div');
@@ -3095,59 +3087,20 @@ function showPunchOutModal(ps,key){
   box.appendChild(poutStatusRow);
   // --- End Selfie Section ---
 
-  // Meter reading
-  var mLabel=document.createElement('label');
-  mLabel.style.cssText='font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;';
-  mLabel.innerHTML='End Meter Reading <span style="color:red;">*</span>';
-  var mInput=document.createElement('input');
-  mInput.type='text';
-  mInput.id='pout-meter';
-  mInput.placeholder='Enter meter reading';
-  mInput.style.cssText='width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;margin-bottom:12px;box-sizing:border-box;';
-  box.appendChild(mLabel);
-  box.appendChild(mInput);
-  
-  // Photo upload
-  var pLabel=document.createElement('label');
-  pLabel.style.cssText='font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;';
-  pLabel.innerHTML='End Meter Photo <span style="color:red;">*</span>';
-  
-  var pBox=document.createElement('div');
-  pBox.style.cssText='border:2px dashed #e2e8f0;border-radius:10px;padding:14px;text-align:center;cursor:pointer;margin-bottom:16px;';
-  pBox.innerHTML='📷 Click to upload end meter photo';
-  
-  var pInput=document.createElement('input');
-  pInput.type='file';
-  pInput.id='pout-photo-input';
-  pInput.accept='image/*';
-  pInput.style.display='none';
-  pInput.onchange=function(){previewPunchPhoto(this);};
-  
-  var pPreview=document.createElement('div');
-  pPreview.id='pout-photo-preview';
-  pPreview.style.marginTop='8px';
-  
-  pBox.onclick=function(){pInput.click();};
-  pBox.appendChild(pInput);
-  pBox.appendChild(pPreview);
-  
-  box.appendChild(pLabel);
-  box.appendChild(pBox);
-  
   // Buttons
   var btnRow=document.createElement('div');
-  btnRow.style.cssText='display:flex;gap:10px;justify-content:flex-end;';
-  
+  btnRow.style.cssText='display:flex;gap:10px;margin-top:4px;';
+
   var cancelBtn=document.createElement('button');
   cancelBtn.textContent='Cancel';
-  cancelBtn.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;';
+  cancelBtn.style.cssText='flex:1;padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;';
   cancelBtn.onclick=function(){overlay.remove();};
-  
+
   var confirmBtn=document.createElement('button');
   confirmBtn.id='pout-confirm-btn';
-  confirmBtn.textContent='⏹ Confirm Punch Out';
+  confirmBtn.textContent='⏹ Punch Out';
   confirmBtn.disabled=true;
-  confirmBtn.style.cssText='padding:8px 16px;background:#f05252;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;opacity:0.5;';
+  confirmBtn.style.cssText='flex:2;padding:10px;background:#f05252;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;opacity:0.5;';
   confirmBtn.onclick=function(){savePunchOut(key);};
   
   btnRow.appendChild(cancelBtn);
@@ -3785,7 +3738,10 @@ async function generateInvoice(id){
   const other=parseFloat(t.other_charge)||0;
   const partsTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
   const finalCharge=parseFloat(t.final_charges)||0;
-  const grandTotal=finalCharge>0?finalCharge:(labor+partsTotal+other);
+  const subTotal=finalCharge>0?finalCharge:(labor+partsTotal+other);
+  const gstPct=parseFloat(ci.gst_pct)||0;
+  const gstAmt=isWarranty?0:Math.round(subTotal*gstPct/100*100)/100;
+  const grandTotal=subTotal+gstAmt;
   const invoiceNo='INV-'+t.id;
   const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
   const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
@@ -3887,8 +3843,10 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
       <tr><td>Parts Total</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
       <tr><td>Labor / Service</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>
       ${other>0?`<tr><td>Other Charges</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>`:''}
+      <tr><td style="color:#374151;">Sub Total</td><td style="text-align:right;">₹${subTotal.toFixed(2)}</td></tr>
+      ${gstPct>0&&!isWarranty?`<tr><td style="color:#374151;">GST (${gstPct}%)</td><td style="text-align:right;">₹${gstAmt.toFixed(2)}</td></tr>`:''}
       ${isWarranty?`<tr><td colspan="2" style="color:#065f46;font-weight:600;text-align:center;">✅ Under Warranty — No Charge</td></tr>`:''}
-      <tr class="grand"><td>GRAND TOTAL</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
+      <tr class="grand"><td>GRAND TOTAL${gstPct>0&&!isWarranty?' (incl. GST)':''}</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
     </tbody>
   </table>
 
@@ -4406,48 +4364,23 @@ async function saveEngUpdate(){
     data.visit_out=outEl?.value||timeOut;
   }
   
-  // ASK SERVICE CHARGES when closing Non-Warranty or Out-of-Warranty call
+  // AUTO-CALCULATE charges when closing Non-Warranty or Out-of-Coverage call (no popup)
   if(status==='Closed'){
     const isNonWarranty=t.call_type&&(t.call_type.includes('Non-Warranty'));
     const isRepeatFOC=t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'));
-    const isOutCoverage=t.warranty_coverage==='Out of Coverage';
-    if(isNonWarranty||isOutCoverage){
-      const partsCost=(currentSpares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
-      if(isRepeatFOC){
-        // Re-Repair FOC — service charges = 0, only parts charged
-        const finalCharges=partsCost;
-        data.service_charges=0;
-        data.final_charges=finalCharges;
-        data.charges_note='Re-Repair FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0);
-        data.timeline=[...(t.timeline||[]),{action:'Charges Set (Re-Repair FOC)',by:currentUser.name,at:new Date().toISOString(),note:'Service: FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0)}];
-        if(partsCost>0){
-          const confirm=window.confirm('Re-Repair FOC — Service charges = ₹0\nParts charges = ₹'+partsCost.toFixed(0)+'\nTotal = ₹'+partsCost.toFixed(0)+'\n\nConfirm?');
-          if(!confirm) return;
-        }
-      }else{
-        const defaultService=isOutCoverage?200:300;
-        const chargesInput=prompt('Service Charges\nParts Cost: ₹'+partsCost.toFixed(0)+'\nService Charges (₹):',defaultService);
-        if(chargesInput===null){return;}
-        const serviceCharges=parseFloat(chargesInput)||defaultService;
-        const finalCharges=partsCost+serviceCharges;
-        data.service_charges=serviceCharges;
-        data.final_charges=finalCharges;
-        data.charges_note='Parts: ₹'+partsCost.toFixed(0)+' + Service: ₹'+serviceCharges.toFixed(0)+' = Total: ₹'+finalCharges.toFixed(0);
-        data.timeline=[...(t.timeline||[]),{action:'Charges Set',by:currentUser.name,at:new Date().toISOString(),note:'Service: ₹'+serviceCharges+' | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0)}];
-      }
-    }
-  }
-
-  // For Non-Warranty closing - auto calculate final charges
-  if(status==='Closed'){
+    const isOutCoverage=t.warranty_coverage==='Out of Coverage'||t.out_of_coverage===true;
     const isNW=t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other');
-    const isOOC=t.out_of_coverage===true;
-    if(isNW||isOOC){
-      const sc=parseFloat(t.service_charges)||0;
-      const partsCost=(currentSpares||[]).reduce(function(s,p){return s+(parseFloat(p.price||0)*parseInt(p.qty||1));},0);
-      const final=sc+partsCost;
-      data.final_charges=final;
-      data.charges_note='Service: Rs'+sc+' + Parts: Rs'+partsCost.toFixed(0)+' = Total: Rs'+final.toFixed(0);
+    if(isNonWarranty||isOutCoverage||isNW){
+      const partsCost=(currentSpares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+      const serviceCharges=isRepeatFOC?0:(parseFloat(t.service_charges)||parseFloat(document.getElementById('call-service-charges')?.value)||0);
+      const finalCharges=partsCost+serviceCharges;
+      data.service_charges=serviceCharges;
+      data.final_charges=finalCharges;
+      data.charges_note='Service: ₹'+serviceCharges.toFixed(0)+' + Parts: ₹'+partsCost.toFixed(0)+' = Total: ₹'+finalCharges.toFixed(0);
+      if(isRepeatFOC){
+        data.charges_note='Re-Repair FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0);
+      }
+      data.timeline=[...(t.timeline||[]),{action:'Charges Set'+(isRepeatFOC?' (Re-Repair FOC)':''),by:currentUser.name,at:new Date().toISOString(),note:data.charges_note}];
     }
   }
 
@@ -6004,6 +5937,7 @@ function switchSettings(tab,el){
         <div class="form-group"><label>Phone</label><input id="ci-phone" value="${ci.phone||''}"></div>
         <div class="form-group"><label>Email</label><input id="ci-email" value="${ci.email||''}"></div>
         <div class="form-group"><label>GST No</label><input id="ci-gst" value="${ci.gst||''}"></div>
+        <div class="form-group"><label>GST % (Invoice par apply thase, 0 = no GST)</label><input id="ci-gst-pct" type="number" min="0" max="28" step="0.1" value="${ci.gst_pct||0}" placeholder="e.g. 18"></div>
         <div class="form-group"><label>Address Line 1</label><input id="ci-addr1" value="${ci.addr1||''}"></div>
         <div class="form-group"><label>City / State / PIN</label><input id="ci-addr2" value="${ci.addr2||''}"></div>
         <div class="form-group"><label>Website</label><input id="ci-web" value="${ci.web||''}"></div>
@@ -6978,7 +6912,7 @@ function getLocation(){
     navigator.geolocation.getCurrentPosition(
       function(p){resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)});},
       function(){resolve(null);},
-      {timeout:8000,maximumAge:30000,enableHighAccuracy:true}
+      {timeout:12000,maximumAge:0,enableHighAccuracy:true}
     );
   });
 }
@@ -7006,7 +6940,7 @@ var _locInterval=null;
 function startLocationTracking(){
   if(_locInterval)return;
   saveLocationEvent('track');
-  _locInterval=setInterval(function(){saveLocationEvent('track');},5*60*1000);
+  _locInterval=setInterval(function(){saveLocationEvent('track');},2*60*1000);
 }
 function stopLocationTracking(){
   if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
@@ -7409,7 +7343,7 @@ async function loadAMCList(filter){
   _amcFilter=filter||'all';
   document.getElementById('amc-list').innerHTML='<div style="text-align:center;padding:30px;color:#9ca3af;">Loading...</div>';
   try{
-    var data=await sb('amc_contracts','GET','?order=amc_end.asc&limit=500');
+    var data=await sb('amc_contracts','GET',null,'?order=amc_end.asc&limit=500');
     _amcAll=data||[];
     var today=new Date();today.setHours(0,0,0,0);
     var in30=new Date(today);in30.setDate(in30.getDate()+30);
@@ -7867,7 +7801,7 @@ async function loadProfit(){
   var nextM=getNextMonth(month);
   try{
     var [tickets,reports]=await Promise.all([
-      sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+month+'-01&updated_at=lt.'+nextM+'-01&select=id,labor,total_amount,eng_id,eng_name,updated_at&limit=1000'),
+      sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+month+'-01&updated_at=lt.'+nextM+'-01&select=id,labor,total_amount,assigned_to,assigned_name,updated_at&limit=1000'),
       sb('daily_reports','GET',null,'?report_date=gte.'+month+'-01&report_date=lt.'+nextM+'-01&select=eng_name,total_amount,petrol_km&limit=500')
     ]);
     var revenue=(tickets||[]).reduce(function(s,t){return s+(parseFloat(t.total_amount)||0);},0);
@@ -7889,7 +7823,7 @@ async function loadProfit(){
     // Engineer-wise breakdown
     var engMap={};
     (tickets||[]).forEach(function(t){
-      var k=t.eng_name||'Unknown';
+      var k=t.assigned_name||'Unknown';
       if(!engMap[k])engMap[k]={name:k,closed:0,revenue:0};
       engMap[k].closed++;engMap[k].revenue+=parseFloat(t.total_amount)||0;
     });
@@ -7988,6 +7922,173 @@ function shareReorderList(){
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 // ===== END MODULE 7 =====
+
+// ===== MODULE 8: WEEKLY MASTER REPORT =====
+async function renderWeekly(){
+  var pc=document.getElementById('page-content');
+  // Calculate current week (Mon-Sun) and last week
+  var now=new Date();
+  var dayOfWeek=now.getDay()||7; // Mon=1..Sun=7
+  var thisMonday=new Date(now);thisMonday.setDate(now.getDate()-(dayOfWeek-1));thisMonday.setHours(0,0,0,0);
+  var thisSunday=new Date(thisMonday);thisSunday.setDate(thisMonday.getDate()+6);
+  var lastMonday=new Date(thisMonday);lastMonday.setDate(thisMonday.getDate()-7);
+  var lastSunday=new Date(thisMonday);lastSunday.setDate(thisMonday.getDate()-1);
+  function fmt(d){return d.toLocaleDateString('en-CA');}
+  function fmtDisp(d){return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});}
+
+  pc.innerHTML='<div style="padding:20px;max-width:1100px;margin:0 auto;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<h2 style="margin:0;font-size:20px;">📊 Weekly Master Report</h2>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    +'<button onclick="loadWeekly(\''+fmt(thisMonday)+'\',\''+fmt(thisSunday)+'\')" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📅 This Week</button>'
+    +'<button onclick="loadWeekly(\''+fmt(lastMonday)+'\',\''+fmt(lastSunday)+'\')" style="background:#64748b;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">◀ Last Week</button>'
+    +'<button onclick="downloadWeeklyExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📥 Download Excel</button>'
+    +'</div></div>'
+    +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">'
+    +'<label style="font-size:13px;font-weight:600;">From:</label><input type="date" id="wr-from" value="'+fmt(thisMonday)+'" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<label style="font-size:13px;font-weight:600;">To:</label><input type="date" id="wr-to" value="'+fmt(thisSunday)+'" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<button onclick="loadWeekly(document.getElementById(\'wr-from\').value,document.getElementById(\'wr-to\').value)" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">🔍 Load</button>'
+    +'</div>'
+    +'<div id="wr-compare" style="margin-bottom:16px;"></div>'
+    +'<div id="wr-content">Loading...</div></div>';
+  await loadWeekly(fmt(thisMonday),fmt(thisSunday));
+}
+
+window._wrData=null;
+async function loadWeekly(from,to){
+  if(document.getElementById('wr-from'))document.getElementById('wr-from').value=from;
+  if(document.getElementById('wr-to'))document.getElementById('wr-to').value=to;
+  document.getElementById('wr-content').innerHTML='<div style="text-align:center;padding:30px;color:#9ca3af;">Loading...</div>';
+
+  // Also load previous period (same duration) for comparison
+  var fromD=new Date(from);var toD=new Date(to);
+  var days=Math.round((toD-fromD)/(1000*60*60*24))+1;
+  var prevTo=new Date(fromD);prevTo.setDate(prevTo.getDate()-1);
+  var prevFrom=new Date(prevTo);prevFrom.setDate(prevTo.getDate()-(days-1));
+  function fmt(d){return d.toLocaleDateString('en-CA');}
+
+  try{
+    var [tickets,prevTickets,reports,prevReports,attendance]=await Promise.all([
+      sb('tickets','GET',null,'?updated_at=gte.'+from+'&updated_at=lte.'+to+'T23:59:59&select=id,status,assigned_name,total_amount,labor,call_type,created_at,updated_at&limit=1000'),
+      sb('tickets','GET',null,'?updated_at=gte.'+fmt(prevFrom)+'&updated_at=lte.'+fmt(prevTo)+'T23:59:59&select=id,status,assigned_name,total_amount,labor,call_type&limit=1000'),
+      sb('daily_reports','GET',null,'?report_date=gte.'+from+'&report_date=lte.'+to+'&limit=500'),
+      sb('daily_reports','GET',null,'?report_date=gte.'+fmt(prevFrom)+'&report_date=lte.'+fmt(prevTo)+'&limit=500'),
+      sb('punch_logs','GET',null,'?punch_in_date=gte.'+from+'&punch_in_date=lte.'+to+'&limit=500')
+    ]);
+
+    // Current week stats
+    var closed=(tickets||[]).filter(function(t){return t.status==='Closed';});
+    var revenue=closed.reduce(function(s,t){return s+(parseFloat(t.total_amount)||0);},0);
+    var collected=(reports||[]).reduce(function(s,r){return s+(parseFloat(r.total_amount)||0);},0);
+    var totalKm=(reports||[]).reduce(function(s,r){return s+(parseFloat(r.petrol_km)||0);},0);
+    var newTickets=(tickets||[]).filter(function(t){return t.created_at&&t.created_at.slice(0,10)>=from&&t.created_at.slice(0,10)<=to;});
+
+    // Previous period stats
+    var prevClosed=(prevTickets||[]).filter(function(t){return t.status==='Closed';});
+    var prevRevenue=prevClosed.reduce(function(s,t){return s+(parseFloat(t.total_amount)||0);},0);
+    var prevCollected=(prevReports||[]).reduce(function(s,r){return s+(parseFloat(r.total_amount)||0);},0);
+
+    function pct(curr,prev){if(!prev)return curr>0?'🆕 New':'—';var p=Math.round((curr-prev)/prev*100);return (p>=0?'▲ +':'▼ ')+p+'%';}
+    function pctColor(curr,prev){if(!prev)return '#6366f1';return curr>=prev?'#10b981':'#ef4444';}
+
+    // Comparison cards
+    var compareHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">';
+    [
+      {icon:'🎫',label:'Calls Closed',curr:closed.length,prev:prevClosed.length},
+      {icon:'📥',label:'New Tickets',curr:newTickets.length,prev:null},
+      {icon:'💰',label:'Revenue ₹',curr:'₹'+Math.round(revenue).toLocaleString('en-IN'),prev:prevRevenue,prevRaw:revenue,currRaw:revenue},
+      {icon:'💵',label:'Collected ₹',curr:'₹'+Math.round(collected).toLocaleString('en-IN'),prev:prevCollected,prevRaw:prevCollected,currRaw:collected},
+      {icon:'🚗',label:'Total KM',curr:totalKm+' km',prev:null},
+      {icon:'👷',label:'Present Days',curr:(attendance||[]).length,prev:null}
+    ].forEach(function(c){
+      var trend=c.prev!==null?pct(c.currRaw||c.curr,c.prevRaw||c.prev):'';
+      var tColor=c.prev!==null?pctColor(c.currRaw||c.curr,c.prevRaw||c.prev):'#6366f1';
+      compareHtml+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;">'
+        +'<div style="font-size:26px;">'+c.icon+'</div>'
+        +'<div style="font-size:20px;font-weight:800;color:#1f2937;margin:4px 0;">'+c.curr+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+c.label+'</div>'
+        +(trend?'<div style="font-size:12px;font-weight:700;color:'+tColor+';margin-top:4px;">'+trend+' vs prev</div>':'')
+        +'</div>';
+    });
+    compareHtml+='</div>';
+    document.getElementById('wr-compare').innerHTML=compareHtml;
+
+    // Engineer breakdown table
+    var engMap={};
+    (tickets||[]).forEach(function(t){
+      var k=t.assigned_name||'Unassigned';
+      if(!engMap[k])engMap[k]={name:k,closed:0,revenue:0,newCalls:0};
+      if(t.status==='Closed'){engMap[k].closed++;engMap[k].revenue+=parseFloat(t.total_amount)||0;}
+      if(t.created_at&&t.created_at.slice(0,10)>=from)engMap[k].newCalls++;
+    });
+    var engRows=Object.values(engMap).sort(function(a,b){return b.closed-a.closed;});
+
+    // Daily trend (tickets closed per day)
+    var dayMap={};
+    closed.forEach(function(t){var d=(t.updated_at||'').slice(0,10);if(d)dayMap[d]=(dayMap[d]||0)+1;});
+    var dayLabels=[];var dayVals=[];
+    var cursor=new Date(from);var end=new Date(to);
+    while(cursor<=end){var ds=cursor.toLocaleDateString('en-CA');dayLabels.push(cursor.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit'}));dayVals.push(dayMap[ds]||0);cursor.setDate(cursor.getDate()+1);}
+    var maxDay=Math.max.apply(null,dayVals)||1;
+
+    var html='<div class="card" style="margin-bottom:16px;"><div class="section-header"><h2>📈 Daily Trend — Calls Closed</h2></div>'
+      +'<div style="display:flex;align-items:flex-end;gap:6px;padding:16px;height:120px;">';
+    dayVals.forEach(function(v,i){
+      var h=Math.round(v/maxDay*80);
+      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">'
+        +'<div style="font-size:11px;font-weight:700;color:#1a56db;">'+v+'</div>'
+        +'<div style="width:100%;height:'+h+'px;background:'+(v===maxDay?'#7c3aed':'#1a56db')+';border-radius:4px 4px 0 0;min-height:2px;"></div>'
+        +'<div style="font-size:9px;color:#9ca3af;text-align:center;">'+dayLabels[i]+'</div></div>';
+    });
+    html+='</div></div>';
+
+    html+='<div class="card"><div class="section-header"><h2>👷 Engineer Scorecard</h2></div>'
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:var(--bg);"><th style="padding:10px;text-align:left;">Engineer</th><th style="padding:10px;text-align:center;">Closed</th><th style="padding:10px;text-align:center;">New Assigned</th><th style="padding:10px;text-align:right;">Revenue</th><th style="padding:10px;">Performance</th></tr></thead><tbody>';
+    var maxRev=engRows.length?Math.max.apply(null,engRows.map(function(e){return e.revenue;})):1;
+    engRows.forEach(function(e){
+      var pct2=maxRev>0?Math.round(e.revenue/maxRev*100):0;
+      html+='<tr style="border-bottom:1px solid var(--border);">'
+        +'<td style="padding:10px;font-weight:700;">'+escHtml(e.name)+'</td>'
+        +'<td style="padding:10px;text-align:center;font-size:18px;font-weight:800;color:#1a56db;">'+e.closed+'</td>'
+        +'<td style="padding:10px;text-align:center;">'+e.newCalls+'</td>'
+        +'<td style="padding:10px;text-align:right;font-weight:700;color:#10b981;">₹'+Math.round(e.revenue).toLocaleString('en-IN')+'</td>'
+        +'<td style="padding:10px;min-width:100px;"><div style="background:#f1f5f9;border-radius:4px;height:8px;"><div style="background:#7c3aed;height:8px;border-radius:4px;width:'+pct2+'%;"></div></div></td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+
+    document.getElementById('wr-content').innerHTML=html;
+    window._wrData={from,to,closed:closed.length,revenue,collected,km:totalKm,engRows,dayLabels,dayVals};
+  }catch(e){
+    document.getElementById('wr-content').innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';
+  }
+}
+
+async function downloadWeeklyExcel(){
+  var d=window._wrData;if(!d){alert('Pehela report load karo.');return;}
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun.');return;}
+  var wb=XLSX.utils.book_new();
+  // Summary sheet
+  var sumData=[
+    ['Weekly Master Report',''],
+    ['Period',d.from+' to '+d.to],
+    ['',''],
+    ['Metric','Value'],
+    ['Calls Closed',d.closed],
+    ['Revenue Collected','₹'+Math.round(d.revenue)],
+    ['Cash Collected','₹'+Math.round(d.collected)],
+    ['Total KM',d.km]
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sumData),'Summary');
+  // Engineer sheet
+  var engData=[['Engineer','Calls Closed','Revenue ₹']].concat(d.engRows.map(function(e){return[e.name,e.closed,Math.round(e.revenue)];}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(engData),'Engineers');
+  // Daily trend
+  var dayData=[['Date','Calls Closed']];d.dayLabels.forEach(function(l,i){dayData.push([l,d.dayVals[i]]);});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dayData),'Daily Trend');
+  XLSX.writeFile(wb,'Weekly_Report_'+d.from+'_'+d.to+'.xlsx');
+}
+// ===== END MODULE 8 =====
 
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
@@ -8097,9 +8198,8 @@ async function renderWalkIn(){
       _wiSelfIds=(_isCSP?'SELF_CHECKIN_CSP':'SELF_CHECKIN_ICP')+',wc_id.eq.SELF_CHECKIN_OTHER';
     }
     try{
-      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=token_no.desc.nullsfirst,arrival_time.desc');
+      todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=created_at.desc.nullslast,arrival_time.desc');
     }catch(e){
-      // Fallback if token_no column not yet added
       todayLogs=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=arrival_time.desc');
     }
     window._todayWILogs=todayLogs;
@@ -8291,8 +8391,8 @@ function showWIModelSuggestions(input){
   dd.innerHTML=filtered.map(function(m){
     var display=m.model_name||cleanModelNo(m.model_no);
     var sub=m.model_name?cleanModelNo(m.model_no):'';
-    return'<div onclick="selectWIModel(this)" data-model="'+cleanModelNo(m.model_no)+'" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
-      +'<b>'+display+'</b>'+(sub&&sub!==display?' <span style="color:var(--text-muted);font-size:11px;">'+sub+'</span>':'')+'</div>';
+    return'<div onclick="selectWIModel(this)" data-model="'+escHtml(display)+'" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+      +'<b>'+escHtml(display)+'</b>'+(sub&&sub!==display?' <span style="color:var(--text-muted);font-size:11px;">'+escHtml(sub)+'</span>':'')+'</div>';
   }).join('');
   dd.style.display='block';
 }
@@ -8334,14 +8434,12 @@ async function fetchWalkInCustomer(){
 }
 
 async function getNextWalkInToken(today){
-  // Sequential token per month, resetting on 1st
-  var monthStart=today.substring(0,8)+'01';
+  // Sequential token per day, resets every new day from #1
   try{
-    var rows=await sb('walkin_log','GET',null,'?visit_date=gte.'+monthStart+'&select=token_no&order=token_no.desc.nullslast&limit=1');
+    var rows=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
     var maxToken=(rows&&rows.length&&rows[0].token_no)||0;
     return maxToken+1;
   }catch(e){
-    // Fallback: count today's entries
     try{var c=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=id');return(c?c.length:0)+1;}catch(e2){return 1;}
   }
 }
@@ -14180,8 +14278,8 @@ async function loadAttendanceReport(){
       +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th></tr></thead><tbody>';
     logs.forEach(function(l){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
-      var photoIn=l.punch_in_photo?'<img src="'+l.punch_in_photo+'" style="width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')">':'-';
-      var photoOut=l.punch_out_photo?'<img src="'+l.punch_out_photo+'" style="width:44px;height:44px;border-radius:6px;object-fit:cover;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')">':'-';
+      var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1a56db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
+      var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1a56db;font-size:11px;">📍 Map</a>':'-';
       var statusBadge2=l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
       html+='<tr style="border-bottom:1px solid var(--border);">'
