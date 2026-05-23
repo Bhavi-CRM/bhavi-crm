@@ -968,7 +968,7 @@ tr:hover td{background:#f8fafc;}
 const SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
 
-function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);u.role='admin';if(!u.role_type)u.role_type='work_controller';}return u;}
+function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);if(!u.role_type)u.role_type='work_controller';}return u;}
 async function sb(t,m='GET',b=null,q=''){
   const url=`${SB_URL}/rest/v1/${t}${q}`;
   const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':m==='POST'?'return=representation':m==='PATCH'?'return=representation':''};
@@ -2270,7 +2270,7 @@ async function doLogin(){
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
-    const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
+    const rl=currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
     setupNav();
@@ -2339,7 +2339,7 @@ async function tryAutoLogin(){
     }
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
-    const rl=currentUser.role==='engineer'?'Engineer':(currentUser.role_type==='work_controller'?'Work Controller':'Administrator');
+    const rl=currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     document.getElementById('topbar-user').textContent=currentUser.name;
     setupNav();
@@ -2381,8 +2381,8 @@ function setupNav(){
     const role=currentUser.role||'';
     const roleType=currentUser.role_type||'';
     const isEng=role==='engineer';
-    const isWC=(role==='admin'&&roleType==='work_controller');
-    const isAdmin=(role==='admin'&&roleType!=='work_controller');
+    const isWC=(role==='admin'&&roleType==='work_controller')||role==='work_controller';
+    const isAdmin=(role==='admin'&&roleType!=='work_controller')&&role!=='work_controller';
     
     // Debug log
     console.log('setupNav:', {role, roleType, isEng, isWC, isAdmin, user: currentUser.user_id});
