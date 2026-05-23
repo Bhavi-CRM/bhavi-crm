@@ -968,6 +968,7 @@ tr:hover td{background:#f8fafc;}
 const SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
 
+function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);u.role='admin';if(!u.role_type)u.role_type='work_controller';}return u;}
 async function sb(t,m='GET',b=null,q=''){
   const url=`${SB_URL}/rest/v1/${t}${q}`;
   const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':m==='POST'?'return=representation':m==='PATCH'?'return=representation':''};
@@ -2260,7 +2261,7 @@ async function doLogin(){
     if(!users||!users.length){showLoginError('User not found');return;}
     const user=users.find(u=>u.password===pass);
     if(!user){showLoginError('Wrong password');return;}
-    currentUser=user;
+    currentUser=normalizeWCUser(user);
     if(loginRole==='engineer'&&currentUser.role!=='engineer'){showLoginError('Use Engineer tab');return;}
     if(loginRole==='admin'&&currentUser.role==='engineer'){showLoginError('Use Admin/WC tab');return;}
     const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -2330,7 +2331,7 @@ async function tryAutoLogin(){
     const users=await res.json();
     if(!Array.isArray(users)||!users.length){localStorage.removeItem('bhavi_session');throw new Error('User not found');}
     currentUser=null;
-    currentUser=users[0];
+    currentUser=normalizeWCUser(users[0]);
     if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
       localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
       alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
@@ -5946,7 +5947,7 @@ async function renderSettings(){
 function switchSettings(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   if(tab==='engineers')sb('users','GET',null,'?role=eq.engineer&order=name').then(e=>document.getElementById('settings-content').innerHTML=renderEngTab(e));
-  else if(tab==='wc')sb('users','GET',null,'?role_type=eq.work_controller&order=name').then(wcs=>document.getElementById('settings-content').innerHTML=renderWCTab(wcs));
+  else if(tab==='wc')sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&order=name').then(wcs=>document.getElementById('settings-content').innerHTML=renderWCTab(wcs));
   else if(tab==='admin') renderAdminTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
@@ -6104,7 +6105,7 @@ async function saveWC(){
   if(!name||(!_editWCId&&!uid)||(!_editWCId&&!pass)){alert('Fill Name, User ID and Password');return;}
   try{
     if(_editWCId){
-      const data={name,initials:init||name.split(' ').map(x=>x[0]).join('').toUpperCase()};
+      const data={name,role:'admin',role_type:'work_controller',initials:init||name.split(' ').map(x=>x[0]).join('').toUpperCase()};
       if(pass)data.password=pass;
       await sb('users','PATCH',data,`?id=eq.${_editWCId}`);
     }else{
@@ -9028,7 +9029,7 @@ async function renderWalkInReport(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
-    var wcs=await sb('users','GET',null,'?role_type=eq.work_controller&is_active=eq.true&order=name');
+    var wcs=await sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name');
     var today=new Date().toLocaleDateString('en-CA');
     pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
       +'<div class="section-header"><h2>🔍 Filter Walk-in Logs</h2></div>'
@@ -9616,7 +9617,7 @@ async function renderCourierReport(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
-    var wcs=await sb('users','GET',null,'?role_type=eq.work_controller&is_active=eq.true&order=name');
+    var wcs=await sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name');
     var today=new Date().toLocaleDateString('en-CA');
     pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
       +'<div class="section-header"><h2>🔍 Filter Courier Entries</h2></div>'
@@ -10237,7 +10238,7 @@ async function renderWorkLogReport(){
   try{
     var [engineers, wcs]=await Promise.all([
       sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
-      sb('users','GET',null,'?role_type=eq.work_controller&is_active=eq.true&order=name')
+      sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name')
     ]);
     var allMembers=[
       ...engineers.map(function(e){return{id:e.eng_id||e.user_id,name:e.name,role:'Engineer'};}),
