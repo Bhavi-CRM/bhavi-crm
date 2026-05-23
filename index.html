@@ -6952,8 +6952,8 @@ function getLocation(){
   });
 }
 
-async function saveLocationEvent(eventType, ticketId){
-  var loc=await getLocation();
+async function saveLocationEvent(eventType, ticketId, locOverride){
+  var loc=locOverride||await getLocation();
   if(!loc)return null;
   try{
     await sb('engineer_locations','POST',{
@@ -6972,13 +6972,60 @@ async function saveLocationEvent(eventType, ticketId){
 }
 
 var _locInterval=null;
+var _watchId=null;
+var _lastKnownLoc=null;
+var _visibilityWarned=false;
+
 function startLocationTracking(){
-  if(_locInterval)return;
-  saveLocationEvent('track');
-  _locInterval=setInterval(function(){saveLocationEvent('track');},2*60*1000);
+  if(_watchId)return;
+
+  // watchPosition: OS-level GPS, fires on every position change (works better in background than polling)
+  if(navigator.geolocation){
+    _watchId=navigator.geolocation.watchPosition(
+      function(p){
+        _lastKnownLoc={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)};
+      },
+      function(e){console.log('GPS watch error:',e.code,e.message);},
+      {enableHighAccuracy:true,maximumAge:0,timeout:20000}
+    );
+  }
+
+  // Save a point every 15 seconds using last known position (fast, no extra GPS call)
+  saveLocationEvent('track',null,null);
+  _locInterval=setInterval(function(){
+    if(_lastKnownLoc){
+      saveLocationEvent('track',null,_lastKnownLoc);
+    }else{
+      saveLocationEvent('track');
+    }
+  },15*1000);
+
+  // Warn when tab goes hidden — browsers throttle/stop GPS when minimized
+  document.addEventListener('visibilitychange',_handleVisibility);
 }
+
+function _handleVisibility(){
+  if(document.hidden&&_watchId&&!_visibilityWarned){
+    _visibilityWarned=true;
+    // Show floating warning banner
+    var w=document.getElementById('gps-bg-warn');
+    if(!w){
+      w=document.createElement('div');
+      w.id='gps-bg-warn';
+      w.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.3);text-align:center;max-width:320px;';
+      w.innerHTML='⚠️ GPS Background Warning<br><span style="font-weight:400;font-size:11px;">Browser maa GPS minimize thata band thay chhe. Sachi route track mate browser open rakhjo.</span>';
+      document.body.appendChild(w);
+      setTimeout(function(){if(w&&w.parentNode)w.parentNode.removeChild(w);},8000);
+    }
+  }
+  if(!document.hidden){_visibilityWarned=false;}
+}
+
 function stopLocationTracking(){
+  if(_watchId){navigator.geolocation.clearWatch(_watchId);_watchId=null;}
   if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
+  document.removeEventListener('visibilitychange',_handleVisibility);
+  _lastKnownLoc=null;_visibilityWarned=false;
 }
 
 // ===== CAMERA SELFIE UTILITIES =====
