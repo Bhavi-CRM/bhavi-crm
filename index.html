@@ -545,7 +545,18 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Stock</label><input type="number" id="inv-qty" value="0" min="0"></div>
         <div class="form-group"><label>Min Stock</label><input type="number" id="inv-min" value="2" min="0"></div>
       </div>
-      <div class="form-group"><label>Price ₹</label><input type="number" id="inv-price" value="0"></div>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div class="form-group"><label>Price ₹</label><input type="number" id="inv-price" value="0"></div>
+        <div class="form-group"><label>GST % on this Part</label>
+          <select id="inv-gst" style="border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;width:100%;outline:none;">
+            <option value="0">0% (Exempt)</option>
+            <option value="5">5%</option>
+            <option value="12">12%</option>
+            <option value="18" selected>18%</option>
+            <option value="28">28%</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-inventory')">Cancel</button>
@@ -1915,6 +1926,7 @@ function saveCompanyInfo(){
     email:document.getElementById('ci-email')?.value||'',
     gst:document.getElementById('ci-gst')?.value||'',
     gst_pct:parseFloat(document.getElementById('ci-gst-pct')?.value)||0,
+    labor_gst_pct:parseFloat(document.getElementById('ci-labor-gst')?.value)||18,
     addr1:document.getElementById('ci-addr1')?.value||'',
     addr2:document.getElementById('ci-addr2')?.value||'',
     web:document.getElementById('ci-web')?.value||'',
@@ -3734,21 +3746,26 @@ async function generateInvoice(id){
   const coWeb=ci.web||'bhavi-crm.github.io/bhavi-crm';
   const coTerms=(ci.terms||'• Warranty on repaired parts: 90 days\n• No warranty on physical/liquid damage\n• Uncollected products after 30 days attract storage charges').split('\n').join('<br>');
   const spares=t.spares||[];
+  const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
   const labor=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const other=parseFloat(t.other_charge)||0;
   const partsTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
-  const finalCharge=parseFloat(t.final_charges)||0;
-  const subTotal=finalCharge>0?finalCharge:(labor+partsTotal+other);
-  const gstPct=parseFloat(ci.gst_pct)||0;
-  const gstAmt=isWarranty?0:Math.round(subTotal*gstPct/100*100)/100;
-  const grandTotal=subTotal+gstAmt;
+  const defaultPartsGst=parseFloat(ci.gst_pct)||18;
+  const laborGstPct=parseFloat(ci.labor_gst_pct)||18;
+  const partsGstAmt=isWarranty?0:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;return a+Math.round((s.qty||1)*(s.price||0)*r/100*100)/100;},0);
+  const laborGstAmt=isWarranty?0:(labor>0?Math.round(labor*laborGstPct/100*100)/100:0);
+  const totalGst=partsGstAmt+laborGstAmt;
+  const subTotal=partsTotal+labor+other;
+  const grandTotal=subTotal+totalGst;
   const invoiceNo='INV-'+t.id;
   const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
-  const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
 
   const partsRows=spares.length?spares.map(function(s,i){
-    return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:right;">₹${((s.qty||1)*(s.price||0)).toFixed(2)}</td></tr>`;
-  }).join(''):'<tr><td colspan="6" style="text-align:center;color:#888;padding:12px;">No parts used</td></tr>';
+    const partGstR=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;
+    const baseAmt=(s.qty||1)*(s.price||0);
+    const partGstAmt=isWarranty?0:Math.round(baseAmt*partGstR/100*100)/100;
+    return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:center;">${isWarranty?'—':partGstR+'%'}</td><td style="text-align:right;">${isWarranty?'—':'₹'+partGstAmt.toFixed(2)}</td><td style="text-align:right;">₹${(baseAmt+partGstAmt).toFixed(2)}</td></tr>`;
+  }).join(''):'<tr><td colspan="8" style="text-align:center;color:#888;padding:12px;">No parts used</td></tr>';
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${invoiceNo}</title>
 <style>
@@ -3831,7 +3848,7 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
 
   <table>
     <thead>
-      <tr><th>#</th><th>Part / Item</th><th>Part Code</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr>
+      <tr><th>#</th><th>Part / Item</th><th>Part Code</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:center;">GST%</th><th style="text-align:right;">GST Amt</th><th style="text-align:right;">Amount</th></tr>
     </thead>
     <tbody>
       ${partsRows}
@@ -3840,13 +3857,14 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
 
   <table class="totals">
     <tbody>
-      <tr><td>Parts Total</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
-      <tr><td>Labor / Service</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>
+      ${partsTotal>0?`<tr><td>Parts Sub-Total (excl. GST)</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>`:''}
+      ${partsGstAmt>0?`<tr><td style="color:#7c3aed;">Parts GST</td><td style="text-align:right;color:#7c3aed;">₹${partsGstAmt.toFixed(2)}</td></tr>`:''}
+      ${labor>0?`<tr><td>Labor / Service (excl. GST)</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>`:''}
+      ${laborGstAmt>0?`<tr><td style="color:#7c3aed;">Labor GST (${laborGstPct}%)</td><td style="text-align:right;color:#7c3aed;">₹${laborGstAmt.toFixed(2)}</td></tr>`:''}
       ${other>0?`<tr><td>Other Charges</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>`:''}
-      <tr><td style="color:#374151;">Sub Total</td><td style="text-align:right;">₹${subTotal.toFixed(2)}</td></tr>
-      ${gstPct>0&&!isWarranty?`<tr><td style="color:#374151;">GST (${gstPct}%)</td><td style="text-align:right;">₹${gstAmt.toFixed(2)}</td></tr>`:''}
+      ${totalGst>0&&!isWarranty?`<tr style="background:#f5f3ff;"><td style="font-weight:700;">Total GST</td><td style="text-align:right;font-weight:700;">₹${totalGst.toFixed(2)}</td></tr>`:''}
       ${isWarranty?`<tr><td colspan="2" style="color:#065f46;font-weight:600;text-align:center;">✅ Under Warranty — No Charge</td></tr>`:''}
-      <tr class="grand"><td>GRAND TOTAL${gstPct>0&&!isWarranty?' (incl. GST)':''}</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
+      <tr class="grand"><td>GRAND TOTAL${totalGst>0&&!isWarranty?' (incl. GST)':''}</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
     </tbody>
   </table>
 
@@ -3864,7 +3882,7 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
   </div>
 </div>
 <script>
-var _invData=${JSON.stringify({id:t.id,cname:t.cname,mobile:t.mobile,model:t.model,brand:t.brand_name,labor:labor,partsTotal:partsTotal,other:other,grandTotal:grandTotal,invoiceNo:invoiceNo,invoiceDate:invoiceDate,isWarranty:isWarranty})};
+var _invData=${JSON.stringify({id:t.id,cname:t.cname,mobile:t.mobile,model:t.model,brand:t.brand_name,labor:labor,partsTotal:partsTotal,other:other,totalGst:totalGst,grandTotal:grandTotal,invoiceNo:invoiceNo,invoiceDate:invoiceDate,isWarranty:isWarranty})};
 function shareInvoiceWA(){
   var d=_invData;
   var txt='━━━━━━━━━━━━━━━━━━━━━\\n'
@@ -3875,9 +3893,10 @@ function shareInvoiceWA(){
     +'📅 Date: '+d.invoiceDate+'\\n\\n'
     +'🔧 *Product: '+d.brand+' '+d.model+'*\\n\\n'
     +'▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\\n'
-    +(d.partsTotal>0?'  Parts Total   → ₹'+d.partsTotal.toFixed(2)+'\\n':'')
-    +'  Labor/Service → ₹'+d.labor.toFixed(2)+'\\n'
+    +(d.partsTotal>0?'  Parts        → ₹'+d.partsTotal.toFixed(2)+'\\n':'')
+    +(d.labor>0?'  Labor/Service → ₹'+d.labor.toFixed(2)+'\\n':'')
     +(d.other>0?'  Other         → ₹'+d.other.toFixed(2)+'\\n':'')
+    +(d.totalGst>0?'  GST           → ₹'+d.totalGst.toFixed(2)+'\\n':'')
     +'▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\\n'
     +'  💵 *Total: ₹'+d.grandTotal.toFixed(2)+'*\\n'
     +'━━━━━━━━━━━━━━━━━━━━━\\n'
@@ -4292,12 +4311,12 @@ async function savePartRequest(addAnother){
   }
 
   // Fetch price from inventory
-  let partPrice=0;
+  let partPrice=0,partGst=18;
   try{
     const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`);
-    if(inv.length)partPrice=parseFloat(inv[0].unit_price)||0;
+    if(inv.length){partPrice=parseFloat(inv[0].unit_price)||0;partGst=inv[0].gst_pct!=null?parseFloat(inv[0].gst_pct):18;}
   }catch(e){}
-  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,requested:true}];
+  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,gst_pct:partGst,requested:true}];
   const tl=[...(t.timeline||[]),{action:'Part Requested — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:`Part: ${code} ${name} × ${qty} | ${note}`}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
   
@@ -4321,7 +4340,7 @@ async function savePartRequest(addAnother){
   }
 }
 
-function spareRow(s,i){return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:1;text-align:right;"><b>₹${(s.qty*(s.price||0)).toFixed(2)}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
+function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>₹${(s.qty*(s.price||0)).toFixed(2)}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
 function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');}
 
 async function saveEngUpdate(){
@@ -4520,7 +4539,7 @@ function renderInvStockTab(){
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th><input type="checkbox" id="inv-select-all" onchange="toggleAllInv(this)"></th>
-      <th>Code</th><th>Name</th><th>Brand</th><th>Model</th><th>Stock</th><th>Min</th><th>Buy Price</th><th>Sell Price</th><th>Value</th><th>Actions</th></tr></thead>
+      <th>Code</th><th>Name</th><th>Brand</th><th>Model</th><th>Stock</th><th>Min</th><th>Price ₹</th><th>GST%</th><th>Value</th><th>Actions</th></tr></thead>
       <tbody id="inv-tbody">${renderInvRows(allInventory)}</tbody>
     </table></div>
   </div>`;
@@ -4762,12 +4781,12 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
-function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
-function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;editingInvId=id;openAddInv();document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-price').value=inv.unit_price||0;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;}
-async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,unit_price:parseFloat(document.getElementById('inv-price').value)||0,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){alert('Error: '+e.message);}}
+function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-gst').value='18';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
+function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;editingInvId=id;openAddInv();document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-price').value=inv.unit_price||0;document.getElementById('inv-gst').value=inv.gst_pct!=null?inv.gst_pct:18;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;}
+async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,unit_price:parseFloat(document.getElementById('inv-price').value)||0,gst_pct:parseFloat(document.getElementById('inv-gst').value)||0,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){alert('Error: '+e.message);}}
 function switchInvStockType(t){
   window._invStockType=t;
   ['in','out','sell'].forEach(function(x){
@@ -4942,6 +4961,7 @@ async function deleteSelectedInv(){
 function downloadStockOutTemplate(){
   const data=allInventory.slice(0,5).map(i=>({'Part Code':i.part_code||'','Part Name':i.item_name,'Current Stock':i.qty_in_stock,'Stock Out Qty':0,'Note':''}));
   if(!data.length)data.push({'Part Code':'CG2-5007-000','Part Name':'Example Part','Current Stock':10,'Stock Out Qty':2,'Note':'Reason for stock out'});
+  // GST column added for reference only — not used in stock out template
   const ws=XLSX.utils.json_to_sheet(data);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Stock Out');
@@ -4986,7 +5006,7 @@ Errors: ${errors}
   input.click();
 }
 function downloadInvTemplate(){const data=[{'Part Code':'CG2-6007-000','Item Name':'LCD ASSY','Brand':'Canon','Model No':'MF3010','Stock':5,'Min Stock':2,'Price':5399}];const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Inventory');XLSX.writeFile(wb,'inventory_template.xlsx');}
-function importInv(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';input.onchange=async e=>{const file=e.target.files[0];const r=new FileReader();r.onload=async ev=>{const wb=XLSX.read(ev.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0;for(const row of data){try{const b=allBrands.find(x=>x.name.toLowerCase()===(row['Brand']||'').toLowerCase());await sb('inventory','POST',{part_code:row['Part Code']||null,item_name:row['Item Name']||'',brand_id:b?.id||null,category:row['Model No']||'',qty_in_stock:parseInt(row['Stock'])||0,min_stock:parseInt(row['Min Stock'])||2,unit_price:parseFloat(row['Price'])||0});c++;}catch(e){}}alert(`Imported ${c}`);renderInventory();};r.readAsBinaryString(file);};input.click();}
+function importInv(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';input.onchange=async e=>{const file=e.target.files[0];const r=new FileReader();r.onload=async ev=>{const wb=XLSX.read(ev.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0;for(const row of data){try{const b=allBrands.find(x=>x.name.toLowerCase()===(row['Brand']||'').toLowerCase());const gstVal=row['GST %']!=null?parseFloat(row['GST %']):18;await sb('inventory','POST',{part_code:row['Part Code']||null,item_name:row['Item Name']||'',brand_id:b?.id||null,category:row['Model No']||'',qty_in_stock:parseInt(row['Stock'])||0,min_stock:parseInt(row['Min Stock'])||2,unit_price:parseFloat(row['Price'])||0,gst_pct:gstVal});c++;}catch(e){}}alert(`Imported ${c}`);renderInventory();};r.readAsBinaryString(file);};input.click();}
 
 // TASKS
 async function renderTasks(){
@@ -5937,7 +5957,22 @@ function switchSettings(tab,el){
         <div class="form-group"><label>Phone</label><input id="ci-phone" value="${ci.phone||''}"></div>
         <div class="form-group"><label>Email</label><input id="ci-email" value="${ci.email||''}"></div>
         <div class="form-group"><label>GST No</label><input id="ci-gst" value="${ci.gst||''}"></div>
-        <div class="form-group"><label>GST % (Invoice par apply thase, 0 = no GST)</label><input id="ci-gst-pct" type="number" min="0" max="28" step="0.1" value="${ci.gst_pct||0}" placeholder="e.g. 18"></div>
+        <div class="form-group"><label>Default Parts GST % <span style="font-size:10px;color:var(--text-muted);">(jyare part par GST na hoy)</span></label>
+          <select id="ci-gst-pct" style="border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;width:100%;outline:none;">
+            <option value="0" ${(ci.gst_pct||18)==0?'selected':''}>0% (Exempt)</option>
+            <option value="5" ${(ci.gst_pct||18)==5?'selected':''}>5%</option>
+            <option value="12" ${(ci.gst_pct||18)==12?'selected':''}>12%</option>
+            <option value="18" ${(ci.gst_pct==null||ci.gst_pct==18)?'selected':''}>18%</option>
+            <option value="28" ${(ci.gst_pct||18)==28?'selected':''}>28%</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Labor / Service GST % <span style="font-size:10px;color:var(--text-muted);">(fixed 18% in India)</span></label>
+          <select id="ci-labor-gst" style="border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;width:100%;outline:none;">
+            <option value="0" ${(ci.labor_gst_pct||18)==0?'selected':''}>0%</option>
+            <option value="5" ${(ci.labor_gst_pct||18)==5?'selected':''}>5%</option>
+            <option value="18" ${(ci.labor_gst_pct==null||ci.labor_gst_pct==18)?'selected':''}>18% (Standard)</option>
+          </select>
+        </div>
         <div class="form-group"><label>Address Line 1</label><input id="ci-addr1" value="${ci.addr1||''}"></div>
         <div class="form-group"><label>City / State / PIN</label><input id="ci-addr2" value="${ci.addr2||''}"></div>
         <div class="form-group"><label>Website</label><input id="ci-web" value="${ci.web||''}"></div>
