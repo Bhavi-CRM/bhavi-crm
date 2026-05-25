@@ -7765,15 +7765,11 @@ window.submitFeedback=async function(ticketId){
   window.addEventListener('DOMContentLoaded',function(){
     ['sidebar','main'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
     var ls=document.getElementById('login-screen');if(ls)ls.style.display='none';
-    document.body.style.overflow='auto';
-    document.body.style.height='auto';
-    document.body.style.minHeight='100vh';
-    document.body.style.display='block';
-    document.body.style.margin='0';
-    document.body.style.background='#f8fafc';
+    document.body.style.overflow='auto';document.body.style.height='auto';
+    document.body.style.minHeight='100vh';document.body.style.display='block';
+    document.body.style.margin='0';document.body.style.background='#f8fafc';
     var d=document.createElement('div');d.id='shop-root';d.style.cssText='min-height:100vh;background:#f8fafc;';
-    document.body.appendChild(d);
-    loadPublicShop(d);
+    document.body.appendChild(d);loadPublicShop(d);
   });
 })();
 
@@ -14468,32 +14464,45 @@ async function renderShiftSettings(){
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br>SQL run karo: CREATE TABLE shift_settings...</div>';}
 }
 
-// ===== SALES MODULE =====
-// Selling Price = final price inclusive of all taxes. Customer pays exactly this.
-// GST is extracted backward from the inclusive price for admin invoice records only.
+async function saveShiftSetting(empId, empName, empRole){
+  var row=document.getElementById('shift-row-'+empId);if(!row)return;
+  var start=row.querySelector('.ss-start')?.value||'09:30';
+  var end=row.querySelector('.ss-end')?.value||'18:30';
+  var off=row.querySelector('.ss-off')?.value||'Sunday';
+  try{
+    await sb('shift_settings','POST',{emp_id:empId,emp_name:empName,emp_role:empRole,shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()});
+    alert('✅ Shift saved!');
+  }catch(e){
+    // Try PATCH if POST fails (duplicate key)
+    try{await sb('shift_settings','PATCH',{shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()},'?emp_id=eq.'+encodeURIComponent(empId));alert('✅ Shift updated!');}
+    catch(e2){alert('Error: '+e2.message);}
+  }
+}
 
-var BHAVI_PAYMENT={
-  name:'BHAVI ELECTRONICS',
-  bank:'HDFC BANK',
-  account:'50200020274632',
-  type:'Current Account',
-  branch:'Bopal, Ahmedabad',
-  ifsc:'HDFC0000305',
-  gstin:'24AAOPJ7528C2ZQ',
-  pan:'AAOPJ7528C',
-  address:'101/A, Shivalik 10, Opp. SBI Zonal Office, S.M. Road, Ambawadi'
-};
+// ===== SALES MODULE =====
+// Selling Price = final price inclusive of all taxes.
+// GST extracted backward from inclusive price for admin invoice records only.
+
+var BHAVI_PAYMENT={name:'BHAVI ELECTRONICS',bank:'HDFC BANK',account:'50200020274632',type:'Current Account',branch:'Bopal, Ahmedabad',ifsc:'HDFC0000305',gstin:'24AAOPJ7528C2ZQ',pan:'AAOPJ7528C'};
+// UPI QR URL cached in memory — loaded from Supabase company_info (shared across all devices)
+window._upiQrUrl='';
 
 function calcGstFromInclusive(price,gstPct){return price-price*100/(100+gstPct);}
 function genOrderNo(){return 'BE-'+Math.random().toString(36).slice(2,8).toUpperCase();}
-function _waOpen(mob,msg){
-  var m=(mob||'').replace(/\D/g,'');if(m.length===10)m='91'+m;
-  window.open('https://wa.me/'+(m||'')+'?text='+encodeURIComponent(msg),'_blank');
-}
+function _waOpen(mob,msg){var m=(mob||'').replace(/\D/g,'');if(m.length===10)m='91'+m;window.open('https://wa.me/'+(m||'')+'?text='+encodeURIComponent(msg),'_blank');}
 
-// UPI QR Code — stored in localStorage (admin sets it once in Sales → Setup)
-function getUpiQrUrl(){return localStorage.getItem('bhavi_upi_qr_url')||'';}
-function setUpiQrUrl(url){localStorage.setItem('bhavi_upi_qr_url',url);}
+// Load UPI QR URL from Supabase — works across all devices/browsers
+async function loadUpiQrUrl(){
+  try{
+    var r=await sb('company_info','GET',null,'?id=eq.1&select=upi_qr_url');
+    window._upiQrUrl=(r&&r[0]&&r[0].upi_qr_url)||'';
+  }catch(e){window._upiQrUrl='';}
+}
+async function saveUpiQrUrl(url){
+  window._upiQrUrl=url;
+  try{await sb('company_info','PATCH',{upi_qr_url:url},'?id=eq.1');}
+  catch(e){alert('Saved locally but could not sync to server: '+e.message);}
+}
 
 async function uploadProductImgFile(file){
   var ext=file.name.split('.').pop().toLowerCase();
@@ -14521,20 +14530,19 @@ async function uploadUpiQr(input){
     var res=await fetch(SB_URL+'/storage/v1/object/product-images/bhavi_upi_qr.png',{method:'POST',headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},body:file});
     if(!res.ok)throw new Error(await res.text());
     var url=SB_URL+'/storage/v1/object/public/product-images/bhavi_upi_qr.png';
-    setUpiQrUrl(url);
-    if(lbl)lbl.innerHTML='✅ QR uploaded! <img src="'+url+'?t='+Date.now()+'" style="width:80px;height:80px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;margin-left:8px;vertical-align:middle;">';
+    await saveUpiQrUrl(url);
+    if(lbl)lbl.innerHTML='✅ QR saved to server — visible on all devices!<br><img src="'+url+'?t='+Date.now()+'" style="width:100px;height:100px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;margin-top:6px;">';
   }catch(e){if(lbl)lbl.textContent='Error: '+e.message;}
 }
 
 function downloadSalesTemplate(){
   if(typeof XLSX==='undefined'){alert('Excel library is not loaded.');return;}
   var wb=XLSX.utils.book_new();
-  var ws=XLSX.utils.aoa_to_sheet([
-    ['Name *','Model','Category','Selling Price * (₹) — Final price incl. GST','GST % (for invoice breakdown)','Stock Status (available / out_of_stock)','Description','Features (semicolon separated)','Specifications (Key:Value ; Key:Value)','Image URL'],
-    ['Canon GI-790 BK Ink','GI-790-BK','Ink','595','18','available','Black ink bottle for Canon Pixma G series','Page yield: 6000 pages; Compatible: Pixma G series','Volume: 135ml; Colour: Black',''],
-    ['Canon PIXMA G3010','G3010','Printer','12500','18','available','Wireless ink tank printer','Print Scan Copy; WiFi; Duplex print','Print Speed: 9 ipm; Resolution: 4800x1200 dpi','']
-  ]);
-  XLSX.utils.book_append_sheet(wb,ws,'Products');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ['Name *','Model','Category','Selling Price * (₹) — Final price incl. all taxes','GST % (for invoice breakdown only)','Stock Status (available / out_of_stock)','Description','Features (semicolon separated)','Specifications (Key:Value ; Key:Value)','Image URL'],
+    ['Canon GI-790 BK Ink','GI-790-BK','Ink','595','18','available','Black ink for Canon Pixma G series','Page yield 6000; Compatible G series','Volume: 135ml; Colour: Black',''],
+    ['Canon PIXMA G3010','G3010','Printer','12500','18','available','Wireless ink tank printer','WiFi; Duplex; Print Scan Copy','Speed: 9ipm; Resolution: 4800x1200','']
+  ]),'Products');
   XLSX.writeFile(wb,'BhaviElectronics_Products_Template.xlsx');
 }
 async function uploadSalesExcel(input){
@@ -14544,8 +14552,7 @@ async function uploadSalesExcel(input){
   reader.onload=async function(e){
     try{
       var wb=XLSX.read(e.target.result,{type:'binary'});
-      var ws=wb.Sheets[wb.SheetNames[0]];
-      var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
       if(!rows.length){alert('No data found in the file.');return;}
       var products=rows.map(function(r){
         var feats=(r['Features (semicolon separated)']||r['Features']||'').split(';').map(function(s){return s.trim();}).filter(Boolean);
@@ -14553,15 +14560,14 @@ async function uploadSalesExcel(input){
         var specs={};specsRaw.forEach(function(s){var kv=s.split(':');if(kv.length>=2)specs[kv[0].trim()]=kv.slice(1).join(':').trim();});
         var priceKey=Object.keys(r).find(function(k){return k.toLowerCase().includes('selling price');});
         return{name:r['Name *']||r['Name']||'',model:r['Model']||'',category:r['Category']||'',
-          price:parseFloat(r[priceKey])||0,gst_percent:parseFloat(r['GST %']||r['GST % (for invoice breakdown)'])||18,
+          price:parseFloat(r[priceKey])||0,gst_percent:parseFloat(r['GST %']||r['GST % (for invoice breakdown only)'])||18,
           stock_status:(r['Stock Status (available / out_of_stock)']||r['Stock Status']||'available').trim(),
           description:r['Description']||'',features:feats,specifications:specs,
           image_url:r['Image URL']||'',is_active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
       }).filter(function(p){return p.name;});
-      if(!products.length){alert('No valid products found in the file.');return;}
+      if(!products.length){alert('No valid products found.');return;}
       await sb('sales_products','POST',products);
-      alert(products.length+' products uploaded successfully!');
-      renderSalesProductsAdmin();
+      alert(products.length+' products uploaded successfully!');renderSalesProductsAdmin();
     }catch(ex){alert('Error: '+ex.message);}
   };
   reader.readAsBinaryString(file);input.value='';
@@ -14569,6 +14575,7 @@ async function uploadSalesExcel(input){
 
 async function renderSales(){
   var pc=document.getElementById('page-content');if(!pc)return;
+  await loadUpiQrUrl(); // fetch from Supabase — works on all devices
   var tab=window._salesTab||'orders';
   pc.innerHTML='<div style="padding:16px 20px;">'
     +'<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">'
@@ -14577,8 +14584,7 @@ async function renderSales(){
     +'<button onclick="salesTab(\'setup\')" style="background:'+(tab==='setup'?'#1a56db':'#f1f5f9')+';color:'+(tab==='setup'?'#fff':'#475569')+';border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;">⚙️ Setup</button>'
     +'<div style="flex:1;"></div>'
     +'<button onclick="showShopLink()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">🔗 Shop Link & QR</button>'
-    +'</div>'
-    +'<div id="sales-tab-content"></div></div>';
+    +'</div><div id="sales-tab-content"></div></div>';
   if(tab==='products')renderSalesProductsAdmin();
   else if(tab==='setup')renderSalesSetup();
   else renderSalesOrdersAdmin();
@@ -14587,19 +14593,19 @@ function salesTab(t){window._salesTab=t;renderSales();}
 
 function renderSalesSetup(){
   var tc=document.getElementById('sales-tab-content');if(!tc)return;
-  var qr=getUpiQrUrl();
-  tc.innerHTML='<div style="max-width:480px;">'
+  var qr=window._upiQrUrl;
+  tc.innerHTML='<div style="max-width:500px;">'
     +'<div class="card" style="margin-bottom:16px;">'
     +'<div class="section-header"><h2>📱 UPI QR Code Setup</h2></div>'
-    +'<div style="padding:16px;font-size:13px;color:#6b7280;line-height:1.7;margin-bottom:14px;">'
-    +'Upload your UPI QR code once. It will appear in all payment detail messages and modals automatically.<br>'
-    +'<span style="font-size:11px;color:#94a3b8;">Supported apps: GPay, PhonePe, Paytm, BHIM, any UPI app</span>'
-    +'</div>'
-    +(qr?'<div style="padding:0 16px 14px;display:flex;align-items:center;gap:12px;">'
-        +'<img src="'+qr+'?t='+Date.now()+'" style="width:100px;height:100px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;">'
-        +'<div><div style="font-size:12px;font-weight:600;color:#10b981;margin-bottom:4px;">✅ QR Code Active</div>'
-        +'<div style="font-size:11px;color:#94a3b8;">Included in all payment messages</div></div>'
-        +'</div>':'<div style="padding:0 16px 14px;color:#94a3b8;font-size:12px;">No QR code uploaded yet.</div>')
+    +'<div style="padding:0 16px 16px;font-size:13px;color:#6b7280;line-height:1.7;">'
+    +'Upload your UPI QR code once — it is stored on the server and will appear on <b>all devices</b> automatically.<br>'
+    +'<span style="font-size:11px;">Works with: GPay, PhonePe, Paytm, BHIM, any UPI app</span></div>'
+    +(qr?'<div style="padding:0 16px 14px;display:flex;align-items:center;gap:14px;">'
+        +'<img src="'+qr+'?t='+Date.now()+'" style="width:110px;height:110px;object-fit:contain;border:2px solid #e2e8f0;border-radius:10px;">'
+        +'<div><div style="font-size:13px;font-weight:700;color:#10b981;margin-bottom:4px;">✅ QR Code Active</div>'
+        +'<div style="font-size:12px;color:#6b7280;">Visible on all devices</div>'
+        +'<div style="font-size:12px;color:#6b7280;">Included in all payment messages</div></div>'
+        +'</div>':'<div style="padding:0 16px 12px;color:#94a3b8;font-size:12px;">No QR code uploaded yet.</div>')
     +'<div style="padding:0 16px 16px;">'
     +'<label style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:10px;padding:14px;cursor:pointer;">'
     +'<input type="file" accept="image/*" onchange="uploadUpiQr(this)" style="display:none;">'
@@ -14608,18 +14614,13 @@ function renderSalesSetup(){
     +'<div style="font-size:11px;color:#94a3b8;">Click to browse — JPG or PNG</div></div></label>'
     +'<div id="upi-qr-status" style="margin-top:8px;font-size:12px;min-height:20px;"></div>'
     +'</div></div>'
-    +'<div class="card">'
-    +'<div class="section-header"><h2>🏦 Bank Details (Auto-filled)</h2></div>'
-    +'<div style="padding:16px;font-size:13px;line-height:2;">'
-    +'<b>Bank:</b> '+BHAVI_PAYMENT.bank+'<br>'
-    +'<b>Account Name:</b> '+BHAVI_PAYMENT.name+'<br>'
-    +'<b>Account No:</b> '+BHAVI_PAYMENT.account+'<br>'
-    +'<b>Account Type:</b> '+BHAVI_PAYMENT.type+'<br>'
-    +'<b>IFSC Code:</b> '+BHAVI_PAYMENT.ifsc+'<br>'
-    +'<b>Branch:</b> '+BHAVI_PAYMENT.branch+'<br>'
-    +'<b>GSTIN:</b> '+BHAVI_PAYMENT.gstin+'<br>'
-    +'</div>'
-    +'<div style="padding:0 16px 16px;font-size:12px;color:#6b7280;">These details are automatically included in all payment WhatsApp messages.</div>'
+    +'<div class="card"><div class="section-header"><h2>🏦 Bank Details</h2></div>'
+    +'<div style="padding:14px 16px;font-size:13px;line-height:2.1;">'
+    +'<b>Bank:</b> '+BHAVI_PAYMENT.bank+'<br><b>Account Name:</b> '+BHAVI_PAYMENT.name+'<br>'
+    +'<b>Account No:</b> '+BHAVI_PAYMENT.account+'<br><b>Account Type:</b> '+BHAVI_PAYMENT.type+'<br>'
+    +'<b>IFSC Code:</b> '+BHAVI_PAYMENT.ifsc+'<br><b>Branch:</b> '+BHAVI_PAYMENT.branch+'<br>'
+    +'<b>GSTIN:</b> '+BHAVI_PAYMENT.gstin+'</div>'
+    +'<div style="padding:0 16px 14px;font-size:12px;color:#10b981;">✅ Auto-included in all payment WhatsApp messages.</div>'
     +'</div></div>';
 }
 
@@ -14630,7 +14631,7 @@ function showShopLink(){
     '<div style="text-align:center;padding:10px;">'
     +'<p style="font-size:13px;color:#6b7280;margin-bottom:12px;">Share this link with customers. No login required.</p>'
     +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;word-break:break-all;font-size:13px;font-weight:600;color:#1a56db;margin-bottom:14px;">'+escHtml(shopUrl)+'</div>'
-    +'<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(shopUrl)+'" style="border-radius:10px;border:1px solid #e2e8f0;margin-bottom:14px;" />'
+    +'<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(shopUrl)+'" style="border-radius:10px;border:1px solid #e2e8f0;margin-bottom:14px;">'
     +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
     +'<button onclick="navigator.clipboard.writeText(\''+escHtml(shopUrl)+'\').then(function(){alert(\'Link copied!\');})" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600;">📋 Copy Link</button>'
     +'<button onclick="sendShopLinkWA()" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600;">📲 Share via WhatsApp</button>'
@@ -14639,7 +14640,7 @@ function showShopLink(){
 }
 function sendShopLinkWA(){
   var shopUrl=window.location.origin+window.location.pathname+'?shop';
-  var msg='🛍️ *Bhavi Electronics — Online Shop*\n\nExplore our product range and place your order online!\n\n🔗 '+shopUrl+'\n\n✅ Easy online ordering\n✅ 100% Advance Payment\n✅ GST Invoice provided\n✅ Fast & secure dispatch\n\n📞 Bhavi Electronics | Where Customer Delight is First';
+  var msg='🛍️ *Bhavi Electronics — Online Shop*\n\nExplore our product range and place your order online!\n\n🔗 '+shopUrl+'\n\n✅ Easy online ordering | 100% Advance | GST Invoice | Fast Dispatch\n\n📞 Bhavi Electronics | Where Customer Delight is First';
   _waOpen('',msg);
 }
 
@@ -14651,18 +14652,17 @@ async function renderSalesProductsAdmin(){
     window._salesProds=prods||[];
     var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
       +'<button onclick="openAddProduct(null)" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Product</button>'
-      +'<button onclick="downloadSalesTemplate()" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📥 Excel Template</button>'
+      +'<button onclick="downloadSalesTemplate()" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📥 Template</button>'
       +'<label style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📤 Bulk Upload<input type="file" accept=".xlsx,.xls" onchange="uploadSalesExcel(this)" style="display:none;"></label>'
       +'<span style="font-size:12px;color:#94a3b8;align-self:center;">'+(prods?prods.length:0)+' products</span>'
       +'</div>';
     if(!prods||!prods.length){tc.innerHTML=html+'<div style="text-align:center;padding:40px;color:#94a3b8;">No products yet. Add your first product!</div>';return;}
     html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">';
     prods.forEach(function(p){
-      var imgHtml=p.image_url
-        ?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:140px;object-fit:cover;border-radius:10px 10px 0 0;">'
-        :'<div style="width:100%;height:100px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:28px;">📦</div>';
       html+='<div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);overflow:hidden;">'
-        +imgHtml+'<div style="padding:10px;">'
+        +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:140px;object-fit:cover;border-radius:10px 10px 0 0;">'
+          :'<div style="width:100%;height:100px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:28px;">📦</div>')
+        +'<div style="padding:10px;">'
         +'<div style="font-size:12px;font-weight:700;color:#1a56db;margin-bottom:2px;">'+escHtml(p.name)+'</div>'
         +(p.model?'<div style="font-size:11px;color:#6b7280;">'+escHtml(p.model)+'</div>':'')
         +'<div style="margin-top:6px;font-size:15px;font-weight:800;color:#111;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
@@ -14670,18 +14670,16 @@ async function renderSalesProductsAdmin(){
         +'<div style="margin-top:4px;"><span style="background:'+(p.stock_status==='available'?'#d1fae5':'#fee2e2')+';color:'+(p.stock_status==='available'?'#065f46':'#991b1b')+';border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;">'+(p.stock_status==='available'?'In Stock':'Out of Stock')+'</span></div>'
         +'<div style="margin-top:8px;display:flex;gap:6px;align-items:center;">'
         +'<label style="flex:1;text-align:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:5px 4px;font-size:11px;cursor:pointer;">📷 Photo<input type="file" accept="image/*" onchange="uploadAndUpdateProductImg(\''+p.id+'\',this)" style="display:none;"></label>'
-        +'<button onclick="openAddProduct(\''+p.id+'\')" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;font-size:14px;">✏️</button>'
-        +'<button onclick="deleteSalesProduct(\''+p.id+'\')" style="background:#fee2e2;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;font-size:14px;">🗑️</button>'
+        +'<button onclick="openAddProduct(\''+p.id+'\')" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;">✏️</button>'
+        +'<button onclick="deleteSalesProduct(\''+p.id+'\')" style="background:#fee2e2;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;">🗑️</button>'
         +'</div></div></div>';
     });
-    html+='</div>';
-    tc.innerHTML=html;
+    html+='</div>';tc.innerHTML=html;
   }catch(e){tc.innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
 }
 
 function openAddProduct(id){
-  var prods=window._salesProds||[];
-  var p=id?prods.find(function(x){return x.id===id;}):null;
+  var p=id?(window._salesProds||[]).find(function(x){return x.id===id;}):null;
   document.getElementById('modal-general-title').textContent=id?'Edit Product':'Add New Product';
   document.getElementById('modal-general-body').innerHTML=
     '<div style="display:flex;flex-direction:column;gap:10px;">'
@@ -14690,19 +14688,16 @@ function openAddProduct(id){
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Model No.</label><input id="sp-model" class="form-input" value="'+escHtml(p?p.model||'':'')+'" placeholder="GI-790-BK"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Category</label><input id="sp-cat" class="form-input" value="'+escHtml(p?p.category||'':'')+'" placeholder="Ink / Printer"></div>'
     +'</div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Selling Price (₹) * <span style="font-weight:400;color:#10b981;font-size:11px;">— Final price, all taxes included. Customer pays this amount.</span></label><input id="sp-price" type="number" class="form-input" value="'+(p?p.price||'':'')+'" placeholder="595"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Selling Price (₹) * <span style="font-weight:400;color:#10b981;font-size:11px;">— Customer pays this exact amount (all taxes included)</span></label><input id="sp-price" type="number" class="form-input" value="'+(p?p.price||'':'')+'" placeholder="595"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">GST % <span style="font-weight:400;color:#94a3b8;font-size:10px;">(invoice only)</span></label><input id="sp-gst" type="number" class="form-input" value="'+(p?p.gst_percent||18:18)+'" placeholder="18"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Stock Status</label><select id="sp-stock" class="form-input"><option value="available" '+((!p||p.stock_status==='available')?'selected':'')+'>In Stock</option><option value="out_of_stock" '+(p&&p.stock_status==='out_of_stock'?'selected':'')+'>Out of Stock</option></select></div>'
     +'</div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Description</label><textarea id="sp-desc" class="form-input" rows="2" placeholder="Brief product description...">'+escHtml(p?p.description||'':'')+'</textarea></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Key Features <span style="font-weight:400;color:#94a3b8;font-size:10px;">(separate with semicolons)</span></label><input id="sp-feats" class="form-input" value="'+escHtml(p?((p.features||[]).join('; ')):'')+'" placeholder="WiFi Enabled; Duplex Printing; High Page Yield"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Specifications <span style="font-weight:400;color:#94a3b8;font-size:10px;">(Key: Value ; Key: Value)</span></label><input id="sp-specs" class="form-input" value="'+escHtml(p?(Object.entries(p.specifications||{}).map(function(kv){return kv[0]+': '+kv[1];}).join(' ; ')):'')+'" placeholder="Print Speed: 9 ipm ; Resolution: 4800x1200 dpi"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Key Features <span style="font-weight:400;color:#94a3b8;font-size:10px;">(semicolons)</span></label><input id="sp-feats" class="form-input" value="'+escHtml(p?((p.features||[]).join('; ')):'')+'" placeholder="WiFi Enabled; Duplex; High Yield"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Specifications <span style="font-weight:400;color:#94a3b8;font-size:10px;">(Key: Value ; Key: Value)</span></label><input id="sp-specs" class="form-input" value="'+escHtml(p?(Object.entries(p.specifications||{}).map(function(kv){return kv[0]+': '+kv[1];}).join(' ; ')):'')+'" placeholder="Speed: 9ipm ; Resolution: 4800x1200"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Image URL</label><input id="sp-img-url" class="form-input" value="'+escHtml(p?p.image_url||'':'')+'" placeholder="https://..."></div>'
-    +'<label style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px;cursor:pointer;">'
-    +'<input type="file" accept="image/*" onchange="uploadProductImg(this)" style="display:none;">'
-    +'<span style="font-size:13px;color:#475569;">📷 Upload Product Image (JPG / PNG)</span>'
-    +'<button type="button" style="margin-left:auto;background:#1a56db;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;" onclick="this.previousElementSibling.previousElementSibling.click()">Browse</button></label>'
+    +'<label style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px;cursor:pointer;"><input type="file" accept="image/*" onchange="uploadProductImg(this)" style="display:none;"><span style="font-size:13px;color:#475569;">📷 Upload Product Image</span><button type="button" style="margin-left:auto;background:#1a56db;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;" onclick="this.previousElementSibling.previousElementSibling.click()">Browse</button></label>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:6px;">'
     +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Cancel</button>'
     +'<button onclick="saveProduct(\''+escHtml(id||'\'')+'\')" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Save Product</button>'
@@ -14720,18 +14715,13 @@ async function saveProduct(id){
     description:(document.getElementById('sp-desc')?.value||'').trim(),features:feats,specifications:specs,
     price:price,gst_percent:parseFloat(document.getElementById('sp-gst')?.value||18),
     stock_status:document.getElementById('sp-stock')?.value||'available',
-    image_url:(document.getElementById('sp-img-url')?.value||'').trim(),
-    is_active:true,updated_at:new Date().toISOString()};
-  try{
-    if(id){await sb('sales_products','PATCH',data,'?id=eq.'+id);}
-    else{data.created_at=new Date().toISOString();await sb('sales_products','POST',data);}
-    closeModal('modal-general');renderSalesProductsAdmin();
-  }catch(e){alert('Error saving product: '+e.message);}
+    image_url:(document.getElementById('sp-img-url')?.value||'').trim(),is_active:true,updated_at:new Date().toISOString()};
+  try{if(id){await sb('sales_products','PATCH',data,'?id=eq.'+id);}else{data.created_at=new Date().toISOString();await sb('sales_products','POST',data);}closeModal('modal-general');renderSalesProductsAdmin();}
+  catch(e){alert('Error: '+e.message);}
 }
 async function deleteSalesProduct(id){
-  if(!confirm('Are you sure you want to delete this product?'))return;
-  try{await sb('sales_products','PATCH',{is_active:false,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesProductsAdmin();}
-  catch(e){alert('Error: '+e.message);}
+  if(!confirm('Delete this product?'))return;
+  try{await sb('sales_products','PATCH',{is_active:false,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesProductsAdmin();}catch(e){alert(e.message);}
 }
 
 async function renderSalesOrdersAdmin(){
@@ -14753,15 +14743,14 @@ async function renderSalesOrdersAdmin(){
       html+='<div style="background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
         +'<div><div style="font-size:14px;font-weight:800;color:#111;">'+escHtml(o.customer_name)+'</div>'
-        +'<div style="font-size:11px;color:#6b7280;">'+escHtml(o.order_no||'')+(o.customer_mobile?' &nbsp;|&nbsp; 📞 '+escHtml(o.customer_mobile):'')+' &nbsp;|&nbsp; '+new Date(o.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</div></div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+escHtml(o.order_no||'')+(o.customer_mobile?' | 📞 '+escHtml(o.customer_mobile):'')+' | '+new Date(o.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</div></div>'
         +'<span style="background:'+col+';color:#fff;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;text-transform:capitalize;">'+escHtml(o.status||'')+'</span>'
         +'</div>'
         +'<div style="margin-top:6px;font-size:15px;font-weight:800;color:#1a56db;">₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'<span style="font-size:11px;font-weight:400;color:#94a3b8;"> incl. all taxes</span></div>'
         +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'+buildSalesActions(o)+'</div>'
         +'</div>';
     });
-    html+='</div>';
-    tc.innerHTML=html;
+    html+='</div>';tc.innerHTML=html;
   }catch(e){tc.innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
 }
 
@@ -14782,36 +14771,28 @@ function buildSalesActions(o){
     btns+='<button onclick="openPaymentModal(\''+id+'\',\''+cn+'\','+tot+',\''+mob+'\')" style="background:#10b981;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Paid</button>';
     btns+='<button onclick="salesWA_PaymentDetails(\''+cn+'\',\''+mob+'\','+tot+',\''+on+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Payment Details</button>';
   }
-  if(s==='paid'){
-    btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Dispatch</button>';
-  }
-  if(s==='dispatched'){
-    btns+='<button onclick="salesMarkStatus(\''+id+'\',\'done\')" style="background:#9ca3af;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Done</button>';
-  }
+  if(s==='paid'){btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Dispatch</button>';}
+  if(s==='dispatched'){btns+='<button onclick="salesMarkStatus(\''+id+'\',\'done\')" style="background:#9ca3af;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Done</button>';}
   return btns;
 }
-async function salesMarkStatus(id,status){
-  try{await sb('sales_orders','PATCH',{status:status,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesOrdersAdmin();}
-  catch(e){alert('Error: '+e.message);}
-}
+async function salesMarkStatus(id,status){try{await sb('sales_orders','PATCH',{status:status,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesOrdersAdmin();}catch(e){alert(e.message);}}
 
 async function openNewSalesOrder(){
   var prods=await sb('sales_products','GET',null,'?is_active=eq.true&stock_status=eq.available&order=name.asc');
   window._salesProdsForOrder=prods||[];_soItemCount=0;
-  document.getElementById('modal-general-title').textContent='Create New Order';
   var opts=(prods||[]).map(function(p){return '<option value="'+p.id+'" data-price="'+p.price+'" data-gst="'+p.gst_percent+'">'+escHtml(p.name+(p.model?' ('+p.model+')':''))+' — ₹'+parseFloat(p.price).toLocaleString('en-IN')+'</option>';}).join('');
+  document.getElementById('modal-general-title').textContent='Create New Order';
   document.getElementById('modal-general-body').innerHTML=
     '<div style="display:flex;flex-direction:column;gap:10px;">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Customer Name *</label><input id="so-cname" class="form-input" placeholder="Full Name"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Mobile No. *</label><input id="so-mob" type="tel" class="form-input" placeholder="10-digit mobile"></div>'
     +'</div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Delivery Address</label><textarea id="so-addr" class="form-input" rows="2" placeholder="Full delivery address"></textarea></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Delivery Address</label><textarea id="so-addr" class="form-input" rows="2"></textarea></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Notes</label><input id="so-notes" class="form-input" placeholder="Special instructions..."></div>'
     +'<div id="so-items-wrap"><div id="so-item-0" class="so-item-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
     +'<select class="so-prod form-input" onchange="calcSalesTotal()" style="flex:3;"><option value="">— Select Product —</option>'+opts+'</select>'
-    +'<input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:64px;">'
-    +'</div></div>'
+    +'<input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:64px;"></div></div>'
     +'<button onclick="addSalesOrderItem()" style="background:#f1f5f9;color:#475569;border:none;border-radius:7px;padding:7px 12px;font-size:13px;cursor:pointer;align-self:flex-start;">+ Add Item</button>'
     +'<div id="so-total-bar" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;"></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
@@ -14822,69 +14803,47 @@ async function openNewSalesOrder(){
 }
 var _soItemCount=0;
 function addSalesOrderItem(){
-  _soItemCount++;
-  var wrap=document.getElementById('so-items-wrap');var prods=window._salesProdsForOrder||[];
+  _soItemCount++;var wrap=document.getElementById('so-items-wrap');var prods=window._salesProdsForOrder||[];
   var div=document.createElement('div');div.id='so-item-'+_soItemCount;div.className='so-item-row';div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;';
-  div.innerHTML='<select class="so-prod form-input" onchange="calcSalesTotal()" style="flex:3;"><option value="">— Select Product —</option>'
-    +prods.map(function(p){return '<option value="'+p.id+'" data-price="'+p.price+'" data-gst="'+p.gst_percent+'">'+escHtml(p.name+(p.model?' ('+p.model+')':''))+' — ₹'+parseFloat(p.price).toLocaleString('en-IN')+'</option>';}).join('')
-    +'</select><input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:64px;">'
-    +'<button onclick="this.parentElement.remove();calcSalesTotal();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-weight:700;">✕</button>';
+  div.innerHTML='<select class="so-prod form-input" onchange="calcSalesTotal()" style="flex:3;"><option value="">— Select Product —</option>'+prods.map(function(p){return '<option value="'+p.id+'" data-price="'+p.price+'" data-gst="'+p.gst_percent+'">'+escHtml(p.name+(p.model?' ('+p.model+')':''))+' — ₹'+parseFloat(p.price).toLocaleString('en-IN')+'</option>';}).join('')+'</select><input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:64px;"><button onclick="this.parentElement.remove();calcSalesTotal();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;font-weight:700;">✕</button>';
   wrap.appendChild(div);
 }
 function calcSalesTotal(){
   var total=0;
-  document.querySelectorAll('[id^="so-item-"]').forEach(function(row){
-    var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);
-    if(!sel||!sel.value)return;
-    total+=parseFloat(sel.selectedOptions[0].dataset.price||0)*qty;
-  });
+  document.querySelectorAll('[id^="so-item-"]').forEach(function(row){var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);if(!sel||!sel.value)return;total+=parseFloat(sel.selectedOptions[0].dataset.price||0)*qty;});
   var tb=document.getElementById('so-total-bar');
   if(tb)tb.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:16px;">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</b><span style="font-size:11px;color:#10b981;">All taxes included</span></div>';
 }
 async function saveSalesOrder(){
-  var cname=(document.getElementById('so-cname')?.value||'').trim();
-  var mob=(document.getElementById('so-mob')?.value||'').trim();
+  var cname=(document.getElementById('so-cname')?.value||'').trim();var mob=(document.getElementById('so-mob')?.value||'').trim();
   if(!cname||!mob){alert('Customer name and mobile number are required.');return;}
   var items=[];
-  document.querySelectorAll('[id^="so-item-"]').forEach(function(row){
-    var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);
-    if(!sel||!sel.value)return;
-    var opt=sel.selectedOptions[0];
-    items.push({product_id:sel.value,name:opt.text.split(' — ₹')[0],price:parseFloat(opt.dataset.price||0),gst_percent:parseFloat(opt.dataset.gst||18),qty:qty});
-  });
+  document.querySelectorAll('[id^="so-item-"]').forEach(function(row){var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);if(!sel||!sel.value)return;var opt=sel.selectedOptions[0];items.push({product_id:sel.value,name:opt.text.split(' — ₹')[0],price:parseFloat(opt.dataset.price||0),gst_percent:parseFloat(opt.dataset.gst||18),qty:qty});});
   if(!items.length){alert('Please select at least one product.');return;}
   var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
   var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
-  var data={order_no:genOrderNo(),customer_name:cname,customer_mobile:mob,
-    customer_address:(document.getElementById('so-addr')?.value||'').trim(),
-    items:items,subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,
-    notes:(document.getElementById('so-notes')?.value||'').trim(),status:'inquiry',
-    created_by:currentUser?.name||'Admin',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  try{await sb('sales_orders','POST',data);closeModal('modal-general');window._salesTab='orders';window._salesStatusFilter='all';renderSales();alert('Order '+data.order_no+' created successfully!');}
-  catch(e){alert('Error creating order: '+e.message);}
+  var data={order_no:genOrderNo(),customer_name:cname,customer_mobile:mob,customer_address:(document.getElementById('so-addr')?.value||'').trim(),items:items,subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,notes:(document.getElementById('so-notes')?.value||'').trim(),status:'inquiry',created_by:currentUser?.name||'Admin',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  try{await sb('sales_orders','POST',data);closeModal('modal-general');window._salesTab='orders';window._salesStatusFilter='all';renderSales();alert('Order '+data.order_no+' created!');}
+  catch(e){alert('Error: '+e.message);}
 }
 
 function openPaymentModal(id,cname,total,mob){
-  var qr=getUpiQrUrl();
+  var qr=window._upiQrUrl;
   document.getElementById('modal-general-title').textContent='Record Payment — '+cname;
   document.getElementById('modal-general-body').innerHTML=
     '<div style="display:flex;flex-direction:column;gap:10px;">'
     +'<div style="background:#d1fae5;border-radius:10px;padding:14px;text-align:center;">'
-    +'<div style="font-size:12px;color:#065f46;margin-bottom:4px;">Amount to Collect</div>'
+    +'<div style="font-size:12px;color:#065f46;margin-bottom:2px;">Amount to Collect</div>'
     +'<div style="font-size:26px;font-weight:800;color:#065f46;">₹'+parseFloat(total).toLocaleString('en-IN')+'</div>'
-    +'<div style="font-size:11px;color:#065f46;margin-top:2px;">All taxes included</div>'
-    +'</div>'
-    +(qr?'<div style="text-align:center;padding:8px 0;">'
-        +'<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">📱 UPI QR Code — Customer can scan this</div>'
-        +'<img src="'+qr+'?t='+Date.now()+'" style="width:160px;height:160px;object-fit:contain;border:2px solid #e2e8f0;border-radius:12px;">'
-        +'<div style="font-size:11px;color:#6b7280;margin-top:4px;">GPay • PhonePe • Paytm • BHIM • Any UPI App</div>'
-        +'</div>':'')
-    +'<div style="background:#f8fafc;border-radius:8px;padding:10px;font-size:12px;line-height:1.8;">'
-    +'<b style="display:block;margin-bottom:4px;">Bank Transfer Details</b>'
-    +'<b>'+BHAVI_PAYMENT.bank+'</b> | A/c: <b>'+BHAVI_PAYMENT.account+'</b> | IFSC: <b>'+BHAVI_PAYMENT.ifsc+'</b>'
-    +'</div>'
+    +'<div style="font-size:11px;color:#10b981;">All taxes included</div></div>'
+    +(qr?'<div style="text-align:center;padding:6px 0;">'
+        +'<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">📱 UPI QR Code — Customer can scan directly</div>'
+        +'<img src="'+qr+'?t='+Date.now()+'" style="width:170px;height:170px;object-fit:contain;border:2px solid #e2e8f0;border-radius:12px;">'
+        +'<div style="font-size:11px;color:#6b7280;margin-top:4px;">GPay • PhonePe • Paytm • BHIM • Any UPI App</div></div>':'')
+    +'<div style="background:#f8fafc;border-radius:8px;padding:10px;font-size:12px;">'
+    +'<b>Bank Transfer:</b> '+BHAVI_PAYMENT.bank+' | A/c: <b>'+BHAVI_PAYMENT.account+'</b> | IFSC: <b>'+BHAVI_PAYMENT.ifsc+'</b></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Payment Method *</label><select id="pm-method" class="form-input"><option value="UPI">UPI (GPay / PhonePe / Paytm)</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cash">Cash</option><option value="Cheque">Cheque</option></select></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Transaction / UTR No.</label><input id="pm-ref" class="form-input" placeholder="e.g. UTR123456789 or GPay transaction ID"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Transaction / UTR No.</label><input id="pm-ref" class="form-input" placeholder="e.g. UTR123456789"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Payment Date</label><input id="pm-date" type="date" class="form-input" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
     +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
@@ -14893,51 +14852,34 @@ function openPaymentModal(id,cname,total,mob){
   openModal('modal-general');
 }
 async function savePaymentRecord(id,cname,total,mob){
-  var method=document.getElementById('pm-method')?.value;
-  var ref=(document.getElementById('pm-ref')?.value||'').trim();
-  var date=document.getElementById('pm-date')?.value;
-  try{
-    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');
-    await sb('sales_orders','PATCH',{status:'paid',payment_method:method,payment_reference:ref,payment_date:date,updated_at:new Date().toISOString()},'?id=eq.'+id);
-    closeModal('modal-general');renderSalesOrdersAdmin();
-    if(mob)salesWA_PaymentConfirm(ord&&ord[0]?ord[0].order_no:'',cname,mob,total,method,ref);
-  }catch(e){alert('Error: '+e.message);}
+  var method=document.getElementById('pm-method')?.value;var ref=(document.getElementById('pm-ref')?.value||'').trim();var date=document.getElementById('pm-date')?.value;
+  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');await sb('sales_orders','PATCH',{status:'paid',payment_method:method,payment_reference:ref,payment_date:date,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(mob)salesWA_PaymentConfirm(ord&&ord[0]?ord[0].order_no:'',cname,mob,total,method,ref);}
+  catch(e){alert('Error: '+e.message);}
 }
-
 function openDispatchModal(id,cname,mob){
   document.getElementById('modal-general-title').textContent='Dispatch Details — '+cname;
   document.getElementById('modal-general-body').innerHTML=
     '<div style="display:flex;flex-direction:column;gap:10px;">'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Courier / Logistics Partner *</label><input id="dp-courier" class="form-input" placeholder="e.g. DTDC, Blue Dart, Delhivery, Speed Post"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Courier / Logistics Partner *</label><input id="dp-courier" class="form-input" placeholder="e.g. DTDC, Blue Dart, Delhivery"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">AWB / Tracking Number *</label><input id="dp-awb" class="form-input" placeholder="e.g. 1234567890"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Dispatch Date</label><input id="dp-date" type="date" class="form-input" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Tracking URL <span style="font-weight:400;color:#94a3b8;font-size:10px;">(optional)</span></label><input id="dp-url" class="form-input" placeholder="https://..."></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
     +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
-    +'<button onclick="saveDispatchRecord(\''+id+'\',\''+cname+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">🚚 Save & Notify Customer</button>'
+    +'<button onclick="saveDispatchRecord(\''+id+'\',\''+cname+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">🚚 Save & Notify</button>'
     +'</div></div>';
   openModal('modal-general');
 }
 async function saveDispatchRecord(id,cname,mob){
-  var courier=(document.getElementById('dp-courier')?.value||'').trim();
-  var awb=(document.getElementById('dp-awb')?.value||'').trim();
-  var date=document.getElementById('dp-date')?.value;
-  var url=(document.getElementById('dp-url')?.value||'').trim();
+  var courier=(document.getElementById('dp-courier')?.value||'').trim();var awb=(document.getElementById('dp-awb')?.value||'').trim();var date=document.getElementById('dp-date')?.value;var url=(document.getElementById('dp-url')?.value||'').trim();
   if(!courier||!awb){alert('Courier name and AWB number are required.');return;}
-  try{
-    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');
-    await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url,updated_at:new Date().toISOString()},'?id=eq.'+id);
-    closeModal('modal-general');renderSalesOrdersAdmin();
-    if(mob)salesWA_Dispatch(ord&&ord[0]?ord[0].order_no:'',cname,mob,courier,awb,date,url);
-  }catch(e){alert('Error: '+e.message);}
+  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(mob)salesWA_Dispatch(ord&&ord[0]?ord[0].order_no:'',cname,mob,courier,awb,date,url);}
+  catch(e){alert('Error: '+e.message);}
 }
-
 async function viewSalesOrder(id){
   try{
-    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id);
-    var o=ord&&ord[0];if(!o)return;
-    var items=o.items||[];
-    var col={inquiry:'#f59e0b',quoted:'#3b82f6',confirmed:'#8b5cf6',paid:'#10b981',dispatched:'#0ea5e9',done:'#9ca3af'}[o.status]||'#9ca3af';
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id);var o=ord&&ord[0];if(!o)return;
+    var items=o.items||[];var col={inquiry:'#f59e0b',quoted:'#3b82f6',confirmed:'#8b5cf6',paid:'#10b981',dispatched:'#0ea5e9',done:'#9ca3af'}[o.status]||'#9ca3af';
     document.getElementById('modal-general-title').textContent='Order — '+escHtml(o.order_no||'');
     var html='<div style="font-size:13px;line-height:1.9;">'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
@@ -14948,122 +14890,53 @@ async function viewSalesOrder(id){
       +'</div>'
       +(o.customer_address?'<div style="margin-bottom:10px;"><div style="font-size:11px;color:#94a3b8;">Delivery Address</div>'+escHtml(o.customer_address)+'</div>':'')
       +'<div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:10px;">';
-    items.forEach(function(it){
-      html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">'
-        +'<span>'+escHtml(it.name||'')+'  <span style="color:#94a3b8;">× '+it.qty+'</span></span>'
-        +'<b>₹'+parseFloat(it.price*it.qty).toLocaleString('en-IN')+'</b></div>';
-    });
+    items.forEach(function(it){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;"><span>'+escHtml(it.name||'')+'  <span style="color:#94a3b8;">× '+it.qty+'</span></span><b>₹'+parseFloat(it.price*it.qty).toLocaleString('en-IN')+'</b></div>';});
     html+='<div style="display:flex;justify-content:space-between;padding:6px 0 2px;font-size:11px;color:#6b7280;"><span>Subtotal (excl. GST)</span><span>₹'+parseFloat(o.subtotal||0).toLocaleString('en-IN')+'</span></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;"><span>GST</span><span>₹'+parseFloat(o.gst_amount||0).toLocaleString('en-IN')+'</span></div>'
-      +'<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:17px;font-weight:800;color:#1a56db;"><span>Total</span><span>₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'</span></div>'
-      +'</div>';
+      +'<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:17px;font-weight:800;color:#1a56db;"><span>Total</span><span>₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'</span></div></div>';
     if(o.payment_method)html+='<div style="margin-bottom:6px;"><span style="color:#94a3b8;font-size:11px;">Payment </span><b>'+escHtml(o.payment_method)+'</b>'+(o.payment_reference?' — '+escHtml(o.payment_reference):'')+(o.payment_date?' on '+o.payment_date:'')+'</div>';
     if(o.courier_name)html+='<div style="margin-bottom:6px;"><span style="color:#94a3b8;font-size:11px;">Courier </span><b>'+escHtml(o.courier_name)+' — AWB: '+escHtml(o.awb_number||'')+'</b>'+(o.dispatch_date?' on '+o.dispatch_date:'')+'</div>';
     if(o.tracking_url)html+='<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="color:#1a56db;font-size:13px;">🔗 Track Shipment</a><br>';
     if(o.notes)html+='<div style="margin-top:6px;"><span style="color:#94a3b8;font-size:11px;">Notes </span>'+escHtml(o.notes)+'</div>';
     html+='</div>';
-    document.getElementById('modal-general-body').innerHTML=html;
-    openModal('modal-general');
+    document.getElementById('modal-general-body').innerHTML=html;openModal('modal-general');
   }catch(e){alert('Error: '+e.message);}
 }
 
-// ── WhatsApp Functions (Professional English) ────────────────────────────────
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
 function _paymentBlock(orderNo,total){
-  var bp=BHAVI_PAYMENT;
-  var qr=getUpiQrUrl();
-  return '━━━━━━━━━━━━━━━━━━━━\n'
-    +'💳 *PAYMENT DETAILS*\n'
-    +'━━━━━━━━━━━━━━━━━━━━\n'
-    +(qr?'📱 *UPI QR Code (Scan & Pay):*\n'+qr+'\n_Scan with GPay, PhonePe, Paytm, BHIM_\n\n':'')
-    +'*Bank:* '+bp.bank+'\n'
-    +'*Account Name:* '+bp.name+'\n'
-    +'*Account No:* `'+bp.account+'`\n'
-    +'*Account Type:* '+bp.type+'\n'
-    +'*IFSC Code:* `'+bp.ifsc+'`\n'
-    +'*Branch:* '+bp.branch+'\n\n'
+  var bp=BHAVI_PAYMENT;var qr=window._upiQrUrl;
+  return '━━━━━━━━━━━━━━━━━━━━\n💳 *PAYMENT DETAILS*\n━━━━━━━━━━━━━━━━━━━━\n'
+    +(qr?'📱 *UPI QR Code — Scan & Pay instantly:*\n'+qr+'\n_Tap the link above, screenshot and scan with GPay / PhonePe / Paytm / BHIM_\n\n':'')
+    +'*Bank:* '+bp.bank+'\n*Account Name:* '+bp.name+'\n*Account No:* `'+bp.account+'`\n*Account Type:* '+bp.type+'\n*IFSC Code:* `'+bp.ifsc+'`\n*Branch:* '+bp.branch+'\n\n'
     +'✅ UPI / GPay / PhonePe / Paytm / BHIM also accepted\n\n'
-    +'*Order Ref:* '+orderNo+'\n'
-    +'*Amount Due:* ₹'+parseFloat(total).toLocaleString('en-IN')+' *(100% Advance)*\n'
-    +'━━━━━━━━━━━━━━━━━━━━\n'
+    +'*Order Ref:* '+orderNo+'\n*Amount Due:* ₹'+parseFloat(total).toLocaleString('en-IN')+' *(100% Advance)*\n━━━━━━━━━━━━━━━━━━━━\n'
     +'After payment, please share the transaction screenshot or UTR number.';
 }
 
 async function salesWA_Brochure(orderId,mob){
-  try{
-    var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=order_no,customer_name');
-    var o=ord&&ord[0]?ord[0]:{};
-    var shopUrl=window.location.origin+window.location.pathname+'?shop';
-    var msg='Dear '+escHtml(o.customer_name||'Valued Customer')+',\n\n'
-      +'Thank you for your interest in Bhavi Electronics! 🙏\n\n'
-      +'Please visit our online product catalog to browse all available products and place your order:\n\n'
-      +'🛍️ *Bhavi Electronics — Online Shop*\n🔗 '+shopUrl+'\n\n'
-      +'✅ Easy online ordering\n✅ 100% Advance Payment\n✅ GST Invoice provided\n✅ Fast & secure dispatch\n\n'
-      +'For any assistance, feel free to contact us.\n\n'
-      +'Warm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_';
-    _waOpen(mob,msg);
-  }catch(e){alert(e.message);}
+  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=customer_name');var o=ord&&ord[0]?ord[0]:{};var shopUrl=window.location.origin+window.location.pathname+'?shop';
+    _waOpen(mob,'Dear '+(o.customer_name||'Valued Customer')+',\n\nThank you for your interest in Bhavi Electronics! 🙏\n\nPlease visit our online product catalog to browse all available products and place your order:\n\n🛍️ *Bhavi Electronics — Online Shop*\n🔗 '+shopUrl+'\n\n✅ Easy online ordering | 100% Advance | GST Invoice | Fast Dispatch\n\nWarm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_');}
+  catch(e){alert(e.message);}
 }
-
 async function salesWA_Quote(orderId,cname,mob,total){
   try{
     var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=order_no,items,total_amount');
-    var o=ord&&ord[0]?ord[0]:{};
-    var items=o.items||[];var orderNo=o.order_no||orderId.slice(0,8);var amt=o.total_amount||total;
+    var o=ord&&ord[0]?ord[0]:{};var items=o.items||[];var orderNo=o.order_no||orderId.slice(0,8);var amt=o.total_amount||total;
     var lines=items.map(function(i){return '  • '+i.name+(i.qty>1?' × '+i.qty:'')+' — ₹'+parseFloat(i.price*i.qty).toLocaleString('en-IN');}).join('\n');
-    var msg='Dear '+escHtml(cname||'Valued Customer')+',\n\n'
-      +'Please find your quotation from *Bhavi Electronics*.\n\n'
-      +'📋 *QUOTATION*\n'
-      +'Order Ref: *'+orderNo+'*\n'
-      +'Date: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'\n\n'
-      +'*Items:*\n'+lines+'\n\n'
-      +'💰 *Total: ₹'+parseFloat(amt).toLocaleString('en-IN')+'* _(All taxes included)_\n\n'
-      +_paymentBlock(orderNo,amt)+'\n\n'
-      +'Warm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_';
-    _waOpen(mob,msg);
+    _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\nPlease find your quotation from *Bhavi Electronics*.\n\n📋 *QUOTATION*\nOrder Ref: *'+orderNo+'*\nDate: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'\n\n*Items:*\n'+lines+'\n\n💰 *Total: ₹'+parseFloat(amt).toLocaleString('en-IN')+'* _(All taxes included)_\n\n'+_paymentBlock(orderNo,amt)+'\n\nWarm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_');
   }catch(e){alert(e.message);}
 }
-
 function salesWA_PaymentDetails(cname,mob,total,orderNo){
-  var msg='Dear '+escHtml(cname||'Valued Customer')+',\n\n'
-    +'Kindly find the payment details below to proceed with your order.\n\n'
-    +_paymentBlock(orderNo,total)+'\n\n'
-    +'Once payment is received, we will confirm your order immediately and begin processing.\n\n'
-    +'Thank you for choosing Bhavi Electronics! 🙏\n'
-    +'_Where Customer Delight is First_';
-  _waOpen(mob,msg);
+  _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\nKindly find the payment details below to proceed with your order.\n\n'+_paymentBlock(orderNo,total)+'\n\nOnce payment is received, we will confirm your order immediately.\n\nThank you for choosing Bhavi Electronics! 🙏\n_Where Customer Delight is First_');
 }
-
 function salesWA_PaymentConfirm(orderNo,cname,mob,total,method,ref){
-  var msg='Dear '+escHtml(cname||'Valued Customer')+',\n\n'
-    +'✅ *Payment Received — Order Confirmed*\n\n'
-    +'We are pleased to confirm receipt of your payment.\n\n'
-    +'📦 *Order No:* '+orderNo+'\n'
-    +'💰 *Amount Paid:* ₹'+parseFloat(total).toLocaleString('en-IN')+'\n'
-    +'💳 *Payment Method:* '+method+(ref?'\n🔢 *Reference No:* '+ref:'')+'\n'
-    +'📅 *Date:* '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'\n\n'
-    +'Your order is confirmed and being prepared for dispatch. Tracking details will be shared once your order is shipped.\n\n'
-    +'For any queries, feel free to contact us: 📞 *Bhavi Electronics*'+(window._companyInfo?.phone?' — '+window._companyInfo.phone:'')+'\n\n'
-    +'Thank you for choosing Bhavi Electronics! 🙏\n'
-    +'_Where Customer Delight is First_';
-  _waOpen(mob,msg);
+  var ci=window._companyInfo||{};
+  _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\n✅ *Payment Received — Order Confirmed*\n\nWe are pleased to confirm receipt of your payment.\n\n📦 *Order No:* '+orderNo+'\n💰 *Amount Paid:* ₹'+parseFloat(total).toLocaleString('en-IN')+'\n💳 *Payment Method:* '+method+(ref?'\n🔢 *Reference No:* '+ref:'')+'\n📅 *Date:* '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'\n\nYour order is confirmed and will be dispatched soon. Tracking details will follow.\n\nFor queries, contact us: 📞 *Bhavi Electronics*'+(ci.phone?' — '+ci.phone:'')+'\n\nThank you for choosing Bhavi Electronics! 🙏\n_Where Customer Delight is First_');
 }
-
 function salesWA_Dispatch(orderNo,cname,mob,courier,awb,date,trackUrl){
   var ci=window._companyInfo||{};
-  var phone=ci.phone||'';
-  var msg='Dear '+escHtml(cname||'Valued Customer')+',\n\n'
-    +'🚚 *Your Order Has Been Dispatched!*\n\n'
-    +'📦 *Order No:* '+orderNo+'\n'
-    +'🏢 *Courier:* '+courier+'\n'
-    +'🔢 *AWB / Tracking No:* *'+awb+'*\n'
-    +'📅 *Dispatch Date:* '+date+'\n'
-    +(trackUrl?'🔗 *Track your shipment:* '+trackUrl+'\n':'')+'\n'
-    +'Estimated delivery: *1–2 working days*.\n\n'
-    +'For any queries, please contact us:\n'
-    +'📞 *Bhavi Electronics*'+(phone?' — '+phone:'')+'\n\n'
-    +'Thank you for shopping with Bhavi Electronics! 🙏\n'
-    +'_Where Customer Delight is First_';
-  _waOpen(mob,msg);
+  _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\n🚚 *Your Order Has Been Dispatched!*\n\n📦 *Order No:* '+orderNo+'\n🏢 *Courier:* '+courier+'\n🔢 *AWB / Tracking No:* *'+awb+'*\n📅 *Dispatch Date:* '+date+'\n'+(trackUrl?'🔗 *Track:* '+trackUrl+'\n':'')+'\nEstimated delivery: *1–2 working days*.\n\nFor queries, contact us: 📞 *Bhavi Electronics*'+(ci.phone?' — '+ci.phone:'')+'\n\nThank you for shopping with Bhavi Electronics! 🙏\n_Where Customer Delight is First_');
 }
 
 // ── Public Shop ───────────────────────────────────────────────────────────────
@@ -15072,17 +14945,10 @@ async function loadPublicShop(container){
   var ci={};try{var r=await sb('company_info','GET',null,'?id=eq.1');ci=(r&&r[0])||{};window._companyInfo=ci;}catch(e){}
   var logoHtml=ci.logo_data?'<img src="'+ci.logo_data+'" style="max-height:44px;max-width:150px;object-fit:contain;">'
     :'<span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:0.5px;">Bhavi Electronics</span>';
-  container.innerHTML=
-    '<div style="background:#1a56db;padding:0 16px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2);">'
-    +logoHtml
-    +'<button id="shop-cart-badge" onclick="toggleShopCart()" style="background:#fff;color:#1a56db;border:none;border-radius:20px;padding:7px 16px;font-size:14px;font-weight:700;cursor:pointer;">🛒 Cart (0)</button>'
-    +'</div>'
+  container.innerHTML='<div style="background:#1a56db;padding:0 16px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2);">'+logoHtml+'<button id="shop-cart-badge" onclick="toggleShopCart()" style="background:#fff;color:#1a56db;border:none;border-radius:20px;padding:7px 16px;font-size:14px;font-weight:700;cursor:pointer;">🛒 Cart (0)</button></div>'
     +'<div id="shop-cart-panel" style="display:none;background:#fff;border-bottom:2px solid #e2e8f0;padding:16px;"></div>'
-    +'<div style="max-width:960px;margin:0 auto;padding:20px 16px;">'
-    +'<h2 style="font-size:20px;font-weight:800;margin:0 0 4px;color:#111;">Our Products</h2>'
-    +'<p style="font-size:13px;color:#6b7280;margin:0 0 18px;">Browse products, add to cart, and place your order.</p>'
-    +'<div id="shop-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:16px;"></div>'
-    +'</div>'
+    +'<div style="max-width:960px;margin:0 auto;padding:20px 16px;"><h2 style="font-size:20px;font-weight:800;margin:0 0 4px;color:#111;">Our Products</h2><p style="font-size:13px;color:#6b7280;margin:0 0 18px;">Browse products, add to cart, and place your order.</p>'
+    +'<div id="shop-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:16px;"></div></div>'
     +'<div id="shop-order-form" style="display:none;max-width:500px;margin:24px auto 40px;background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 20px rgba(0,0,0,0.1);"></div>';
   _shopCart=[];
   try{_shopProds=await sb('sales_products','GET',null,'?is_active=eq.true&stock_status=eq.available&order=name.asc')||[];}catch(e){_shopProds=[];}
@@ -15095,34 +14961,27 @@ function renderShopProducts(){
     return '<div style="background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;display:flex;flex-direction:column;">'
       +(p.image_url?'<img src="'+escHtml(p.image_url)+'" onclick="shopViewProduct('+i+')" style="width:100%;height:150px;object-fit:cover;cursor:pointer;">'
         :'<div onclick="shopViewProduct('+i+')" style="width:100%;height:110px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer;">📦</div>')
-      +'<div style="padding:12px;flex:1;display:flex;flex-direction:column;">'
-      +'<div onclick="shopViewProduct('+i+')" style="cursor:pointer;flex:1;">'
+      +'<div style="padding:12px;flex:1;display:flex;flex-direction:column;"><div onclick="shopViewProduct('+i+')" style="cursor:pointer;flex:1;">'
       +'<div style="font-size:13px;font-weight:700;color:#111;margin-bottom:2px;line-height:1.4;">'+escHtml(p.name)+'</div>'
       +(p.model?'<div style="font-size:11px;color:#6b7280;">'+escHtml(p.model)+'</div>':'')
-      +'</div>'
-      +'<div style="margin-top:8px;">'
-      +'<div style="font-size:18px;font-weight:800;color:#1a56db;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
+      +'</div><div style="margin-top:8px;"><div style="font-size:18px;font-weight:800;color:#1a56db;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
       +'<div style="font-size:11px;color:#10b981;margin-bottom:8px;">✅ All taxes included</div>'
-      +'<button onclick="shopAddToCart('+i+')" style="width:100%;background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;">+ Add to Cart</button>'
-      +'</div></div></div>';
+      +'<button onclick="shopAddToCart('+i+')" style="width:100%;background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;">+ Add to Cart</button></div></div></div>';
   }).join('');
 }
 function shopViewProduct(idx){
   var p=_shopProds[idx];if(!p)return;
   var ex=document.getElementById('shop-prod-overlay');if(ex)ex.remove();
   var feats=(p.features||[]).filter(Boolean);var specs=p.specifications||{};
-  var overlay=document.createElement('div');
-  overlay.id='shop-prod-overlay';
+  var overlay=document.createElement('div');overlay.id='shop-prod-overlay';
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';
-  overlay.innerHTML=
-    '<div id="shop-prod-modal" style="background:#fff;border-radius:16px;max-width:500px;width:100%;margin-top:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+  overlay.innerHTML='<div id="shop-prod-modal" style="background:#fff;border-radius:16px;max-width:500px;width:100%;margin-top:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
     +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:280px;object-fit:cover;">'
       :'<div style="width:100%;height:120px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;font-size:52px;">📦</div>')
-    +'<div style="padding:20px;">'
-    +'<h2 style="margin:0 0 4px;font-size:18px;font-weight:800;color:#111;">'+escHtml(p.name)+'</h2>'
-    +(p.model?'<div style="font-size:12px;color:#6b7280;margin-bottom:10px;">Model: '+escHtml(p.model)+(p.category?' &nbsp;|&nbsp; '+escHtml(p.category):'')+'</div>':'')
+    +'<div style="padding:20px;"><h2 style="margin:0 0 4px;font-size:18px;font-weight:800;color:#111;">'+escHtml(p.name)+'</h2>'
+    +(p.model?'<div style="font-size:12px;color:#6b7280;margin-bottom:10px;">Model: '+escHtml(p.model)+(p.category?' | '+escHtml(p.category):'')+'</div>':'')
     +'<div style="font-size:26px;font-weight:800;color:#1a56db;margin-bottom:4px;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
-    +'<div style="font-size:12px;color:#10b981;margin-bottom:14px;">✅ Inclusive of all taxes &nbsp;|&nbsp; 100% Advance Payment</div>'
+    +'<div style="font-size:12px;color:#10b981;margin-bottom:14px;">✅ Inclusive of all taxes | 100% Advance Payment</div>'
     +(p.description?'<p style="font-size:13px;color:#475569;margin:0 0 14px;line-height:1.6;">'+escHtml(p.description)+'</p>':'')
     +(feats.length?'<div style="margin-bottom:14px;"><b style="font-size:13px;display:block;margin-bottom:6px;">Key Features</b><ul style="margin:0;padding-left:20px;">'+feats.map(function(f){return '<li style="font-size:13px;color:#374151;margin-bottom:4px;">'+escHtml(f)+'</li>';}).join('')+'</ul></div>':'')
     +(Object.keys(specs).length?'<div style="margin-bottom:16px;"><b style="font-size:13px;display:block;margin-bottom:6px;">Specifications</b><div style="background:#f8fafc;border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;">'+Object.entries(specs).map(function(kv){return '<div style="font-size:12px;color:#6b7280;">'+escHtml(kv[0])+'</div><div style="font-size:12px;font-weight:600;color:#111;">'+escHtml(kv[1])+'</div>';}).join('')+'</div></div>':'')
@@ -15133,19 +14992,8 @@ function shopViewProduct(idx){
   overlay.addEventListener('click',function(e){var m=document.getElementById('shop-prod-modal');if(m&&!m.contains(e.target))overlay.remove();});
   document.body.appendChild(overlay);
 }
-function shopAddToCartFromOverlay(idx){
-  shopAddToCart(idx);
-  var btn=document.getElementById('shop-atc-btn-'+idx);
-  if(btn){btn.textContent='✅ Added!';btn.style.background='#10b981';setTimeout(function(){document.getElementById('shop-prod-overlay')?.remove();},700);}
-}
-function shopAddToCart(idx){
-  var p=_shopProds[idx];if(!p)return;
-  var ex=_shopCart.find(function(c){return c.id===p.id;});
-  if(ex){ex.qty++;}else{_shopCart.push({id:p.id,name:p.name,model:p.model||'',price:p.price,gst_percent:p.gst_percent||18,qty:1});}
-  updateCartBadge();
-  var b=document.getElementById('shop-cart-badge');
-  if(b){b.style.background='#10b981';setTimeout(function(){b.style.background='#fff';},500);}
-}
+function shopAddToCartFromOverlay(idx){shopAddToCart(idx);var btn=document.getElementById('shop-atc-btn-'+idx);if(btn){btn.textContent='✅ Added!';btn.style.background='#10b981';setTimeout(function(){document.getElementById('shop-prod-overlay')?.remove();},700);}}
+function shopAddToCart(idx){var p=_shopProds[idx];if(!p)return;var ex=_shopCart.find(function(c){return c.id===p.id;});if(ex){ex.qty++;}else{_shopCart.push({id:p.id,name:p.name,model:p.model||'',price:p.price,gst_percent:p.gst_percent||18,qty:1});}updateCartBadge();var b=document.getElementById('shop-cart-badge');if(b){b.style.background='#10b981';setTimeout(function(){b.style.background='#fff';},500);}}
 function updateCartBadge(){var b=document.getElementById('shop-cart-badge');if(b)b.textContent='🛒 Cart ('+_shopCart.reduce(function(s,c){return s+c.qty;},0)+')';}
 function toggleShopCart(){var p=document.getElementById('shop-cart-panel');if(!p)return;p.style.display=p.style.display==='none'?'block':'none';if(p.style.display==='block')renderCartPanel();}
 function renderCartPanel(){
@@ -15153,23 +15001,8 @@ function renderCartPanel(){
   if(!_shopCart.length){panel.innerHTML='<div style="max-width:960px;margin:0 auto;text-align:center;color:#94a3b8;padding:16px;">Your cart is empty.</div>';return;}
   var total=_shopCart.reduce(function(s,c){return s+c.price*c.qty;},0);
   var html='<div style="max-width:960px;margin:0 auto;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">🛒 Shopping Cart</div>';
-  _shopCart.forEach(function(c,i){
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'
-      +'<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+escHtml(c.name)+'</div>'+(c.model?'<div style="font-size:11px;color:#94a3b8;">'+escHtml(c.model)+'</div>':'')+'</div>'
-      +'<div style="display:flex;align-items:center;gap:4px;background:#f8fafc;border-radius:8px;padding:4px;">'
-      +'<button onclick="shopQtyChange('+i+',-1)" style="background:none;border:none;width:26px;height:26px;cursor:pointer;font-size:17px;font-weight:700;">−</button>'
-      +'<span style="width:24px;text-align:center;font-weight:700;">'+c.qty+'</span>'
-      +'<button onclick="shopQtyChange('+i+',1)" style="background:none;border:none;width:26px;height:26px;cursor:pointer;font-size:17px;font-weight:700;">+</button>'
-      +'</div>'
-      +'<div style="min-width:70px;text-align:right;font-weight:700;color:#1a56db;">₹'+parseFloat(c.price*c.qty).toLocaleString('en-IN')+'</div>'
-      +'<button onclick="shopRemoveCart('+i+')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">Remove</button>'
-      +'</div>';
-  });
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid #e2e8f0;">'
-    +'<div><div style="font-size:18px;font-weight:800;">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</div>'
-    +'<div style="font-size:11px;color:#10b981;">All taxes included</div></div>'
-    +'<button onclick="shopPlaceOrder()" style="background:#1a56db;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;">Proceed to Order →</button>'
-    +'</div></div>';
+  _shopCart.forEach(function(c,i){html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;"><div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+escHtml(c.name)+'</div>'+(c.model?'<div style="font-size:11px;color:#94a3b8;">'+escHtml(c.model)+'</div>':'')+'</div><div style="display:flex;align-items:center;gap:4px;background:#f8fafc;border-radius:8px;padding:4px;"><button onclick="shopQtyChange('+i+',-1)" style="background:none;border:none;width:26px;height:26px;cursor:pointer;font-size:17px;font-weight:700;">−</button><span style="width:24px;text-align:center;font-weight:700;">'+c.qty+'</span><button onclick="shopQtyChange('+i+',1)" style="background:none;border:none;width:26px;height:26px;cursor:pointer;font-size:17px;font-weight:700;">+</button></div><div style="min-width:70px;text-align:right;font-weight:700;color:#1a56db;">₹'+parseFloat(c.price*c.qty).toLocaleString('en-IN')+'</div><button onclick="shopRemoveCart('+i+')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;">Remove</button></div>';});
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:2px solid #e2e8f0;"><div><div style="font-size:18px;font-weight:800;">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</div><div style="font-size:11px;color:#10b981;">All taxes included</div></div><button onclick="shopPlaceOrder()" style="background:#1a56db;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;">Proceed to Order →</button></div></div>';
   panel.innerHTML=html;
 }
 function shopQtyChange(i,d){_shopCart[i].qty+=d;if(_shopCart[i].qty<1)_shopCart[i].qty=1;updateCartBadge();renderCartPanel();}
@@ -15179,75 +15012,30 @@ async function shopPlaceOrder(){
   var form=document.getElementById('shop-order-form');if(!form)return;
   form.style.display='block';
   var total=_shopCart.reduce(function(s,c){return s+c.price*c.qty;},0);
-  form.innerHTML='<h3 style="margin:0 0 4px;font-size:17px;font-weight:800;">Complete Your Order</h3>'
-    +'<p style="font-size:13px;color:#6b7280;margin:0 0 16px;">Enter your details to place the order.</p>'
+  form.innerHTML='<h3 style="margin:0 0 4px;font-size:17px;font-weight:800;">Complete Your Order</h3><p style="font-size:13px;color:#6b7280;margin:0 0 16px;">Enter your details to place the order.</p>'
     +'<div style="display:flex;flex-direction:column;gap:12px;">'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Full Name *</label><input id="shop-name" style="width:100%;padding:11px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;" placeholder="Enter your full name"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Mobile Number * (10 digits)</label><input id="shop-mob" type="tel" style="width:100%;padding:11px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;" placeholder="e.g. 9876543210"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Delivery Address *</label><textarea id="shop-addr" rows="3" style="width:100%;padding:11px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;resize:none;" placeholder="Full delivery address with city and PIN code"></textarea></div>'
-    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;line-height:1.7;">'
-    +'<b>📋 Order Summary</b><br>'
-    +_shopCart.map(function(c){return escHtml(c.name)+' ×'+c.qty+' — ₹'+parseFloat(c.price*c.qty).toLocaleString('en-IN');}).join('<br>')
-    +'<br><b>Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</b> (All taxes included)'
-    +'</div>'
-    +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:12px;color:#166534;line-height:1.7;">'
-    +'⚠️ <b>Payment Note:</b> 100% advance payment is required. After submitting your order, our team will contact you within 24 hours with payment instructions.'
-    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Delivery Address *</label><textarea id="shop-addr" rows="3" style="width:100%;padding:11px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;resize:none;" placeholder="Full address with city and PIN code"></textarea></div>'
+    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;line-height:1.7;"><b>📋 Order Summary</b><br>'+_shopCart.map(function(c){return escHtml(c.name)+' ×'+c.qty+' — ₹'+parseFloat(c.price*c.qty).toLocaleString('en-IN');}).join('<br>')+'<br><b>Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</b> (All taxes included)</div>'
+    +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:12px;color:#166534;line-height:1.7;">⚠️ <b>Payment Note:</b> 100% advance payment required. Our team will contact you within 24 hours with payment instructions.</div>'
     +'<button onclick="shopSubmitOrder()" style="background:#10b981;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;width:100%;">✅ Place Order</button>'
     +'<button onclick="document.getElementById(\'shop-order-form\').style.display=\'none\';document.getElementById(\'shop-cart-panel\').style.display=\'block\';renderCartPanel();" style="background:#f1f5f9;color:#475569;border:none;border-radius:10px;padding:10px;cursor:pointer;width:100%;font-size:13px;">← Back to Cart</button>'
     +'</div>';
   form.scrollIntoView({behavior:'smooth',block:'start'});
 }
 window.shopSubmitOrder=async function(){
-  var name=(document.getElementById('shop-name')?.value||'').trim();
-  var mob=(document.getElementById('shop-mob')?.value||'').replace(/\D/g,'');
-  var addr=(document.getElementById('shop-addr')?.value||'').trim();
-  if(!name){alert('Please enter your full name.');return;}
-  if(mob.length!==10){alert('Please enter a valid 10-digit mobile number.');return;}
-  if(!addr){alert('Please enter your delivery address.');return;}
-  if(!_shopCart.length){alert('Your cart is empty. Please add items before placing an order.');return;}
+  var name=(document.getElementById('shop-name')?.value||'').trim();var mob=(document.getElementById('shop-mob')?.value||'').replace(/\D/g,'');var addr=(document.getElementById('shop-addr')?.value||'').trim();
+  if(!name){alert('Please enter your full name.');return;}if(mob.length!==10){alert('Please enter a valid 10-digit mobile number.');return;}if(!addr){alert('Please enter your delivery address.');return;}if(!_shopCart.length){alert('Your cart is empty.');return;}
   var items=_shopCart.map(function(c){return{product_id:c.id,name:c.name,model:c.model,price:c.price,gst_percent:c.gst_percent||18,qty:c.qty};});
-  var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
-  var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
-  var data={order_no:genOrderNo(),customer_name:name,customer_mobile:mob,customer_address:addr,
-    items:items,subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,
-    status:'inquiry',created_by:'Online Shop',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
+  var data={order_no:genOrderNo(),customer_name:name,customer_mobile:mob,customer_address:addr,items:items,subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,status:'inquiry',created_by:'Online Shop',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   try{
-    await sb('sales_orders','POST',data);
-    _shopCart=[];updateCartBadge();
-    document.getElementById('shop-order-form').innerHTML=
-      '<div style="text-align:center;padding:32px 20px;">'
-      +'<div style="font-size:56px;margin-bottom:14px;">🎉</div>'
-      +'<h2 style="color:#10b981;margin:0 0 8px;font-size:22px;">Order Placed Successfully!</h2>'
-      +'<p style="color:#6b7280;font-size:14px;margin:0 0 6px;">Order No: <b style="color:#111;">'+escHtml(data.order_no)+'</b></p>'
-      +'<p style="color:#6b7280;font-size:14px;margin:0 0 16px;">Total: <b style="color:#1a56db;font-size:16px;">₹'+Math.round(total).toLocaleString('en-IN')+'</b></p>'
-      +'<div style="background:#f0fdf4;border-radius:10px;padding:14px;font-size:13px;color:#166534;margin-bottom:16px;text-align:left;line-height:1.8;">'
-      +'<b>What happens next?</b><br>'
-      +'✅ Your order has been received.<br>'
-      +'📞 We will contact you within 24 hours on <b>'+mob+'</b>.<br>'
-      +'💳 Payment details will be shared via WhatsApp.<br>'
-      +'🚚 Order dispatched after payment confirmation.'
-      +'</div>'
-      +'<p style="color:#9ca3af;font-size:12px;">Thank you for choosing <b>Bhavi Electronics</b><br><i>Where Customer Delight is First</i></p>'
-      +'</div>';
+    await sb('sales_orders','POST',data);_shopCart=[];updateCartBadge();
+    document.getElementById('shop-order-form').innerHTML='<div style="text-align:center;padding:32px 20px;"><div style="font-size:56px;margin-bottom:14px;">🎉</div><h2 style="color:#10b981;margin:0 0 8px;font-size:22px;">Order Placed Successfully!</h2><p style="color:#6b7280;font-size:14px;margin:0 0 6px;">Order No: <b style="color:#111;">'+escHtml(data.order_no)+'</b></p><p style="color:#6b7280;font-size:14px;margin:0 0 16px;">Total: <b style="color:#1a56db;font-size:16px;">₹'+Math.round(total).toLocaleString('en-IN')+'</b></p><div style="background:#f0fdf4;border-radius:10px;padding:14px;font-size:13px;color:#166534;margin-bottom:16px;text-align:left;line-height:1.8;"><b>What happens next?</b><br>✅ Your order has been received.<br>📞 We will contact you within 24 hours on <b>'+mob+'</b>.<br>💳 Payment details will be shared via WhatsApp.<br>🚚 Order dispatched after payment confirmation.</div><p style="color:#9ca3af;font-size:12px;">Thank you for choosing <b>Bhavi Electronics</b><br><i>Where Customer Delight is First</i></p></div>';
   }catch(e){alert('Unable to place order. Please try again.\nError: '+e.message);}
 };
 // ===== END SALES MODULE =====
-
-async function saveShiftSetting(empId, empName, empRole){
-  var row=document.getElementById('shift-row-'+empId);if(!row)return;
-  var start=row.querySelector('.ss-start')?.value||'09:30';
-  var end=row.querySelector('.ss-end')?.value||'18:30';
-  var off=row.querySelector('.ss-off')?.value||'Sunday';
-  try{
-    await sb('shift_settings','POST',{emp_id:empId,emp_name:empName,emp_role:empRole,shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()});
-    alert('✅ Shift saved!');
-  }catch(e){
-    // Try PATCH if POST fails (duplicate key)
-    try{await sb('shift_settings','PATCH',{shift_start:start,shift_end:end,weekly_off:off,updated_at:new Date().toISOString()},'?emp_id=eq.'+encodeURIComponent(empId));alert('✅ Shift updated!');}
-    catch(e2){alert('Error: '+e2.message);}
-  }
-}
 </script>
 </body>
 </html>
