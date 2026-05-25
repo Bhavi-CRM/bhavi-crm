@@ -9193,7 +9193,11 @@ async function renderCourier(){
 
   var today=new Date().toLocaleDateString('en-CA');
   var allEntries=[];
-  try{allEntries=await sb('courier_log','GET',null,'?order=entry_date.desc,created_at.desc&limit=50');}catch(e){}
+  try{
+    var isWCUser=(currentUser.role_type==='work_controller'||currentUser.role==='work_controller');
+    var courierQ=isWCUser?'?wc_id=eq.'+encodeURIComponent(currentUser.user_id)+'&order=entry_date.desc,created_at.desc&limit=200':'?order=entry_date.desc,created_at.desc&limit=50';
+    allEntries=await sb('courier_log','GET',null,courierQ);
+  }catch(e){}
 
   pc.innerHTML=`
   <div class="card" style="margin-bottom:14px;">
