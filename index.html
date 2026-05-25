@@ -6194,11 +6194,7 @@ function openSignature(id){
 function initSig(){sigCanvas=document.getElementById('sig-canvas');sigCtx=sigCanvas.getContext('2d');sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.strokeStyle='#1a56db';sigCtx.lineWidth=2;sigCtx.lineCap='round';sigCanvas.onmousedown=e=>{sigDrawing=true;const r=sigCanvas.getBoundingClientRect();sigCtx.beginPath();sigCtx.moveTo(e.clientX-r.left,e.clientY-r.top);};sigCanvas.onmousemove=e=>{if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();sigCtx.lineTo(e.clientX-r.left,e.clientY-r.top);sigCtx.stroke();};sigCanvas.onmouseup=()=>sigDrawing=false;sigCanvas.ontouchstart=e=>{e.preventDefault();sigDrawing=true;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.beginPath();sigCtx.moveTo(t.clientX-r.left,t.clientY-r.top);};sigCanvas.ontouchmove=e=>{e.preventDefault();if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.lineTo(t.clientX-r.left,t.clientY-r.top);sigCtx.stroke();};sigCanvas.ontouchend=()=>sigDrawing=false;}
 function clearSig(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);}}
 async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');
-  // Auto-offer WhatsApp feedback after signature
-  if(t&&t.mobile){
-    const sendNow=confirm('✅ Signature saved!\n\nCustomer ne WhatsApp par Feedback link moklo?\n\n'+t.cname+' ('+t.mobile+')');
-    if(sendNow)sendFeedbackWA(t.id,t.cname||'',t.mobile||'',t.assigned_name||'');
-  }else{alert('Signature saved! ✅');}
+  if(t&&t.mobile){const sendNow=confirm('✅ Signature saved!\n\nCustomer ne Google Review link WhatsApp par moklo?\n\n'+t.cname+' ('+t.mobile+')');if(sendNow)sendFeedbackWA(t.id,t.cname||'',t.mobile||'',t.assigned_name||'');}else{alert('Signature saved! ✅');}
 }catch(e){alert(e.message);}}
 
 // JOB SHEET PRINT - Point 12: no meter photos, has signature
@@ -7658,58 +7654,47 @@ async function renderFeedback(){
   var content=document.getElementById('page-content');
   content.innerHTML='<div style="padding:20px;max-width:1000px;margin:0 auto;">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
-    +'<h2 style="margin:0;font-size:20px;">⭐ Customer Feedback</h2></div>'
-    +'<div style="display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;margin-bottom:14px;width:fit-content;">'
-    +'<button id="fb-tab-received" class="tab active" onclick="switchFbTab(\'received\')">⭐ Received</button>'
-    +'<button id="fb-tab-pending" class="tab" onclick="switchFbTab(\'pending\')">⏳ Pending</button>'
-    +'</div>'
-    +'<div id="fb-received-panel">'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
-    +'<select id="fb-eng-filter" onchange="loadFeedback()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
-    +'<option value="">All Engineers</option></select>'
-    +'<input type="month" id="fb-month" value="'+new Date().toLocaleDateString('en-CA').slice(0,7)+'" onchange="loadFeedback()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
-    +'</div>'
-    +'<div id="fb-summary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;"></div>'
-    +'<div id="fb-list">Loading...</div>'
-    +'</div>'
-    +'<div id="fb-pending-panel" style="display:none;"><div id="fb-pending-list">Loading...</div></div>'
+    +'<h2 style="margin:0;font-size:20px;">⭐ Google Review Tracker</h2></div>'
+    +'<div id="fb-pending-list"><div class="loading">Loading...</div></div>'
     +'</div>';
-  try{
-    var engs=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&select=user_id,name&order=name');
-    var sel=document.getElementById('fb-eng-filter');
-    if(sel)(engs||[]).forEach(function(e){sel.innerHTML+='<option value="'+e.user_id+'">'+e.name+'</option>';});
-  }catch(e){}
-  await loadFeedback();
-}
-function switchFbTab(tab){
-  document.getElementById('fb-tab-received').className='tab'+(tab==='received'?' active':'');
-  document.getElementById('fb-tab-pending').className='tab'+(tab==='pending'?' active':'');
-  document.getElementById('fb-received-panel').style.display=tab==='received'?'block':'none';
-  document.getElementById('fb-pending-panel').style.display=tab==='pending'?'block':'none';
-  if(tab==='pending')loadFeedbackPending();
+  await loadFeedbackPending();
 }
 async function loadFeedbackPending(){
   var el=document.getElementById('fb-pending-list');
   if(!el)return;
   el.innerHTML='<div class="loading">Loading...</div>';
   try{
-    // Closed tickets in last 90 days without feedback_sent_at
     var d90=new Date();d90.setDate(d90.getDate()-90);
-    var rows=await sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+d90.toLocaleDateString('en-CA')+'&feedback_sent_at=is.null&select=id,cname,mobile,assigned_name,updated_at,feedback_sent_at&order=updated_at.desc&limit=200');
-    if(!rows||!rows.length){el.innerHTML='<div style="text-align:center;padding:40px;color:#10b981;font-size:15px;">✅ Badha closed tickets ne feedback link moklayi gayo chhe!</div>';return;}
-    el.innerHTML='<div style="margin-bottom:10px;font-size:13px;color:#6b7280;">'+rows.length+' closed tickets — feedback link moklayo nathi</div>'
-      +'<div style="display:grid;gap:8px;">'
-      +rows.map(function(r){
-        var mob=(r.mobile||'').replace(/\D/g,'');
+    var [pendingRows,sentRows]=await Promise.all([
+      sb('tickets','GET',null,'?status=eq.Closed&updated_at=gte.'+d90.toLocaleDateString('en-CA')+'&feedback_sent_at=is.null&select=id,cname,mobile,assigned_name,updated_at&order=updated_at.desc&limit=200'),
+      sb('tickets','GET',null,'?status=eq.Closed&feedback_sent_at=not.is.null&select=id,cname,mobile,assigned_name,feedback_sent_at,updated_at&order=feedback_sent_at.desc&limit=100')
+    ]);
+    var pendHtml='<div style="display:grid;gap:8px;">'
+      +(pendingRows&&pendingRows.length?pendingRows.map(function(r){
         var safeN=(r.cname||'').replace(/'/g,'').replace(/`/g,'');
         var safeE=(r.assigned_name||'').replace(/'/g,'');
-        return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+        return '<div style="background:#fff;border:1px solid #fee2e2;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
           +'<div><div style="font-weight:700;font-size:13px;">'+escHtml(r.cname||'')+'</div>'
           +'<div style="font-size:11px;color:#6b7280;">📞 '+escHtml(r.mobile||'')+' | 👷 '+escHtml(r.assigned_name||'-')+'</div>'
           +'<div style="font-size:11px;color:#9ca3af;">Closed: '+(r.updated_at?r.updated_at.slice(0,10):'-')+'</div></div>'
           +'<button onclick="sendFeedbackWA(\''+r.id+'\',\''+safeN+'\',\''+r.mobile+'\',\''+safeE+'\')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">📲 Send WA</button>'
           +'</div>';
-      }).join('')+'</div>';
+      }).join(''):'<div style="text-align:center;padding:30px;color:#10b981;font-size:14px;">✅ Badha ne link moklayi gayu!</div>')
+      +'</div>';
+    var sentHtml=sentRows&&sentRows.length?'<div style="margin-top:20px;">'
+      +'<div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;">✅ Link moklayo (last 100)</div>'
+      +'<div style="display:grid;gap:6px;">'
+      +sentRows.map(function(r){return '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+        +'<div><div style="font-weight:600;font-size:13px;">'+escHtml(r.cname||'')+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">👷 '+escHtml(r.assigned_name||'-')+'</div></div>'
+        +'<div style="font-size:11px;color:#10b981;font-weight:600;">Sent: '+(r.feedback_sent_at?r.feedback_sent_at.slice(0,10):'-')+'</div>'
+        +'</div>';}).join('')
+      +'</div></div>':'';
+    var stats='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">'
+      +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">⏳</span><div><div style="font-size:18px;font-weight:700;color:#ef4444;">'+(pendingRows?pendingRows.length:0)+'</div><div style="font-size:11px;color:#6b7280;">Pending (90 days)</div></div></div>'
+      +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">✅</span><div><div style="font-size:18px;font-weight:700;color:#10b981;">'+(sentRows?sentRows.length:0)+'</div><div style="font-size:11px;color:#6b7280;">Link Moklayo</div></div></div>'
+      +'</div>';
+    el.innerHTML=stats+'<div style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:8px;">⏳ Pending — Link moklayo nathi (last 90 days)</div>'+pendHtml+sentHtml;
   }catch(e){el.innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
 }
 async function loadFeedback(){
@@ -7753,22 +7738,18 @@ async function loadFeedback(){
 }
 async function sendFeedbackWA(ticketId,customerName,mobile,engName){
   var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var fbUrl=window.location.href.split('?')[0]+'?feedback='+ticketId;
-  var googleReviewUrl='https://g.page/r/CSwQRPzeSL8QEAE/review';
   var msg='Dear *'+customerName+'*,\n\n'
     +'Thank you for choosing *'+(ci.name||'Bhavi Electronics')+'*! 🙏\n\n'
     +'Your service request has been completed by *'+(engName||'our engineer')+'*.\n\n'
-    +'⭐ *Rate Our Service (1-5 stars):*\n'
-    +fbUrl+'\n\n'
-    +'🌟 *Share Your Google Review:*\n'
-    +googleReviewUrl+'\n\n'
-    +'Your feedback motivates our team to serve you better!\n\n'
-    +'For any issues or queries, please call us:\n'
+    +'We would love to hear your experience! Please take a moment to share your review on Google:\n\n'
+    +'🌟 *Google Review:*\n'
+    +'https://g.page/r/CSwQRPzeSL8QEAE/review\n\n'
+    +'Your review motivates our team to serve you better!\n\n'
+    +'For any queries, please call us:\n'
     +'📞 *'+(ci.phone||'+91 9574004969')+'*';
   var mob=(mobile||'').replace(/\D/g,'');
   if(mob.length===10)mob='91'+mob;
   window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
-  // Track that feedback link was sent
   try{await sb('tickets','PATCH',{feedback_sent_at:new Date().toISOString(),feedback_sent_by:currentUser.name},'?id=eq.'+ticketId);}catch(e){}
 }
 // Public feedback form (shown when ?feedback=ticketId in URL)
