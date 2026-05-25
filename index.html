@@ -7741,17 +7741,6 @@ function sendFeedbackWA(ticketId,customerName,mobile,engName){
     window._fbRating=0;
   });
 })();
-(function(){
-  var p=new URLSearchParams(window.location.search);
-  if(!p.has('shop'))return;
-  window.addEventListener('DOMContentLoaded',function(){
-    ['sidebar','main'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
-    var ls=document.getElementById('login-screen');if(ls)ls.style.display='none';
-    document.body.style.margin='0';document.body.style.background='#f8fafc';
-    var d=document.createElement('div');d.id='shop-root';document.body.appendChild(d);
-    loadPublicShop(d);
-  });
-})();
 window.setFbStar=function(n){
   window._fbRating=n;
   document.querySelectorAll('#fb-stars span').forEach(function(s,i){s.textContent=i<n?'⭐':'☆';});
@@ -7769,6 +7758,27 @@ window.submitFeedback=async function(ticketId){
 };
 // ===== END MODULE 4 =====
 
+// ===== PUBLIC SHOP IIFE =====
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  if(!p.has('shop'))return;
+  window.addEventListener('DOMContentLoaded',function(){
+    ['sidebar','main'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});
+    var ls=document.getElementById('login-screen');if(ls)ls.style.display='none';
+    // SCROLL FIX: body has overflow:hidden + height:100vh — override for shop
+    document.body.style.overflow='auto';
+    document.body.style.height='auto';
+    document.body.style.minHeight='100vh';
+    document.body.style.display='block';
+    document.body.style.margin='0';
+    document.body.style.background='#f8fafc';
+    var d=document.createElement('div');
+    d.id='shop-root';
+    d.style.cssText='min-height:100vh;background:#f8fafc;';
+    document.body.appendChild(d);
+    loadPublicShop(d);
+  });
+})();
 // ===== MODULE 5: FOLLOW-UP TRACKER =====
 async function renderFollowup(){
   var content=document.getElementById('page-content');
@@ -14228,7 +14238,6 @@ function clearAILog(){
     <div class="modal-body" id="modal-general-body"></div>
   </div>
 </div>
-
 <div class="modal-overlay hidden" id="modal-trash" onclick="if(event.target===this)this.classList.add('hidden')" style="z-index:9998;">
   <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:700px;">
     <div class="modal-header" style="background:#fef2f2;">
@@ -14460,279 +14469,280 @@ async function renderShiftSettings(){
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br>SQL run karo: CREATE TABLE shift_settings...</div>';}
 }
 
-// ============================================================
-// SALES MODULE
-// Price = Selling Price (GST inclusive) — customer pays exactly this
-// GST shown as breakdown for admin/invoice only
-// ============================================================
-var _salesProducts=[];
-var _salesCurrentTab='orders';
-var _sfRowCount={feat:100,spec:100};
-var _soItemCount=0;
-var _salesStatusColor={inquiry:'#f59e0b',quoted:'#3b82f6',confirmed:'#8b5cf6',paid:'#10b981',dispatched:'#06b6d4',done:'#64748b'};
-var _salesStatusLabel={inquiry:'Inquiry',quoted:'Quoted',confirmed:'Confirmed',paid:'Paid',dispatched:'Dispatched',done:'Done'};
+// ===== SALES MODULE =====
+// Price = Selling Price (GST inclusive) — customer pays exactly this. GST extracted backward for admin use only.
+function calcGstFromInclusive(price,gstPct){return price-price*100/(100+gstPct);}
 
-// Reverse GST: from GST-inclusive price, extract GST amount
-function calcGstFromInclusive(price, gstPct){return price - price*100/(100+gstPct);}
+async function uploadProductImgFile(file){
+  var ext=file.name.split('.').pop().toLowerCase();
+  var fname='prod_'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.'+ext;
+  var res=await fetch(SB_URL+'/storage/v1/object/product-images/'+fname,{method:'POST',headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},body:file});
+  if(!res.ok){var e=await res.text();throw new Error('Upload failed: '+e);}
+  return SB_URL+'/storage/v1/object/public/product-images/'+fname;
+}
+async function uploadProductImg(input){
+  var file=input.files[0];if(!file)return;
+  var btn=input.parentElement.querySelector('button');if(btn)btn.textContent='Uploading...';
+  try{var url=await uploadProductImgFile(file);document.getElementById('sp-img-url').value=url;if(btn)btn.textContent='✅ Uploaded';}
+  catch(e){alert(e.message);if(btn)btn.textContent='Upload';}
+}
+async function uploadAndUpdateProductImg(productId,input){
+  var file=input.files[0];if(!file)return;
+  var lbl=input.parentElement;if(lbl)lbl.innerHTML='Uploading...';
+  try{var url=await uploadProductImgFile(file);await sb('sales_products','PATCH',{image_url:url,updated_at:new Date().toISOString()},'?id=eq.'+productId);renderSalesProductsAdmin();}
+  catch(e){alert(e.message);if(lbl)lbl.innerHTML='<input type="file" accept="image/*" onchange="uploadAndUpdateProductImg(\''+productId+'\',this)" style="display:none" id="upd-img-'+productId+'"><label for="upd-img-'+productId+'" style="cursor:pointer;font-size:11px;">📷 Add Photo</label>';}
+}
+function downloadSalesTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun.');return;}
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Name *','Model','Category','Selling Price * (₹)\n[Final price — GST included]','GST %\n[for invoice breakdown only]','Stock Status\n(available / out_of_stock)','Description','Features\n(semicolon separated)','Specifications\n(Key:Value ; Key:Value)','Image URL'],
+    ['Canon GI-790 BK Ink','GI-790-BK','Ink','595','18','available','Black ink bottle for Canon Pixma printers','Page yield: 6000 pages; Compatible: Pixma G series','Volume: 135ml; Type: Pigment',''],
+    ['Canon PIXMA G3010','G3010','Printer','12500','18','available','Wireless ink tank printer','Print, Scan, Copy; WiFi enabled; Duplex print','Print Speed: 9 ipm; Resolution: 4800x1200 dpi','']
+  ]);
+  XLSX.utils.book_append_sheet(wb,ws,'Products');
+  XLSX.writeFile(wb,'SalesProducts_Template.xlsx');
+}
+async function uploadSalesExcel(input){
+  var file=input.files[0];if(!file)return;
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun.');return;}
+  var reader=new FileReader();
+  reader.onload=async function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){alert('File ma koi data nathi.');return;}
+      var products=rows.map(function(r){
+        var feats=(r['Features\n(semicolon separated)']||r['Features']||'').split(';').map(function(s){return s.trim();}).filter(Boolean);
+        var specsRaw=(r['Specifications\n(Key:Value ; Key:Value)']||r['Specifications']||'').split(';');
+        var specs={};specsRaw.forEach(function(s){var kv=s.split(':');if(kv.length>=2)specs[kv[0].trim()]=kv.slice(1).join(':').trim();});
+        var priceKey=Object.keys(r).find(function(k){return k.includes('Selling Price');});
+        return{name:r['Name *']||r['Name']||'',model:r['Model']||'',category:r['Category']||'',
+          price:parseFloat(r[priceKey])||0,gst_percent:parseFloat(r['GST %'])||18,
+          stock_status:(r['Stock Status\n(available / out_of_stock)']||r['Stock Status']||'available').trim(),
+          description:r['Description']||'',features:feats,specifications:specs,
+          image_url:r['Image URL']||'',is_active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+      }).filter(function(p){return p.name;});
+      if(!products.length){alert('Valid rows nathi mili.');return;}
+      await sb('sales_products','POST',products);
+      alert(products.length+' products upload thayi!');
+      renderSalesProductsAdmin();
+    }catch(ex){alert('Error: '+ex.message);}
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
+}
 
 async function renderSales(){
-  var c=document.getElementById('page-content');
-  c.innerHTML='<div id="sales-wrap"><div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">'
-    +'<button class="btn" id="stab-orders" onclick="salesTab(\'orders\')">📋 Orders</button>'
-    +'<button class="btn btn-outline" id="stab-products" onclick="salesTab(\'products\')">📦 Products</button>'
-    +'<button class="btn btn-sm" style="background:#10b981;color:#fff;border-color:#10b981;margin-left:auto;" onclick="showShopLink()">🔗 Shop Link & QR</button>'
-    +'</div><div id="sales-tab-body"></div></div>';
-  salesTab(_salesCurrentTab);
-}
-function salesTab(tab){
-  _salesCurrentTab=tab;
-  ['orders','products'].forEach(function(t){var b=document.getElementById('stab-'+t);if(!b)return;b.className=t===tab?'btn btn-primary':'btn btn-outline';});
+  var pc=document.getElementById('page-content');
+  if(!pc)return;
+  var tab=window._salesTab||'orders';
+  pc.innerHTML='<div style="padding:16px 20px;">'
+    +'<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">'
+    +'<button onclick="salesTab(\'orders\')" style="background:'+(tab==='orders'?'#1a56db':'#f1f5f9')+';color:'+(tab==='orders'?'#fff':'#475569')+';border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;">📋 Orders</button>'
+    +'<button onclick="salesTab(\'products\')" style="background:'+(tab==='products'?'#1a56db':'#f1f5f9')+';color:'+(tab==='products'?'#fff':'#475569')+';border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;">🛍️ Products</button>'
+    +'<div style="flex:1;"></div>'
+    +'<button onclick="showShopLink()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">🔗 Shop Link & QR</button>'
+    +'</div>'
+    +'<div id="sales-tab-content"></div></div>';
   if(tab==='products')renderSalesProductsAdmin();else renderSalesOrdersAdmin();
 }
+function salesTab(tab){window._salesTab=tab;renderSales();}
+
 function showShopLink(){
   var shopUrl=window.location.origin+window.location.pathname+'?shop';
-  var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(shopUrl);
-  var html='<div style="text-align:center;"><p style="font-size:13px;color:#6b7280;margin-bottom:10px;">Customer ne aa link share karo ya QR scan karavo:</p><div style="background:#f1f5f9;border-radius:8px;padding:10px 14px;font-size:12px;word-break:break-all;margin-bottom:12px;text-align:left;">'+escHtml(shopUrl)+'</div><div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;"><button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(\''+shopUrl+'\').then(function(){alert(\'✅ Link copied!\');})">📋 Copy Link</button><button class="btn btn-outline btn-sm" onclick="sendShopLinkWA()">📲 WhatsApp</button></div><img src="'+qrUrl+'" style="border-radius:10px;border:2px solid #e2e8f0;" /><p style="font-size:11px;color:#94a3b8;margin-top:8px;">Customer phone se QR scan kare → shop khulegi</p></div>';
-  document.getElementById('modal-general-title').textContent='🛒 Shop Link & QR Code';
-  document.getElementById('modal-general-body').innerHTML=html+'<div style="text-align:right;margin-top:12px;"><button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Close</button></div>';
+  document.getElementById('modal-general-title').textContent='🔗 Shop Link & QR Code';
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="text-align:center;padding:10px;">'
+    +'<p style="font-size:13px;color:#6b7280;margin-bottom:12px;">Aa link customer ne share karo. Koi login ni jarur nathi.</p>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;word-break:break-all;font-size:13px;font-weight:600;color:#1a56db;margin-bottom:14px;">'+escHtml(shopUrl)+'</div>'
+    +'<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(shopUrl)+'" style="border-radius:10px;border:1px solid #e2e8f0;" />'
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
+    +'<button onclick="navigator.clipboard.writeText(\''+escHtml(shopUrl)+'\').then(function(){alert(\'Link copied!\');})" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600;">📋 Copy Link</button>'
+    +'<button onclick="sendShopLinkWA()" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600;">📲 Share on WhatsApp</button>'
+    +'</div></div>';
   openModal('modal-general');
 }
 function sendShopLinkWA(){
   var shopUrl=window.location.origin+window.location.pathname+'?shop';
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var msg='Dear Customer,\n\n*'+(ci.name||'Bhavi Electronics')+'* — Online Product Shop\n\nAb ghar baithe hamare products dekhiye aur order kariye!\n\n👉 '+shopUrl+'\n\n✅ 100% Advance Payment\n🚚 Home Delivery Available\n\nKoi sawaal ho to call karein:\n📞 '+(ci.phone||'+91 9574004969');
+  var msg='🛍️ *Bhavi Electronics — Online Shop*\n\nAapni nayi online shop par visit karo!\nProducts browse karo, cart ma add karo ane order karo.\n\n🔗 '+shopUrl+'\n\n✅ 100% Advance Payment | Fast Dispatch | GST Bill Provided';
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
-// Image upload to Supabase Storage
-async function uploadProductImgFile(file){
-  if(file.size>5*1024*1024){alert('Image too large! Max 5MB.');throw new Error('Too large');}
-  var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-  var fileName=Date.now()+'_'+Math.random().toString(36).substr(2,6)+'.'+ext;
-  var resp=await fetch(SB_URL+'/storage/v1/object/product-images/'+fileName,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},body:file});
-  if(!resp.ok){var err=await resp.text();throw new Error(err);}
-  return SB_URL+'/storage/v1/object/public/product-images/'+fileName;
-}
-async function uploadProductImg(input){
-  var file=input.files[0];if(!file)return;
-  var imgEl=document.getElementById('sp-img');var prevEl=document.getElementById('sp-img-preview');
-  try{
-    if(prevEl)prevEl.innerHTML='<div style="font-size:12px;color:#64748b;padding:4px;">Uploading...</div>';
-    var url=await uploadProductImgFile(file);
-    if(imgEl)imgEl.value=url;
-    if(prevEl)prevEl.innerHTML='<img src="'+escHtml(url)+'" style="width:100%;max-height:110px;object-fit:cover;border-radius:6px;margin-top:4px;">';
-  }catch(e){if(prevEl)prevEl.innerHTML='';alert('Upload failed: '+e.message+'\n\nFirst create bucket in Supabase:\nStorage → New bucket → Name: product-images → Public: ON');}
-  input.value='';
-}
-async function uploadAndUpdateProductImg(productId,input){
-  var file=input.files[0];if(!file)return;
-  try{var url=await uploadProductImgFile(file);await sb('sales_products','PATCH',{image_url:url,updated_at:new Date().toISOString()},'?id=eq.'+productId);renderSalesProductsAdmin();}
-  catch(e){alert('Upload failed: '+e.message+'\n\nCreate bucket: Supabase → Storage → product-images → Public ON');}
-  input.value='';
-}
-
-// Bulk Excel upload
-function downloadSalesTemplate(){
-  var wb=XLSX.utils.book_new();
-  var data=[
-    ['Name *','Model','Category','Selling Price * (₹)\n[Final price — GST included]','GST %\n[for invoice breakdown only]','Stock Status\n(available / out_of_stock)','Description','Features\n(semicolon separated)','Specifications\n(Key:Value ; Key:Value)','Image URL'],
-    ['Canon PIXMA G2010','G2010','Printer',12500,18,'available','3-in-1 Inkjet Printer','Print;Scan;Copy;Wireless','Print Speed:5 ppm;Ink Type:Refillable;Connectivity:USB+WiFi',''],
-    ['HP LaserJet M15w','M15w','Printer',8499,18,'available','Compact Wireless Laser Printer','Fast Print;Wireless;Compact','Print Speed:18 ppm;Connectivity:WiFi;Paper Size:A4','']
-  ];
-  var ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:25},{wch:12},{wch:12},{wch:20},{wch:12},{wch:18},{wch:30},{wch:35},{wch:40},{wch:40}];
-  XLSX.utils.book_append_sheet(wb,ws,'Products');
-  XLSX.writeFile(wb,'bhavi_products_template.xlsx');
-}
-async function uploadSalesExcel(input){
-  var file=input.files[0];if(!file)return;input.value='';
-  var reader=new FileReader();
-  reader.onload=async function(e){
-    try{
-      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-      var ws=wb.Sheets[wb.SheetNames[0]];var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      if(rows.length<2){alert('File is empty or has only headers!');return;}
-      var products=[];
-      for(var i=1;i<rows.length;i++){
-        var r=rows[i];var name=String(r[0]||'').trim();var price=parseFloat(r[3])||0;
-        if(!name||!price)continue;
-        var feats=(r[7]?String(r[7]).split(';').map(function(s){return s.trim();}).filter(Boolean):[]);
-        var specs={};
-        if(r[8])String(r[8]).split(';').forEach(function(pair){var pts=pair.split(':');if(pts.length>=2)specs[pts[0].trim()]=pts.slice(1).join(':').trim();});
-        products.push({name:name,model:String(r[1]||'').trim()||null,category:String(r[2]||'').trim()||null,price:price,gst_percent:parseFloat(r[4])||18,stock_status:String(r[5]||'available').trim()||'available',description:String(r[6]||'').trim()||null,features:feats,specifications:specs,image_url:String(r[9]||'').trim()||null,is_active:true,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
-      }
-      if(!products.length){alert('No valid products found!\nMake sure Name and Price columns are filled.');return;}
-      if(!confirm(products.length+' products found.\n\nInsert all into catalog?'))return;
-      var tb=document.getElementById('sales-tab-body');
-      if(tb)tb.innerHTML='<div style="text-align:center;padding:30px;">Uploading '+products.length+' products...</div>';
-      var success=0,errors=0;
-      for(var j=0;j<products.length;j++){try{await sb('sales_products','POST',products[j]);success++;}catch(ex){errors++;}}
-      alert('✅ Done!\n'+success+' products added.'+(errors?' ('+errors+' errors)':''));
-      renderSalesProductsAdmin();
-    }catch(ex){alert('Error reading file: '+ex.message);}
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-// Products admin
 async function renderSalesProductsAdmin(){
-  var tb=document.getElementById('sales-tab-body');
-  tb.innerHTML='<div style="text-align:center;padding:30px;color:#64748b;">Loading...</div>';
+  var tc=document.getElementById('sales-tab-content');if(!tc)return;
+  tc.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8;">Loading products...</div>';
   try{
     var prods=await sb('sales_products','GET',null,'?is_active=eq.true&order=created_at.desc');
-    _salesProducts=prods||[];
-    var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-      +'<span style="color:#64748b;font-size:13px;">'+prods.length+' products</span>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-      +'<button class="btn btn-outline btn-sm" onclick="downloadSalesTemplate()" title="Download Excel template">📥 Template</button>'
-      +'<label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;" title="Upload Excel with products">📤 Bulk Upload<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadSalesExcel(this)"></label>'
-      +'<button class="btn btn-primary btn-sm" onclick="openAddProduct(null)">+ Add Product</button>'
-      +'</div></div>';
-    if(!prods.length){tb.innerHTML=html+'<div style="text-align:center;padding:50px;color:#94a3b8;"><div style="font-size:36px;margin-bottom:10px;">📦</div><div>No products yet.<br><small>📥 Download template → fill → 📤 Bulk Upload<br>OR click + Add Product</small></div></div>';return;}
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">';
+    var html='<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
+      +'<button onclick="openAddProduct(null)" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Product</button>'
+      +'<button onclick="downloadSalesTemplate()" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📥 Template</button>'
+      +'<label style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">📤 Bulk Upload<input type="file" accept=".xlsx,.xls" onchange="uploadSalesExcel(this)" style="display:none;"></label>'
+      +'<span style="font-size:12px;color:#94a3b8;align-self:center;">'+(prods?prods.length:0)+' products</span>'
+      +'</div>';
+    if(!prods||!prods.length){tc.innerHTML=html+'<div style="text-align:center;padding:40px;color:#94a3b8;">No products yet. Add your first product!</div>';return;}
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">';
     prods.forEach(function(p){
-      var inStock=p.stock_status==='available';
-      var specs=p.specifications||{};var specKeys=Object.keys(specs).slice(0,3);
-      html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
-        +(p.image_url
-          ?'<div style="position:relative;"><img src="'+escHtml(p.image_url)+'" style="width:100%;height:150px;object-fit:cover;" onerror="this.style.display=\'none\'"><label style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;">📸<input type="file" accept="image/*" style="display:none" onchange="uploadAndUpdateProductImg(\''+p.id+'\',this)"></label></div>'
-          :'<div style="height:70px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);display:flex;align-items:center;justify-content:center;gap:8px;"><span style="font-size:32px;">📦</span><label style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;color:#475569;">📸 Add Photo<input type="file" accept="image/*" style="display:none" onchange="uploadAndUpdateProductImg(\''+p.id+'\',this)"></label></div>')
-        +'<div style="padding:12px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:5px;margin-bottom:6px;">'
-        +'<div style="min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(p.name)+'</div>'+(p.model?'<div style="font-size:11px;color:#64748b;">'+escHtml(p.model)+'</div>':'')+'</div>'
-        +'<span style="flex-shrink:0;background:'+(inStock?'#dcfce7;color:#16a34a':'#fee2e2;color:#dc2626')+';padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;">'+(inStock?'In Stock':'Out')+'</span>'
-        +'</div>'
-        +(specKeys.length?'<div style="margin-bottom:6px;font-size:11px;color:#475569;display:flex;flex-wrap:wrap;gap:3px;">'+specKeys.map(function(k){return '<span style="background:#f1f5f9;border-radius:4px;padding:2px 5px;">'+escHtml(k)+': '+escHtml(specs[k])+'</span>';}).join('')+'</div>':'')
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">'
-        +'<div><div style="font-size:17px;font-weight:800;">₹'+Math.round(p.price||0).toLocaleString('en-IN')+'</div>'
-        // ✅ FIXED: price is selling price (GST inclusive) — no extra GST added
+      var imgHtml=p.image_url
+        ?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:140px;object-fit:cover;border-radius:10px 10px 0 0;">'
+        :'<div style="width:100%;height:100px;background:#f1f5f9;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:28px;">📦</div>';
+      html+='<div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);overflow:hidden;">'
+        +imgHtml
+        +'<div style="padding:10px;">'
+        +'<div style="font-size:12px;font-weight:700;color:#1a56db;margin-bottom:2px;">'+escHtml(p.name)+'</div>'
+        +(p.model?'<div style="font-size:11px;color:#6b7280;">'+escHtml(p.model)+'</div>':'')
+        +'<div style="margin-top:6px;font-size:15px;font-weight:800;color:#111;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
         +'<div style="font-size:10px;color:#94a3b8;">Selling Price (GST incl.)</div>'
-        +'</div>'
-        +'<div style="display:flex;gap:4px;">'
-        +'<button class="btn btn-outline btn-sm" onclick="openAddProduct(\''+p.id+'\')">✏️</button>'
-        +'<button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;" onclick="deleteSalesProduct(\''+p.id+'\')">🗑️</button>'
-        +'</div></div></div></div>';
+        +'<div style="margin-top:4px;"><span style="background:'+(p.stock_status==='available'?'#d1fae5':'#fee2e2')+';color:'+(p.stock_status==='available'?'#065f46':'#991b1b')+';border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;">'+(p.stock_status==='available'?'In Stock':'Out of Stock')+'</span></div>'
+        +'<div style="margin-top:8px;display:flex;gap:6px;align-items:center;">'
+        +'<label style="flex:1;text-align:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:5px 4px;font-size:11px;cursor:pointer;">📷 Add Photo<input type="file" accept="image/*" onchange="uploadAndUpdateProductImg(\''+p.id+'\',this)" style="display:none;"></label>'
+        +'<button onclick="openAddProduct(\''+p.id+'\')" style="background:#f1f5f9;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;font-size:14px;">✏️</button>'
+        +'<button onclick="deleteSalesProduct(\''+p.id+'\')" style="background:#fee2e2;border:none;border-radius:7px;padding:6px 10px;cursor:pointer;font-size:14px;">🗑️</button>'
+        +'</div></div></div>';
     });
-    html+='</div>';tb.innerHTML=html;
-  }catch(e){tb.innerHTML='<div class="alert alert-warning"><strong>Tables not found.</strong> Run SQL in Supabase:<br><textarea readonly style="width:100%;height:90px;font-size:10px;font-family:monospace;padding:6px;">'+getSalesSQL()+'</textarea></div>';}
+    html+='</div>';
+    tc.innerHTML=html;
+  }catch(e){tc.innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
 }
 
 function getSalesSQL(){
-  return "CREATE TABLE IF NOT EXISTS sales_products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL, model text, category text, description text, features jsonb DEFAULT '[]', specifications jsonb DEFAULT '{}', price numeric(10,2) NOT NULL DEFAULT 0, gst_percent numeric(5,2) DEFAULT 18, stock_status text DEFAULT 'available', image_url text, is_active boolean DEFAULT true, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());\n\nCREATE TABLE IF NOT EXISTS sales_orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_no text UNIQUE, customer_name text NOT NULL, customer_mobile text NOT NULL, customer_address text, items jsonb DEFAULT '[]', subtotal numeric(10,2) DEFAULT 0, gst_amount numeric(10,2) DEFAULT 0, total_amount numeric(10,2) DEFAULT 0, status text DEFAULT 'inquiry', payment_method text, payment_reference text, payment_date date, courier_name text, awb_number text, dispatch_date date, tracking_url text, notes text, created_by text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());\n\nALTER TABLE sales_products ENABLE ROW LEVEL SECURITY;\nALTER TABLE sales_orders ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"pub_read\" ON sales_products FOR SELECT USING (true);\nCREATE POLICY \"pub_insert\" ON sales_orders FOR INSERT WITH CHECK (true);\nCREATE POLICY \"adm_products\" ON sales_products FOR ALL USING (true);\nCREATE POLICY \"adm_orders\" ON sales_orders FOR ALL USING (true);";
+  return `-- Run this in Supabase SQL Editor (one time only)\nCREATE TABLE IF NOT EXISTS sales_products (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  name text NOT NULL, model text, category text, description text,\n  features jsonb DEFAULT \'[]\', specifications jsonb DEFAULT \'{}\',\n  price numeric(10,2) NOT NULL DEFAULT 0,\n  gst_percent numeric(5,2) DEFAULT 18,\n  stock_status text DEFAULT \'available\',\n  image_url text, is_active boolean DEFAULT true,\n  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()\n);\nCREATE TABLE IF NOT EXISTS sales_orders (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  order_no text UNIQUE, customer_name text NOT NULL,\n  customer_mobile text NOT NULL, customer_address text,\n  items jsonb DEFAULT \'[]\', subtotal numeric(10,2) DEFAULT 0,\n  gst_amount numeric(10,2) DEFAULT 0, total_amount numeric(10,2) DEFAULT 0,\n  status text DEFAULT \'inquiry\', payment_method text,\n  payment_reference text, payment_date date,\n  courier_name text, awb_number text, dispatch_date date,\n  tracking_url text, notes text, created_by text,\n  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()\n);\nALTER TABLE sales_products ENABLE ROW LEVEL SECURITY;\nALTER TABLE sales_orders ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "pub_read" ON sales_products FOR SELECT USING (true);\nCREATE POLICY "pub_insert" ON sales_orders FOR INSERT WITH CHECK (true);\nCREATE POLICY "adm_products" ON sales_products FOR ALL USING (true);\nCREATE POLICY "adm_orders" ON sales_orders FOR ALL USING (true);`;
 }
 
 function openAddProduct(id){
-  var p=id?(_salesProducts||[]).find(function(x){return x.id===id;}):null;
-  var feats=(p&&p.features)||[];var specs=p&&p.specifications?p.specifications:{};var specKeys=Object.keys(specs);
-  var imgUrl=p?escHtml(p.image_url||''):'';
-  var html='<div style="display:grid;gap:10px;">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Product Name *</label><input id="sp-name" class="form-input" value="'+(p?escHtml(p.name||''):'')+'" placeholder="e.g. Canon PIXMA G2010"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Model No</label><input id="sp-model" class="form-input" value="'+(p?escHtml(p.model||''):'')+'" placeholder="G2010"></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Category</label><select id="sp-cat" class="form-input"><option value="">-- Select --</option>'+['Printer','Camera','Laptop','AC','TV','Mobile','Tablet','Other'].map(function(c){return '<option value="'+c+'"'+(p&&p.category===c?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Stock</label><select id="sp-stock" class="form-input"><option value="available"'+(!p||p.stock_status==='available'?' selected':'')+'>In Stock</option><option value="out_of_stock"'+(p&&p.stock_status==='out_of_stock'?' selected':'')+'>Out of Stock</option></select></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-    // ✅ FIXED: clear label — selling price = what customer pays (GST already included)
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Selling Price (₹) * <span style="font-weight:400;color:#10b981;font-size:11px;">← Customer ko yahi pay karna hoga</span></label><input id="sp-price" type="number" class="form-input" value="'+(p?p.price||'':'')+'" placeholder="12500"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">GST % <span style="font-weight:400;color:#94a3b8;font-size:11px;">(for invoice only)</span></label><input id="sp-gst" type="number" class="form-input" value="'+(p?p.gst_percent||18:18)+'"></div>'
-    +'</div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Product Image</label>'
-    +'<div style="display:flex;gap:6px;align-items:center;">'
-    +'<input id="sp-img" class="form-input" value="'+imgUrl+'" placeholder="https://...image.jpg (or upload)" style="flex:1;">'
-    +'<label style="cursor:pointer;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:7px 11px;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;">📸 Upload<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="uploadProductImg(this)"></label></div>'
-    +(imgUrl?'<img src="'+imgUrl+'" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:5px;" onerror="this.style.display=\'none\'">':'')
-    +'<div id="sp-img-preview"></div></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Description</label><textarea id="sp-desc" class="form-input" rows="2" style="resize:vertical;">'+(p?escHtml(p.description||''):' ')+'</textarea></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;">Features</label>'
-    +'<div id="sp-feats">'+feats.map(function(f,i){return '<div style="display:flex;gap:5px;margin-bottom:5px;" id="feat-row-'+i+'"><input class="form-input sp-feat-inp" value="'+escHtml(f)+'" placeholder="Feature..." style="flex:1;"><button type="button" onclick="removeSalesRow(\'feat-row-'+i+'\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0 9px;cursor:pointer;">✕</button></div>';}).join('')+'</div>'
-    +'<button type="button" onclick="addSalesFeat()" class="btn btn-outline btn-sm" style="margin-top:3px;">+ Add Feature</button></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;">Specifications</label>'
-    +'<div id="sp-specs">'+specKeys.map(function(k,i){return '<div style="display:flex;gap:5px;margin-bottom:5px;" id="spec-row-'+i+'"><input class="form-input sp-spec-key" value="'+escHtml(k)+'" placeholder="Label" style="flex:1;"><input class="form-input sp-spec-val" value="'+escHtml(specs[k])+'" placeholder="Value" style="flex:1;"><button type="button" onclick="removeSalesRow(\'spec-row-'+i+'\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0 9px;cursor:pointer;">✕</button></div>';}).join('')+'</div>'
-    +'<button type="button" onclick="addSalesSpec()" class="btn btn-outline btn-sm" style="margin-top:3px;">+ Add Spec</button></div>'
-    +'</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">'
-    +'<button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveProduct(\''+( id||'')+'\')">💾 Save</button></div>';
+  var prods=window._salesProds||[];
+  var p=id?prods.find(function(x){return x.id===id;}):null;
   document.getElementById('modal-general-title').textContent=id?'Edit Product':'Add Product';
-  document.getElementById('modal-general-body').innerHTML=html;
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Name *</label><input id="sp-name" class="form-input" value="'+escHtml(p?p.name||'':'')+'" placeholder="Canon GI-790 BK Ink"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Model</label><input id="sp-model" class="form-input" value="'+escHtml(p?p.model||'':'')+'" placeholder="GI-790-BK"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Category</label><input id="sp-cat" class="form-input" value="'+escHtml(p?p.category||'':'')+'" placeholder="Ink / Printer"></div>'
+    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Selling Price (₹) * <span style="font-weight:400;color:#10b981;font-size:11px;">← Customer ko yahi pay karna hoga</span></label><input id="sp-price" type="number" class="form-input" value="'+(p?p.price||'':'')+'" placeholder="12500"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">GST % <span style="font-weight:400;color:#94a3b8;font-size:10px;">(invoice only)</span></label><input id="sp-gst" type="number" class="form-input" value="'+(p?p.gst_percent||18:18)+'" placeholder="18"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Stock Status</label><select id="sp-stock" class="form-input"><option value="available" '+((!p||p.stock_status==='available')?'selected':'')+'>In Stock</option><option value="out_of_stock" '+(p&&p.stock_status==='out_of_stock'?'selected':'')+'>Out of Stock</option></select></div>'
+    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Description</label><textarea id="sp-desc" class="form-input" rows="2" placeholder="Short description...">'+escHtml(p?p.description||'':'')+'</textarea></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Features <span style="font-weight:400;color:#94a3b8;font-size:10px;">(semicolon separated)</span></label><input id="sp-feats" class="form-input" value="'+escHtml(p?((p.features||[]).join(';')):'')+'" placeholder="WiFi; Duplex Print; High Yield"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Specifications <span style="font-weight:400;color:#94a3b8;font-size:10px;">(Key:Value ; Key:Value)</span></label><input id="sp-specs" class="form-input" value="'+escHtml(p?(Object.entries(p.specifications||{}).map(function(kv){return kv[0]+':'+kv[1];}).join(';')):'')+'" placeholder="Print Speed:9ipm ; Resolution:4800x1200"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Image URL <span style="font-weight:400;color:#94a3b8;font-size:10px;">(or upload below)</span></label><input id="sp-img-url" class="form-input" value="'+escHtml(p?p.image_url||'':'')+'" placeholder="https://..."></div>'
+    +'<div><label style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px;cursor:pointer;">'
+    +'<input type="file" accept="image/*" onchange="uploadProductImg(this)" style="display:none;"><span style="font-size:13px;color:#475569;">📷 Upload Photo (JPG/PNG)</span><button type="button" style="margin-left:auto;background:#1a56db;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;" onclick="this.parentElement.querySelector(\'input\').click()">Browse</button></label></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;">'
+    +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Cancel</button>'
+    +'<button onclick="saveProduct(\''+escHtml(id||'')+'\''+')" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Save Product</button>'
+    +'</div></div>';
   openModal('modal-general');
 }
-function addSalesFeat(){var c=_sfRowCount.feat++;var d=document.getElementById('sp-feats');if(!d)return;var row=document.createElement('div');row.id='feat-row-'+c;row.style.cssText='display:flex;gap:5px;margin-bottom:5px;';row.innerHTML='<input class="form-input sp-feat-inp" placeholder="Feature..." style="flex:1;"><button type="button" onclick="removeSalesRow(\'feat-row-'+c+'\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0 9px;cursor:pointer;">✕</button>';d.appendChild(row);}
-function addSalesSpec(){var c=_sfRowCount.spec++;var d=document.getElementById('sp-specs');if(!d)return;var row=document.createElement('div');row.id='spec-row-'+c;row.style.cssText='display:flex;gap:5px;margin-bottom:5px;';row.innerHTML='<input class="form-input sp-spec-key" placeholder="Label" style="flex:1;"><input class="form-input sp-spec-val" placeholder="Value" style="flex:1;"><button type="button" onclick="removeSalesRow(\'spec-row-'+c+'\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:0 9px;cursor:pointer;">✕</button>';d.appendChild(row);}
-function removeSalesRow(id){var e=document.getElementById(id);if(e)e.remove();}
+
 async function saveProduct(id){
-  var name=(document.getElementById('sp-name')?.value||'').trim();var price=parseFloat(document.getElementById('sp-price')?.value||0);
-  if(!name||!price){alert('Product name and price required!');return;}
-  var feats=Array.from(document.querySelectorAll('.sp-feat-inp')).map(function(i){return i.value.trim();}).filter(Boolean);
-  var keys=document.querySelectorAll('.sp-spec-key'),vals=document.querySelectorAll('.sp-spec-val');var specs={};keys.forEach(function(k,i){if(k.value.trim()&&vals[i]&&vals[i].value.trim())specs[k.value.trim()]=vals[i].value.trim();});
-  var data={name:name,model:(document.getElementById('sp-model')?.value||'').trim()||null,category:document.getElementById('sp-cat')?.value||null,stock_status:document.getElementById('sp-stock')?.value||'available',price:price,gst_percent:parseFloat(document.getElementById('sp-gst')?.value||18),image_url:(document.getElementById('sp-img')?.value||'').trim()||null,description:(document.getElementById('sp-desc')?.value||'').trim()||null,features:feats,specifications:specs,is_active:true,updated_at:new Date().toISOString()};
-  try{if(id){await sb('sales_products','PATCH',data,'?id=eq.'+id);}else{data.created_at=new Date().toISOString();await sb('sales_products','POST',data);}closeModal('modal-general');renderSalesProductsAdmin();}catch(e){alert('Error: '+e.message);}
+  var name=(document.getElementById('sp-name')?.value||'').trim();
+  var price=parseFloat(document.getElementById('sp-price')?.value||0);
+  if(!name||!price){alert('Name and Price required.');return;}
+  var feats=(document.getElementById('sp-feats')?.value||'').split(';').map(function(s){return s.trim();}).filter(Boolean);
+  var specsRaw=(document.getElementById('sp-specs')?.value||'').split(';');
+  var specs={};specsRaw.forEach(function(s){var kv=s.split(':');if(kv.length>=2)specs[kv[0].trim()]=kv.slice(1).join(':').trim();});
+  var data={name:name,model:(document.getElementById('sp-model')?.value||'').trim(),category:(document.getElementById('sp-cat')?.value||'').trim(),
+    description:(document.getElementById('sp-desc')?.value||'').trim(),features:feats,specifications:specs,
+    price:price,gst_percent:parseFloat(document.getElementById('sp-gst')?.value||18),
+    stock_status:document.getElementById('sp-stock')?.value||'available',
+    image_url:(document.getElementById('sp-img-url')?.value||'').trim(),
+    is_active:true,updated_at:new Date().toISOString()};
+  try{if(id){await sb('sales_products','PATCH',data,'?id=eq.'+id);}else{data.created_at=new Date().toISOString();await sb('sales_products','POST',data);}closeModal('modal-general');renderSalesProductsAdmin();}
+  catch(e){alert('Error: '+e.message);}
 }
 async function deleteSalesProduct(id){if(!confirm('Delete this product?'))return;try{await sb('sales_products','PATCH',{is_active:false,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesProductsAdmin();}catch(e){alert(e.message);}}
 
-// Orders admin
 async function renderSalesOrdersAdmin(){
-  var tb=document.getElementById('sales-tab-body');
-  tb.innerHTML='<div style="text-align:center;padding:30px;color:#64748b;">Loading orders...</div>';
+  var tc=document.getElementById('sales-tab-content');if(!tc)return;
+  tc.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8;">Loading orders...</div>';
   try{
-    var orders=await sb('sales_orders','GET',null,'?order=created_at.desc&limit=300');
-    var sf=window._salesStatusFilter||'all';
-    var filtered=sf==='all'?orders:orders.filter(function(o){return o.status===sf;});
-    var counts={};['inquiry','quoted','confirmed','paid','dispatched','done'].forEach(function(s){counts[s]=orders.filter(function(o){return o.status===s;}).length;});
-    var html='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">'
-      +'<div style="display:flex;gap:5px;flex-wrap:wrap;">'
-      +[['all','All',orders.length],['inquiry','Inquiry',counts.inquiry],['quoted','Quoted',counts.quoted],['confirmed','Confirmed',counts.confirmed],['paid','Paid',counts.paid],['dispatched','Dispatched',counts.dispatched],['done','Done',counts.done]].map(function(s){
-        var active=sf===s[0];var col=s[0]==='all'?'#1e293b':(_salesStatusColor[s[0]]||'#64748b');
-        return '<button onclick="window._salesStatusFilter=\''+s[0]+'\';renderSalesOrdersAdmin();" style="background:'+(active?col:'#f1f5f9')+';color:'+(active?'#fff':'#475569')+';border:none;border-radius:20px;padding:4px 11px;font-size:12px;cursor:pointer;font-weight:600;">'+escHtml(s[1])+' ('+s[2]+')</button>';
-      }).join('')+'</div>'
-      +'<button class="btn btn-primary btn-sm" onclick="openNewSalesOrder()">+ New Order</button></div>';
-    if(!filtered.length){tb.innerHTML=html+'<div style="text-align:center;padding:40px;color:#94a3b8;">No orders found.</div>';return;}
-    html+='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f1f5f9;"><th style="padding:8px 10px;text-align:left;">Order No</th><th style="padding:8px 10px;text-align:left;">Customer</th><th style="padding:8px 10px;text-align:left;">Items</th><th style="padding:8px 10px;text-align:right;">Total</th><th style="padding:8px 10px;">Status</th><th style="padding:8px 10px;">Date</th><th style="padding:8px 10px;">Actions</th></tr></thead><tbody>';
+    var orders=await sb('sales_orders','GET',null,'?order=created_at.desc&limit=200');
+    var statusFilter=window._salesStatusFilter||'all';
+    var statuses=[['all','All',orders?orders.length:0,'#6b7280'],['inquiry','Inquiry',0,'#f59e0b'],['quoted','Quoted',0,'#3b82f6'],['confirmed','Confirmed',0,'#8b5cf6'],['paid','Paid',0,'#10b981'],['dispatched','Dispatched',0,'#0ea5e9'],['done','Done',0,'#6b7280']];
+    if(orders)orders.forEach(function(o){var s=statuses.find(function(x){return x[0]===o.status;});if(s)s[2]++;});
+    var filtered=statusFilter==='all'?orders:(orders||[]).filter(function(o){return o.status===statusFilter;});
+    var html='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
+    statuses.forEach(function(s){html+='<button onclick="window._salesStatusFilter=\''+s[0]+'\';renderSalesOrdersAdmin();" style="background:'+(statusFilter===s[0]?s[3]:'#f1f5f9')+';color:'+(statusFilter===s[0]?'#fff':'#475569')+';border:none;border-radius:20px;padding:4px 11px;font-size:12px;cursor:pointer;font-weight:600;">'+escHtml(s[1])+' ('+s[2]+')</button>';});
+    html+='</div>';
+    html+='<button onclick="openNewSalesOrder()" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;">+ New Order</button>';
+    if(!filtered||!filtered.length){tc.innerHTML=html+'<div style="text-align:center;padding:40px;color:#94a3b8;">No orders found.</div>';return;}
+    html+='<div style="display:flex;flex-direction:column;gap:8px;">';
     filtered.forEach(function(o){
-      var sc=_salesStatusColor[o.status]||'#94a3b8';var mob=(o.customer_mobile||'').replace(/\D/g,'');if(mob.length===10)mob='91'+mob;
-      var itemsTxt=(o.items||[]).map(function(i){return escHtml(i.name)+(i.qty>1?' ×'+i.qty:'');}).join(', ')||'-';
-      html+='<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:8px 10px;font-weight:700;">'+escHtml(o.order_no||'-')+'</td><td style="padding:8px 10px;"><div style="font-weight:600;">'+escHtml(o.customer_name||'-')+'</div><div style="font-size:11px;color:#64748b;">'+escHtml(o.customer_mobile||'')+'</div></td><td style="padding:8px 10px;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+itemsTxt+'</td><td style="padding:8px 10px;text-align:right;font-weight:700;">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</td><td style="padding:8px 10px;text-align:center;"><span style="background:'+sc+'22;color:'+sc+';padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">'+(_salesStatusLabel[o.status]||o.status)+'</span></td><td style="padding:8px 10px;font-size:11px;color:#64748b;">'+(o.created_at?o.created_at.slice(0,10):'-')+'</td><td style="padding:8px 10px;">'+buildSalesActions(o,mob)+'</td></tr>';
+      var statusColors={inquiry:'#f59e0b',quoted:'#3b82f6',confirmed:'#8b5cf6',paid:'#10b981',dispatched:'#0ea5e9',done:'#9ca3af'};
+      var col=statusColors[o.status]||'#9ca3af';
+      html+='<div style="background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.07);">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+        +'<div><div style="font-size:13px;font-weight:800;color:#111;">'+escHtml(o.customer_name)+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+escHtml(o.order_no||'')+(o.customer_mobile?' | 📞 '+escHtml(o.customer_mobile):'')+' | '+new Date(o.created_at).toLocaleDateString('en-IN')+'</div></div>'
+        +'<span style="background:'+col+';color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">'+escHtml(o.status||'')+'</span>'
+        +'</div>'
+        +'<div style="margin-top:6px;font-size:14px;font-weight:800;color:#1a56db;">₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'</div>'
+        +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'+buildSalesActions(o,o.customer_mobile)+'</div>'
+        +'</div>';
     });
-    html+='</tbody></table></div>';tb.innerHTML=html;
-  }catch(e){tb.innerHTML='<div class="alert alert-warning">Error: '+escHtml(e.message)+'<br><br>Run SQL:<br><textarea readonly style="width:100%;height:80px;font-size:10px;font-family:monospace;padding:6px;">'+getSalesSQL()+'</textarea></div>';}
+    html+='</div>';
+    tc.innerHTML=html;
+  }catch(e){tc.innerHTML='<div style="color:red;padding:20px;">Error: '+e.message+'</div>';}
 }
+
 function buildSalesActions(o,mob){
-  var a=[];
-  if(o.status==='inquiry')a.push('<button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;" onclick="salesSendBrochureWA(\''+o.id+'\',\''+mob+'\')">📲 WA</button>','<button class="btn btn-sm btn-outline" onclick="salesMarkStatus(\''+o.id+'\',\'quoted\')">Quoted</button>');
-  if(o.status==='quoted')a.push('<button class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;" onclick="salesMarkStatus(\''+o.id+'\',\'confirmed\')">✅ Confirm</button>');
-  if(o.status==='confirmed')a.push('<button class="btn btn-sm" style="background:#10b981;color:#fff;border:none;" onclick="openPaymentModal(\''+o.id+'\',\''+escHtml(o.customer_name)+'\','+(o.total_amount||0)+',\''+mob+'\')">💰 Paid</button>');
-  if(o.status==='paid')a.push('<button class="btn btn-sm" style="background:#06b6d4;color:#fff;border:none;" onclick="openDispatchModal(\''+o.id+'\',\''+escHtml(o.customer_name)+'\',\''+mob+'\')">🚚 Dispatch</button>');
-  if(o.status==='dispatched')a.push('<button class="btn btn-sm" style="background:#64748b;color:#fff;border:none;" onclick="salesMarkStatus(\''+o.id+'\',\'done\')">✅ Done</button>');
-  a.push('<button class="btn btn-sm btn-outline" onclick="viewSalesOrder(\''+o.id+'\')">👁️</button>');
-  return a.join(' ');
+  var s=o.status;var id=o.id;var cn=escHtml(o.customer_name);var tot=o.total_amount||0;
+  var btns='<button onclick="viewSalesOrder(\''+id+'\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">👁 View</button>';
+  if(s==='inquiry'){btns+='<button onclick="salesMarkStatus(\''+id+'\',\'quoted\')" style="background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Quote Sent</button>';btns+='<button onclick="salesSendBrochureWA(\''+id+'\',\''+escHtml(mob||'')+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 WA Brochure</button>';}
+  if(s==='quoted'){btns+='<button onclick="salesMarkStatus(\''+id+'\',\'confirmed\')" style="background:#8b5cf6;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Confirm Order</button>';}
+  if(s==='confirmed'){btns+='<button onclick="openPaymentModal(\''+id+'\',\''+cn+'\','+tot+',\''+escHtml(mob||'')+'\')" style="background:#10b981;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Paid</button>';}
+  if(s==='paid'){btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Dispatch</button>';}
+  if(s==='dispatched'){btns+='<button onclick="salesMarkStatus(\''+id+'\',\'done\')" style="background:#9ca3af;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Done</button>';}
+  return btns;
 }
 async function salesMarkStatus(id,status){try{await sb('sales_orders','PATCH',{status:status,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesOrdersAdmin();}catch(e){alert(e.message);}}
 
 async function openNewSalesOrder(){
-  var prods=await sb('sales_products','GET',null,'?is_active=eq.true&order=name');
-  _salesProducts=prods||[];_soItemCount=0;
-  window._salesProdsOpts=prods.map(function(p){return '<option value="'+p.id+'" data-price="'+(p.price||0)+'" data-gst="'+(p.gst_percent||18)+'" data-name="'+escHtml(p.name)+'">'+escHtml(p.name)+(p.model?' ('+p.model+')':'')+'  ₹'+Math.round(p.price||0).toLocaleString('en-IN')+'</option>';}).join('');
-  var html='<div style="display:grid;gap:10px;">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Customer Name *</label><input id="so-cname" class="form-input" placeholder="Ramesh Patel"></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Mobile *</label><input id="so-cmob" class="form-input" type="tel" placeholder="9876543210"></div></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Delivery Address</label><input id="so-addr" class="form-input" placeholder="Full address..."></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;">Products *</label><div id="so-items"></div><button type="button" onclick="addSalesOrderItem()" class="btn btn-outline btn-sm" style="margin-top:5px;">+ Add Product</button></div>'
-    +'<div id="so-total-bar" style="background:#f1f5f9;border-radius:8px;padding:10px;font-size:13px;min-height:36px;"></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Type</label><select id="so-type" class="form-input"><option value="inquiry">Inquiry</option><option value="confirmed">Confirmed</option></select></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Notes</label><input id="so-notes" class="form-input" placeholder="Any notes..."></div></div>'
-    +'</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Cancel</button><button class="btn btn-primary" onclick="saveSalesOrder()">💾 Create Order</button></div>';
-  document.getElementById('modal-general-title').textContent='📋 New Sales Order';
-  document.getElementById('modal-general-body').innerHTML=html;
-  openModal('modal-general');addSalesOrderItem();
+  var prods=await sb('sales_products','GET',null,'?is_active=eq.true&stock_status=eq.available&order=name.asc');
+  window._salesProdsForOrder=prods||[];
+  document.getElementById('modal-general-title').textContent='New Sales Order';
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Customer Name *</label><input id="so-cname" class="form-input" placeholder="Ramesh Patel"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Mobile *</label><input id="so-mob" type="tel" class="form-input" placeholder="9876543210"></div>'
+    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Address</label><textarea id="so-addr" class="form-input" rows="2" placeholder="Delivery address..."></textarea></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Notes</label><input id="so-notes" class="form-input" placeholder="Any special instructions..."></div>'
+    +'<div id="so-items-wrap"><div id="so-item-0" class="so-item-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
+    +'<select class="so-prod form-input" onchange="calcSalesTotal()" style="flex:2;">'
+    +'<option value="">Select Product</option>'
+    +(prods||[]).map(function(p){return '<option value="'+p.id+'" data-price="'+p.price+'" data-gst="'+p.gst_percent+'">'+escHtml(p.name+(p.model?' ('+p.model+')':''))+'  ₹'+parseFloat(p.price).toLocaleString('en-IN')+'</option>';}).join('')
+    +'</select>'
+    +'<input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:60px;">'
+    +'</div></div>'
+    +'<button onclick="addSalesOrderItem()" style="background:#f1f5f9;color:#475569;border:none;border-radius:7px;padding:7px 12px;font-size:13px;cursor:pointer;">+ Add Item</button>'
+    +'<div id="so-total-bar" style="background:#f8fafc;border-radius:8px;padding:10px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Cancel</button>'
+    +'<button onclick="saveSalesOrder()" style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Save Order</button>'
+    +'</div></div>';
+  openModal('modal-general');
+  calcSalesTotal();
 }
+var _soItemCount=0;
 function addSalesOrderItem(){
-  var c=_soItemCount++;var d=document.getElementById('so-items');if(!d)return;
-  var row=document.createElement('div');row.id='so-item-'+c;row.style.cssText='display:flex;gap:5px;margin-bottom:7px;align-items:center;';
-  row.innerHTML='<select class="form-input so-prod" onchange="calcSalesTotal()" style="flex:2;"><option value="">-- Select Product --</option>'+(window._salesProdsOpts||'')+'</select><input type="number" class="form-input so-qty" value="1" min="1" onchange="calcSalesTotal()" style="width:60px;flex-shrink:0;"><button type="button" onclick="removeSalesRow(\'so-item-'+c+'\');calcSalesTotal();" style="background:#ef4444;color:#fff;border:none;border-radius:6px;width:32px;height:36px;cursor:pointer;flex-shrink:0;">✕</button>';
-  d.appendChild(row);
+  _soItemCount++;
+  var wrap=document.getElementById('so-items-wrap');
+  var prods=window._salesProdsForOrder||[];
+  var div=document.createElement('div');div.id='so-item-'+_soItemCount;div.className='so-item-row';div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  div.innerHTML='<select class="so-prod form-input" onchange="calcSalesTotal()" style="flex:2;"><option value="">Select Product</option>'
+    +(prods||[]).map(function(p){return '<option value="'+p.id+'" data-price="'+p.price+'" data-gst="'+p.gst_percent+'">'+escHtml(p.name+(p.model?' ('+p.model+')':''))+'  ₹'+parseFloat(p.price).toLocaleString('en-IN')+'</option>';}).join('')
+    +'</select><input type="number" class="so-qty form-input" value="1" min="1" onchange="calcSalesTotal()" style="width:60px;">'
+    +'<button onclick="this.parentElement.remove();calcSalesTotal();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 8px;cursor:pointer;">✕</button>';
+  wrap.appendChild(div);
 }
 function calcSalesTotal(){
-  // ✅ Price = selling price (GST inclusive). Total = sum of prices. No extra GST added.
   var total=0;
   document.querySelectorAll('[id^="so-item-"]').forEach(function(row){
     var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);
@@ -14743,178 +14753,303 @@ function calcSalesTotal(){
   if(tb)tb.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:15px;font-weight:800;">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</span><span style="font-size:11px;color:#94a3b8;">GST included in price</span></div>';
 }
 async function saveSalesOrder(){
-  var cname=(document.getElementById('so-cname')?.value||'').trim();var cmob=(document.getElementById('so-cmob')?.value||'').trim();
-  if(!cname||!cmob){alert('Customer name and mobile required!');return;}
-  var total=0;var items=[];
+  var cname=(document.getElementById('so-cname')?.value||'').trim();
+  var mob=(document.getElementById('so-mob')?.value||'').trim();
+  if(!cname||!mob){alert('Customer name and mobile required.');return;}
+  var items=[];
   document.querySelectorAll('[id^="so-item-"]').forEach(function(row){
     var sel=row.querySelector('.so-prod');var qty=parseInt(row.querySelector('.so-qty')?.value||1);
     if(!sel||!sel.value)return;
-    var opt=sel.selectedOptions[0];var price=parseFloat(opt.dataset.price||0);var gPct=parseFloat(opt.dataset.gst||18);
-    total+=price*qty;
-    items.push({product_id:sel.value,name:opt.dataset.name||opt.text,qty:qty,price:price,gst_percent:gPct});
+    var opt=sel.selectedOptions[0];
+    var pr=window._salesProdsForOrder||[];
+    var prod=pr.find(function(p){return p.id===sel.value;});
+    items.push({product_id:sel.value,name:opt.text.split('  ₹')[0],price:parseFloat(opt.dataset.price||0),gst_percent:parseFloat(opt.dataset.gst||18),qty:qty});
   });
-  if(!items.length){alert('Add at least one product!');return;}
-  // ✅ total = selling price (GST inclusive). GST extracted for admin reference only.
+  if(!items.length){alert('Ek product select karo.');return;}
+  var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+  // GST extracted backward from inclusive price (admin reference only)
   var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
   var subtotal=total-gstAmt;
-  var yr=new Date().getFullYear();var existing=[];
-  try{existing=await sb('sales_orders','GET',null,'?order_no=like.SO-'+yr+'-%&select=id');}catch(e){}
-  var orderNo='SO-'+yr+'-'+String((existing.length||0)+1).padStart(3,'0');
-  var status=document.getElementById('so-type')?.value||'inquiry';
-  var data={order_no:orderNo,customer_name:cname,customer_mobile:cmob,customer_address:(document.getElementById('so-addr')?.value||'').trim()||null,items:items,subtotal:Math.round(subtotal*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,status:status,notes:(document.getElementById('so-notes')?.value||'').trim()||null,created_by:currentUser?.name||'Admin',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  try{
-    await sb('sales_orders','POST',data);closeModal('modal-general');renderSalesOrdersAdmin();
-    var mob=cmob.replace(/\D/g,'');if(mob.length===10)mob='91'+mob;
-    if(confirm('Order '+orderNo+' created!\n\nWhatsApp par details moklu?'))salesSendQuoteWA(orderNo,cname,mob,items,total);
-  }catch(e){alert('Error: '+e.message);}
+  var now=new Date();
+  var orderNo='SO-'+now.getFullYear()+('0'+(now.getMonth()+1)).slice(-2)+('0'+now.getDate()).slice(-2)+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+  var data={order_no:orderNo,customer_name:cname,customer_mobile:mob,customer_address:(document.getElementById('so-addr')?.value||'').trim(),
+    items:items,subtotal:Math.round(subtotal*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,
+    notes:(document.getElementById('so-notes')?.value||'').trim(),status:'inquiry',
+    created_by:currentUser?.name||'Admin',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  try{await sb('sales_orders','POST',data);closeModal('modal-general');window._salesTab='orders';window._salesStatusFilter='all';renderSales();alert('Order '+orderNo+' created!');}
+  catch(e){alert('Error: '+e.message);}
 }
+
 function openPaymentModal(id,cname,total,mob){
-  var html='<div style="display:grid;gap:10px;"><div style="background:#dcfce7;border-radius:8px;padding:14px;text-align:center;"><div style="font-size:24px;font-weight:800;color:#16a34a;">₹'+Math.round(total||0).toLocaleString('en-IN')+'</div><div style="font-size:12px;color:#15803d;">Amount to Collect</div></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Payment Method</label><select id="pay-method" class="form-input"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option></select></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Reference / Txn No</label><input id="pay-ref" class="form-input" placeholder="UPI txn ID..."></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Date</label><input id="pay-date" type="date" class="form-input" value="'+new Date().toISOString().slice(0,10)+'"></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Cancel</button><button class="btn btn-primary" style="background:#10b981;border-color:#10b981;" onclick="savePaymentRecord(\''+id+'\',\''+escHtml(cname)+'\','+(total||0)+',\''+mob+'\')">✅ Save</button></div>';
-  document.getElementById('modal-general-title').textContent='💰 Payment — '+cname;document.getElementById('modal-general-body').innerHTML=html;openModal('modal-general');
+  document.getElementById('modal-general-title').textContent='Mark Payment — '+cname;
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div style="background:#d1fae5;border-radius:8px;padding:12px;text-align:center;font-size:18px;font-weight:800;color:#065f46;">₹'+parseFloat(total).toLocaleString('en-IN')+' Received</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Payment Method *</label><select id="pm-method" class="form-input"><option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer</option><option value="Cheque">Cheque</option></select></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Reference / UTR No.</label><input id="pm-ref" class="form-input" placeholder="UPI ref or cheque number"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Payment Date</label><input id="pm-date" type="date" class="form-input" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
+    +'<button onclick="savePaymentRecord(\''+id+'\',\''+cname+'\','+total+',\''+escHtml(mob||'')+'\')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Confirm Payment</button>'
+    +'</div></div>';
+  openModal('modal-general');
 }
 async function savePaymentRecord(id,cname,total,mob){
-  var method=document.getElementById('pay-method')?.value;var ref=(document.getElementById('pay-ref')?.value||'').trim();var date=document.getElementById('pay-date')?.value;
-  try{var orders=await sb('sales_orders','GET',null,'?id=eq.'+id);var orderNo=(orders[0]?.order_no)||id;await sb('sales_orders','PATCH',{status:'paid',payment_method:method,payment_reference:ref||null,payment_date:date,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(confirm('✅ Payment saved!\n\nWhatsApp confirmation moklu?\n\n'+cname))salesSendPaymentWA(orderNo,cname,mob,total,method,ref);}catch(e){alert(e.message);}
+  var method=document.getElementById('pm-method')?.value;
+  var ref=document.getElementById('pm-ref')?.value||'';
+  var date=document.getElementById('pm-date')?.value;
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no,items');
+    await sb('sales_orders','PATCH',{status:'paid',payment_method:method,payment_reference:ref,payment_date:date,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    closeModal('modal-general');renderSalesOrdersAdmin();
+    var orderNo=ord&&ord[0]?ord[0].order_no:'';
+    if(mob)salesSendPaymentWA(orderNo,cname,mob,total,method,ref);
+  }catch(e){alert('Error: '+e.message);}
 }
 function openDispatchModal(id,cname,mob){
-  var html='<div style="display:grid;gap:10px;"><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Courier *</label><input id="dis-courier" class="form-input" list="co-opts" placeholder="DTDC, BlueDart..."><datalist id="co-opts"><option>DTDC</option><option>BlueDart</option><option>India Post</option><option>Delhivery</option><option>Ecom Express</option></datalist></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">AWB / Tracking No *</label><input id="dis-awb" class="form-input" placeholder="1234567890"></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Dispatch Date</label><input id="dis-date" type="date" class="form-input" value="'+new Date().toISOString().slice(0,10)+'"></div><div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Tracking URL (optional)</label><input id="dis-url" class="form-input" placeholder="https://..."></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Cancel</button><button class="btn btn-primary" style="background:#06b6d4;border-color:#06b6d4;" onclick="saveDispatchRecord(\''+id+'\',\''+escHtml(cname)+'\',\''+mob+'\')">🚚 Save</button></div>';
-  document.getElementById('modal-general-title').textContent='🚚 Dispatch — '+cname;document.getElementById('modal-general-body').innerHTML=html;openModal('modal-general');
+  document.getElementById('modal-general-title').textContent='Dispatch Details — '+cname;
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Courier Name *</label><input id="dp-courier" class="form-input" placeholder="DTDC / Blue Dart / Delhivery"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">AWB / Tracking Number *</label><input id="dp-awb" class="form-input" placeholder="1234567890"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Dispatch Date</label><input id="dp-date" type="date" class="form-input" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Tracking URL <span style="font-weight:400;color:#94a3b8;font-size:10px;">(optional)</span></label><input id="dp-url" class="form-input" placeholder="https://track.delhivery.com/..."></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
+    +'<button onclick="saveDispatchRecord(\''+id+'\',\''+cname+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">Save & Notify</button>'
+    +'</div></div>';
+  openModal('modal-general');
 }
 async function saveDispatchRecord(id,cname,mob){
-  var courier=(document.getElementById('dis-courier')?.value||'').trim();var awb=(document.getElementById('dis-awb')?.value||'').trim();if(!courier||!awb){alert('Courier and AWB required!');return;}
-  var date=document.getElementById('dis-date')?.value;var url=(document.getElementById('dis-url')?.value||'').trim();
-  try{var orders=await sb('sales_orders','GET',null,'?id=eq.'+id);var orderNo=(orders[0]?.order_no)||id;await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url||null,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(confirm('✅ Dispatch saved!\n\nTracking WhatsApp par moklu?\n\n'+cname))salesSendDispatchWA(orderNo,cname,mob,courier,awb,date,url);}catch(e){alert(e.message);}
+  var courier=(document.getElementById('dp-courier')?.value||'').trim();
+  var awb=(document.getElementById('dp-awb')?.value||'').trim();
+  var date=document.getElementById('dp-date')?.value;
+  var url=(document.getElementById('dp-url')?.value||'').trim();
+  if(!courier||!awb){alert('Courier name and AWB required.');return;}
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');
+    await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    closeModal('modal-general');renderSalesOrdersAdmin();
+    var orderNo=ord&&ord[0]?ord[0].order_no:'';
+    if(mob)salesSendDispatchWA(orderNo,cname,mob,courier,awb,date,url);
+  }catch(e){alert('Error: '+e.message);}
 }
 async function viewSalesOrder(id){
-  var orders=await sb('sales_orders','GET',null,'?id=eq.'+id);var o=orders[0];if(!o){alert('Order not found');return;}
-  var sc=_salesStatusColor[o.status]||'#94a3b8';var mob=(o.customer_mobile||'').replace(/\D/g,'');if(mob.length===10)mob='91'+mob;
-  var itemRows=(o.items||[]).map(function(i,idx){return '<tr style="background:'+(idx%2?'#f8fafc':'#fff')+'"><td style="padding:6px 10px;">'+escHtml(i.name)+'</td><td style="padding:6px 10px;text-align:center;">'+i.qty+'</td><td style="padding:6px 10px;text-align:right;">₹'+Math.round((i.price||0)*i.qty).toLocaleString('en-IN')+'</td></tr>';}).join('');
-  var html='<div style="display:grid;gap:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><div style="font-size:20px;font-weight:800;">'+escHtml(o.order_no||'-')+'</div><div style="font-size:12px;color:#64748b;">'+(o.created_at?o.created_at.slice(0,10):'-')+'</div></div><span style="background:'+sc+'22;color:'+sc+';padding:4px 13px;border-radius:20px;font-size:12px;font-weight:700;">'+(_salesStatusLabel[o.status]||o.status)+'</span></div>'
-    +'<div style="background:#f8fafc;border-radius:8px;padding:11px;font-size:13px;"><div style="font-weight:700;margin-bottom:4px;">👤 Customer</div><div style="font-weight:600;">'+escHtml(o.customer_name||'-')+'</div><div style="color:#64748b;">'+escHtml(o.customer_mobile||'')+'</div>'+(o.customer_address?'<div style="color:#64748b;font-size:12px;margin-top:2px;">'+escHtml(o.customer_address)+'</div>':'')+'</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;">Product</th><th style="padding:6px 10px;text-align:center;">Qty</th><th style="padding:6px 10px;text-align:right;">Amount</th></tr></thead><tbody>'+itemRows+'</tbody>'
-    +'<tfoot>'
-    // ✅ Show GST breakdown for admin (extracted from inclusive price)
-    +'<tr><td colspan="2" style="padding:6px 10px;color:#64748b;font-size:12px;">GST included</td><td style="padding:6px 10px;text-align:right;color:#64748b;font-size:12px;">₹'+Math.round(o.gst_amount||0).toLocaleString('en-IN')+'</td></tr>'
-    +'<tr style="border-top:2px solid #e2e8f0;"><td colspan="2" style="padding:7px 10px;font-size:15px;font-weight:800;">Total Payable</td><td style="padding:7px 10px;text-align:right;font-size:15px;font-weight:800;">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</td></tr></tfoot></table>'
-    +(o.payment_method?'<div style="background:#dcfce7;border-radius:8px;padding:10px;font-size:13px;">💰 '+escHtml(o.payment_method)+(o.payment_reference?' · '+escHtml(o.payment_reference):'')+(o.payment_date?' · '+o.payment_date:'')+'</div>':'')
-    +(o.courier_name?'<div style="background:#e0f2fe;border-radius:8px;padding:10px;font-size:13px;">🚚 '+escHtml(o.courier_name)+' · AWB: '+escHtml(o.awb_number||'-')+(o.dispatch_date?' · '+o.dispatch_date:'')+(o.tracking_url?'<br><a href="'+escHtml(o.tracking_url)+'" target="_blank" style="color:#0284c7;">Track 🔗</a>':'')+'</div>':'')
-    +(o.notes?'<div style="font-size:12px;color:#64748b;background:#f8fafc;padding:8px;border-radius:6px;">📝 '+escHtml(o.notes)+'</div>':'')
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+buildSalesActions(o,mob)+'</div></div>';
-  document.getElementById('modal-general-title').textContent='Order Details';document.getElementById('modal-general-body').innerHTML=html+'<div style="text-align:right;margin-top:12px;"><button class="btn btn-outline" onclick="closeModal(\'modal-general\')">Close</button></div>';openModal('modal-general');
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id);
+    var o=ord&&ord[0]?ord[0]:null;if(!o)return;
+    var items=o.items||[];
+    document.getElementById('modal-general-title').textContent='Order: '+escHtml(o.order_no||'');
+    var html='<div style="font-size:13px;line-height:1.8;">'
+      +'<b>Customer:</b> '+escHtml(o.customer_name)+'<br>'
+      +'<b>Mobile:</b> '+escHtml(o.customer_mobile||'-')+'<br>'
+      +(o.customer_address?'<b>Address:</b> '+escHtml(o.customer_address)+'<br>':'')
+      +'<b>Status:</b> '+escHtml(o.status||'')+'<br>'
+      +'<b>Date:</b> '+new Date(o.created_at).toLocaleDateString('en-IN')+'<br>'
+      +'<hr style="border:none;border-top:1px solid #e2e8f0;margin:10px 0;">'
+      +'<b>Items:</b><br>';
+    items.forEach(function(it){
+      html+='• '+escHtml(it.name||'')+'  x'+it.qty+'  ₹'+parseFloat(it.price*it.qty).toLocaleString('en-IN')+'<br>';
+    });
+    html+='<hr style="border:none;border-top:1px solid #e2e8f0;margin:10px 0;">'
+      +'<b>Subtotal (excl. GST):</b> ₹'+parseFloat(o.subtotal||0).toLocaleString('en-IN')+'<br>'
+      +'<b>GST Amount:</b> ₹'+parseFloat(o.gst_amount||0).toLocaleString('en-IN')+'<br>'
+      +'<b style="font-size:15px;">Total:</b> <b style="font-size:15px;color:#1a56db;">₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'</b><br>';
+    if(o.payment_method)html+='<b>Payment:</b> '+escHtml(o.payment_method)+(o.payment_reference?' ('+escHtml(o.payment_reference)+')':'')+'<br>';
+    if(o.courier_name)html+='<b>Courier:</b> '+escHtml(o.courier_name)+' — AWB: '+escHtml(o.awb_number||'')+'<br>';
+    if(o.tracking_url)html+='<b>Track:</b> <a href="'+escHtml(o.tracking_url)+'" target="_blank">'+escHtml(o.tracking_url)+'</a><br>';
+    if(o.notes)html+='<b>Notes:</b> '+escHtml(o.notes)+'<br>';
+    html+='</div>';
+    document.getElementById('modal-general-body').innerHTML=html;
+    openModal('modal-general');
+  }catch(e){alert(e.message);}
 }
 
-// WhatsApp — total is selling price, no extra GST shown to customer
+// WhatsApp functions
 async function salesSendBrochureWA(orderId,mob){
-  var orders=await sb('sales_orders','GET',null,'?id=eq.'+orderId);var o=orders[0];if(!o)return;
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var itemsTxt=(o.items||[]).map(function(i){return '📦 *'+i.name+'*  ₹'+Math.round(i.price||0).toLocaleString('en-IN')+' × '+i.qty;}).join('\n');
-  var msg='Dear *'+o.customer_name+'*,\n\nThank you for your interest in *'+(ci.name||'Bhavi Electronics')+'*!\n\n'+itemsTxt+'\n\n✅ *Total: ₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'*\n(All prices inclusive of GST)\n\n💳 Payment: 100% Advance\nTo confirm, please call:\n📞 *'+(ci.phone||'+91 9574004969')+'*';
-  if(!mob){mob=(o.customer_mobile||'').replace(/\D/g,'');if(mob.length===10)mob='91'+mob;}
-  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
-  await sb('sales_orders','PATCH',{status:'quoted',updated_at:new Date().toISOString()},'?id=eq.'+orderId);renderSalesOrdersAdmin();
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=order_no,customer_name,items');
+    var o=ord&&ord[0]?ord[0]:{};
+    var items=o.items||[];
+    var shopUrl=window.location.origin+window.location.pathname+'?shop';
+    var msg='🛍️ *Bhavi Electronics — Product Catalog*\n\nDear '+escHtml(o.customer_name||'Customer')+',\n\nAapna inquiry ('+escHtml(o.order_no||'')+ ') badal thank you!\n\nAapni pasandgida products browse karva mate aapni online shop visit karo:\n🔗 '+shopUrl+'\n\n✅ Products add karo ane order karo\n✅ 100% Advance Payment\n✅ Fast Dispatch\n\nKoi pan prashna mate contact karo: 📞 Bhavi Electronics';
+    var mobClean=(mob||'').replace(/\D/g,'');if(mobClean.length===10)mobClean='91'+mobClean;
+    if(mobClean)window.open('https://wa.me/'+mobClean+'?text='+encodeURIComponent(msg),'_blank');
+  }catch(e){alert(e.message);}
 }
 function salesSendQuoteWA(orderNo,cname,mob,items,total){
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var itemsTxt=(items||[]).map(function(i){return '📦 *'+(i.name||'')+'* × '+i.qty+'  ₹'+Math.round((i.price||0)*i.qty).toLocaleString('en-IN');}).join('\n');
-  var msg='Dear *'+cname+'*,\n\nYour order is placed at *'+(ci.name||'Bhavi Electronics')+'*!\n\n📋 Order No: *'+orderNo+'*\n\n'+itemsTxt+'\n\n✅ *Total Payable: ₹'+Math.round(total||0).toLocaleString('en-IN')+'*\n(All prices inclusive of GST)\n\n💳 100% Advance Payment required.\nOur team will contact you for payment.\n\n📞 *'+(ci.phone||'+91 9574004969')+'*';
-  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+  var lines=(items||[]).map(function(i){return '• '+i.name+' x'+i.qty+' = ₹'+parseFloat(i.price*i.qty).toLocaleString('en-IN');}).join('\n');
+  var msg='📋 *Bhavi Electronics — Quotation*\n\nDear '+cname+',\n\nOrder No: *'+orderNo+'*\n\n'+lines+'\n\n*Total: ₹'+parseFloat(total).toLocaleString('en-IN')+'* (All prices inclusive of GST)\n\n💳 100% Advance Payment required.\n\nFor confirmation, please reply to this message.';
+  var mobClean=(mob||'').replace(/\D/g,'');if(mobClean.length===10)mobClean='91'+mobClean;
+  if(mobClean)window.open('https://wa.me/'+mobClean+'?text='+encodeURIComponent(msg),'_blank');
 }
 function salesSendPaymentWA(orderNo,cname,mob,total,method,ref){
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var msg='Dear *'+cname+'*,\n\n✅ Payment received! Thank you.\n\n📋 Order No: *'+orderNo+'*\n💰 Amount Paid: *₹'+Math.round(total||0).toLocaleString('en-IN')+'*\n'+(method?'💳 '+method+'\n':'')+(ref?'🔖 Ref: '+ref+'\n':'')+'\nYour product will be dispatched shortly.\n📞 *'+(ci.phone||'+91 9574004969')+'*';
-  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+  var msg='✅ *Payment Confirmed — Bhavi Electronics*\n\nDear '+cname+',\n\nTumaro payment confirm thai gayo!\n\n📦 Order No: *'+orderNo+'*\n💰 Amount: ₹'+parseFloat(total).toLocaleString('en-IN')+'\n💳 Method: '+method+(ref?' | Ref: '+ref:'')+'\n\nTumaro order hava prepare thase ane dispatch thata j tracking details moklai jashe.\n\nThank you for choosing Bhavi Electronics! 🙏';
+  var mobClean=(mob||'').replace(/\D/g,'');if(mobClean.length===10)mobClean='91'+mobClean;
+  if(mobClean)window.open('https://wa.me/'+mobClean+'?text='+encodeURIComponent(msg),'_blank');
 }
 function salesSendDispatchWA(orderNo,cname,mob,courier,awb,date,trackUrl){
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var msg='Dear *'+cname+'*,\n\n🚚 Your order has been dispatched!\n\n📋 Order No: *'+orderNo+'*\n📦 Courier: *'+courier+'*\n🔖 AWB: *'+awb+'*\n'+(date?'📅 Dispatched: '+date+'\n':'')+(trackUrl?'🔗 Track: '+trackUrl+'\n':'')+'\nExpected delivery: 3-5 business days.\n📞 *'+(ci.phone||'+91 9574004969')+'*';
-  window.open('https://wa.me/'+mob+'?text='+encodeURIComponent(msg),'_blank');
+  var msg='🚚 *Order Dispatched — Bhavi Electronics*\n\nDear '+cname+',\n\nTumaro order dispatch thai gayo!\n\n📦 Order No: *'+orderNo+'*\n🏢 Courier: '+courier+'\n🔢 AWB No: *'+awb+'*\n📅 Dispatch Date: '+date+(trackUrl?'\n🔗 Track: '+trackUrl:'')+'\n\nJo koi problem hoy to amne contact karo.\n\nThank you for shopping with Bhavi Electronics! 🙏';
+  var mobClean=(mob||'').replace(/\D/g,'');if(mobClean.length===10)mobClean='91'+mobClean;
+  if(mobClean)window.open('https://wa.me/'+mobClean+'?text='+encodeURIComponent(msg),'_blank');
 }
 
-// ============================================================
-// PUBLIC SHOP
-// ============================================================
-var _shopCart=[];var _shopAllProds=[];
+// Public Shop
+var _shopCart=[];
+var _shopProds=[];
 async function loadPublicShop(container){
-  if(!container)container=document.getElementById('shop-root');if(!container)return;
-  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
-  var compName=ci.name||'Bhavi Electronics';var compPhone=ci.phone||'+91 9574004969';
-  container.innerHTML='<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;min-height:100vh;background:#f8fafc;">'
-    +'<div style="background:#1e293b;color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,0.3);"><div><div style="font-weight:800;font-size:16px;">🏪 '+escHtml(compName)+'</div><div style="font-size:10px;opacity:0.65;">Online Product Shop</div></div>'
-    +'<div style="display:flex;align-items:center;gap:10px;"><a href="tel:'+escHtml(compPhone)+'" style="color:#fff;text-decoration:none;font-size:12px;opacity:0.85;">📞 '+escHtml(compPhone)+'</a><button onclick="toggleShopCart()" style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:700;font-size:13px;">🛒 Cart <span id="shop-cart-count" style="background:#fff;color:#f59e0b;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;margin-left:3px;">0</span></button></div></div>'
-    +'<div id="shop-body" style="max-width:1100px;margin:0 auto;padding:18px;"></div>'
-    +'<div id="shop-cart-panel" style="display:none;position:fixed;right:0;top:0;bottom:0;width:min(360px,100vw);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.15);z-index:200;overflow-y:auto;padding:18px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h3 style="margin:0;font-size:16px;">🛒 Your Cart</h3><button onclick="toggleShopCart()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;">✕</button></div><div id="shop-cart-items"></div><div id="shop-cart-total"></div><div id="shop-checkout-form"></div></div></div>';
+  var ci={};try{var r=await sb('company_info','GET',null,'?id=eq.1');ci=(r&&r[0])||{};}catch(e){}
+  var logoHtml=ci.logo_data?'<img src="'+ci.logo_data+'" style="max-height:44px;max-width:140px;object-fit:contain;">'
+    :'<span style="font-size:16px;font-weight:800;color:#fff;">Bhavi Electronics</span>';
+  container.innerHTML=
+    '<div style="background:#1a56db;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;">'
+    +logoHtml
+    +'<div style="display:flex;align-items:center;gap:10px;">'
+    +'<span id="shop-cart-badge" onclick="toggleShopCart()" style="background:#fff;color:#1a56db;border-radius:20px;padding:6px 14px;font-size:14px;font-weight:700;cursor:pointer;">🛒 Cart (0)</span>'
+    +'</div></div>'
+    +'<div id="shop-cart-panel" style="display:none;background:#fff;border-bottom:2px solid #e2e8f0;padding:16px;max-width:640px;margin:0 auto;"></div>'
+    +'<div style="max-width:900px;margin:0 auto;padding:16px;">'
+    +'<h2 style="font-size:18px;font-weight:800;margin:0 0 16px;color:#111;">Our Products</h2>'
+    +'<div id="shop-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;"></div>'
+    +'</div>'
+    +'<div id="shop-order-form" style="display:none;max-width:480px;margin:20px auto;background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.1);"></div>';
+  _shopCart=[];
+  try{
+    _shopProds=await sb('sales_products','GET',null,'?is_active=eq.true&stock_status=eq.available&order=name.asc')||[];
+  }catch(e){_shopProds=[];}
   renderShopProducts();
 }
-async function renderShopProducts(){
-  var body=document.getElementById('shop-body');if(!body)return;
-  body.innerHTML='<div style="text-align:center;padding:50px;color:#64748b;">Loading products...</div>';
-  try{
-    var resp=await fetch(SB_URL+'/rest/v1/sales_products?is_active=eq.true&stock_status=eq.available&order=name',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    var prods=await resp.json();_shopAllProds=Array.isArray(prods)?prods:[];
-    if(!_shopAllProds.length){body.innerHTML='<div style="text-align:center;padding:70px;color:#94a3b8;"><div style="font-size:48px;margin-bottom:14px;">📦</div><div style="font-size:16px;font-weight:600;">No products available</div></div>';return;}
-    var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px;">';
-    _shopAllProds.forEach(function(p){
-      var feats=(p.features||[]).slice(0,4);
-      html+='<div style="background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.07);overflow:hidden;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s;" onmouseover="this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,0.13)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 2px 12px rgba(0,0,0,0.07)\'">'
-        +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:170px;object-fit:cover;" onclick="shopViewProduct(\''+p.id+'\')" onerror="this.style.display=\'none\'">':'<div style="height:90px;background:linear-gradient(135deg,#dbeafe,#e0e7ff);display:flex;align-items:center;justify-content:center;font-size:44px;" onclick="shopViewProduct(\''+p.id+'\')">📦</div>')
-        +'<div style="padding:15px;"><div style="font-weight:700;font-size:15px;margin-bottom:2px;cursor:pointer;" onclick="shopViewProduct(\''+p.id+'\')">'+escHtml(p.name)+'</div>'
-        +(p.model?'<div style="font-size:11px;color:#94a3b8;margin-bottom:7px;">Model: '+escHtml(p.model)+'</div>':'<div style="margin-bottom:5px;"></div>')
-        +(feats.length?'<ul style="margin:0 0 10px;padding-left:17px;font-size:12px;color:#475569;">'+feats.map(function(f){return '<li>'+escHtml(f)+'</li>';}).join('')+'</ul>':'')
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">'
-        // ✅ Customer sees only the selling price — no extra GST added
-        +'<div><div style="font-size:19px;font-weight:800;color:#1e293b;">₹'+Math.round(p.price||0).toLocaleString('en-IN')+'</div>'
-        +'<div style="font-size:10px;color:#94a3b8;">Incl. all taxes</div></div>'
-        +'<button onclick="shopAddToCart(\''+p.id+'\')" style="background:#1e293b;color:#fff;border:none;border-radius:8px;padding:8px 13px;cursor:pointer;font-weight:700;font-size:13px;">+ Cart</button>'
-        +'</div></div></div>';
-    });html+='</div>';body.innerHTML=html;
-  }catch(e){body.innerHTML='<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">Error loading products.</div>';}
+function renderShopProducts(){
+  var grid=document.getElementById('shop-products-grid');if(!grid)return;
+  if(!_shopProds.length){grid.innerHTML='<div style="color:#94a3b8;padding:40px;text-align:center;">No products available right now.</div>';return;}
+  grid.innerHTML=_shopProds.map(function(p,i){
+    return '<div onclick="shopViewProduct('+i+')" style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);overflow:hidden;cursor:pointer;transition:transform 0.15s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'\'"">'
+      +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:140px;object-fit:cover;">'
+        :'<div style="width:100%;height:100px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:32px;">📦</div>')
+      +'<div style="padding:10px;">'
+      +'<div style="font-size:12px;font-weight:700;color:#111;margin-bottom:2px;">'+escHtml(p.name)+'</div>'
+      +(p.model?'<div style="font-size:11px;color:#6b7280;">'+escHtml(p.model)+'</div>':'')
+      +'<div style="margin-top:6px;font-size:15px;font-weight:800;color:#1a56db;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
+      +'<div style="font-size:10px;color:#10b981;">Incl. all taxes</div>'
+      +'<button onclick="event.stopPropagation();shopAddToCart('+i+')" style="margin-top:8px;width:100%;background:#1a56db;color:#fff;border:none;border-radius:7px;padding:7px;font-size:13px;font-weight:600;cursor:pointer;">+ Add to Cart</button>'
+      +'</div></div>';
+  }).join('');
 }
-function shopViewProduct(id){
-  var p=(_shopAllProds||[]).find(function(x){return x.id===id;});if(!p)return;
-  var specs=p.specifications||{};var specKeys=Object.keys(specs);var feats=p.features||[];
-  var d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:14px;';d.onclick=function(e){if(e.target===d)d.remove();};
-  d.innerHTML='<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;">'+(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:16px 16px 0 0;" onerror="this.style.display=\'none\'">':'')+'<div style="padding:18px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;"><div><div style="font-size:18px;font-weight:800;">'+escHtml(p.name)+'</div>'+(p.model?'<div style="font-size:12px;color:#64748b;">Model: '+escHtml(p.model)+'</div>':'')+'</div><button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:none;border:1px solid #e2e8f0;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:16px;flex-shrink:0;margin-left:8px;">✕</button></div>'+(p.description?'<p style="color:#475569;font-size:13px;margin-bottom:11px;">'+escHtml(p.description)+'</p>':'')+(feats.length?'<div style="margin-bottom:11px;"><div style="font-weight:700;font-size:13px;margin-bottom:5px;">✨ Features</div><ul style="margin:0;padding-left:17px;font-size:13px;color:#475569;">'+feats.map(function(f){return '<li>'+escHtml(f)+'</li>';}).join('')+'</ul></div>':'')+(specKeys.length?'<div style="margin-bottom:13px;"><div style="font-weight:700;font-size:13px;margin-bottom:5px;">📋 Specifications</div><table style="width:100%;font-size:12px;border-collapse:collapse;">'+specKeys.map(function(k,i){return '<tr style="background:'+(i%2?'#f8fafc':'#fff')+'"><td style="padding:5px 8px;color:#64748b;font-weight:600;white-space:nowrap;">'+escHtml(k)+'</td><td style="padding:5px 8px;">'+escHtml(specs[k])+'</td></tr>';}).join('')+'</table></div>':'')
-    +'<div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:10px;padding:13px;">'
-    // ✅ One clean price — no GST addition
-    +'<div><div style="font-size:22px;font-weight:800;color:#1e293b;">₹'+Math.round(p.price||0).toLocaleString('en-IN')+'</div><div style="font-size:11px;color:#94a3b8;">Incl. all taxes</div></div>'
-    +'<button onclick="shopAddToCart(\''+p.id+'\');this.closest(\'div[style*=fixed]\').remove();" style="background:#1e293b;color:#fff;border:none;border-radius:10px;padding:12px 18px;cursor:pointer;font-weight:700;font-size:14px;">🛒 Add to Cart</button></div></div></div>';
-  document.body.appendChild(d);
+function shopViewProduct(idx){
+  var p=_shopProds[idx];if(!p)return;
+  var feats=(p.features||[]).filter(Boolean);
+  var specs=p.specifications||{};
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;margin-top:20px;overflow:hidden;" onclick="event.stopPropagation()">'
+    +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:260px;object-fit:cover;">'
+      :'<div style="width:100%;height:120px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>')
+    +'<div style="padding:18px;">'
+    +'<h2 style="margin:0 0 4px;font-size:17px;">'+escHtml(p.name)+'</h2>'
+    +(p.model?'<div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Model: '+escHtml(p.model)+'</div>':'')
+    +'<div style="font-size:22px;font-weight:800;color:#1a56db;margin-bottom:4px;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
+    +'<div style="font-size:12px;color:#10b981;margin-bottom:12px;">✅ Incl. all taxes | 100% Advance</div>'
+    +(p.description?'<p style="font-size:13px;color:#475569;margin:0 0 12px;">'+escHtml(p.description)+'</p>':'')
+    +(feats.length?'<div style="margin-bottom:12px;"><b style="font-size:13px;">Features:</b><ul style="margin:6px 0 0;padding-left:18px;">'+feats.map(function(f){return '<li style="font-size:13px;color:#374151;margin-bottom:3px;">'+escHtml(f)+'</li>';}).join('')+'</ul></div>':'')
+    +(Object.keys(specs).length?'<div style="margin-bottom:14px;"><b style="font-size:13px;">Specifications:</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">'+Object.entries(specs).map(function(kv){return '<div style="font-size:12px;color:#6b7280;">'+escHtml(kv[0])+'</div><div style="font-size:12px;font-weight:600;">'+escHtml(kv[1])+'</div>';}).join('')+'</div></div>':'')
+    +'<div style="display:flex;gap:8px;">'
+    +'<button onclick="shopAddToCart('+idx+');this.closest(\'div[style*=\"position:fixed\"]\').remove();" style="flex:2;background:#1a56db;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;">🛒 Add to Cart</button>'
+    +'<button onclick="this.closest(\'div[style*=\"position:fixed\"]\').remove();" style="flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:9px;padding:12px;cursor:pointer;font-weight:600;">Close</button>'
+    +'</div></div></div>';
+  document.body.appendChild(overlay);
 }
-function shopAddToCart(id){var p=(_shopAllProds||[]).find(function(x){return x.id===id;});if(!p)return;var ex=_shopCart.find(function(c){return c.id===id;});if(ex){ex.qty+=1;}else{_shopCart.push({id:p.id,name:p.name,price:p.price,gst_percent:p.gst_percent||18,qty:1});}updateCartBadge();renderCartPanel();var panel=document.getElementById('shop-cart-panel');if(panel)panel.style.display='block';}
-function updateCartBadge(){var cnt=document.getElementById('shop-cart-count');if(cnt)cnt.textContent=_shopCart.reduce(function(s,c){return s+c.qty;},0);}
-function toggleShopCart(){var p=document.getElementById('shop-cart-panel');if(!p)return;p.style.display=p.style.display==='none'?'block':'none';if(p.style.display==='block')renderCartPanel();}
+function shopAddToCart(idx){
+  var p=_shopProds[idx];if(!p)return;
+  var ex=_shopCart.find(function(c){return c.id===p.id;});
+  if(ex){ex.qty++;}else{_shopCart.push({id:p.id,name:p.name,model:p.model,price:p.price,gst_percent:p.gst_percent,qty:1});}
+  updateCartBadge();
+  var badge=document.getElementById('shop-cart-badge');
+  if(badge){badge.style.background='#10b981';setTimeout(function(){badge.style.background='#fff';},600);}
+}
+function updateCartBadge(){
+  var b=document.getElementById('shop-cart-badge');
+  if(b)b.textContent='🛒 Cart ('+_shopCart.reduce(function(s,c){return s+c.qty;},0)+')';
+}
+function toggleShopCart(){
+  var panel=document.getElementById('shop-cart-panel');
+  if(!panel)return;
+  panel.style.display=panel.style.display==='none'?'block':'none';
+  if(panel.style.display==='block')renderCartPanel();
+}
 function renderCartPanel(){
-  var iEl=document.getElementById('shop-cart-items');var tEl=document.getElementById('shop-cart-total');var cEl=document.getElementById('shop-checkout-form');if(!iEl)return;
-  if(!_shopCart.length){iEl.innerHTML='<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">Cart is empty</div>';if(tEl)tEl.innerHTML='';if(cEl)cEl.innerHTML='';return;}
-  // ✅ Total = sum of selling prices (GST inclusive). No extra addition.
+  var panel=document.getElementById('shop-cart-panel');if(!panel)return;
+  if(!_shopCart.length){panel.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">Cart is empty</div>';return;}
   var total=_shopCart.reduce(function(s,c){return s+c.price*c.qty;},0);
-  var html='';
-  _shopCart.forEach(function(c,i){html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f1f5f9;"><div style="flex:1;min-width:0;margin-right:8px;"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(c.name)+'</div><div style="font-size:11px;color:#64748b;">₹'+Math.round(c.price).toLocaleString('en-IN')+' each</div></div><div style="display:flex;align-items:center;gap:5px;flex-shrink:0;"><button onclick="shopQtyChange('+i+',-1)" style="background:#f1f5f9;border:none;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;font-weight:700;">-</button><span style="font-weight:700;min-width:18px;text-align:center;font-size:13px;">'+c.qty+'</span><button onclick="shopQtyChange('+i+',1)" style="background:#f1f5f9;border:none;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:13px;font-weight:700;">+</button><button onclick="shopRemoveCart('+i+')" style="background:#fee2e2;color:#ef4444;border:none;border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:11px;">✕</button></div></div>';});
-  iEl.innerHTML=html;
-  if(tEl)tEl.innerHTML='<div style="border-top:2px solid #e2e8f0;padding-top:11px;margin-top:8px;"><div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;margin-bottom:4px;"><span>Total Payable</span><span>₹'+Math.round(total).toLocaleString('en-IN')+'</span></div><div style="font-size:11px;color:#94a3b8;text-align:right;margin-bottom:6px;">Incl. all taxes</div><div style="font-size:11px;color:#f59e0b;font-weight:600;text-align:center;">💳 100% Advance Payment Required</div></div>';
-  if(cEl)cEl.innerHTML='<div style="margin-top:14px;border-top:2px solid #e2e8f0;padding-top:14px;"><div style="font-weight:700;margin-bottom:9px;font-size:14px;">📋 Your Details</div><input id="shop-cname" placeholder="Your Full Name *" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:7px;box-sizing:border-box;outline:none;"><input id="shop-cmob" type="tel" placeholder="Mobile Number *" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:7px;box-sizing:border-box;outline:none;"><input id="shop-addr" placeholder="Delivery Address *" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:12px;box-sizing:border-box;outline:none;"><button onclick="shopPlaceOrder()" style="width:100%;background:#1e293b;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">🛒 Place Order</button><p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:7px;">Our team will contact you for payment & delivery.</p></div>';
+  var html='<div style="font-weight:700;margin-bottom:10px;">Your Cart</div>';
+  _shopCart.forEach(function(c,i){
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'
+      +'<div style="flex:1;font-size:13px;font-weight:600;">'+escHtml(c.name)+'</div>'
+      +'<div style="display:flex;align-items:center;gap:4px;">'
+      +'<button onclick="shopQtyChange('+i+',-1)" style="background:#f1f5f9;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-weight:700;">-</button>'
+      +'<span style="width:24px;text-align:center;font-weight:700;">'+c.qty+'</span>'
+      +'<button onclick="shopQtyChange('+i+',1)" style="background:#f1f5f9;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-weight:700;">+</button>'
+      +'</div>'
+      +'<div style="min-width:60px;text-align:right;font-weight:700;color:#1a56db;">₹'+parseFloat(c.price*c.qty).toLocaleString('en-IN')+'</div>'
+      +'<button onclick="shopRemoveCart('+i+')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;">✕</button>'
+      +'</div>';
+  });
+  html+='<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">'
+    +'<span style="font-size:16px;font-weight:800;">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</span>'
+    +'<span style="font-size:11px;color:#10b981;">Incl. all taxes</span>'
+    +'</div>'
+    +'<button onclick="shopPlaceOrder()" style="margin-top:12px;width:100%;background:#1a56db;color:#fff;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Place Order →</button>';
+  panel.innerHTML=html;
 }
-function shopQtyChange(i,d){if(!_shopCart[i])return;_shopCart[i].qty+=d;if(_shopCart[i].qty<1)_shopCart.splice(i,1);updateCartBadge();renderCartPanel();}
+function shopQtyChange(i,d){_shopCart[i].qty+=d;if(_shopCart[i].qty<1)_shopCart[i].qty=1;updateCartBadge();renderCartPanel();}
 function shopRemoveCart(i){_shopCart.splice(i,1);updateCartBadge();renderCartPanel();}
 async function shopPlaceOrder(){
-  var cname=(document.getElementById('shop-cname')?.value||'').trim();var cmob=(document.getElementById('shop-cmob')?.value||'').trim();var addr=(document.getElementById('shop-addr')?.value||'').trim();
-  if(!cname||!cmob||!addr){alert('Please fill all fields!');return;}if(!_shopCart.length){alert('Cart is empty!');return;}
-  // ✅ total = selling price total (GST inclusive)
-  var total=_shopCart.reduce(function(s,c){return s+c.price*c.qty;},0);
-  var items=_shopCart.map(function(c){return {product_id:c.id,name:c.name,qty:c.qty,price:c.price,gst_percent:c.gst_percent};});
-  var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
-  var yr=new Date().getFullYear();
-  var countResp=await fetch(SB_URL+'/rest/v1/sales_orders?select=id&order_no=like.SO-'+yr+'-%',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-  var existing=await countResp.json();var orderNo='SO-'+yr+'-'+String((Array.isArray(existing)?existing.length:0)+1).padStart(3,'0');
-  var data={order_no:orderNo,customer_name:cname,customer_mobile:cmob,customer_address:addr,items:items,subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,status:'inquiry',created_by:'Online Shop',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  try{
-    var r=await fetch(SB_URL+'/rest/v1/sales_orders',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});
-    if(!r.ok){var err=await r.text();throw new Error(err);}
-    _shopCart=[];updateCartBadge();
-    var panel=document.getElementById('shop-cart-panel');
-    if(panel)panel.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;min-height:60vh;"><div style="font-size:54px;margin-bottom:14px;">✅</div><div style="font-size:20px;font-weight:800;margin-bottom:8px;">Order Placed!</div><div style="font-size:14px;color:#64748b;margin-bottom:6px;">Order No: <strong>'+orderNo+'</strong></div><div style="font-size:13px;color:#64748b;margin-bottom:20px;line-height:1.5;">Our team will contact you shortly<br>for payment & delivery details.</div><a href="tel:'+(JSON.parse(localStorage.getItem('bhavi_company')||'{}').phone||'+91 9574004969')+'" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;">📞 Call Us</a><button onclick="document.getElementById(\'shop-cart-panel\').style.display=\'none\'" style="margin-top:12px;background:none;border:1px solid #e2e8f0;border-radius:8px;padding:8px 20px;cursor:pointer;font-size:13px;color:#64748b;">Continue Shopping</button></div>';
-  }catch(e){alert('Error placing order: '+e.message);}
+  var form=document.getElementById('shop-order-form');
+  if(!form)return;
+  form.style.display='block';
+  form.innerHTML='<h3 style="margin:0 0 14px;font-size:16px;">Your Details</h3>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<input id="shop-name" class="form-input" placeholder="Your Name *" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:14px;">'
+    +'<input id="shop-mob" type="tel" class="form-input" placeholder="Mobile Number * (10 digits)" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:14px;">'
+    +'<textarea id="shop-addr" class="form-input" rows="2" placeholder="Delivery Address *" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:14px;resize:none;"></textarea>'
+    +'<div style="background:#fef3c7;border-radius:8px;padding:10px;font-size:12px;color:#92400e;">⚠️ 100% Advance Payment required. After order submission, our team will contact you for payment details.</div>'
+    +'<button onclick="shopSubmitOrder()" style="background:#10b981;color:#fff;border:none;border-radius:9px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">✅ Confirm Order</button>'
+    +'<button onclick="document.getElementById(\'shop-order-form\').style.display=\'none\'" style="background:#f1f5f9;color:#475569;border:none;border-radius:9px;padding:10px;cursor:pointer;">← Back to Cart</button>'
+    +'</div>';
+  form.scrollIntoView({behavior:'smooth'});
 }
+window.shopSubmitOrder=async function(){
+  var name=(document.getElementById('shop-name')?.value||'').trim();
+  var mob=(document.getElementById('shop-mob')?.value||'').replace(/\D/g,'');
+  var addr=(document.getElementById('shop-addr')?.value||'').trim();
+  if(!name){alert('Naam bharvu jaruri chhe.');return;}
+  if(mob.length!==10){alert('Valid 10-digit mobile number bharvo.');return;}
+  if(!addr){alert('Delivery address jaruri chhe.');return;}
+  if(!_shopCart.length){alert('Cart empty chhe.');return;}
+  var items=_shopCart.map(function(c){return{product_id:c.id,name:c.name,price:c.price,gst_percent:c.gst_percent||18,qty:c.qty};});
+  var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+  var gstAmt=items.reduce(function(s,i){return s+calcGstFromInclusive(i.price*i.qty,i.gst_percent);},0);
+  var subtotal=total-gstAmt;
+  var _now=new Date();
+  var orderNo='SO-'+_now.getFullYear()+('0'+(_now.getMonth()+1)).slice(-2)+('0'+_now.getDate()).slice(-2)+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+  var data={order_no:orderNo,customer_name:name,customer_mobile:mob,customer_address:addr,
+    items:items,subtotal:Math.round(subtotal*100)/100,gst_amount:Math.round(gstAmt*100)/100,total_amount:Math.round(total*100)/100,
+    status:'inquiry',created_by:'Online Shop',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  try{
+    await sb('sales_orders','POST',data);
+    _shopCart=[];updateCartBadge();
+    document.getElementById('shop-cart-panel').style.display='none';
+    document.getElementById('shop-order-form').innerHTML='<div style="text-align:center;padding:30px;">'
+      +'<div style="font-size:48px;margin-bottom:12px;">🎉</div>'
+      +'<h2 style="color:#10b981;margin:0 0 8px;">Order Placed!</h2>'
+      +'<p style="color:#6b7280;font-size:14px;">Order No: <b>'+escHtml(orderNo)+'</b></p>'
+      +'<p style="color:#6b7280;font-size:14px;">Total: <b>₹'+Math.round(total).toLocaleString('en-IN')+'</b></p>'
+      +'<p style="color:#6b7280;font-size:13px;margin-top:8px;">Aapni team tamne 24 kaak ma contact karsi payment ane delivery mate.</p>'
+      +'<p style="color:#10b981;font-size:13px;font-weight:600;margin-top:8px;">Thank you for choosing Bhavi Electronics! 🙏</p>'
+      +'</div>';
+  }catch(e){alert('Error placing order: '+e.message);}
+};
+// ===== END SALES MODULE =====
 
 async function saveShiftSetting(empId, empName, empRole){
   var row=document.getElementById('shift-row-'+empId);if(!row)return;
