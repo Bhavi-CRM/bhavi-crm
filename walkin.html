@@ -711,13 +711,12 @@ async function submitEntry(){
   var now=new Date();
   var arrivalTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var today=now.toLocaleDateString('en-CA');
-  // Sequential token: count all entries this month + 1
+  // Token resets from 1 every new day
   var tokenNum=1;
   try{
-    var monthStart=today.substring(0,8)+'01';
-    var rows=await sbGet('walkin_log','?visit_date=gte.'+monthStart+'&select=token_no&order=token_no.desc.nullslast&limit=1');
+    var rows=await sbGet('walkin_log','?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
     tokenNum=((rows&&rows.length&&rows[0].token_no)||0)+1;
-  }catch(e){tokenNum=Math.floor(100+Math.random()*900);}
+  }catch(e){tokenNum=1;}
   var allProducts=state.products.map(function(p){
     return{brand:p.brand||catLabel,model:p.model||subcatLabel,type:wiType,warranty:p.warranty||'Other',remarks:(p.problem||remarks)};
   });
