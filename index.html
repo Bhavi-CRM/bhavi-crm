@@ -2784,6 +2784,21 @@ async function renderDashboard(){
 
     document.getElementById('page-content').innerHTML=`
       ${punchHtml}
+      <!-- Customer Portal Banner -->
+      <div style="background:linear-gradient(135deg,#1a3fa8,#2563eb);color:#fff;border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 4px 14px rgba(26,63,168,.25);">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">📱</span>
+          <div>
+            <div style="font-size:14px;font-weight:800;margin-bottom:2px;">Customer Booking Portal</div>
+            <div style="font-size:11px;opacity:.8;">Services &amp; Shop — share with customers</div>
+            <div style="font-size:11px;opacity:.65;margin-top:2px;font-family:monospace;">bhavi-crm.github.io/bhavi-crm/complaint.html</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button onclick="showPortalQR()" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📷 QR Code</button>
+          <button onclick="window.open('https://bhavi-crm.github.io/bhavi-crm/complaint.html','_blank')" style="background:#fff;color:#1a3fa8;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🔗 Open</button>
+        </div>
+      </div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
         <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${active}</div></div>
@@ -9302,6 +9317,70 @@ function printWalkInQR(){
     +'<p style="font-size:10px;color:#9ca3af;margin-top:16px;">'+_WALKIN_URL+'</p>'
     +'</body></html>');
   win.document.close();
+}
+
+// ===== CUSTOMER PORTAL QR CODE =====
+var _PORTAL_URL='https://bhavi-crm.github.io/bhavi-crm/complaint.html';
+function showPortalQR(){
+  var existing=document.getElementById('modal-portal-qr');
+  if(existing)existing.remove();
+  var url=_PORTAL_URL;
+  var qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data='+encodeURIComponent(url);
+  var modal=document.createElement('div');
+  modal.id='modal-portal-qr';
+  modal.className='modal-overlay';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  modal.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:400px;text-align:center;">'
+    +'<div class="modal-header"><h2>📱 Customer Booking Portal QR</h2>'
+    +'<button class="close-btn" onclick="document.getElementById(\'modal-portal-qr\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:20px;">'
+    +'<div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:12px;padding:16px;margin-bottom:14px;">'
+    +'<div style="display:flex;justify-content:center;margin-bottom:12px;">'
+    +'<img src="'+qrSrc+'" width="220" height="220" style="border-radius:8px;border:2px solid #bfdbfe;" onerror="this.outerHTML=\'<div style=&quot;font-size:13px;color:#6b7280;padding:20px;&quot;>QR load failed.<br>Use the link below.</div>\'">'
+    +'</div>'
+    +'<div style="font-size:11px;color:#1e40af;word-break:break-all;font-weight:600;">'+url+'</div>'
+    +'</div>'
+    +'<div style="font-size:13px;color:#374151;margin-bottom:14px;line-height:1.6;">Customer aa QR scan karke Services book kari shake chhe ya Shop ma thi product kharidi shake chhe. Shop/counter par display karo.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:center;">'
+    +'<button class="btn btn-primary btn-sm" onclick="window.open(\''+url+'\',\'_blank\')">🔗 Open Portal</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="printPortalQR()">🖨️ Print QR</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="copyPortalLink()">📋 Copy Link</button>'
+    +'</div>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+
+function printPortalQR(){
+  var url=_PORTAL_URL;
+  var qrSrc='https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data='+encodeURIComponent(url);
+  var win=window.open('','_blank','width=480,height=620');
+  win.document.write('<!DOCTYPE html><html><head><title>Bhavi Electronics — Book a Service QR</title>'
+    +'<style>body{font-family:Arial,sans-serif;text-align:center;padding:30px;background:#fff;}'
+    +'h2{color:#1a3fa8;font-size:20px;margin-bottom:4px;}'
+    +'.tag{font-size:11px;color:#888;letter-spacing:.8px;margin-bottom:20px;display:block;}'
+    +'img{border:2px solid #bfdbfe;border-radius:10px;}'
+    +'.title{font-size:16px;font-weight:800;color:#1a3fa8;margin:16px 0 6px;}'
+    +'.sub{font-size:12px;color:#555;margin:0 0 4px;line-height:1.6;}'
+    +'.url{font-size:10px;color:#94a3b8;margin-top:14px;word-break:break-all;}'
+    +'@media print{body{margin:0;padding:20px;}}'
+    +'</style></head><body>'
+    +'<h2>Bhavi Electronics &amp; Automation</h2>'
+    +'<span class="tag">WHERE CUSTOMER DELIGHT IS FIRST</span>'
+    +'<div><img src="'+qrSrc+'" width="300" height="300" onload="window.print();"></div>'
+    +'<div class="title">📱 Scan to Book a Service / Shop</div>'
+    +'<div class="sub">Printer &amp; Scanner Repair &nbsp;·&nbsp; Camera Repair<br>CCTV Install &nbsp;·&nbsp; Home Automation &nbsp;·&nbsp; Shop</div>'
+    +'<div class="sub" style="color:#059669;font-weight:700;margin-top:8px;">✅ Visit Charges: Rs. 649/- only</div>'
+    +'<div style="margin-top:14px;padding:10px;background:#f0f9ff;border-radius:8px;display:inline-block;">'
+    +'📞 <b>+91 63526 03399</b></div>'
+    +'<div class="url">'+url+'</div>'
+    +'</body></html>');
+  win.document.close();
+}
+
+function copyPortalLink(){
+  var url=_PORTAL_URL;
+  if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){alert('Link copied!\n'+url);});}
+  else{var t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);alert('Link copied!\n'+url);}
 }
 
 // ===== WALK-IN REPORT (ADMIN) =====
