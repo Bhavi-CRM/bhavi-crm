@@ -8396,7 +8396,7 @@ async function renderWalkIn(){
   </div>
 
   <div class="card">
-    <div class="section-header"><h2>📋 આજના Walk-ins</h2><span style="font-size:12px;color:var(--text-muted);">${todayLogs.length} entries</span></div>
+    <div class="section-header"><h2>📋 Today's Walk-ins</h2><span style="font-size:12px;color:var(--text-muted);">${todayLogs.length} entries</span></div>
     <div id="wi-today-list">${renderWalkInList(todayLogs)}</div>
   </div>`;
 
@@ -8420,6 +8420,45 @@ document.addEventListener('click',function(e){
   }
 });
 
+function _getWCType(){
+  var routeSel=document.getElementById('wi-route');
+  if(routeSel){var rv=routeSel.value;if(rv==='ICP')return'ICP';if(rv==='CSP')return'CSP';return'OTHER';}
+  var n=(currentUser&&currentUser.name||'').toUpperCase();
+  var u=(currentUser&&currentUser.user_id||'').toUpperCase();
+  if(n.includes('CSP')||u.includes('CSP'))return'CSP';
+  if(n.includes('ICP')||u.includes('ICP'))return'ICP';
+  return'OTHER';
+}
+function wiTypeChanged(sel){
+  var row=sel.closest('.wi-product-row')||sel.closest('.wi-edit-row');
+  if(!row)return;
+  var lbl=row.querySelector('.wi-secondary-lbl');
+  var sec=row.querySelector('.wi-secondary-sel');
+  if(!lbl||!sec)return;
+  var type=sel.value;
+  if(type==='Purchase'){
+    lbl.textContent='Purchase Type';
+    var wct=_getWCType();
+    var opts='<option value="">— Select —</option>';
+    if(wct==='CSP'||wct==='OTHER'){opts+='<option value="Printer Ink / Cartridges">\uD83D\uDDA8\uFE0F Printer Ink / Cartridges</option><option value="New Printer">\uD83D\uDDA8\uFE0F New Printer</option>';}
+    if(wct==='ICP'||wct==='OTHER'){opts+='<option value="Camera Accessories">\uD83D\uDCF7 Camera Accessories</option>';}
+    sec.innerHTML=opts;
+  } else if(type==='For Checking Only'){
+    lbl.textContent='Condition';
+    sec.innerHTML='<option value="Warranty">\u2705 Warranty</option><option value="Non Warranty">\u274C Non Warranty</option><option value="Other">\uD83D\uDD04 Other</option><option value="Very Old Products">\u23F0 Very Old Products</option>';
+  } else {
+    lbl.textContent='Warranty';
+    sec.innerHTML='<option value="In Warranty">\u2705 In Warranty</option><option value="Out of Warranty">\u274C Out of Warranty</option><option value="Other">\uD83D\uDD04 Other</option>';
+  }
+}
+function _brandDisplay(brand){
+  if(!brand)return'';
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(brand)){
+    var b=(window.allBrands||[]).find(function(x){return x.id===brand;});
+    return b?b.name:'';
+  }
+  return brand;
+}
 function addWalkInProduct(){
   var container=document.getElementById('wi-products');
   if(!container)return;
@@ -8431,7 +8470,7 @@ function addWalkInProduct(){
   // Build brand options from allBrands global
   var brandOpts='<option value="">Select Brand</option>';
   if(window.allBrands&&allBrands.length){
-    allBrands.forEach(function(b){brandOpts+='<option value="'+b.id+'" data-name="'+b.name+'">'+b.name+'</option>';});
+    allBrands.forEach(function(b){brandOpts+='<option value="'+escHtml(b.name)+'" data-id="'+b.id+'">'+b.name+'</option>';});
   } else {
     ['Canon','Panasonic','Fujifilm','Other'].forEach(function(b){brandOpts+='<option value="'+b+'">'+b+'</option>';});
   }
@@ -8449,11 +8488,18 @@ function addWalkInProduct(){
     +'</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
     +'<div class="form-group"><label>Type</label>'
-    +'<select class="wi-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
-    +'<option value="Inward">📥 Inward</option><option value="Outward">📤 Outward</option><option value="Other">🔄 Other</option></select></div>'
-    +'<div class="form-group"><label>Warranty</label>'
-    +'<select class="wi-warranty" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
-    +'<option value="In Warranty">✅ In Warranty</option><option value="Out of Warranty">❌ Out of Warranty</option><option value="Other">🔄 Other</option></select></div>'
+    +'<select class="wi-type" onchange="wiTypeChanged(this)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
+    +'<option value="Inward">📥 Inward</option>'
+    +'<option value="Outward">📤 Outward</option>'
+    +'<option value="Other">🔄 Other</option>'
+    +'<option value="Purchase">🛒 Purchase</option>'
+    +'<option value="For Checking Only">🔍 For Checking Only</option>'
+    +'</select></div>'
+    +'<div class="form-group">'
+    +'<label class="wi-secondary-lbl" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Warranty</label>'
+    +'<select class="wi-secondary-sel" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
+    +'<option value="In Warranty">✅ In Warranty</option><option value="Out of Warranty">❌ Out of Warranty</option><option value="Other">🔄 Other</option>'
+    +'</select></div>'
     +'</div>'
     +'<div class="form-group"><label>Remarks / Special Note</label>'
     +'<input type="text" class="wi-remarks" placeholder="e.g. Paper jam, Display issue, Physical damage..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>';
@@ -8472,15 +8518,15 @@ function showWIModelSuggestions(input){
   var dd=row.querySelector('.wi-model-dropdown');
   var q=input.value.trim().toLowerCase();
   var brandSel=row.querySelector('.wi-brand');
-  var brandId=brandSel?brandSel.value:'';
-  var brandName=brandSel&&brandSel.selectedOptions[0]?brandSel.selectedOptions[0].getAttribute('data-name')||brandId:'';
+  var brandName=brandSel&&brandSel.selectedOptions[0]?brandSel.selectedOptions[0].value:'';
+  var brandId=brandSel&&brandSel.selectedOptions[0]?brandSel.selectedOptions[0].getAttribute('data-id')||'':'';
 
   if(!q){dd.style.display='none';return;}
 
   // Filter allModels
   var models=window.allModels||[];
   var filtered=models.filter(function(m){
-    var matchBrand=!brandId||m.brand_id===brandId||brandId===brandName;
+    var matchBrand=!brandName||(brandId&&m.brand_id===brandId)||m.brand_name===brandName;
     var matchQ=(m.model_no||'').toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);
     return matchBrand&&matchQ;
   }).slice(0,10);
@@ -8514,7 +8560,7 @@ function renumberWIProducts(){
 
 async function fetchWalkInCustomer(){
   var mob=document.getElementById('wi-mobile').value.trim();
-  if(mob.length!==10){alert('10 digit mobile no enter karo');return;}
+  if(mob.length!==10){alert('Please enter a valid 10-digit mobile number.');return;}
   try{
     // Search in customers table first
     var custs=await sb('customers','GET',null,'?mobile=eq.'+mob);
@@ -8553,27 +8599,30 @@ async function saveWalkIn(){
   var departure=document.getElementById('wi-departure').value;
 
   if(!mobile||!name||!arrival){
-    alert('Mobile, Name, Arrival Time jaruri chhe');
+    alert('Mobile, Name, and Arrival Time are required.');
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Walk-in Entry';}
     return;
   }
   if(mobile.length!==10){
-    alert('10 digit mobile no enter karo');
+    alert('Please enter a valid 10-digit mobile number.');
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Walk-in Entry';}
     return;
   }
 
   var products=[];
   document.querySelectorAll('.wi-product-row').forEach(function(row){
-    var brand=row.querySelector('.wi-brand')?.value||'';
+    var brandSel=row.querySelector('.wi-brand');
+    var brand=brandSel&&brandSel.selectedIndex>0?(brandSel.selectedOptions[0].value||''):'';
     var model=row.querySelector('.wi-model')?.value.trim()||'';
     var type=row.querySelector('.wi-type')?.value||'Inward';
-    var warranty=row.querySelector('.wi-warranty')?.value||'In Warranty';
+    var secVal=row.querySelector('.wi-secondary-sel')?.value||'';
+    var warranty=type==='Purchase'?'':(secVal||'In Warranty');
+    var subtype=type==='Purchase'?secVal:(type==='For Checking Only'?secVal:'');
     var remarks=row.querySelector('.wi-remarks')?.value.trim()||'';
-    if(model||brand)products.push({brand,model,type,warranty,remarks});
+    if(model||brand)products.push({brand,model,type,warranty,subtype,remarks});
   });
   if(!products.length){
-    alert('Ochhamama ek product add karo');
+    alert('Please add at least one product.');
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Walk-in Entry';}
     return;
   }
@@ -8614,7 +8663,7 @@ async function saveWalkIn(){
 // Update departure time for existing entry
 async function updateWIDeparture(id){
   var now=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  var conf=confirm('Departure time set karvu chhe?\nTime: '+now);
+  var conf=confirm('Set departure time to: '+now+'?');
   if(!conf)return;
   try{
     await sb('walkin_log','PATCH',{departure_time:now,updated_at:new Date().toISOString()},'?id=eq.'+id);
@@ -8624,19 +8673,21 @@ async function updateWIDeparture(id){
 }
 
 function renderWalkInList(logs){
-  if(!logs||!logs.length)return'<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">📭 આજ કોઈ walk-in નથી</div>';
+  if(!logs||!logs.length)return'<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">📭 No walk-ins today</div>';
   return logs.map(function(l){
     var products=l.products||[];
-    var hasInward=products.some(function(p){return p.type==='Inward';});
+    var hasService=products.some(function(p){return p.type==='Inward'||p.type==='For Checking Only';});
+    var hasPurchase=products.some(function(p){return p.type==='Purchase';});
+    var borderColor=hasPurchase?'#d97706':(hasService?'#1a56db':'#0e9f6e');
     var depBtn=!l.departure_time
       ?'<button onclick="updateWIDeparture(\''+l.id+'\')" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">⏰ Set Departure</button>'
       :'<span style="font-size:11px;color:#065f46;background:#d1fae5;padding:3px 8px;border-radius:99px;">Out: '+l.departure_time+'</span>';
     var tokenBadge=l.token_no?'<span style="background:#1a56db;color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;margin-right:8px;">#'+l.token_no+'</span>':'';
     var jobBadge=l.job_id?'<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;">✅ '+l.job_id+'</span>':'';
-    var createJobBtn=hasInward&&!l.job_id
+    var createJobBtn=hasService&&!l.job_id
       ?'<button onclick="createJobFromWalkIn(\''+l.id+'\')" style="background:#1a56db;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">🔧 Create Job</button>'
       :'';
-    return '<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+(hasInward?'#1a56db':'#0e9f6e')+';">'
+    return '<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+borderColor+';">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
       +'<div>'
       +'<div style="font-weight:600;font-size:14px;">'+tokenBadge+l.customer_name+' <span style="font-size:12px;color:var(--text-muted);">'+l.mobile+'</span> '+jobBadge+'</div>'
@@ -8650,13 +8701,16 @@ function renderWalkInList(logs){
       +'</div>'
       +'<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">'
       +products.map(function(p){
-        var typeColor=p.type==='Inward'?'#1a56db':p.type==='Outward'?'#0e9f6e':'#7c3aed';
-        var wColor=p.warranty==='In Warranty'?'#065f46':'#991b1b';
-        var wBg=p.warranty==='In Warranty'?'#d1fae5':'#fee2e2';
+        var typeColors={'Inward':'#1a56db','Outward':'#0e9f6e','Other':'#7c3aed','Purchase':'#d97706','For Checking Only':'#0369a1'};
+        var typeColor=typeColors[p.type]||'#7c3aed';
+        var brandDisp=_brandDisplay(p.brand);
+        var wLabel=p.type==='Purchase'?(p.subtype||''):(p.type==='For Checking Only'?(p.subtype||p.warranty||''):p.warranty);
+        var wColor=(!wLabel)?'#374151':(wLabel==='In Warranty'||wLabel==='Warranty'?'#065f46':'#991b1b');
+        var wBg=(!wLabel)?'#f1f5f9':(wLabel==='In Warranty'||wLabel==='Warranty'?'#d1fae5':'#fee2e2');
         return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;">'
-          +'<span style="font-weight:600;">'+(p.brand?p.brand+' ':'')+cleanModelNo(p.model||'')+'</span>'
+          +'<span style="font-weight:600;">'+(brandDisp?brandDisp+' ':'')+cleanModelNo(p.model||'')+'</span>'
           +' <span style="background:#e0f2fe;color:'+typeColor+';padding:1px 6px;border-radius:99px;font-size:10px;font-weight:600;">'+p.type+'</span>'
-          +' <span style="background:'+wBg+';color:'+wColor+';padding:1px 6px;border-radius:99px;font-size:10px;font-weight:600;">'+p.warranty+'</span>'
+          +(wLabel?' <span style="background:'+wBg+';color:'+wColor+';padding:1px 6px;border-radius:99px;font-size:10px;font-weight:600;">'+wLabel+'</span>':'')
           +(p.remarks?' <span style="color:var(--text-muted);">— '+p.remarks+'</span>':'')
           +'</div>';
       }).join('')
@@ -8679,7 +8733,7 @@ async function createJobFromWalkIn(wiId){
   var banner=document.createElement('div');
   banner.id='wi-source-banner';
   banner.style.cssText='background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:center;gap:10px;';
-  banner.innerHTML='<span style="font-size:18px;">🚶</span><div><b>Walk-in Entry se Create ho raha hai</b> — Token #'+(l.token_no||'—')+' &nbsp;|&nbsp; In: '+(l.arrival_time||'')+'<br><span style="font-size:11px;color:#1a56db;">Customer ki details auto-fill ho gayi hai. Serial No aur Problem verify karke Save karein.</span></div>';
+  banner.innerHTML='<span style="font-size:18px;">🚶</span><div><b>Creating Job from Walk-in</b> — Token #'+(l.token_no||'—')+' &nbsp;|&nbsp; In: '+(l.arrival_time||'')+'<br><span style="font-size:11px;color:#1a56db;">Customer details auto-filled. Please verify Serial No and Problem before saving.</span></div>';
   var modalBody=document.querySelector('#modal-call .modal-body');
   if(modalBody)modalBody.insertBefore(banner,modalBody.firstChild);
 
@@ -8691,7 +8745,7 @@ async function createJobFromWalkIn(wiId){
 
   // Auto-fill first inward product
   var products=l.products||[];
-  var inwardProds=products.filter(function(p){return p.type==='Inward';});
+  var inwardProds=products.filter(function(p){return p.type==='Inward'||p.type==='For Checking Only';});
   var firstProd=inwardProds[0]||products[0]||{};
 
   // Set brand
@@ -8716,8 +8770,9 @@ async function createJobFromWalkIn(wiId){
   // Call type from warranty
   var callTypeEl=document.getElementById('call-type');
   if(callTypeEl){
-    if(firstProd.warranty==='In Warranty')callTypeEl.value='Warranty';
-    else if(firstProd.warranty==='Out of Warranty')callTypeEl.value='Non-Warranty';
+    var wv=firstProd.warranty||'';
+    if(wv==='In Warranty'||wv==='Warranty')callTypeEl.value='Warranty';
+    else if(wv==='Out of Warranty'||wv==='Non Warranty'||wv==='Very Old Products')callTypeEl.value='Non-Warranty';
     handleCallTypeChange();
   }
   // Service type = Carry In (customer walked in)
@@ -8782,7 +8837,7 @@ async function createJobFromWalkIn(wiId){
   if(inwardProds.length>1){
     var multiDiv=document.createElement('div');
     multiDiv.style.cssText='background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:14px;';
-    multiDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">📦 Walk-in ma '+inwardProds.length+' products chhe — Product 1 auto-filled. Baaki manually add karo:</div>'
+    multiDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">📦 Walk-in has '+inwardProds.length+' products — Product 1 auto-filled. Please add remaining manually:</div>'
       +inwardProds.slice(1).map(function(p,i){
         return '<div style="font-size:12px;padding:3px 0;color:#166534;">• '+(p.brand?p.brand+' ':'')+p.model+' ('+(p.warranty||'?')+')'+(p.remarks?' — '+p.remarks:'')+'</div>';
       }).join('');
@@ -8804,18 +8859,22 @@ async function editWalkIn(id){
 
   var products=entry.products||[];
   var brands=window.allBrands||[];
-  var brandOpts='<option value="">Select Brand</option>'+brands.map(function(b){return'<option value="'+b.id+'" data-name="'+escQ(b.name)+'">'+b.name+'</option>';}).join('');
+  var brandOpts='<option value="">Select Brand</option>'+brands.map(function(b){return'<option value="'+escQ(b.name)+'" data-id="'+b.id+'">'+b.name+'</option>';}).join('');
 
   function buildProductRow(p,idx){
     var removeBtn=idx>0?'<button onclick="this.closest(\'.wi-edit-row\').remove()" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;">✕</button>':'';
+    var secLabel=p.type==='Purchase'?'Purchase Type':(p.type==='For Checking Only'?'Condition':'Warranty');
+    var brandVal=p.brand&&!/^[0-9a-f]{8}-[0-9a-f]{4}/.test(p.brand)?p.brand:(_brandDisplay(p.brand)||p.brand||'');
+    var brandOptsSel=brandOpts.replace('value="'+brandVal+'"','value="'+brandVal+'" selected');
+    var secVal=p.type==='Purchase'?(p.subtype||''):(p.type==='For Checking Only'?(p.subtype||p.warranty||'Warranty'):(p.warranty||'In Warranty'));
     return '<div class="wi-edit-row" style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:8px;">'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">'
-      +'<div><label style="font-size:11px;">Brand</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+brandOpts+'</select></div>'
+      +'<div><label style="font-size:11px;">Brand</label><select class="wei-brand" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+brandOptsSel+'</select></div>'
       +'<div><label style="font-size:11px;">Model <span style="color:red;">*</span></label><input type="text" value="'+escQ(cleanModelNo(p.model||''))+'" placeholder="Model name..." style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
       +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">'
-      +'<div><label style="font-size:11px;">Type</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option'+(p.type==='Inward'?' selected':'')+'>Inward</option><option'+(p.type==='Outward'?' selected':'')+'>Outward</option><option'+(p.type==='Other'?' selected':'')+'>Other</option></select></div>'
-      +'<div><label style="font-size:11px;">Warranty</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option'+(p.warranty==='In Warranty'?' selected':'')+'>In Warranty</option><option'+(p.warranty==='Out of Warranty'?' selected':'')+'>Out of Warranty</option><option'+(p.warranty==='Other'?' selected':'')+'>Other</option></select></div>'
+      +'<div><label style="font-size:11px;">Type</label><select class="wei-type" onchange="wiTypeChanged(this)" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option'+(p.type==='Inward'?' selected':'')+' value="Inward">📥 Inward</option><option'+(p.type==='Outward'?' selected':'')+' value="Outward">📤 Outward</option><option'+(p.type==='Other'?' selected':'')+' value="Other">🔄 Other</option><option'+(p.type==='Purchase'?' selected':'')+' value="Purchase">🛒 Purchase</option><option'+(p.type==='For Checking Only'?' selected':'')+' value="For Checking Only">🔍 For Checking Only</option></select></div>'
+      +'<div><label class="wi-secondary-lbl" style="font-size:11px;display:block;margin-bottom:4px;">'+secLabel+'</label><select class="wi-secondary-sel" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></select></div>'
       +'<div><label style="font-size:11px;">Remarks</label><input type="text" value="'+escQ(p.remarks||'')+'" placeholder="Optional..." style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
       +removeBtn
       +'</div></div>';
@@ -8843,6 +8902,21 @@ async function editWalkIn(id){
   // Store brand opts for add row
   window._weibrands=brandOpts;
   window._weiRowCount=products.length;
+  // Init secondary selects for existing products
+  setTimeout(function(){
+    modal.querySelectorAll('.wi-edit-row').forEach(function(row){
+      var typeSel=row.querySelector('.wei-type');
+      if(typeSel)wiTypeChanged(typeSel);
+      // restore secondary value
+      var secSel=row.querySelector('.wi-secondary-sel');
+      if(secSel){
+        var pIdx=Array.from(modal.querySelectorAll('.wi-edit-row')).indexOf(row);
+        var pp=products[pIdx]||{};
+        var sv=typeSel&&typeSel.value==='Purchase'?(pp.subtype||''):(typeSel&&typeSel.value==='For Checking Only'?(pp.subtype||pp.warranty||'Warranty'):(pp.warranty||'In Warranty'));
+        if(sv)secSel.value=sv;
+      }
+    });
+  },50);
 }
 
 function addWEIProductRow(){
@@ -8853,12 +8927,12 @@ function addWEIProductRow(){
   var div=document.createElement('div');div.className='wi-edit-row';
   div.style.cssText='background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:8px;';
   div.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">'
-    +'<div><label style="font-size:11px;">Brand</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+brandOpts+'</select></div>'
+    +'<div><label style="font-size:11px;">Brand</label><select class="wei-brand" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;">'+brandOpts+'</select></div>'
     +'<div><label style="font-size:11px;">Model <span style="color:red;">*</span></label><input type="text" placeholder="Model name..." style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;">'
-    +'<div><label style="font-size:11px;">Type</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option>Inward</option><option>Outward</option><option>Other</option></select></div>'
-    +'<div><label style="font-size:11px;">Warranty</label><select style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option>In Warranty</option><option>Out of Warranty</option><option>Other</option></select></div>'
+    +'<div><label style="font-size:11px;">Type</label><select class="wei-type" onchange="wiTypeChanged(this)" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option value="Inward">📥 Inward</option><option value="Outward">📤 Outward</option><option value="Other">🔄 Other</option><option value="Purchase">🛒 Purchase</option><option value="For Checking Only">🔍 For Checking Only</option></select></div>'
+    +'<div><label class="wi-secondary-lbl" style="font-size:11px;display:block;margin-bottom:4px;">Warranty</label><select class="wi-secondary-sel" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"><option value="In Warranty">✅ In Warranty</option><option value="Out of Warranty">❌ Out of Warranty</option><option value="Other">🔄 Other</option></select></div>'
     +'<div><label style="font-size:11px;">Remarks</label><input type="text" placeholder="Optional..." style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100%;outline:none;"></div>'
     +'<button onclick="this.closest(\'.wi-edit-row\').remove()" style="background:#fee2e2;border:none;color:#dc2626;border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap;">✕</button>'
     +'</div>';
@@ -8874,21 +8948,26 @@ async function saveEditWalkIn(id){
   var arrival=document.getElementById('wei-arrival').value;
   var departure=document.getElementById('wei-departure').value;
   if(!name||!mobile||!arrival){
-    alert('Name, Mobile, Arrival jaruri chhe');
+    alert('Name, Mobile, and Arrival Time are required.');
     if(btn){btn.disabled=false;btn.textContent='💾 Update Entry';}return;
   }
   var products=[];
   document.querySelectorAll('#wei-products-list .wi-edit-row').forEach(function(row){
-    var cols=row.querySelectorAll('select,input[type="text"]');
-    var brand=cols[0]?.value||'';
-    var model=(cols[1]?.value||'').trim();
-    var type=cols[2]?.value||'Inward';
-    var warranty=cols[3]?.value||'In Warranty';
-    var remarks=(cols[4]?.value||'').trim();
-    if(model||brand)products.push({brand,model,type,warranty,remarks});
+    var brandSel=row.querySelector('.wei-brand');
+    var brand=brandSel&&brandSel.selectedIndex>0?(brandSel.selectedOptions[0].value||''):'';
+    var modelInput=row.querySelectorAll('input[type="text"]')[0];
+    var model=(modelInput?.value||'').trim();
+    var typeSel=row.querySelector('.wei-type');
+    var type=typeSel?typeSel.value:'Inward';
+    var secVal=row.querySelector('.wi-secondary-sel')?.value||'';
+    var warranty=type==='Purchase'?'':(secVal||'In Warranty');
+    var subtype=type==='Purchase'?secVal:(type==='For Checking Only'?secVal:'');
+    var remarksInput=row.querySelectorAll('input[type="text"]')[1];
+    var remarks=(remarksInput?.value||'').trim();
+    if(model||brand)products.push({brand,model,type,warranty,subtype,remarks});
   });
   if(!products.length){
-    alert('Ochhamama ek product add karo');
+    alert('Please add at least one product.');
     if(btn){btn.disabled=false;btn.textContent='💾 Update Entry';}return;
   }
   try{
