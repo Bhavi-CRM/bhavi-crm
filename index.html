@@ -5942,6 +5942,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('admin',this)">👑 Admin Profile</button>
       <button class="tab" onclick="switchSettings('logo',this)">🖼️ Logo</button>
       <button class="tab" onclick="switchSettings('company',this)">🏢 Company Info</button>
+      <button class="tab" onclick="switchSettings('portal',this)">🌐 Portal Services</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -5950,6 +5951,7 @@ function switchSettings(tab,el){
   if(tab==='engineers')sb('users','GET',null,'?role=eq.engineer&order=name').then(e=>document.getElementById('settings-content').innerHTML=renderEngTab(e));
   else if(tab==='wc')sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&order=name').then(wcs=>document.getElementById('settings-content').innerHTML=renderWCTab(wcs));
   else if(tab==='admin') renderAdminTab();
+  else if(tab==='portal') renderPortalServicesTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -6056,6 +6058,139 @@ async function changeAdminPassword(){
     document.getElementById('admin-conf-pass').value='';
   }catch(e){alert('Error: '+e.message);}
 }
+
+// ===== PORTAL SERVICES ADMIN =====
+async function renderPortalServicesTab(){
+  var sc=document.getElementById('settings-content');
+  sc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var svcs=await sb('portal_services','GET',null,'?order=sort_order');
+    var html='<div class="card">'
+      +'<div class="section-header"><h2>🌐 Portal Services</h2><button class="btn btn-primary" onclick="openPortalSvcModal()">+ Add Service</button></div>'
+      +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400e;">'
+      +'ℹ️ These services appear on the customer booking portal (complaint.html). Changes apply immediately after save.'
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px;">';
+    svcs.forEach(function(s){
+      var activeColor=s.is_active?'#059669':'#9ca3af';
+      var typeBadge=s.service_type==='repair'?'<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">REPAIR</span>':'<span style="background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;">INQUIRY</span>';
+      html+='<div style="background:#f8fafc;border:1.5px solid '+(s.is_active?'var(--border)':'#fecaca')+';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;">'
+        +'<span style="font-size:28px;flex-shrink:0;">'+escHtml(s.icon||'🔧')+'</span>'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:700;font-size:14px;">'+escHtml(s.name)+'</div>'
+        +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+escHtml(s.price_display||'')+'&nbsp;·&nbsp;'+typeBadge+'</div>'
+        +(s.subtitle?'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'+escHtml(s.subtitle)+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0;">'
+        +'<button class="btn btn-outline btn-sm" onclick="openPortalSvcModal(\''+escHtml(s.id)+'\')">✏️ Edit</button>'
+        +'<button class="btn btn-sm" style="background:'+(s.is_active?'#fee2e2':'#f0fdf4')+';color:'+(s.is_active?'#dc2626':'#059669')+';border:1px solid '+(s.is_active?'#fca5a5':'#86efac')+';border-radius:7px;padding:6px 10px;cursor:pointer;" onclick="togglePortalSvc(\''+s.id+'\','+s.is_active+')">'+(s.is_active?'⏸ Hide':'▶ Show')+'</button>'
+        +'</div></div>';
+    });
+    html+='</div></div>';
+    if(!svcs.length){
+      html='<div class="card"><div class="section-header"><h2>🌐 Portal Services</h2><button class="btn btn-primary" onclick="openPortalSvcModal()">+ Add Service</button></div>'
+        +'<div style="text-align:center;padding:30px;color:var(--text-muted);">No services yet. Click "+ Add Service" to add.<br><br>'
+        +'<div style="font-size:12px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:left;max-width:400px;margin:0 auto;">'
+        +'<b>First time setup:</b> Run this SQL in Supabase dashboard to create the table:<br><br>'
+        +'<code style="font-size:10px;white-space:pre-wrap;">CREATE TABLE portal_services (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL,\n  icon TEXT DEFAULT \'🔧\',\n  price_display TEXT,\n  price_amount NUMERIC DEFAULT 0,\n  service_type TEXT DEFAULT \'inquiry\',\n  repair_cat TEXT,\n  inquiry_type TEXT,\n  subtitle TEXT,\n  includes JSONB DEFAULT \'[]\',\n  form_fields JSONB DEFAULT \'[]\',\n  sort_order INTEGER DEFAULT 0,\n  is_active BOOLEAN DEFAULT true,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);</code></div></div></div>';
+    }
+    sc.innerHTML=html;
+  }catch(e){
+    sc.innerHTML='<div class="card"><div class="section-header"><h2>🌐 Portal Services</h2><button class="btn btn-primary" onclick="openPortalSvcModal()">+ Add Service</button></div>'
+      +'<div class="alert alert-warning">⚠️ Table not found. Please create the <b>portal_services</b> table first.<br><br>'
+      +'<div style="font-size:11px;background:#f8fafc;border-radius:8px;padding:12px;margin-top:10px;">'
+      +'Run in Supabase SQL Editor:<br><code style="white-space:pre-wrap;">CREATE TABLE portal_services (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL,\n  icon TEXT DEFAULT \'🔧\',\n  price_display TEXT,\n  price_amount NUMERIC DEFAULT 0,\n  service_type TEXT DEFAULT \'inquiry\',\n  repair_cat TEXT,\n  inquiry_type TEXT,\n  subtitle TEXT,\n  includes JSONB DEFAULT \'[]\',\n  form_fields JSONB DEFAULT \'[]\',\n  sort_order INTEGER DEFAULT 0,\n  is_active BOOLEAN DEFAULT true,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);</code></div></div></div>';
+  }
+}
+
+async function openPortalSvcModal(id){
+  var existing=null;
+  if(id){
+    try{var r=await sb('portal_services','GET',null,'?id=eq.'+encodeURIComponent(id));existing=r&&r[0];}catch(e){}
+  }
+  var inc=(existing&&existing.includes&&Array.isArray(existing.includes))?existing.includes.join('\n'):'';
+  var flds=(existing&&existing.form_fields)?JSON.stringify(existing.form_fields,null,2):'[]';
+  var html='<div class="modal-overlay" id="modal-portal-svc" onclick="if(event.target===this)closeModal(\'modal-portal-svc\')">'
+    +'<div class="modal-box" style="max-width:540px;">'
+    +'<div class="modal-header"><h3>'+(id?'✏️ Edit Service':'➕ Add New Service')+'</h3><button onclick="closeModal(\'modal-portal-svc\')" class="modal-close">✕</button></div>'
+    +'<div class="modal-body" style="max-height:70vh;overflow-y:auto;">'
+    +'<div class="form-grid">'
+    +'<div class="form-group"><label>Service ID (unique key) *</label><input id="ps-id" value="'+escHtml(id||'')+'" placeholder="e.g. printer-repair" '+(id?'readonly style="background:#f3f4f6"':'')+'></div>'
+    +'<div class="form-group"><label>Icon (emoji) *</label><input id="ps-icon" value="'+escHtml((existing&&existing.icon)||'🔧')+'" placeholder="🔧" style="font-size:20px;"></div>'
+    +'<div class="form-group"><label>Service Name *</label><input id="ps-name" value="'+escHtml((existing&&existing.name)||'')+'" placeholder="e.g. Printer Repair"></div>'
+    +'<div class="form-group"><label>Price Display *</label><input id="ps-price-disp" value="'+escHtml((existing&&existing.price_display)||'')+'" placeholder="e.g. ₹649/- or ₹1500+"></div>'
+    +'<div class="form-group"><label>Price Amount (₹)</label><input id="ps-price-amt" type="number" value="'+(existing?existing.price_amount||0:0)+'" placeholder="649"></div>'
+    +'<div class="form-group"><label>Service Type *</label>'
+    +'<select id="ps-type" onchange="_psTypeChange()"><option value="inquiry"'+((!existing||existing.service_type==='inquiry')?' selected':'')+'> Inquiry</option><option value="repair"'+((existing&&existing.service_type==='repair')?' selected':'')+'>⚙️ Repair (Onsite)</option></select></div>'
+    +'</div>'
+    +'<div id="ps-repair-fields" style="display:'+(existing&&existing.service_type==='repair'?'block':'none')+';">'
+    +'<div class="form-group"><label>Repair Category</label><select id="ps-repair-cat"><option value="printer"'+((existing&&existing.repair_cat==='printer')?' selected':'')+'>🖨️ Printer</option><option value="scanner"'+((existing&&existing.repair_cat==='scanner')?' selected':'')+'>🖻 Scanner</option></select></div>'
+    +'</div>'
+    +'<div id="ps-inquiry-fields" style="display:'+((!existing||existing.service_type==='inquiry')?'block':'none')+';">'
+    +'<div class="form-group"><label>Inquiry Type Label</label><input id="ps-inq-type" value="'+escHtml((existing&&existing.inquiry_type)||'')+'" placeholder="e.g. Camera Repair"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Subtitle (short description)</label><input id="ps-subtitle" value="'+escHtml((existing&&existing.subtitle)||'')+'" placeholder="One-line description"></div>'
+    +'<div class="form-group"><label>Sort Order</label><input id="ps-order" type="number" value="'+(existing?existing.sort_order||0:0)+'" placeholder="0"></div>'
+    +'<div class="form-group" style="grid-column:1/-1"><label>What\'s Included (one item per line)</label>'
+    +'<textarea id="ps-includes" rows="5" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;" placeholder="Expert repair service&#10;All major brands&#10;Estimate before work begins">'+escHtml(inc)+'</textarea></div>'
+    +'<div class="form-group" style="grid-column:1/-1"><label>Inquiry Form Fields <span style="font-size:10px;color:var(--text-muted);">(JSON array — for inquiry type)</span></label>'
+    +'<textarea id="ps-fields" rows="6" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;font-family:monospace;" placeholder=\'[{"id":"inq-brand","label":"Brand","type":"select","opts":["Canon","Other"]},{"id":"inq-model","label":"Model","type":"text","placeholder":"Enter model"}]\'>'+escHtml(flds)+'</textarea>'
+    +'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">type: "select" (opts array) or "text" (placeholder string)</div></div>'
+    +'</div>'
+    +'<div class="modal-footer"><button class="btn btn-primary" onclick="savePortalService('+(id?'\''+id+'\'':'null')+')">💾 Save Service</button><button class="btn btn-outline" onclick="closeModal(\'modal-portal-svc\')" style="width:auto;margin-left:8px;">Cancel</button>'
+    +(id?'<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;padding:8px 14px;cursor:pointer;margin-left:auto;" onclick="deletePortalService(\''+id+'\')">🗑️ Delete</button>':'')
+    +'</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function _psTypeChange(){
+  var t=document.getElementById('ps-type').value;
+  document.getElementById('ps-repair-fields').style.display=t==='repair'?'block':'none';
+  document.getElementById('ps-inquiry-fields').style.display=t==='inquiry'?'block':'none';
+}
+
+async function savePortalService(existingId){
+  var id=(document.getElementById('ps-id').value||'').trim().toLowerCase().replace(/\s+/g,'-');
+  var name=(document.getElementById('ps-name').value||'').trim();
+  var icon=(document.getElementById('ps-icon').value||'🔧').trim();
+  var priceDisp=(document.getElementById('ps-price-disp').value||'').trim();
+  var priceAmt=parseFloat(document.getElementById('ps-price-amt').value)||0;
+  var svcType=document.getElementById('ps-type').value;
+  var repairCat=document.getElementById('ps-repair-cat')?.value||'printer';
+  var inqType=(document.getElementById('ps-inq-type')?.value||'').trim();
+  var subtitle=(document.getElementById('ps-subtitle').value||'').trim();
+  var sortOrder=parseInt(document.getElementById('ps-order').value)||0;
+  var includesRaw=(document.getElementById('ps-includes').value||'').trim();
+  var includes=includesRaw?includesRaw.split('\n').map(function(x){return x.trim();}).filter(Boolean):[];
+  var fieldsRaw=(document.getElementById('ps-fields').value||'').trim();
+  var formFields=[];
+  try{formFields=JSON.parse(fieldsRaw||'[]');}catch(e){alert('Form Fields JSON is invalid: '+e.message);return;}
+  if(!id||!name||!priceDisp){alert('Service ID, Name and Price Display are required.');return;}
+  var data={id,name,icon,price_display:priceDisp,price_amount:priceAmt,service_type:svcType,
+    repair_cat:svcType==='repair'?repairCat:null,inquiry_type:svcType==='inquiry'?(inqType||name):null,
+    subtitle,includes:JSON.stringify(includes),form_fields:JSON.stringify(formFields),
+    sort_order:sortOrder,is_active:true,updated_at:new Date().toISOString()};
+  try{
+    if(existingId){
+      await sb('portal_services','PATCH',data,'?id=eq.'+encodeURIComponent(existingId));
+    } else {
+      data.created_at=new Date().toISOString();
+      await sb('portal_services','POST',data);
+    }
+    closeModal('modal-portal-svc');
+    renderPortalServicesTab();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function togglePortalSvc(id,current){
+  try{await sb('portal_services','PATCH',{is_active:!current,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));renderPortalServicesTab();}catch(e){alert(e.message);}
+}
+
+async function deletePortalService(id){
+  if(!confirm('Delete this service from portal? This cannot be undone.'))return;
+  try{await sb('portal_services','DELETE',null,'?id=eq.'+encodeURIComponent(id));closeModal('modal-portal-svc');renderPortalServicesTab();}catch(e){alert(e.message);}
+}
+// ===== END PORTAL SERVICES ADMIN =====
 
 function renderWCTab(wcs){
   return `<div class="card">

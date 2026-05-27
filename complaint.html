@@ -166,65 +166,60 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 <!-- ========== PAGE: HOME ========== -->
 <div class="page active fade" id="pg-home">
   <div class="home-header">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
       <img src="icon-192.png" style="width:44px;height:44px;border-radius:10px;background:#fff;padding:3px;object-fit:contain;" onerror="this.style.display='none'">
       <div>
         <div style="font-size:13px;font-weight:800;opacity:.9;">Bhavi Electronics &amp; Automation</div>
         <div style="font-size:10px;opacity:.65;letter-spacing:.4px;">WHERE CUSTOMER DELIGHT IS FIRST</div>
       </div>
+      <!-- Cart badge (shown in shop tab) -->
+      <button id="home-cart-btn" onclick="showCartDrawer()" style="display:none;margin-left:auto;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;">🛒 <span id="home-cart-count">0</span></button>
     </div>
     <div class="welcome">👋 Welcome!</div>
     <div class="subtitle">Printers &nbsp;·&nbsp; Cameras &nbsp;·&nbsp; Home Automation &nbsp;·&nbsp; CCTV</div>
-    <button class="btn-book" onclick="document.getElementById('services-section').scrollIntoView({behavior:'smooth'})">+ Book a Service</button>
   </div>
 
-  <div class="services-section" id="services-section">
+  <!-- Tab Bar -->
+  <div style="display:flex;border-bottom:2px solid var(--border);background:#fff;position:sticky;top:0;z-index:50;">
+    <button id="tab-svc" onclick="homeTab('services')" style="flex:1;padding:12px;font-size:14px;font-weight:700;border:none;background:#fff;color:var(--primary);cursor:pointer;border-bottom:3px solid var(--primary);">🔧 Services</button>
+    <button id="tab-shop" onclick="homeTab('shop')" style="flex:1;padding:12px;font-size:14px;font-weight:700;border:none;background:#fff;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;">🛍️ Shop</button>
+  </div>
+
+  <!-- Services Tab -->
+  <div id="home-services" class="services-section">
     <div class="services-title">Our Services</div>
-    <div class="services-grid">
-
-      <div class="svc-card repair-card" onclick="selectService('printer-repair')">
-        <span class="s-icon">🖨️</span>
-        <div class="s-name">Printer Repair</div>
-        <div class="s-price">₹649/-</div>
-      </div>
-
-      <div class="svc-card repair-card" onclick="selectService('scanner-repair')">
-        <span class="s-icon">🖻</span>
-        <div class="s-name">Scanner Service</div>
-        <div class="s-price">₹649/-</div>
-      </div>
-
-      <div class="svc-card" onclick="selectService('camera-repair')">
-        <span class="s-icon">📷</span>
-        <div class="s-name">Camera Repair</div>
-        <div class="s-price">₹1500+</div>
-      </div>
-
-      <div class="svc-card" onclick="selectService('printer-amc')">
-        <span class="s-icon">📋</span>
-        <div class="s-name">Printer AMC</div>
-        <div class="s-price">₹5000+</div>
-      </div>
-
-      <div class="svc-card" onclick="selectService('home-automation')">
-        <span class="s-icon">🏠</span>
-        <div class="s-name">Home Automation</div>
-        <div class="s-price">₹3000+</div>
-      </div>
-
-      <div class="svc-card" onclick="selectService('cctv-install')">
-        <span class="s-icon">📹</span>
-        <div class="s-name">CCTV Install</div>
-        <div class="s-price">₹2500+</div>
-      </div>
-
+    <div class="services-grid" id="svc-grid">
+      <div class="svc-card repair-card" onclick="selectService('printer-repair')"><span class="s-icon">🖨️</span><div class="s-name">Printer Repair</div><div class="s-price">₹649/-</div></div>
+      <div class="svc-card repair-card" onclick="selectService('scanner-repair')"><span class="s-icon">🖻</span><div class="s-name">Scanner Service</div><div class="s-price">₹649/-</div></div>
+      <div class="svc-card" onclick="selectService('camera-repair')"><span class="s-icon">📷</span><div class="s-name">Camera Repair</div><div class="s-price">₹1500+</div></div>
+      <div class="svc-card" onclick="selectService('printer-amc')"><span class="s-icon">📋</span><div class="s-name">Printer AMC</div><div class="s-price">₹5000+</div></div>
+      <div class="svc-card" onclick="selectService('home-automation')"><span class="s-icon">🏠</span><div class="s-name">Home Automation</div><div class="s-price">₹3000+</div></div>
+      <div class="svc-card" onclick="selectService('cctv-install')"><span class="s-icon">📹</span><div class="s-name">CCTV Install</div><div class="s-price">₹2500+</div></div>
+      <div class="svc-card" onclick="selectService('ink-purchase')" style="border-color:#fde68a;"><span class="s-icon">🖊️</span><div class="s-name">Ink / Cartridge</div><div class="s-price" style="color:#d97706;">Buy Now</div></div>
+      <div class="svc-card" onclick="selectService('printer-purchase')" style="border-color:#fde68a;"><span class="s-icon">🛒</span><div class="s-name">Buy Printer</div><div class="s-price" style="color:#d97706;">Get Quote</div></div>
     </div>
-    <div style="margin-top:20px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:24px;">📞</span>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Need Help? Call Us</div>
-        <a href="tel:+916352603399" style="font-size:15px;font-weight:800;color:var(--primary);text-decoration:none;">+91 63526 03399</a>
+    <div style="margin-top:16px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">📞</span>
+      <div><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Need Help? Call Us</div>
+      <a href="tel:+916352603399" style="font-size:15px;font-weight:800;color:var(--primary);text-decoration:none;">+91 63526 03399</a></div>
+    </div>
+  </div>
+
+  <!-- Shop Tab -->
+  <div id="home-shop" style="display:none;">
+    <!-- Cart Drawer -->
+    <div id="cart-drawer" style="display:none;background:#fff;border-bottom:2px solid var(--border);padding:16px;"></div>
+    <!-- Product grid -->
+    <div style="padding:16px;">
+      <div class="services-title">🛍️ Our Products</div>
+      <div id="shop-prod-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;">Loading products...</div>
       </div>
+    </div>
+    <!-- Checkout floating bar -->
+    <div id="cart-bar" style="display:none;position:sticky;bottom:0;left:0;right:0;background:#1a3fa8;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;z-index:60;box-shadow:0 -4px 16px rgba(0,0,0,.15);">
+      <div><div style="font-size:11px;opacity:.8;" id="cart-bar-items">0 items</div><div style="font-size:18px;font-weight:800;" id="cart-bar-total">₹0</div></div>
+      <button onclick="showCartDrawer()" style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">🛒 View Cart &amp; Order</button>
     </div>
   </div>
 </div>
@@ -559,6 +554,62 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
   </div>
 </div>
 
+<!-- ========== PAGE: SHOP ORDER FORM ========== -->
+<div class="page fade" id="pg-shop-order">
+  <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
+  <div class="header" style="background:linear-gradient(135deg,#0f2d7a,#1a3fa8);">
+    <h1>🛒 Complete Order</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Your Details</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home');homeTab('shop')">‹ Back to Shop</button>
+    <!-- Order summary -->
+    <div id="order-summary-box" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:16px;"></div>
+    <!-- Customer details -->
+    <div class="section-title">Your Delivery Details</div>
+    <div class="inp-group"><label>Full Name <span class="req">*</span></label><input class="inp" id="ord-name" type="text" placeholder="Your full name"></div>
+    <div class="inp-group"><label>Mobile Number <span class="req">*</span></label><input class="inp" id="ord-mob" type="tel" maxlength="10" placeholder="10 digit mobile" inputmode="numeric"></div>
+    <div class="inp-group"><label>Delivery Address <span class="req">*</span></label><textarea class="inp" id="ord-addr" rows="3" placeholder="House no, Street, Area, City, PIN..."></textarea></div>
+    <div class="inp-group"><label>Special Instructions</label><input class="inp" id="ord-notes" type="text" placeholder="Any special notes..."></div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;line-height:1.7;margin-bottom:10px;">
+      ⚠️ <b>Payment:</b> 100% advance payment required. Our team will contact you within 24 hours with payment instructions via WhatsApp.
+    </div>
+    <div class="err-msg" id="err-order"></div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="submitShopOrder()" id="btn-place-order">✅ Place Order</button></div>
+</div>
+
+<!-- ========== PAGE: ORDER SUCCESS ========== -->
+<div class="page fade" id="pg-order-success">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="header" style="background:linear-gradient(160deg,#065f46,#059669);">
+    <h1>🎉 Order Placed!</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Thank You!</div>
+  </div>
+  <div class="body">
+    <div style="text-align:center;padding:16px 0 10px;">
+      <div style="font-size:56px;margin-bottom:10px;">🎉</div>
+      <div style="font-size:22px;font-weight:900;color:#059669;margin-bottom:4px;">Order Placed Successfully!</div>
+      <div style="font-size:13px;color:var(--muted);" id="ord-success-no"></div>
+    </div>
+    <div class="info-box" id="ord-success-info"></div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;font-size:13px;color:#166534;margin-bottom:14px;line-height:1.8;">
+      <b>What happens next?</b><br>
+      ✅ Your order has been received.<br>
+      📞 We will contact you within 24 hours.<br>
+      💳 Payment details via WhatsApp.<br>
+      🚚 Dispatched after payment confirmation.
+    </div>
+    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);text-align:center;">
+      📍 <b>Bhavi Electronics &amp; Automation</b><br>
+      📞 <a href="tel:+916352603399" style="color:var(--primary);font-weight:700;">+91 63526 03399</a>
+    </div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="goPage('pg-home');homeTab('shop')">🛍️ Continue Shopping</button><button class="btn-outline" onclick="goPage('pg-home');homeTab('services')">🔧 Book a Service</button></div>
+</div>
+
 <!-- ========== SCRIPT ========== -->
 <script>
 var SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
@@ -613,6 +664,28 @@ var SERVICES={
       {id:'inq-proptype',label:'Property Type',type:'select',opts:['Home / Residence','Office','Shop / Showroom','Warehouse / Factory','Other']},
       {id:'inq-camcount',label:'No. of Cameras Needed',type:'select',opts:['2 cameras','4 cameras','6 cameras','8 cameras','More than 8 (we will advise)']},
       {id:'inq-camtype',label:'Preferred Camera Type',type:'select',opts:['Basic HD (720p / 1080p)','Full HD (2MP / 4MP)','4K / IP Camera','Not Sure — as per budget']},
+    ]
+  },
+  'ink-purchase':{
+    icon:'🖊️',name:'Ink / Cartridge Purchase',price:'Best Price Guaranteed',type:'inquiry',
+    sub:'Original & compatible ink, toner and cartridges',
+    includes:['Original Canon, Epson, HP ink bottles & cartridges','Compatible & refill options available','All models covered — we will check availability','Home delivery or pick-up from store','Best market price guaranteed','Bulk orders welcome'],
+    inqType:'Ink / Cartridge Purchase',
+    fields:[
+      {id:'inq-prmodel',label:'Printer Brand & Model',type:'text',placeholder:'e.g. Canon PIXMA G3010 / HP 678'},
+      {id:'inq-inktype',label:'Ink / Cartridge Type',type:'select',opts:['Ink Bottle (Refill)','Ink Cartridge','Toner Cartridge','Not Sure — advise me']},
+      {id:'inq-qty',label:'Quantity Needed',type:'select',opts:['1','2','3-5','6-10','More than 10 (bulk)']},
+    ]
+  },
+  'printer-purchase':{
+    icon:'🛒',name:'Buy New Printer',price:'Get Best Quote',type:'inquiry',
+    sub:'New printers at best prices — all brands',
+    includes:['Canon, Epson, HP — all major brands','Inkjet, laser & multifunction printers','Home, office & commercial models','Best price with warranty','Free installation support','Easy EMI options available'],
+    inqType:'New Printer Purchase',
+    fields:[
+      {id:'inq-usage',label:'Printer Usage',type:'select',opts:['Home / Personal','Small Office (1-5 users)','Office (5-20 users)','Commercial / High Volume']},
+      {id:'inq-prtype',label:'Printer Type',type:'select',opts:['Inkjet (colour prints)','Laser (black & white)','Laser (colour)','Multifunction (print+scan+copy)','Photo Printer','Not Sure — advise me']},
+      {id:'inq-budget',label:'Approximate Budget',type:'select',opts:['Under ₹5,000','₹5,000 – ₹10,000','₹10,000 – ₹25,000','₹25,000 – ₹50,000','Above ₹50,000']},
     ]
   }
 };
@@ -998,9 +1071,234 @@ function printDoc(){
 }
 
 function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// ===== HOME TABS =====
+function homeTab(tab){
+  var isSvc=tab==='services';
+  document.getElementById('home-services').style.display=isSvc?'':'none';
+  document.getElementById('home-shop').style.display=isSvc?'none':'';
+  var ts=document.getElementById('tab-svc'),tsh=document.getElementById('tab-shop');
+  ts.style.color=isSvc?'var(--primary)':'var(--muted)';ts.style.borderBottomColor=isSvc?'var(--primary)':'transparent';
+  tsh.style.color=isSvc?'var(--muted)':'var(--primary)';tsh.style.borderBottomColor=isSvc?'transparent':'var(--primary)';
+  var cb=document.getElementById('home-cart-btn');if(cb)cb.style.display=isSvc?'none':'flex';
+  if(!isSvc&&!window._shopLoaded){loadShop();}
+}
+
+// ===== SHOP =====
+var _cart=[];var _shopProds=[];window._shopLoaded=false;
+
+async function loadShop(){
+  window._shopLoaded=true;
+  var grid=document.getElementById('shop-prod-grid');if(!grid)return;
+  grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;"><span class="spinner" style="border-top-color:var(--primary);border-color:var(--border);"></span> Loading...</div>';
+  try{
+    _shopProds=await sbGet('sales_products','?is_active=eq.true&order=name.asc')||[];
+    renderShopGrid();
+  }catch(e){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;">Unable to load products. Please try again.</div>';
+  }
+}
+
+function renderShopGrid(){
+  var grid=document.getElementById('shop-prod-grid');if(!grid)return;
+  if(!_shopProds.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;font-size:13px;">No products available right now.</div>';return;}
+  grid.innerHTML=_shopProds.map(function(p,i){
+    var inCart=_cart.find(function(c){return c.id===p.id;});
+    return '<div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;" onclick="viewProduct('+i+')">'
+      +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:130px;object-fit:cover;">'
+        :'<div style="width:100%;height:90px;background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;font-size:36px;">📦</div>')
+      +'<div style="padding:10px;flex:1;display:flex;flex-direction:column;">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:3px;">'+escHtml(p.name)+'</div>'
+      +(p.model?'<div style="font-size:10px;color:var(--muted);">'+escHtml(p.model)+'</div>':'')
+      +'<div style="margin-top:auto;padding-top:8px;">'
+      +'<div style="font-size:16px;font-weight:800;color:var(--primary);">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
+      +'<button onclick="event.stopPropagation();addToCart('+i+')" style="margin-top:6px;width:100%;background:'+(inCart?'#059669':'var(--primary)')+';color:#fff;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">'+(inCart?'✅ In Cart':'+ Add to Cart')+'</button>'
+      +'</div></div></div>';
+  }).join('');
+}
+
+function viewProduct(idx){
+  var p=_shopProds[idx];if(!p)return;
+  var ex=document.getElementById('prod-overlay');if(ex)ex.remove();
+  var feats=(p.features||[]).filter(Boolean);var specs=p.specifications||{};
+  var ov=document.createElement('div');ov.id='prod-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;margin-top:8px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:240px;object-fit:cover;">'
+      :'<div style="width:100%;height:100px;background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>')
+    +'<div style="padding:18px;">'
+    +'<h2 style="margin:0 0 3px;font-size:17px;font-weight:800;">'+escHtml(p.name)+'</h2>'
+    +(p.model?'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(p.model)+(p.category?' &nbsp;·&nbsp; '+escHtml(p.category):'')+'</div>':'')
+    +'<div style="font-size:24px;font-weight:800;color:var(--primary);margin-bottom:3px;">₹'+parseFloat(p.price).toLocaleString('en-IN')+'</div>'
+    +'<div style="font-size:11px;color:#059669;margin-bottom:12px;">✅ All taxes included &nbsp;·&nbsp; 100% Advance</div>'
+    +(p.description?'<p style="font-size:13px;color:#475569;margin:0 0 12px;line-height:1.6;">'+escHtml(p.description)+'</p>':'')
+    +(feats.length?'<div style="margin-bottom:12px;"><b style="font-size:12px;">Key Features</b><ul style="margin:6px 0 0;padding-left:18px;">'+feats.map(function(f){return'<li style="font-size:12px;color:#374151;margin-bottom:3px;">'+escHtml(f)+'</li>';}).join('')+'</ul></div>':'')
+    +(Object.keys(specs).length?'<div style="margin-bottom:14px;"><b style="font-size:12px;">Specifications</b><div style="background:#f8fafc;border-radius:8px;padding:10px;margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;">'+Object.entries(specs).map(function(kv){return'<div style="font-size:11px;color:var(--muted);">'+escHtml(kv[0])+'</div><div style="font-size:11px;font-weight:700;">'+escHtml(kv[1])+'</div>';}).join('')+'</div></div>':'')
+    +'<div style="display:flex;gap:8px;">'
+    +'<button id="ov-atc-'+idx+'" onclick="addToCartOv('+idx+')" style="flex:2;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🛒 Add to Cart</button>'
+    +'<button onclick="document.getElementById(\'prod-overlay\').remove()" style="flex:1;background:#f1f5f9;color:var(--muted);border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:600;">Close</button>'
+    +'</div></div></div>';
+  ov.addEventListener('click',function(e){var m=ov.querySelector('div');if(m&&!m.contains(e.target))ov.remove();});
+  document.body.appendChild(ov);
+  // Update button if already in cart
+  var inCart=_cart.find(function(c){return c.id===p.id;});
+  if(inCart){var b=document.getElementById('ov-atc-'+idx);if(b){b.textContent='✅ In Cart';b.style.background='#059669';}}
+}
+
+function addToCartOv(idx){
+  addToCart(idx);
+  var b=document.getElementById('ov-atc-'+idx);if(b){b.textContent='✅ Added!';b.style.background='#059669';}
+  setTimeout(function(){var ov=document.getElementById('prod-overlay');if(ov)ov.remove();},600);
+}
+
+function addToCart(idx){
+  var p=_shopProds[idx];if(!p)return;
+  var ex=_cart.find(function(c){return c.id===p.id;});
+  if(ex){ex.qty++;}else{_cart.push({id:p.id,name:p.name,model:p.model||'',price:parseFloat(p.price),gst_percent:p.gst_percent||18,qty:1});}
+  updateCartUI();renderShopGrid();
+}
+
+function updateCartUI(){
+  var total=_cart.reduce(function(s,c){return s+c.price*c.qty;},0);
+  var qty=_cart.reduce(function(s,c){return s+c.qty;},0);
+  // Home cart button
+  var hc=document.getElementById('home-cart-count');if(hc)hc.textContent=qty;
+  // Floating bar
+  var bar=document.getElementById('cart-bar');
+  var bi=document.getElementById('cart-bar-items');
+  var bt=document.getElementById('cart-bar-total');
+  if(bar){
+    bar.style.display=qty?'flex':'none';
+    if(bi)bi.textContent=qty+' item'+(qty===1?'':'s');
+    if(bt)bt.textContent='₹'+Math.round(total).toLocaleString('en-IN');
+  }
+}
+
+function showCartDrawer(){
+  var drawer=document.getElementById('cart-drawer');if(!drawer)return;
+  if(drawer.style.display==='block'){drawer.style.display='none';return;}
+  drawer.style.display='block';
+  if(!_cart.length){drawer.innerHTML='<div style="text-align:center;color:var(--muted);padding:12px;">Your cart is empty.</div>';return;}
+  var total=_cart.reduce(function(s,c){return s+c.price*c.qty;},0);
+  var html='<div style="font-size:13px;font-weight:700;margin-bottom:10px;">🛒 Cart</div>';
+  _cart.forEach(function(c,i){
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'
+      +'<div style="flex:1;"><div style="font-size:12px;font-weight:600;">'+escHtml(c.name)+'</div>'+(c.model?'<div style="font-size:10px;color:var(--muted);">'+escHtml(c.model)+'</div>':'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:3px;background:#f8fafc;border-radius:7px;padding:3px;">'
+      +'<button onclick="cartQty('+i+',-1)" style="background:none;border:none;width:24px;height:24px;cursor:pointer;font-size:16px;font-weight:700;">−</button>'
+      +'<span style="width:22px;text-align:center;font-weight:700;font-size:13px;">'+c.qty+'</span>'
+      +'<button onclick="cartQty('+i+',1)" style="background:none;border:none;width:24px;height:24px;cursor:pointer;font-size:16px;font-weight:700;">+</button>'
+      +'</div>'
+      +'<div style="min-width:60px;text-align:right;font-weight:700;font-size:13px;color:var(--primary);">₹'+Math.round(c.price*c.qty).toLocaleString('en-IN')+'</div>'
+      +'<button onclick="cartRemove('+i+')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px;">✕</button>'
+      +'</div>';
+  });
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:2px solid var(--border);">'
+    +'<div><div style="font-size:16px;font-weight:800;">₹'+Math.round(total).toLocaleString('en-IN')+'</div><div style="font-size:10px;color:#059669;">All taxes incl.</div></div>'
+    +'<button onclick="goToShopOrder()" style="background:var(--primary);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">Proceed to Order →</button>'
+    +'</div>';
+  drawer.innerHTML=html;
+}
+
+function cartQty(i,d){_cart[i].qty+=d;if(_cart[i].qty<1)_cart[i].qty=1;updateCartUI();showCartDrawer();}
+function cartRemove(i){_cart.splice(i,1);updateCartUI();if(!_cart.length){var dr=document.getElementById('cart-drawer');if(dr)dr.style.display='none';}else showCartDrawer();}
+
+function goToShopOrder(){
+  if(!_cart.length)return;
+  // Build order summary
+  var total=_cart.reduce(function(s,c){return s+c.price*c.qty;},0);
+  var sumHtml='<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">📦 Order Summary</div>';
+  _cart.forEach(function(c){sumHtml+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #dbeafe;"><span>'+escHtml(c.name)+' ×'+c.qty+'</span><b>₹'+Math.round(c.price*c.qty).toLocaleString('en-IN')+'</b></div>';});
+  sumHtml+='<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;margin-top:8px;"><span>Total</span><span style="color:var(--primary);">₹'+Math.round(total).toLocaleString('en-IN')+'</span></div>';
+  document.getElementById('order-summary-box').innerHTML=sumHtml;
+  var drawer=document.getElementById('cart-drawer');if(drawer)drawer.style.display='none';
+  goPage('pg-shop-order');
+}
+
+async function submitShopOrder(){
+  var name=(document.getElementById('ord-name')?.value||'').trim();
+  var mob=(document.getElementById('ord-mob')?.value||'').trim();
+  var addr=(document.getElementById('ord-addr')?.value||'').trim();
+  var notes=(document.getElementById('ord-notes')?.value||'').trim();
+  var err=document.getElementById('err-order');err.style.display='none';
+  if(!name){err.textContent='Please enter your full name.';err.style.display='block';return;}
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  if(!addr){err.textContent='Please enter your delivery address.';err.style.display='block';return;}
+  if(!_cart.length){err.textContent='Your cart is empty.';err.style.display='block';return;}
+  var items=_cart.map(function(c){return{product_id:c.id,name:c.name,model:c.model,price:c.price,gst_percent:c.gst_percent||18,qty:c.qty};});
+  var total=items.reduce(function(s,i){return s+i.price*i.qty;},0);
+  var gstAmt=items.reduce(function(s,i){var rate=i.gst_percent||18;return s+(i.price*i.qty*rate/(100+rate));},0);
+  var btn=document.getElementById('btn-place-order');btn.disabled=true;btn.textContent='Placing order...';
+  try{
+    // Generate order number
+    var year=new Date().getFullYear();
+    var existOrds=await sbGet('sales_orders','?order_no=like.SHOP-'+year+'*&order=order_no.desc&limit=1');
+    var num=1;if(existOrds&&existOrds.length){var last=existOrds[0].order_no||'';var parts=last.split('-');num=parseInt(parts[parts.length-1]||0)+1;}
+    var orderNo='SHOP-'+year+'-'+String(num).padStart(3,'0');
+    var data={order_no:orderNo,customer_name:name,customer_mobile:mob,customer_address:addr,items:items,
+      subtotal:Math.round((total-gstAmt)*100)/100,gst_amount:Math.round(gstAmt*100)/100,
+      total_amount:Math.round(total*100)/100,notes:notes,status:'inquiry',
+      created_by:'Customer Portal',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+    await sbPostMin('sales_orders',data);
+    // Success
+    document.getElementById('ord-success-no').textContent='Order No: '+orderNo;
+    document.getElementById('ord-success-info').innerHTML=
+      '<div class="info-row"><span class="ir-lbl">👤 Name</span><span class="ir-val">'+escHtml(name)+'</span></div>'
+      +'<div class="info-row"><span class="ir-lbl">📱 Mobile</span><span class="ir-val">'+escHtml(mob)+'</span></div>'
+      +'<div class="info-row"><span class="ir-lbl">📍 Address</span><span class="ir-val">'+escHtml(addr)+'</span></div>'
+      +'<div class="info-row"><span class="ir-lbl">💰 Total</span><span class="ir-val" style="font-weight:800;color:var(--primary);">₹'+Math.round(total).toLocaleString('en-IN')+'</span></div>';
+    _cart=[];updateCartUI();
+    goPage('pg-order-success');
+  }catch(e){err.textContent='Error placing order: '+e.message;err.style.display='block';}
+  btn.disabled=false;btn.textContent='✅ Place Order';
+}
+
+// ---- Load portal_services from DB and render home ----
+async function loadPortalServices(){
+  try{
+    var rows=await sbGet('portal_services','?is_active=eq.true&order=sort_order');
+    if(rows&&rows.length){
+      // Override SERVICES with DB data
+      var newSvcs={};
+      rows.forEach(function(s){
+        var inc=s.includes;if(typeof inc==='string'){try{inc=JSON.parse(inc);}catch(e){inc=[];}}
+        var flds=s.form_fields;if(typeof flds==='string'){try{flds=JSON.parse(flds);}catch(e){flds=[];}}
+        newSvcs[s.id]={
+          icon:s.icon||'🔧',name:s.name,price:s.price_display||'',
+          type:s.service_type||'inquiry',
+          repairCat:s.repair_cat||'printer',
+          inqType:s.inquiry_type||s.name,
+          sub:s.subtitle||'',
+          includes:Array.isArray(inc)?inc:[],
+          fields:Array.isArray(flds)?flds:[],
+          priceAmount:s.price_amount||0
+        };
+      });
+      SERVICES=newSvcs;
+      // Re-render home page service grid
+      renderHomeServices(rows);
+    }
+  }catch(e){/* table may not exist yet — use hardcoded SERVICES */}
+}
+
+function renderHomeServices(rows){
+  var grid=document.getElementById('svc-grid');
+  if(!grid)return;
+  grid.innerHTML=rows.map(function(s){
+    var isRepair=s.service_type==='repair';
+    return '<div class="svc-card'+(isRepair?' repair-card':'')+'" onclick="selectService(\''+escHtml(s.id)+'\')">'
+      +'<span class="s-icon">'+escHtml(s.icon||'🔧')+'</span>'
+      +'<div class="s-name">'+escHtml(s.name)+'</div>'
+      +'<div class="s-price">'+escHtml(s.price_display||'')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
 window.addEventListener('load',function(){
+  // Load models
   var r=new XMLHttpRequest();r.open('GET',SB_URL+'/rest/v1/models?order=model_no&select=id,model_no,model_name&limit=1000');r.setRequestHeader('apikey',SB_KEY);r.setRequestHeader('Authorization','Bearer '+SB_KEY);
   r.onload=function(){try{allModels=JSON.parse(r.responseText)||[];}catch(e){}};r.send();
+  // Load services from DB
+  loadPortalServices();
 });
 </script>
 </body>
