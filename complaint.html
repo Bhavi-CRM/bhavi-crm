@@ -201,7 +201,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <div style="margin-top:16px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
       <span style="font-size:22px;">📞</span>
       <div><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Need Help? Call Us</div>
-      <a href="tel:+916352603399" style="font-size:15px;font-weight:800;color:var(--primary);text-decoration:none;">+91 63526 03399</a></div>
+      <a href="tel:+919574004969" style="font-size:15px;font-weight:800;color:var(--primary);text-decoration:none;">+91 9574004969</a></div>
     </div>
   </div>
 
@@ -216,10 +216,67 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
         <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px;">Loading products...</div>
       </div>
     </div>
+    <!-- My Orders link -->
+    <div style="padding:0 16px 8px;text-align:right;">
+      <button onclick="goPage('pg-my-orders')" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;">📦 Track My Orders</button>
+    </div>
     <!-- Checkout floating bar -->
     <div id="cart-bar" style="display:none;position:sticky;bottom:0;left:0;right:0;background:#1a3fa8;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;z-index:60;box-shadow:0 -4px 16px rgba(0,0,0,.15);">
       <div><div style="font-size:11px;opacity:.8;" id="cart-bar-items">0 items</div><div style="font-size:18px;font-weight:800;" id="cart-bar-total">₹0</div></div>
       <button onclick="showCartDrawer()" style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;">🛒 View Cart &amp; Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: REPAIR TYPE ========== -->
+<div class="page fade" id="pg-repair-type">
+  <div class="progress-bar"><div class="progress-fill" style="width:12%"></div></div>
+  <div class="header">
+    <h1 id="rtype-hdr">Choose Service Type</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="rtype-badge">Step 1</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home')">‹ Back to Services</button>
+    <div class="section-title">How would you like service?</div>
+
+    <!-- Onsite card -->
+    <div onclick="selectRepairType('onsite')" style="background:#fff;border:2px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;cursor:pointer;transition:all .18s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <span style="font-size:34px;flex-shrink:0;">🏠</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">Onsite Visit</div>
+          <div style="font-size:22px;font-weight:900;color:#059669;margin-bottom:6px;">₹649<span style="font-size:13px;font-weight:600;color:var(--muted);">/- Visit Charges</span></div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+            ✅ Engineer visits your home or office<br>
+            ✅ Service within <b>24 working hours</b><br>
+            ✅ No need to carry your device
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Carry In card -->
+    <div onclick="selectRepairType('carry-in')" style="background:#fff;border:2px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;cursor:pointer;transition:all .18s;" onmouseover="this.style.borderColor='#d97706'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <span style="font-size:34px;flex-shrink:0;">🏪</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">Carry In</div>
+          <div style="font-size:22px;font-weight:900;color:#d97706;margin-bottom:6px;">₹413<span style="font-size:13px;font-weight:600;color:var(--muted);">/- Service Charges</span></div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+            ✅ Bring device to our office<br>
+            ✅ Repair in <b>2–3 working days</b><br>
+            ✅ Lower cost option
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;background:#fffbeb;border-radius:8px;padding:8px 12px;font-size:11px;color:#92400e;">
+        📍 <b>Bhavi Electronics &amp; Automation</b> &nbsp;·&nbsp; 📞 <a href="tel:+919574004969" style="color:#92400e;font-weight:700;">+91 9574004969</a>
+      </div>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;font-size:12px;color:#1e40af;line-height:1.6;">
+      💡 Both services include a detailed diagnosis. Additional spare parts or repair charges will be quoted separately before any work begins.
     </div>
   </div>
 </div>
@@ -261,30 +318,15 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <div class="step-badge">Please Read Carefully</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-home')">‹ Back</button>
+    <button class="back-btn" onclick="goPage('pg-repair-type')">‹ Back</button>
     <div id="terms-cat-badge" style="text-align:center;margin-bottom:14px;"></div>
     <div class="terms-box">
-      <h3>📋 Service Visit Terms &amp; Conditions</h3>
-      <div class="term-item">
-        <div class="term-num">1</div>
-        <div class="term-text"><b>Engineer Visit Charges: Rs. 649/- (Non-Refundable)</b><br>A service visit &amp; initial diagnosis fee of Rs. 649/- is applicable for every engineer visit, payable directly to the engineer upon arrival.</div>
-      </div>
-      <div class="term-item">
-        <div class="term-num">2</div>
-        <div class="term-text"><b>Spare Parts &amp; Additional Charges</b><br>If your product requires spare parts or additional repair, the engineer will provide a written estimate. Parts &amp; additional labour charges are over and above the Rs. 649/- visit fee.</div>
-      </div>
-      <div class="term-item">
-        <div class="term-num">3</div>
-        <div class="term-text"><b>Repair Estimate Not Accepted</b><br>If the repair estimate is not acceptable, the Rs. 649/- visit &amp; inspection charge remains payable and non-refundable.</div>
-      </div>
-      <div class="term-item">
-        <div class="term-num">4</div>
-        <div class="term-text"><b>Service Scope</b><br>Onsite Printer / Scanner repair &amp; maintenance. Engineer attends within 2–3 working days. You will be contacted to confirm visit timing.</div>
-      </div>
+      <h3 id="terms-box-title">📋 Service Terms &amp; Conditions</h3>
+      <div id="terms-content"></div>
     </div>
     <div class="agree-row" onclick="toggleAgree()">
       <input type="checkbox" id="chk-agree" onchange="toggleAgree(event)">
-      <label for="chk-agree" onclick="return false;">I have read and agree to the above Terms &amp; Conditions. I agree to pay Rs. 649/- as the engineer visit &amp; inspection charge, regardless of whether I accept the final repair estimate.</label>
+      <label for="chk-agree" id="lbl-agree-text" onclick="return false;">I have read and agree to the above Terms &amp; Conditions.</label>
     </div>
     <div class="err-msg" id="err-terms">Please accept the Terms &amp; Conditions to proceed.</div>
     <button class="btn-primary" onclick="proceedAfterTerms()">✅ I Agree &amp; Proceed →</button>
@@ -302,6 +344,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <div class="step-badge" id="sb-lang">Select Language</div>
   </div>
   <div class="body">
+    <button class="back-btn" onclick="backFromLang()">‹ Back</button>
     <div class="section-title">Select Language &nbsp;/&nbsp; ભાષા &nbsp;/&nbsp; भाषा</div>
     <button class="lang-btn lang-gu" onclick="setLang('gu')">
       <div class="lang-badge">ગુ</div>
@@ -545,7 +588,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;font-size:13px;color:#1e40af;margin-bottom:14px;line-height:1.6;" id="success-msg">Our team will contact you shortly.</div>
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;font-size:12px;color:#166534;margin-bottom:14px;">
       📍 <b>Bhavi Electronics &amp; Automation</b><br>
-      📞 <a href="tel:+916352603399" style="color:#166534;font-weight:700;">+91 63526 03399</a>
+      📞 <a href="tel:+919574004969" style="color:#166534;font-weight:700;">+91 9574004969</a>
     </div>
   </div>
   <div class="footer" style="display:flex;flex-direction:column;gap:10px;">
@@ -569,7 +612,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <!-- Customer details -->
     <div class="section-title">Your Delivery Details</div>
     <div class="inp-group"><label>Full Name <span class="req">*</span></label><input class="inp" id="ord-name" type="text" placeholder="Your full name"></div>
-    <div class="inp-group"><label>Mobile Number <span class="req">*</span></label><input class="inp" id="ord-mob" type="tel" maxlength="10" placeholder="10 digit mobile" inputmode="numeric"></div>
+    <div class="inp-group"><label>Mobile Number <span class="req">*</span></label><input class="inp" id="ord-mob" type="tel" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" oninput="if(this.value.length===10)autoFillCustomerByMobile(this.value,{name:'ord-name',address:'ord-addr'})"></div>
     <div class="inp-group"><label>Delivery Address <span class="req">*</span></label><textarea class="inp" id="ord-addr" rows="3" placeholder="House no, Street, Area, City, PIN..."></textarea></div>
     <div class="inp-group"><label>Special Instructions</label><input class="inp" id="ord-notes" type="text" placeholder="Any special notes..."></div>
     <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;line-height:1.7;margin-bottom:10px;">
@@ -604,10 +647,37 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     </div>
     <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);text-align:center;">
       📍 <b>Bhavi Electronics &amp; Automation</b><br>
-      📞 <a href="tel:+916352603399" style="color:var(--primary);font-weight:700;">+91 63526 03399</a>
+      📞 <a href="tel:+919574004969" style="color:var(--primary);font-weight:700;">+91 9574004969</a>
     </div>
   </div>
-  <div class="footer"><button class="btn-primary" onclick="goPage('pg-home');homeTab('shop')">🛍️ Continue Shopping</button><button class="btn-outline" onclick="goPage('pg-home');homeTab('services')">🔧 Book a Service</button></div>
+  <div class="footer">
+    <button class="btn-primary" onclick="goPage('pg-home');homeTab('shop')">🛍️ Continue Shopping</button>
+    <button class="btn-outline" onclick="goMyOrders()" style="margin-top:8px;">📦 Track My Orders</button>
+    <button class="btn-outline" onclick="goPage('pg-home');homeTab('services')" style="margin-top:8px;">🔧 Book a Service</button>
+  </div>
+</div>
+
+<!-- ========== PAGE: MY ORDERS ========== -->
+<div class="page fade" id="pg-my-orders">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="header" style="background:linear-gradient(135deg,#0f2d7a,#1a3fa8);">
+    <h1>📦 My Orders</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Order Status</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home');homeTab('shop')">‹ Back to Shop</button>
+    <div class="section-title">Track Your Orders</div>
+    <div class="inp-group">
+      <label>Mobile Number</label>
+      <div style="display:flex;gap:8px;">
+        <input class="inp" type="tel" id="myord-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+        <button class="btn-primary btn-sm" onclick="loadMyOrders()">Search →</button>
+      </div>
+    </div>
+    <div class="err-msg" id="err-myord"></div>
+    <div id="myord-list"></div>
+  </div>
 </div>
 
 <!-- ========== SCRIPT ========== -->
@@ -693,6 +763,7 @@ var SERVICES={
 // ---- State ----
 var state={
   lang:'en',serviceId:'',serviceType:'',
+  repairType:'', // 'onsite' | 'carry-in'
   mobile:'',existingCust:null,isNew:false,
   firstName:'',lastName:'',altMobile:'',address:'',pin:'',city:'',custState:'',
   warrantyType:'',
@@ -719,14 +790,10 @@ function selectService(svcId){
   state.serviceType=svc.type;
 
   if(svc.type==='repair'){
-    // Show Terms first
-    var badge=document.getElementById('terms-cat-badge');
-    if(badge)badge.innerHTML='<span style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:99px;padding:5px 14px;font-size:13px;font-weight:700;color:#1e40af;">'
-      +svc.icon+' '+svc.name+' &nbsp;|&nbsp; <span style="color:#059669;">Rs. 649/-</span></span>';
-    var chk=document.getElementById('chk-agree');
-    if(chk)chk.checked=false;
-    document.getElementById('err-terms').style.display='none';
-    goPage('pg-terms');
+    // Show repair type selection first
+    _setTxt('rtype-hdr',svc.name);
+    _setTxt('rtype-badge',svc.icon+' '+svc.name);
+    goPage('pg-repair-type');
   } else {
     // Show service info
     document.getElementById('si-hdr').textContent=svc.name;
@@ -739,6 +806,40 @@ function selectService(svcId){
     ul.innerHTML=(svc.includes||[]).map(function(i){return'<li>'+escHtml(i)+'</li>';}).join('');
     goPage('pg-service-info');
   }
+}
+
+// ---- Repair type (Onsite / Carry In) ----
+function selectRepairType(type){
+  state.repairType=type;
+  var svc=SERVICES[state.serviceId]||{};
+  var charges=type==='carry-in'?'413':'649';
+  var badge=document.getElementById('terms-cat-badge');
+  if(badge)badge.innerHTML='<div style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:99px;padding:5px 14px;font-size:13px;font-weight:700;color:#1e40af;">'+(svc.icon||'🖨️')+' '+(svc.name||'Repair')+' &nbsp;|&nbsp; <span style="color:'+(type==='carry-in'?'#d97706':'#059669')+';">Rs. '+charges+'/-</span></div>';
+  var agreeLabel=document.getElementById('lbl-agree-text');
+  if(agreeLabel)agreeLabel.textContent='I have read and agree to the above Terms & Conditions. I agree to pay Rs. '+charges+'/- as the service charge, regardless of whether I accept the final repair estimate.';
+  // Render terms content
+  var tc=document.getElementById('terms-content');
+  if(tc){
+    if(type==='onsite'){
+      tc.innerHTML='<div class="term-item"><div class="term-num">1</div><div class="term-text"><b>Engineer Visit Charges: Rs. 649/- (Non-Refundable)</b><br>A service visit &amp; initial diagnosis fee of Rs. 649/- is applicable for every engineer visit, payable directly to the engineer upon arrival.</div></div>'
+        +'<div class="term-item"><div class="term-num">2</div><div class="term-text"><b>Spare Parts &amp; Additional Charges</b><br>If your product requires spare parts or additional repair, the engineer will provide a written estimate. Parts &amp; additional labour charges are over and above the Rs. 649/- visit fee.</div></div>'
+        +'<div class="term-item"><div class="term-num">3</div><div class="term-text"><b>Repair Estimate Not Accepted</b><br>If the repair estimate is not acceptable, the Rs. 649/- visit &amp; inspection charge remains payable and non-refundable.</div></div>'
+        +'<div class="term-item"><div class="term-num">4</div><div class="term-text"><b>Service Scope &amp; Timing</b><br>Onsite Printer / Scanner repair &amp; maintenance at your premises. Engineer attends within <b>24 working hours</b>. You will be contacted to confirm visit timing.</div></div>';
+    } else {
+      tc.innerHTML='<div class="term-item"><div class="term-num">1</div><div class="term-text"><b>Carry In Service Charges: Rs. 413/- (Non-Refundable)</b><br>A service &amp; initial diagnosis fee of Rs. 413/- is applicable for every Carry In job, payable at our office when you drop your device.</div></div>'
+        +'<div class="term-item"><div class="term-num">2</div><div class="term-text"><b>Spare Parts &amp; Additional Charges</b><br>If your product requires spare parts or additional repair, our technician will provide a written estimate. Parts &amp; additional labour charges are over and above the Rs. 413/- service fee.</div></div>'
+        +'<div class="term-item"><div class="term-num">3</div><div class="term-text"><b>Repair Estimate Not Accepted</b><br>If the repair estimate is not acceptable, the Rs. 413/- service &amp; inspection charge remains payable and non-refundable.</div></div>'
+        +'<div class="term-item"><div class="term-num">4</div><div class="term-text"><b>Carry In Service Scope &amp; Timing</b><br>Please bring your Printer / Scanner to our office. Repair is completed within <b>2–3 working days</b>. You will be notified via SMS/call when ready for collection. 📍 <b>Bhavi Electronics &amp; Automation</b> &nbsp;|&nbsp; 📞 <a href="tel:+919574004969" style="color:var(--primary);">+91 9574004969</a></div></div>';
+    }
+  }
+  var chk=document.getElementById('chk-agree');if(chk)chk.checked=false;
+  document.getElementById('err-terms').style.display='none';
+  goPage('pg-terms');
+}
+
+function backFromLang(){
+  if(state.serviceType==='repair')goPage('pg-terms');
+  else goPage('pg-service-info');
 }
 
 function toggleAgree(e){
@@ -975,15 +1076,24 @@ async function submitForm(){
       var tickets=await sbGet('tickets','?id=like.BEA-'+year+'*&order=id.desc&limit=1');
       var num=1;if(tickets&&tickets.length)num=parseInt(tickets[0].id.split('-').pop())+1;
       state.ticketId='BEA-'+year+'-'+String(num).padStart(3,'0');
-      var desc='Customer Complaint (Self-Service Portal)\nModel: '+state.modelNo+(state.serialNo?'\nSerial: '+state.serialNo:'')+'\nWarranty: '+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+(state.remarks?'\nRemarks: '+state.remarks:'')+(state.serialPhotoB64?'\n[Serial Photo Attached]':'');
-      await sbPostMin('tickets',{id:state.ticketId,job_sheet:state.ticketId,call_type:state.warrantyType==='out_of_warranty'?'Non-Warranty':'Other',service_type:svc.repairCat==='scanner'?'Scanner Onsite':'Printer Onsite',status:'Pending Allocation',brand_name:'',model:state.modelNo,serial:state.serialNo||'',cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',problem:state.problem,description:desc,action:'',assigned_to:null,assigned_name:null,warranty_coverage:state.warrantyType==='out_of_warranty'?'NA':'Other',wc_type:'CSP',service_charges:649,rerepair:'No',rerepair_foc:false,serial_photo:state.serialPhotoB64||null,signature:state.signatureB64,spares:[],timeline:[{action:'Complaint Registered',by:'Customer Self-Service',at:now.toISOString(),note:'Via service portal — '+svc.name}],created_at:now.toISOString(),updated_at:now.toISOString()});
+      var isCarryIn=state.repairType==='carry-in';
+      var svcCharges=isCarryIn?413:649;
+      var svcTypeStr=isCarryIn?(svc.repairCat==='scanner'?'Scanner Carry In':'Printer Carry In'):(svc.repairCat==='scanner'?'Scanner Onsite':'Printer Onsite');
+      var desc='Customer Complaint (Self-Service Portal)\nService Type: '+(isCarryIn?'Carry In':'Onsite Visit')+'\nModel: '+state.modelNo+(state.serialNo?'\nSerial: '+state.serialNo:'')+'\nWarranty: '+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+(state.remarks?'\nRemarks: '+state.remarks:'')+(state.serialPhotoB64?'\n[Serial Photo Attached]':'');
+      var tData={id:state.ticketId,job_sheet:state.ticketId,call_type:state.warrantyType==='out_of_warranty'?'Non-Warranty':'Other',service_type:svcTypeStr,status:'Pending Allocation',brand_name:'',model:state.modelNo,serial:state.serialNo||'',cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',problem:state.problem,description:desc,action:'',assigned_to:null,assigned_name:null,warranty_coverage:state.warrantyType==='out_of_warranty'?'NA':'Other',wc_type:'CSP',service_charges:svcCharges,rerepair:'No',rerepair_foc:false,serial_photo:state.serialPhotoB64||null,signature:state.signatureB64,spares:[],timeline:[{action:'Complaint Registered',by:'Customer Self-Service',at:now.toISOString(),note:'Via service portal — '+svc.name+' ('+(isCarryIn?'Carry In':'Onsite')+')'}],created_at:now.toISOString(),updated_at:now.toISOString()};
+      try{await sbPostMin('tickets',tData);}catch(e2){
+        if(e2.message&&(e2.message.includes('serial_photo')||e2.message.includes('signature')||e2.message.includes('PGRST204'))){
+          var tData2=Object.assign({},tData);delete tData2.serial_photo;delete tData2.signature;
+          await sbPostMin('tickets',tData2);
+        }else{throw e2;}
+      }
 
       // Success UI
       document.getElementById('success-hdr').textContent='✅ Complaint Registered!';
       document.getElementById('success-badge').textContent='Job Sheet: '+state.ticketId;
       document.getElementById('success-ticket-box').innerHTML='<div class="ticket-box"><div class="ticket-lbl">JOB SHEET NUMBER</div><div class="ticket-num">'+escHtml(state.ticketId)+'</div><div style="font-size:11px;opacity:.7;margin-top:6px;">'+state.createdAt+'</div></div>';
-      document.getElementById('success-info').innerHTML=_successRows(custName,svc.name,'Printer / Scanner Onsite',state.problem,'₹649/- (Visit Charges)');
-      document.getElementById('success-msg').textContent='Your complaint has been registered. Our engineer will contact you within 2–3 working days to confirm the visit timing.';
+      document.getElementById('success-info').innerHTML=_successRows(custName,svc.name,svcTypeStr,state.problem,'₹'+svcCharges+'/- ('+(isCarryIn?'Service Charges':'Visit Charges')+')');
+      document.getElementById('success-msg').textContent=isCarryIn?'Your complaint has been registered. Please bring your device to our office. Repair will be completed within 2–3 working days. We will notify you when ready.':'Your complaint has been registered. Our engineer will contact you within 24 working hours to confirm the visit timing.';
       document.getElementById('btn-print').style.display='';
 
     } else {
@@ -1065,7 +1175,7 @@ function printDoc(){
   if(state.serialPhotoB64){html+='<div class="sec photo"><h3>Serial Number Photo</h3><img src="'+state.serialPhotoB64+'"></div>';}
   html+='<div class="sec"><h3>Customer Signature</h3><div class="sign-area">'+(state.signatureB64?'<img src="'+state.signatureB64+'">':'<div style="color:#94a3b8;padding-top:20px;">Not captured</div>')+'</div></div>'
     +'<div class="terms-note"><b>TERMS ACKNOWLEDGED:</b><br>1. Engineer Visit &amp; Inspection Charges: Rs. 649/- (Non-Refundable) — payable to engineer on arrival.<br>2. Spare parts / additional repair charged extra as per engineer estimate.<br>3. If estimate not accepted, Rs. 649/- visit charge still payable.</div>'
-    +'<div class="footer-note"><b>BHAVI ELECTRONICS &amp; AUTOMATION</b> | 📞 +91 63526 03399<br>Service within 2–3 working days | Job Sheet: <b>'+escHtml(state.ticketId)+'</b></div>'
+    +'<div class="footer-note"><b>BHAVI ELECTRONICS &amp; AUTOMATION</b> | 📞 +91 9574004969<br>Service within 2–3 working days | Job Sheet: <b>'+escHtml(state.ticketId)+'</b></div>'
     +'</div></body></html>';
   var win=window.open('','_blank','width=750,height=900');win.document.open();win.document.write(html);win.document.close();win.onload=function(){win.print();};
 }
@@ -1204,6 +1314,10 @@ function cartRemove(i){_cart.splice(i,1);updateCartUI();if(!_cart.length){var dr
 
 function goToShopOrder(){
   if(!_cart.length)return;
+  // Pre-fill mobile + name from last service flow if known
+  if(state.mobile){var mo=document.getElementById('ord-mob');if(mo&&!mo.value)mo.value=state.mobile;}
+  var custN=state.isNew?(state.firstName+' '+state.lastName).trim():(state.existingCust&&state.existingCust.cname)||'';
+  if(custN){var no=document.getElementById('ord-name');if(no&&!no.value)no.value=custN;}
   // Build order summary
   var total=_cart.reduce(function(s,c){return s+c.price*c.qty;},0);
   var sumHtml='<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">📦 Order Summary</div>';
@@ -1247,6 +1361,7 @@ async function submitShopOrder(){
       +'<div class="info-row"><span class="ir-lbl">📍 Address</span><span class="ir-val">'+escHtml(addr)+'</span></div>'
       +'<div class="info-row"><span class="ir-lbl">💰 Total</span><span class="ir-val" style="font-weight:800;color:var(--primary);">₹'+Math.round(total).toLocaleString('en-IN')+'</span></div>';
     _cart=[];updateCartUI();
+    if(mob&&!state.mobile)state.mobile=mob; // save for My Orders
     goPage('pg-order-success');
   }catch(e){err.textContent='Error placing order: '+e.message;err.style.display='block';}
   btn.disabled=false;btn.textContent='✅ Place Order';
@@ -1291,6 +1406,66 @@ function renderHomeServices(rows){
       +'<div class="s-price">'+escHtml(s.price_display||'')+'</div>'
       +'</div>';
   }).join('');
+}
+
+// ---- My Orders ----
+function goMyOrders(){
+  // Pre-fill mobile if we know it
+  var mobEl=document.getElementById('myord-mob');
+  if(mobEl&&state.mobile)mobEl.value=state.mobile;
+  goPage('pg-my-orders');
+  if(state.mobile)loadMyOrders();
+}
+
+async function loadMyOrders(){
+  var mob=(document.getElementById('myord-mob')?.value||'').trim();
+  var err=document.getElementById('err-myord');err.style.display='none';
+  var list=document.getElementById('myord-list');
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  list.innerHTML='<div style="text-align:center;color:var(--muted);padding:20px;"><span class="spinner" style="border-top-color:var(--primary);border-color:var(--border);"></span> Loading...</div>';
+  try{
+    var orders=await sbGet('sales_orders','?customer_mobile=eq.'+mob+'&order=created_at.desc&limit=20')||[];
+    if(!orders.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No orders found for this mobile number.</div>';return;}
+    var statusColor={'inquiry':'#d97706','confirmed':'#1a3fa8','payment_received':'#059669','dispatched':'#7c3aed','delivered':'#059669','cancelled':'#dc2626'};
+    var statusLabel={'inquiry':'Inquiry Received','confirmed':'Confirmed','payment_received':'Payment Done','dispatched':'Dispatched','delivered':'Delivered','cancelled':'Cancelled'};
+    list.innerHTML=orders.map(function(o){
+      var clr=statusColor[o.status]||'#64748b';
+      var lbl=statusLabel[o.status]||o.status||'Processing';
+      var items=(o.items||[]).map(function(i){return escHtml(i.name||'')+(i.qty>1?' ×'+i.qty:'');}).join(', ');
+      return '<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+        +'<div><div style="font-size:14px;font-weight:800;color:var(--text);">'+escHtml(o.order_no||'')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
+        +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;">'+escHtml(lbl)+'</span>'
+        +'</div>'
+        +(items?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📦 '+items+'</div>':'')
+        +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        +'<div style="font-size:15px;font-weight:800;color:var(--primary);">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</div>'
+        +(o.tracking_info?'<div style="font-size:11px;color:#7c3aed;font-weight:600;">🚚 '+escHtml(o.tracking_info)+'</div>':'')
+        +'</div>'
+        +(o.notes?'<div style="font-size:11px;color:var(--muted);margin-top:6px;background:#f8fafc;border-radius:6px;padding:5px 8px;">📝 '+escHtml(o.notes)+'</div>':'')
+        +'</div>';
+    }).join('');
+  }catch(e){list.innerHTML='<div style="text-align:center;color:var(--danger);padding:20px;font-size:13px;">Error: '+escHtml(e.message)+'</div>';}
+}
+
+// ---- Auto-search customer by mobile (CRM helper) ----
+async function autoFillCustomerByMobile(mob,targetFields){
+  if(!mob||!/^\d{10}$/.test(mob))return null;
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
+    if(custs&&custs.length){
+      var c=custs[0];
+      if(targetFields){
+        if(targetFields.name&&c.cname)document.getElementById(targetFields.name).value=c.cname;
+        if(targetFields.address&&c.address)document.getElementById(targetFields.address).value=c.address;
+        if(targetFields.city&&c.city)document.getElementById(targetFields.city).value=c.city;
+        if(targetFields.pin&&c.pin)document.getElementById(targetFields.pin).value=c.pin;
+      }
+      return c;
+    }
+  }catch(e){}
+  return null;
 }
 
 window.addEventListener('load',function(){

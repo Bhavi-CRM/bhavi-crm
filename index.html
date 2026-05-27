@@ -9371,7 +9371,7 @@ function printPortalQR(){
     +'<div class="sub">Printer &amp; Scanner Repair &nbsp;·&nbsp; Camera Repair<br>CCTV Install &nbsp;·&nbsp; Home Automation &nbsp;·&nbsp; Shop</div>'
     +'<div class="sub" style="color:#059669;font-weight:700;margin-top:8px;">✅ Visit Charges: Rs. 649/- only</div>'
     +'<div style="margin-top:14px;padding:10px;background:#f0f9ff;border-radius:8px;display:inline-block;">'
-    +'📞 <b>+91 63526 03399</b></div>'
+    +'📞 <b>+91 9574004969</b></div>'
     +'<div class="url">'+url+'</div>'
     +'</body></html>');
   win.document.close();
@@ -15100,6 +15100,8 @@ async function renderSalesOrdersAdmin(){
         +'<span style="background:'+col+';color:#fff;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;text-transform:capitalize;">'+escHtml(o.status||'')+'</span>'
         +'</div>'
         +'<div style="margin-top:6px;font-size:15px;font-weight:800;color:#1a56db;">₹'+parseFloat(o.total_amount||0).toLocaleString('en-IN')+'<span style="font-size:11px;font-weight:400;color:#94a3b8;"> incl. all taxes</span></div>'
+        +(o.courier_name?'<div style="margin-top:6px;font-size:12px;color:#0ea5e9;font-weight:600;">🚚 '+escHtml(o.courier_name)+' — AWB: '+escHtml(o.awb_number||'')+(o.tracking_url?'  <a href="'+escHtml(o.tracking_url)+'" target="_blank" style="color:#1a56db;font-size:11px;">Track →</a>':'')+'</div>':'')
+        +(o.delivery_date?'<div style="font-size:11px;color:#059669;font-weight:600;">✅ Delivered: '+o.delivery_date+'</div>':'')
         +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">'+buildSalesActions(o)+'</div>'
         +'</div>';
     });
@@ -15124,8 +15126,16 @@ function buildSalesActions(o){
     btns+='<button onclick="openPaymentModal(\''+id+'\',\''+cn+'\','+tot+',\''+mob+'\')" style="background:#10b981;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Paid</button>';
     btns+='<button onclick="salesWA_PaymentDetails(\''+cn+'\',\''+mob+'\','+tot+',\''+on+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Payment Details</button>';
   }
-  if(s==='paid'){btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Dispatch</button>';}
-  if(s==='dispatched'){btns+='<button onclick="salesMarkStatus(\''+id+'\',\'done\')" style="background:#9ca3af;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Done</button>';}
+  if(s==='paid'){
+    btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">🚚 Dispatch</button>';
+  }
+  if(s==='dispatched'){
+    btns+='<button onclick="openDeliveryModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#059669;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">✅ Mark Delivered</button>';
+    btns+='<button onclick="salesWA_ResendTracking(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Resend Tracking</button>';
+  }
+  if(s==='done'){
+    btns+='<button onclick="salesWA_Delivered_resend(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Delivery Msg</button>';
+  }
   return btns;
 }
 async function salesMarkStatus(id,status){try{await sb('sales_orders','PATCH',{status:status,updated_at:new Date().toISOString()},'?id=eq.'+id);renderSalesOrdersAdmin();}catch(e){alert(e.message);}}
@@ -15216,17 +15226,20 @@ function openDispatchModal(id,cname,mob){
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Courier / Logistics Partner *</label><input id="dp-courier" class="form-input" placeholder="e.g. DTDC, Blue Dart, Delhivery"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">AWB / Tracking Number *</label><input id="dp-awb" class="form-input" placeholder="e.g. 1234567890"></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Dispatch Date</label><input id="dp-date" type="date" class="form-input" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Tracking URL <span style="font-weight:400;color:#94a3b8;font-size:10px;">(optional)</span></label><input id="dp-url" class="form-input" placeholder="https://..."></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Tracking URL <span style="font-weight:400;color:#94a3b8;font-size:10px;">(optional)</span></label><input id="dp-url" class="form-input" placeholder="https://tracking.dtdc.com/..."></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Notes <span style="font-weight:400;color:#94a3b8;font-size:10px;">(optional)</span></label><input id="dp-notes" class="form-input" placeholder="Packed securely, fragile item..."></div>'
+    +'<div style="background:#fffbeb;border-radius:8px;padding:10px;font-size:12px;color:#92400e;">📲 A WhatsApp message with tracking details will be sent to the customer automatically.</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
     +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
-    +'<button onclick="saveDispatchRecord(\''+id+'\',\''+cname+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">🚚 Save & Notify</button>'
+    +'<button onclick="saveDispatchRecord(\''+id+'\',\''+cname+'\',\''+escHtml(mob||'')+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">🚚 Dispatch & Notify Customer</button>'
     +'</div></div>';
   openModal('modal-general');
 }
 async function saveDispatchRecord(id,cname,mob){
   var courier=(document.getElementById('dp-courier')?.value||'').trim();var awb=(document.getElementById('dp-awb')?.value||'').trim();var date=document.getElementById('dp-date')?.value;var url=(document.getElementById('dp-url')?.value||'').trim();
   if(!courier||!awb){alert('Courier name and AWB number are required.');return;}
-  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(mob)salesWA_Dispatch(ord&&ord[0]?ord[0].order_no:'',cname,mob,courier,awb,date,url);}
+  var trackInfo=courier+' | AWB: '+awb+(url?' | '+url:'');
+  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no');await sb('sales_orders','PATCH',{status:'dispatched',courier_name:courier,awb_number:awb,dispatch_date:date,tracking_url:url,tracking_info:trackInfo,notes:(document.getElementById('dp-notes')?.value||'').trim()||undefined,updated_at:new Date().toISOString()},'?id=eq.'+id);closeModal('modal-general');renderSalesOrdersAdmin();if(mob)salesWA_Dispatch(ord&&ord[0]?ord[0].order_no:'',cname,mob,courier,awb,date,url);}
   catch(e){alert('Error: '+e.message);}
 }
 async function viewSalesOrder(id){
@@ -15290,6 +15303,53 @@ function salesWA_PaymentConfirm(orderNo,cname,mob,total,method,ref){
 function salesWA_Dispatch(orderNo,cname,mob,courier,awb,date,trackUrl){
   var ci=window._companyInfo||{};
   _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\n🚚 *Your Order Has Been Dispatched!*\n\n📦 *Order No:* '+orderNo+'\n🏢 *Courier:* '+courier+'\n🔢 *AWB / Tracking No:* *'+awb+'*\n📅 *Dispatch Date:* '+date+'\n'+(trackUrl?'🔗 *Track:* '+trackUrl+'\n':'')+'\nEstimated delivery: *1–2 working days*.\n\nFor queries, contact us: 📞 *Bhavi Electronics*'+(ci.phone?' — '+ci.phone:'')+'\n\nThank you for shopping with Bhavi Electronics! 🙏\n_Where Customer Delight is First_');
+}
+
+function openDeliveryModal(id,cname,mob){
+  document.getElementById('modal-general-title').textContent='Confirm Delivery — '+cname;
+  document.getElementById('modal-general-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:12px;">'
+    +'<div style="background:#d1fae5;border-radius:10px;padding:14px;text-align:center;">'
+    +'<div style="font-size:36px;margin-bottom:6px;">🎉</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#065f46;">Mark order as Delivered?</div>'
+    +'<div style="font-size:12px;color:#059669;margin-top:4px;">A WhatsApp thank-you message will be sent to the customer.</div>'
+    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Delivery Note <span style="font-weight:400;color:#94a3b8;">(optional)</span></label>'
+    +'<input id="del-note" class="form-input" placeholder="e.g. Delivered to John at door, left with security..."></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +'<button onclick="closeModal(\'modal-general\')" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;">Cancel</button>'
+    +'<button onclick="saveDeliveryRecord(\''+id+'\',\''+escHtml(cname)+'\',\''+escHtml(mob||'')+'\')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:600;">✅ Confirm Delivered</button>'
+    +'</div></div>';
+  openModal('modal-general');
+}
+async function saveDeliveryRecord(id,cname,mob){
+  var note=(document.getElementById('del-note')?.value||'').trim();
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no,items');
+    var o=ord&&ord[0]?ord[0]:{};
+    await sb('sales_orders','PATCH',{status:'done',delivery_date:new Date().toLocaleDateString('en-CA'),delivery_note:note||null,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    closeModal('modal-general');renderSalesOrdersAdmin();
+    if(mob)salesWA_Delivered(o.order_no||'',cname,mob,o.items||[],note);
+  }catch(e){alert('Error: '+e.message);}
+}
+function salesWA_Delivered(orderNo,cname,mob,items,note){
+  var ci=window._companyInfo||{};
+  var itemList=(items||[]).map(function(i){return '  ✅ '+i.name+(i.qty>1?' × '+i.qty:'');}).join('\n');
+  _waOpen(mob,'Dear '+escHtml(cname||'Valued Customer')+',\n\n🎉 *Your Order Has Been Delivered!*\n\n📦 *Order No:* '+orderNo+'\n\n*Items Delivered:*\n'+itemList+'\n'+(note?'\n📝 Note: '+note+'\n':'')+'\nWe hope you are happy with your purchase! 😊\n\nIf you have any questions or need support:\n📞 *Bhavi Electronics* '+(ci.phone?ci.phone:'+91 9574004969')+'\n\n⭐ We would love your feedback!\n\nThank you for choosing Bhavi Electronics! 🙏\n_Where Customer Delight is First_');
+}
+async function salesWA_Delivered_resend(id,cname,mob){
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no,items,delivery_note');
+    var o=ord&&ord[0]?ord[0]:{};
+    salesWA_Delivered(o.order_no||'',cname,mob,o.items||[],o.delivery_note||'');
+  }catch(e){alert(e.message);}
+}
+async function salesWA_ResendTracking(id,cname,mob){
+  try{
+    var ord=await sb('sales_orders','GET',null,'?id=eq.'+id+'&select=order_no,courier_name,awb_number,dispatch_date,tracking_url');
+    var o=ord&&ord[0]?ord[0]:{};
+    salesWA_Dispatch(o.order_no||'',cname,mob,o.courier_name||'',o.awb_number||'',o.dispatch_date||'',o.tracking_url||'');
+  }catch(e){alert(e.message);}
 }
 
 // ── Public Shop ───────────────────────────────────────────────────────────────
