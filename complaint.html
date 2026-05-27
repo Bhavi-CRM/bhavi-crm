@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bhavi Electronics — Book a Service</title>
+<link rel="icon" href="icon-192.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--primary:#1a3fa8;--primary-light:#2563eb;--success:#059669;--danger:#dc2626;--orange:#f59e0b;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+.page{display:none;width:100%;max-width:500px;min-height:100vh;background:var(--card);flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.08);}
+.page.active{display:flex;}
+
+/* Progress */
+.progress-bar{height:4px;background:#dbeafe;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#1a3fa8,#2563eb);transition:width .4s;border-radius:2px;}
+
+/* Header */
+.header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
+.header-logo{width:52px;height:52px;border-radius:12px;margin:0 auto 8px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+.header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
+.header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
+.step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
+
+/* Home page header */
+.home-header{background:linear-gradient(135deg,#1a3fa8 0%,#2563eb 100%);color:#fff;padding:24px 20px 22px;position:relative;overflow:hidden;}
+.home-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;}
+.home-header::after{content:'';position:absolute;bottom:-20px;left:-20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;}
+.home-header .welcome{font-size:22px;font-weight:900;margin-bottom:4px;}
+.home-header .subtitle{font-size:12px;opacity:.8;margin-bottom:16px;font-weight:400;}
+.btn-book{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(217,119,6,.4);letter-spacing:.3px;}
+.btn-book:hover{box-shadow:0 6px 20px rgba(217,119,6,.5);}
+
+/* Service grid */
+.services-section{padding:18px;}
+.services-title{font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px;}
+.services-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.svc-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 12px;text-align:center;cursor:pointer;transition:all .18s;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+.svc-card:hover{border-color:var(--primary-light);box-shadow:0 4px 18px rgba(37,99,235,.14);transform:translateY(-2px);}
+.svc-card:active{transform:translateY(0);}
+.svc-card .s-icon{font-size:30px;margin-bottom:8px;display:block;}
+.svc-card .s-name{font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.svc-card .s-price{font-size:12px;font-weight:700;color:#d97706;}
+.svc-card.repair-card .s-price{color:#059669;}
+
+/* Body */
+.body{flex:1;padding:20px 18px;overflow-y:auto;}
+.footer{padding:14px 18px;border-top:1px solid var(--border);background:#f9fafb;}
+
+/* Form elements */
+.section-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;text-align:center;}
+.inp-group{margin-bottom:14px;}
+.inp-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px;}
+.inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:15px;color:var(--text);outline:none;transition:border .18s;background:#fafcff;}
+.inp:focus{border-color:var(--primary-light);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.08);}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;cursor:pointer;}
+textarea.inp{resize:none;min-height:80px;font-family:inherit;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.req{color:#dc2626;}
+
+/* Service info */
+.svc-info-hero{background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1.5px solid #bfdbfe;border-radius:var(--radius);padding:20px;margin-bottom:16px;text-align:center;}
+.svc-info-hero .si-icon{font-size:44px;margin-bottom:10px;}
+.svc-info-hero h2{font-size:18px;font-weight:900;color:var(--primary);margin-bottom:4px;}
+.svc-info-hero .si-price{font-size:16px;font-weight:800;color:#d97706;margin-bottom:12px;}
+.include-list{text-align:left;list-style:none;padding:0;}
+.include-list li{font-size:13px;color:var(--text);padding:6px 0;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.include-list li:last-child{border-bottom:none;}
+.include-list li::before{content:'✅';flex-shrink:0;font-size:12px;margin-top:1px;}
+
+/* Terms */
+.terms-box{background:#f8fafc;border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
+.terms-box h3{font-size:12px;font-weight:800;color:var(--primary);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;text-align:center;padding-bottom:10px;border-bottom:2px solid var(--border);}
+.term-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;}
+.term-item:last-child{border-bottom:none;}
+.term-num{width:24px;height:24px;background:var(--primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:2px;}
+.term-text{font-size:12px;color:var(--text);line-height:1.6;}
+.term-text b{color:var(--primary);}
+.agree-row{display:flex;align-items:flex-start;gap:12px;padding:14px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;margin-bottom:14px;cursor:pointer;}
+.agree-row input[type=checkbox]{width:20px;height:20px;cursor:pointer;flex-shrink:0;margin-top:2px;accent-color:var(--primary);}
+.agree-row label{font-size:12px;font-weight:600;color:#92400e;line-height:1.5;cursor:pointer;}
+
+/* Warranty */
+.warr-grid{display:flex;flex-direction:column;gap:10px;}
+.warr-card{padding:14px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .18s;}
+.warr-card:hover{border-color:var(--primary-light);background:#eff6ff;}
+.warr-card.w1:hover,.warr-card.w1.sel{border-color:#059669;background:#f0fdf4;}
+.warr-card.w2:hover,.warr-card.w2.sel{border-color:#dc2626;background:#fef2f2;}
+.warr-card.w3:hover,.warr-card.w3.sel{border-color:#d97706;background:#fffbeb;}
+.warr-card .wt{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.warr-card .ws{font-size:12px;color:var(--muted);margin-top:3px;}
+
+/* Warranty info (Canon) */
+.warr-info-box{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #86efac;border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.contact-row{display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border-radius:10px;margin-bottom:8px;border:1px solid #bbf7d0;}
+.contact-row .c-icon{font-size:22px;flex-shrink:0;}
+.contact-row .c-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.contact-row .c-val{font-size:14px;font-weight:700;color:var(--text);margin-top:1px;}
+.contact-row a{color:var(--primary);text-decoration:none;}
+
+/* Customer found */
+.cust-found{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:var(--radius);padding:12px;margin-bottom:14px;}
+
+/* Model search */
+.model-wrap{position:relative;}
+.model-drop{position:absolute;z-index:500;background:#fff;border:1.5px solid var(--primary-light);border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;margin-top:2px;}
+.model-drop div{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
+.model-drop div:hover{background:#eff6ff;}
+.model-drop div:last-child{border-bottom:none;}
+
+/* Photo */
+.photo-upload{border:2px dashed var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .18s;background:#fafcff;}
+.photo-upload:hover{border-color:var(--primary-light);background:#eff6ff;}
+.photo-preview{width:100%;max-height:150px;object-fit:contain;border-radius:8px;margin-top:8px;display:none;}
+
+/* Signature */
+.sign-wrap{border:2px solid var(--border);border-radius:12px;background:#fafcff;overflow:hidden;position:relative;touch-action:none;}
+#sign-canvas{display:block;width:100%;cursor:crosshair;touch-action:none;}
+.sign-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#cbd5e1;font-size:13px;font-weight:600;pointer-events:none;text-align:center;line-height:1.5;}
+
+/* Ticket box */
+.ticket-box{background:linear-gradient(135deg,#0f2d7a,#2563eb);color:#fff;border-radius:16px;padding:24px 20px;text-align:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(26,63,168,.3);}
+.ticket-num{font-size:28px;font-weight:900;letter-spacing:3px;margin:6px 0;}
+.ticket-lbl{font-size:11px;opacity:.8;letter-spacing:.5px;}
+.inq-box{background:linear-gradient(135deg,#065f46,#059669);color:#fff;border-radius:16px;padding:24px 20px;text-align:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(5,150,105,.3);}
+
+/* Info rows */
+.info-box{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+.info-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.info-row:last-child{border-bottom:none;}
+.info-row .ir-lbl{color:var(--muted);font-weight:600;width:80px;flex-shrink:0;}
+.info-row .ir-val{color:var(--text);font-weight:500;}
+
+/* Buttons */
+.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(26,63,168,.25);}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(26,63,168,.35);}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
+.btn-outline{width:100%;background:#fff;color:var(--primary);border:1.5px solid var(--primary-light);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;}
+.btn-outline:hover{background:#eff6ff;}
+.back-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px;}
+.back-btn:hover{color:var(--primary);}
+.btn-sm{padding:8px 16px;font-size:13px;border-radius:8px;width:auto;}
+
+/* Lang */
+.lang-btn{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;transition:all .18s;width:100%;margin-bottom:10px;}
+.lang-btn:hover{border-color:var(--primary-light);background:#eff6ff;}
+.lang-badge{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;}
+.lang-gu .lang-badge{background:#fff3e0;color:#e65100;}
+.lang-hi .lang-badge{background:#fce4ec;color:#c62828;}
+.lang-en .lang-badge{background:#e3f2fd;color:#1565c0;}
+
+/* Alerts */
+.err-msg{color:#dc2626;font-size:13px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:10px;display:none;}
+.info-msg{color:#1e40af;font-size:13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+.spinner{width:16px;height:16px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.fade{animation:fadeIn .22s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+@media print{body{background:#fff;}.no-print{display:none!important;}}
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE: HOME ========== -->
+<div class="page active fade" id="pg-home">
+  <div class="home-header">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <img src="icon-192.png" style="width:44px;height:44px;border-radius:10px;background:#fff;padding:3px;object-fit:contain;" onerror="this.style.display='none'">
+      <div>
+        <div style="font-size:13px;font-weight:800;opacity:.9;">Bhavi Electronics &amp; Automation</div>
+        <div style="font-size:10px;opacity:.65;letter-spacing:.4px;">WHERE CUSTOMER DELIGHT IS FIRST</div>
+      </div>
+    </div>
+    <div class="welcome">👋 Welcome!</div>
+    <div class="subtitle">Printers &nbsp;·&nbsp; Cameras &nbsp;·&nbsp; Home Automation &nbsp;·&nbsp; CCTV</div>
+    <button class="btn-book" onclick="document.getElementById('services-section').scrollIntoView({behavior:'smooth'})">+ Book a Service</button>
+  </div>
+
+  <div class="services-section" id="services-section">
+    <div class="services-title">Our Services</div>
+    <div class="services-grid">
+
+      <div class="svc-card repair-card" onclick="selectService('printer-repair')">
+        <span class="s-icon">🖨️</span>
+        <div class="s-name">Printer Repair</div>
+        <div class="s-price">₹649/-</div>
+      </div>
+
+      <div class="svc-card repair-card" onclick="selectService('scanner-repair')">
+        <span class="s-icon">🖻</span>
+        <div class="s-name">Scanner Service</div>
+        <div class="s-price">₹649/-</div>
+      </div>
+
+      <div class="svc-card" onclick="selectService('camera-repair')">
+        <span class="s-icon">📷</span>
+        <div class="s-name">Camera Repair</div>
+        <div class="s-price">₹1500+</div>
+      </div>
+
+      <div class="svc-card" onclick="selectService('printer-amc')">
+        <span class="s-icon">📋</span>
+        <div class="s-name">Printer AMC</div>
+        <div class="s-price">₹5000+</div>
+      </div>
+
+      <div class="svc-card" onclick="selectService('home-automation')">
+        <span class="s-icon">🏠</span>
+        <div class="s-name">Home Automation</div>
+        <div class="s-price">₹3000+</div>
+      </div>
+
+      <div class="svc-card" onclick="selectService('cctv-install')">
+        <span class="s-icon">📹</span>
+        <div class="s-name">CCTV Install</div>
+        <div class="s-price">₹2500+</div>
+      </div>
+
+    </div>
+    <div style="margin-top:20px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:24px;">📞</span>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Need Help? Call Us</div>
+        <a href="tel:+916352603399" style="font-size:15px;font-weight:800;color:var(--primary);text-decoration:none;">+91 63526 03399</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: SERVICE INFO (Inquiry services) ========== -->
+<div class="page fade" id="pg-service-info">
+  <div class="progress-bar"><div class="progress-fill" style="width:10%"></div></div>
+  <div class="header">
+    <h1 id="si-hdr">Service Details</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="si-badge">Step 1</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home')">‹ Back to Services</button>
+    <div class="svc-info-hero">
+      <div class="si-icon" id="si-icon">📷</div>
+      <h2 id="si-name">Camera Repair</h2>
+      <div class="si-price" id="si-price">Starting ₹1500/-</div>
+      <div style="font-size:12px;color:var(--muted);" id="si-sub">Expert repair for all major camera brands</div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">What's Included</div>
+    <ul class="include-list" id="si-includes"></ul>
+    <div class="divider"></div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;margin-bottom:16px;">
+      💡 <b>No obligation.</b> Our team will review your inquiry and contact you with a detailed quotation before any work begins.
+    </div>
+  </div>
+  <div class="footer">
+    <button class="btn-primary" onclick="goPage('pg-lang')">I'm Interested — Proceed →</button>
+  </div>
+</div>
+
+<!-- ========== PAGE: TERMS (Repair only) ========== -->
+<div class="page fade" id="pg-terms">
+  <div class="progress-bar"><div class="progress-fill" style="width:15%"></div></div>
+  <div class="header">
+    <h1>Terms &amp; Conditions</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Please Read Carefully</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home')">‹ Back</button>
+    <div id="terms-cat-badge" style="text-align:center;margin-bottom:14px;"></div>
+    <div class="terms-box">
+      <h3>📋 Service Visit Terms &amp; Conditions</h3>
+      <div class="term-item">
+        <div class="term-num">1</div>
+        <div class="term-text"><b>Engineer Visit Charges: Rs. 649/- (Non-Refundable)</b><br>A service visit &amp; initial diagnosis fee of Rs. 649/- is applicable for every engineer visit, payable directly to the engineer upon arrival.</div>
+      </div>
+      <div class="term-item">
+        <div class="term-num">2</div>
+        <div class="term-text"><b>Spare Parts &amp; Additional Charges</b><br>If your product requires spare parts or additional repair, the engineer will provide a written estimate. Parts &amp; additional labour charges are over and above the Rs. 649/- visit fee.</div>
+      </div>
+      <div class="term-item">
+        <div class="term-num">3</div>
+        <div class="term-text"><b>Repair Estimate Not Accepted</b><br>If the repair estimate is not acceptable, the Rs. 649/- visit &amp; inspection charge remains payable and non-refundable.</div>
+      </div>
+      <div class="term-item">
+        <div class="term-num">4</div>
+        <div class="term-text"><b>Service Scope</b><br>Onsite Printer / Scanner repair &amp; maintenance. Engineer attends within 2–3 working days. You will be contacted to confirm visit timing.</div>
+      </div>
+    </div>
+    <div class="agree-row" onclick="toggleAgree()">
+      <input type="checkbox" id="chk-agree" onchange="toggleAgree(event)">
+      <label for="chk-agree" onclick="return false;">I have read and agree to the above Terms &amp; Conditions. I agree to pay Rs. 649/- as the engineer visit &amp; inspection charge, regardless of whether I accept the final repair estimate.</label>
+    </div>
+    <div class="err-msg" id="err-terms">Please accept the Terms &amp; Conditions to proceed.</div>
+    <button class="btn-primary" onclick="proceedAfterTerms()">✅ I Agree &amp; Proceed →</button>
+    <button class="btn-outline" onclick="goPage('pg-home')">✖ Cancel</button>
+  </div>
+</div>
+
+<!-- ========== PAGE: LANGUAGE ========== -->
+<div class="page fade" id="pg-lang">
+  <div class="progress-bar"><div class="progress-fill" style="width:22%"></div></div>
+  <div class="header">
+    <img src="icon-192.png" class="header-logo" alt="Bhavi" onerror="this.style.display='none'">
+    <h1>Bhavi Electronics &amp; Automation</h1>
+    <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
+    <div class="step-badge" id="sb-lang">Select Language</div>
+  </div>
+  <div class="body">
+    <div class="section-title">Select Language &nbsp;/&nbsp; ભાષા &nbsp;/&nbsp; भाषा</div>
+    <button class="lang-btn lang-gu" onclick="setLang('gu')">
+      <div class="lang-badge">ગુ</div>
+      <div><span style="font-size:15px;font-weight:700;display:block;">ગુજરાતી</span><span style="font-size:11px;color:var(--muted);">Gujarati</span></div>
+      <span style="margin-left:auto;color:var(--muted);">›</span>
+    </button>
+    <button class="lang-btn lang-hi" onclick="setLang('hi')">
+      <div class="lang-badge">हि</div>
+      <div><span style="font-size:15px;font-weight:700;display:block;">हिंदी</span><span style="font-size:11px;color:var(--muted);">Hindi</span></div>
+      <span style="margin-left:auto;color:var(--muted);">›</span>
+    </button>
+    <button class="lang-btn lang-en" onclick="setLang('en')">
+      <div class="lang-badge">EN</div>
+      <div><span style="font-size:15px;font-weight:700;display:block;">English</span><span style="font-size:11px;color:var(--muted);">English</span></div>
+      <span style="margin-left:auto;color:var(--muted);">›</span>
+    </button>
+  </div>
+</div>
+
+<!-- ========== PAGE: MOBILE ========== -->
+<div class="page fade" id="pg-mobile">
+  <div class="progress-bar"><div class="progress-fill" style="width:35%"></div></div>
+  <div class="header">
+    <h1 id="hdr-mobile">Mobile Number</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="sb-mobile">Step 2</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-lang')">‹ <span id="lbl-back-lang">Back</span></button>
+    <div class="section-title" id="lbl-mobile-title">Enter your mobile number</div>
+    <div class="inp-group">
+      <label id="lbl-mobile">Mobile Number <span class="req">*</span></label>
+      <div style="display:flex;gap:8px;">
+        <input class="inp" type="tel" id="inp-mobile" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+        <button class="btn-primary btn-sm" onclick="checkMobile()" id="btn-check-mob">Check →</button>
+      </div>
+    </div>
+    <div class="err-msg" id="err-mobile"></div>
+    <div id="mob-result"></div>
+  </div>
+</div>
+
+<!-- ========== PAGE: CUSTOMER DETAILS ========== -->
+<div class="page fade" id="pg-customer">
+  <div class="progress-bar"><div class="progress-fill" style="width:48%"></div></div>
+  <div class="header">
+    <h1 id="hdr-cust">Your Details</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="sb-cust">Step 3</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-mobile')">‹ <span id="lbl-back-mob">Back</span></button>
+    <div class="section-title" id="lbl-cust-title">Please fill your details</div>
+    <div class="form-row">
+      <div class="inp-group"><label id="lbl-fname">First Name <span class="req">*</span></label><input class="inp" type="text" id="inp-fname" placeholder="First name"></div>
+      <div class="inp-group"><label id="lbl-lname">Last Name <span class="req">*</span></label><input class="inp" type="text" id="inp-lname" placeholder="Last name"></div>
+    </div>
+    <div class="form-row">
+      <div class="inp-group"><label id="lbl-mob2">Mobile <span class="req">*</span></label><input class="inp" type="tel" id="inp-mob2" maxlength="10" readonly style="background:#f3f4f6;"></div>
+      <div class="inp-group"><label id="lbl-alt">Alternate No</label><input class="inp" type="tel" id="inp-alt" maxlength="10" placeholder="Alt. mobile"></div>
+    </div>
+    <div class="inp-group"><label id="lbl-addr">Full Address <span class="req">*</span></label><textarea class="inp" id="inp-addr" rows="2" placeholder="House no, Street, Area..."></textarea></div>
+    <div class="form-row">
+      <div class="inp-group"><label id="lbl-pin">Pin Code <span class="req">*</span></label><input class="inp" type="tel" id="inp-pin" maxlength="6" placeholder="6 digit" inputmode="numeric"></div>
+      <div class="inp-group"><label id="lbl-city">City <span class="req">*</span></label><input class="inp" type="text" id="inp-city" placeholder="City"></div>
+    </div>
+    <div class="inp-group">
+      <label id="lbl-state">State <span class="req">*</span></label>
+      <select class="inp" id="inp-state">
+        <option value="">— Select State —</option>
+        <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option>
+        <option>Bihar</option><option>Chhattisgarh</option><option>Goa</option>
+        <option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option>
+        <option>Jharkhand</option><option>Karnataka</option><option>Kerala</option>
+        <option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option>
+        <option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option>
+        <option>Odisha</option><option>Punjab</option><option>Rajasthan</option>
+        <option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option>
+        <option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option>
+        <option>West Bengal</option><option>Delhi</option>
+      </select>
+    </div>
+    <div class="err-msg" id="err-cust"></div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="submitCustomer()" id="btn-save-cust">Save &amp; Continue →</button></div>
+</div>
+
+<!-- ========== PAGE: WARRANTY (Repair only) ========== -->
+<div class="page fade" id="pg-warranty">
+  <div class="progress-bar"><div class="progress-fill" style="width:58%"></div></div>
+  <div class="header">
+    <h1 id="hdr-warr">Warranty Status</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="sb-warr">Step 4</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="backFromWarranty()">‹ <span id="lbl-back-warr">Back</span></button>
+    <div class="section-title" id="lbl-warr-title">Is your product under warranty?</div>
+    <div class="warr-grid">
+      <div class="warr-card w1" onclick="selectWarranty('warranty')"><div class="wt">✅ <span id="lbl-w1">Warranty</span></div><div class="ws" id="lbl-w1s">My product is under manufacturer warranty</div></div>
+      <div class="warr-card w2" onclick="selectWarranty('out_of_warranty')"><div class="wt">❌ <span id="lbl-w2">Out of Warranty</span></div><div class="ws" id="lbl-w2s">Warranty period has expired</div></div>
+      <div class="warr-card w3" onclick="selectWarranty('not_sure')"><div class="wt">❓ <span id="lbl-w3">Not Sure</span></div><div class="ws" id="lbl-w3s">I am not sure about the warranty status</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: WARRANTY INFO (Canon) ========== -->
+<div class="page fade" id="pg-warr-info">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="header" style="background:linear-gradient(160deg,#065f46,#059669);">
+    <h1>✅ Warranty Service</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Canon Warranty Support</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-warranty')">‹ Back</button>
+    <div class="warr-info-box">
+      <div style="text-align:center;font-size:32px;margin-bottom:8px;">🖨️</div>
+      <div style="text-align:center;font-size:16px;font-weight:800;color:#166534;margin-bottom:6px;">Canon India Pvt. Ltd.</div>
+      <div style="text-align:center;font-size:12px;color:#16a34a;margin-bottom:14px;">Your product is covered under Canon warranty. Please contact Canon India directly — their engineer will visit your premises for service.</div>
+    </div>
+    <div class="contact-row"><span class="c-icon">📞</span><div><div class="c-label">Toll Free</div><div class="c-val"><a href="tel:18002083366">1800 208 3366</a></div></div></div>
+    <div class="contact-row"><span class="c-icon">💬</span><div><div class="c-label">WhatsApp</div><div class="c-val"><a href="https://wa.me/919108510853">+91 91085 10853</a></div></div></div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-top:12px;font-size:12px;color:#92400e;line-height:1.6;">
+      <b>हिंदी:</b> आपका उत्पाद Canon वारंटी में है। Canon India से सीधे संपर्क करें — इंजीनियर आपके घर विजिट करेंगे।<br><br>
+      <b>ગુજરાતી:</b> Canon India Pvt. Ltd. ને direct contact કરો — engineer ઘરે visit કરશે.
+    </div>
+    <div class="divider"></div>
+    <button class="btn-outline" onclick="goPage('pg-home')">🏠 Home</button>
+  </div>
+</div>
+
+<!-- ========== PAGE: PRODUCT DETAILS (Repair) ========== -->
+<div class="page fade" id="pg-product">
+  <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
+  <div class="header">
+    <h1 id="hdr-prod">Product Details</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="sb-prod">Step 5</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-warranty')">‹ <span id="lbl-back-prod">Back</span></button>
+    <div class="section-title" id="lbl-prod-title">Enter product information</div>
+    <div class="inp-group">
+      <label id="lbl-model">Model Number <span class="req">*</span></label>
+      <div class="model-wrap">
+        <input class="inp" type="text" id="inp-model" placeholder="Type model number..." autocomplete="off" oninput="searchModel(this.value)" onfocus="searchModel(this.value)">
+        <div class="model-drop" id="model-drop" style="display:none;"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;" id="lbl-model-hint">Start typing to search or enter manually</div>
+    </div>
+    <div class="inp-group"><label id="lbl-serial">Serial Number</label><input class="inp" type="text" id="inp-serial" placeholder="Product serial number (optional)"></div>
+    <div class="inp-group">
+      <label id="lbl-serial-photo">Serial Number Photo</label>
+      <div class="photo-upload" onclick="document.getElementById('photo-camera').click()">
+        <div style="font-size:22px;margin-bottom:4px;">📷</div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);" id="lbl-camera">Take Photo / Upload</div>
+        <input type="file" id="photo-camera" accept="image/*" style="display:none;" onchange="handlePhoto(this)">
+        <img id="preview-photo" class="photo-preview">
+      </div>
+    </div>
+    <div class="inp-group">
+      <label id="lbl-problem">Problem <span class="req">*</span></label>
+      <select class="inp" id="inp-problem">
+        <option value="">— Select problem —</option>
+        <option>Paper Jam</option>
+        <option>Not Printing</option>
+        <option>Ink / Toner Not Recognized</option>
+        <option>Poor Print Quality</option>
+        <option>Scanner Not Working</option>
+        <option>Connectivity Issue (WiFi / USB)</option>
+        <option>Display / Panel Not Working</option>
+        <option>Error Code / Blinking Lights</option>
+        <option>Head Cleaning Required</option>
+        <option>Physical Damage</option>
+        <option>Noise / Sound Issue</option>
+        <option>Not Turning On</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="inp-group"><label id="lbl-remarks">Remarks / Description</label><textarea class="inp" id="inp-remarks" rows="3" placeholder="Describe the problem in detail..."></textarea></div>
+    <div class="err-msg" id="err-prod"></div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="goToSign('repair')" id="btn-to-sign">Continue to Signature →</button></div>
+</div>
+
+<!-- ========== PAGE: INQUIRY FORM ========== -->
+<div class="page fade" id="pg-inquiry">
+  <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
+  <div class="header">
+    <h1 id="hdr-inq">Service Details</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="sb-inq">Step 5</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="backFromInquiry()">‹ <span id="lbl-back-inq">Back</span></button>
+    <div class="section-title" id="lbl-inq-title">Tell us more about your requirement</div>
+    <div id="inq-fields"></div>
+    <div class="inp-group">
+      <label id="lbl-inq-remarks">Additional Remarks <span class="req">*</span></label>
+      <textarea class="inp" id="inp-inq-remarks" rows="3" placeholder="Please describe your requirement in detail..."></textarea>
+    </div>
+    <div class="err-msg" id="err-inq"></div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="goToSign('inquiry')">Continue to Signature →</button></div>
+</div>
+
+<!-- ========== PAGE: SIGNATURE ========== -->
+<div class="page fade" id="pg-sign">
+  <div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
+  <div class="header">
+    <h1 id="hdr-sign">Signature</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Step 6</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" id="back-from-sign" onclick="backFromSign()">‹ Back</button>
+    <div class="section-title" id="lbl-sign-title">Sign to confirm your request</div>
+    <div class="sign-wrap" style="margin-bottom:12px;">
+      <canvas id="sign-canvas" height="200"></canvas>
+      <div class="sign-hint" id="sign-hint-txt">✍️ Sign here with finger or stylus</div>
+    </div>
+    <button class="btn-outline" onclick="clearSign()" style="margin-bottom:14px;">🗑️ <span id="lbl-clear-sign">Clear Signature</span></button>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:12px;color:#92400e;" id="lbl-sign-note">By signing, you confirm the details provided are correct.</div>
+    <div class="err-msg" id="err-sign"></div>
+  </div>
+  <div class="footer"><button class="btn-primary" onclick="submitForm()" id="btn-submit"><span id="btn-submit-txt">✅ Submit</span></button></div>
+</div>
+
+<!-- ========== PAGE: SUCCESS ========== -->
+<div class="page fade" id="pg-success">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="header" style="background:linear-gradient(160deg,#065f46,#059669);">
+    <h1 id="success-hdr">✅ Request Submitted!</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="success-badge">Done</div>
+  </div>
+  <div class="body">
+    <div id="success-ticket-box"></div>
+    <div class="info-box" id="success-info"></div>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;font-size:13px;color:#1e40af;margin-bottom:14px;line-height:1.6;" id="success-msg">Our team will contact you shortly.</div>
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;font-size:12px;color:#166534;margin-bottom:14px;">
+      📍 <b>Bhavi Electronics &amp; Automation</b><br>
+      📞 <a href="tel:+916352603399" style="color:#166534;font-weight:700;">+91 63526 03399</a>
+    </div>
+  </div>
+  <div class="footer" style="display:flex;flex-direction:column;gap:10px;">
+    <button class="btn-primary" id="btn-print" onclick="printDoc()">🖨️ Download / Print</button>
+    <button class="btn-outline" onclick="goPage('pg-home')">🏠 Back to Home</button>
+  </div>
+</div>
+
+<!-- ========== SCRIPT ========== -->
+<script>
+var SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
+var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
+
+async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbPostMin(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
+
+// ---- Service config ----
+var SERVICES={
+  'printer-repair':{icon:'🖨️',name:'Printer Repair',price:'₹649/-',type:'repair',repairCat:'printer'},
+  'scanner-repair':{icon:'🖻',name:'Scanner Service',price:'₹649/-',type:'repair',repairCat:'scanner'},
+  'camera-repair':{
+    icon:'📷',name:'Camera Repair',price:'Starting ₹1500/-',type:'inquiry',
+    sub:'Expert repair for all major camera brands',
+    includes:['All major brands: Canon, Fujifilm, Panasonic, Nikon, Sony','Camera body & lens repair','Water damage assessment','Shutter, sensor & display repair','Detailed estimate before any work begins','Repaired at our certified service centre'],
+    inqType:'Camera Repair',
+    fields:[
+      {id:'inq-brand',label:'Camera Brand',type:'select',opts:['Canon','Fujifilm','Panasonic','Nikon','Sony','Other']},
+      {id:'inq-model',label:'Camera Model',type:'text',placeholder:'e.g. Canon EOS 1500D'},
+      {id:'inq-issue',label:'Issue',type:'select',opts:['Not Turning On','Lens Error / Stuck Lens','Auto-Focus Not Working','Display / Screen Broken','Water Damage','Physical Damage','Shutter Issue','Error on Display','Other']},
+    ]
+  },
+  'printer-amc':{
+    icon:'📋',name:'Printer AMC',price:'Starting ₹5000/- per year',type:'inquiry',
+    sub:'Annual Maintenance Contract for your office printer',
+    includes:['Scheduled service visits throughout the year','Head cleaning & alignment','Minor adjustments & tune-up','Priority support response','Flexible plans: 1 year / 2 year','Ink, toner & spare parts charged separately'],
+    inqType:'Printer AMC',
+    fields:[
+      {id:'inq-qty',label:'Number of Printers',type:'select',opts:['1','2','3','4','5 or more']},
+      {id:'inq-prmodel',label:'Printer Brand / Model',type:'text',placeholder:'e.g. Canon PIXMA G3010'},
+      {id:'inq-usage',label:'Usage Level',type:'select',opts:['Light (Home use)','Medium (Small office)','Heavy (Commercial / High volume)']},
+    ]
+  },
+  'home-automation':{
+    icon:'🏠',name:'Home Automation',price:'Starting ₹3000/-',type:'inquiry',
+    sub:'Transform your home with smart controls',
+    includes:['Control lights, fans & appliances via app or voice','Works with Google Home, Alexa & Apple Siri','Curtain & blind automation','Smart door locks & security','Professional installation by certified team','No rewiring required for most setups'],
+    inqType:'Home Automation',
+    fields:[
+      {id:'inq-proptype',label:'Property Type',type:'select',opts:['Flat / Apartment','Bungalow / Villa','Office','Shop / Showroom','Other']},
+      {id:'inq-automation',label:'What do you want to automate?',type:'select',opts:['Lights & Fans','Curtains / Blinds','Security & Door Locks','Full Home (All of the above)','Not sure — need guidance']},
+      {id:'inq-rooms',label:'Number of Rooms / Points',type:'select',opts:['1 – 5','6 – 10','11 – 20','More than 20']},
+    ]
+  },
+  'cctv-install':{
+    icon:'📹',name:'CCTV Installation',price:'Starting ₹2500/-',type:'inquiry',
+    sub:'Professional security camera installation',
+    includes:['Supply & installation of HD / IP cameras','DVR / NVR setup & configuration','Mobile app for remote live view','Covers homes, offices, shops & warehouses','Indoor & outdoor weatherproof cameras','1 year installation warranty'],
+    inqType:'CCTV Installation',
+    fields:[
+      {id:'inq-proptype',label:'Property Type',type:'select',opts:['Home / Residence','Office','Shop / Showroom','Warehouse / Factory','Other']},
+      {id:'inq-camcount',label:'No. of Cameras Needed',type:'select',opts:['2 cameras','4 cameras','6 cameras','8 cameras','More than 8 (we will advise)']},
+      {id:'inq-camtype',label:'Preferred Camera Type',type:'select',opts:['Basic HD (720p / 1080p)','Full HD (2MP / 4MP)','4K / IP Camera','Not Sure — as per budget']},
+    ]
+  }
+};
+
+// ---- State ----
+var state={
+  lang:'en',serviceId:'',serviceType:'',
+  mobile:'',existingCust:null,isNew:false,
+  firstName:'',lastName:'',altMobile:'',address:'',pin:'',city:'',custState:'',
+  warrantyType:'',
+  modelId:null,modelNo:'',serialNo:'',serialPhotoB64:'',
+  problem:'',remarks:'',
+  signatureB64:'',
+  signFor:'', // 'repair' | 'inquiry'
+  ticketId:'',inquiryId:'',createdAt:''
+};
+
+var allModels=[];
+
+// ---- Navigation ----
+function goPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  var pg=document.getElementById(id);if(pg){pg.classList.add('active');window.scrollTo(0,0);}
+  if(id==='pg-sign')initSignCanvas();
+}
+
+// ---- Service Selection ----
+function selectService(svcId){
+  state.serviceId=svcId;
+  var svc=SERVICES[svcId];if(!svc)return;
+  state.serviceType=svc.type;
+
+  if(svc.type==='repair'){
+    // Show Terms first
+    var badge=document.getElementById('terms-cat-badge');
+    if(badge)badge.innerHTML='<span style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:99px;padding:5px 14px;font-size:13px;font-weight:700;color:#1e40af;">'
+      +svc.icon+' '+svc.name+' &nbsp;|&nbsp; <span style="color:#059669;">Rs. 649/-</span></span>';
+    var chk=document.getElementById('chk-agree');
+    if(chk)chk.checked=false;
+    document.getElementById('err-terms').style.display='none';
+    goPage('pg-terms');
+  } else {
+    // Show service info
+    document.getElementById('si-hdr').textContent=svc.name;
+    document.getElementById('si-icon').textContent=svc.icon;
+    document.getElementById('si-name').textContent=svc.name;
+    document.getElementById('si-price').textContent=svc.price;
+    document.getElementById('si-sub').textContent=svc.sub||'';
+    document.getElementById('si-badge').textContent=svc.price;
+    var ul=document.getElementById('si-includes');
+    ul.innerHTML=(svc.includes||[]).map(function(i){return'<li>'+escHtml(i)+'</li>';}).join('');
+    goPage('pg-service-info');
+  }
+}
+
+function toggleAgree(e){
+  if(e)e.stopPropagation();
+  var chk=document.getElementById('chk-agree');
+  if(e&&e.type==='click'&&e.target!==chk)chk.checked=!chk.checked;
+  document.getElementById('err-terms').style.display='none';
+}
+function proceedAfterTerms(){
+  if(!document.getElementById('chk-agree').checked){document.getElementById('err-terms').style.display='block';return;}
+  goPage('pg-lang');
+}
+
+// ---- Language ----
+var TL={
+  en:{'mobile-title':'Enter your mobile number','mobile-lbl':'Mobile Number','check':'Check →','cust-title':'Please fill your details','back':'Back','fname':'First Name','lname':'Last Name','mob':'Mobile','alt':'Alternate No','addr':'Full Address','pin':'Pin Code','city':'City','state':'State','save-cont':'Save & Continue →','warr-title':'Is your product under warranty?','w1':'Warranty','w1s':'My product is under manufacturer warranty','w2':'Out of Warranty','w2s':'Warranty period has expired','w3':'Not Sure','w3s':'I am not sure about the warranty status','prod-title':'Enter product information','model':'Model Number','serial':'Serial Number','serial-photo':'Serial Number Photo','camera':'Take Photo / Upload','problem':'Problem','remarks':'Remarks / Description','model-hint':'Start typing to search or enter manually','sign-title':'Sign to confirm your request','clear-sign':'Clear Signature','sign-note':'By signing, you confirm the details are correct.','submit':'✅ Submit','inq-title':'Tell us about your requirement','inq-remarks':'Additional Remarks'},
+  hi:{'mobile-title':'मोबाइल नंबर दर्ज करें','mobile-lbl':'मोबाइल नंबर','check':'जाँचें →','cust-title':'कृपया अपनी जानकारी भरें','back':'वापस','fname':'पहला नाम','lname':'अंतिम नाम','mob':'मोबाइल','alt':'वैकल्पिक नंबर','addr':'पूरा पता','pin':'पिन कोड','city':'शहर','state':'राज्य','save-cont':'सहेजें और जारी रखें →','warr-title':'क्या आपका उत्पाद वारंटी में है?','w1':'वारंटी','w1s':'मेरा उत्पाद वारंटी में है','w2':'वारंटी समाप्त','w2s':'वारंटी अवधि समाप्त','w3':'पता नहीं','w3s':'वारंटी की जानकारी नहीं','prod-title':'उत्पाद की जानकारी दर्ज करें','model':'मॉडल नंबर','serial':'सीरियल नंबर','serial-photo':'सीरियल नंबर फोटो','camera':'फोटो लें / अपलोड करें','problem':'समस्या','remarks':'टिप्पणी','model-hint':'खोजने के लिए टाइप करें','sign-title':'अपनी शिकायत की पुष्टि के लिए हस्ताक्षर करें','clear-sign':'साफ़ करें','sign-note':'हस्ताक्षर करके, आप पुष्टि करते हैं कि जानकारी सही है।','submit':'✅ सबमिट करें','inq-title':'अपनी आवश्यकता बताएं','inq-remarks':'अतिरिक्त टिप्पणी'},
+  gu:{'mobile-title':'મોબાઈલ નંબર દાખલ કરો','mobile-lbl':'મોબાઈલ નંબર','check':'તપાસો →','cust-title':'કૃપા કરી વિગત ભરો','back':'પાછળ','fname':'પ્રથમ નામ','lname':'અટક','mob':'મોબાઈલ','alt':'વૈકલ્પિક નંબર','addr':'સંપૂર્ણ સરનામું','pin':'પિન કોડ','city':'શહેર','state':'રાજ્ય','save-cont':'સેવ કરો અને ચાલુ →','warr-title':'Product warranty માં છે?','w1':'Warranty','w1s':'Product manufacturer warranty માં છે','w2':'Warranty સમાપ્ત','w2s':'Warranty expire થઈ ગઈ','w3':'ખ્યાલ નથી','w3s':'Warranty status ની ખબર નથી','prod-title':'Product ની માહિતી','model':'Model Number','serial':'Serial Number','serial-photo':'Serial Number ફોટો','camera':'Camera / Upload','problem':'સમસ્યા','remarks':'રિમાર્ક','model-hint':'Search કરો અથવા type કરો','sign-title':'Request confirm કરવા signature','clear-sign':'Clear','sign-note':'Signature કરીને confirm કરો.','submit':'✅ Submit','inq-title':'તમારી જરૂરિયાત જણાવો','inq-remarks':'વધારાની માહિતી'}
+};
+function t(k){return(TL[state.lang]&&TL[state.lang][k])||TL['en'][k]||k;}
+
+function setLang(lang){
+  state.lang=lang;
+  // Apply translations
+  _setTxt('lbl-mobile-title',t('mobile-title'));
+  _setTxt('lbl-mobile',t('mobile-lbl')+' *');
+  _setTxt('btn-check-mob',t('check'));
+  _setTxt('lbl-cust-title',t('cust-title'));
+  _setTxt('lbl-fname',t('fname')+' *');_setTxt('lbl-lname',t('lname')+' *');
+  _setTxt('lbl-mob2',t('mob')+' *');_setTxt('lbl-alt',t('alt'));
+  _setTxt('lbl-addr',t('addr')+' *');_setTxt('lbl-pin',t('pin')+' *');
+  _setTxt('lbl-city',t('city')+' *');_setTxt('lbl-state',t('state')+' *');
+  _setTxt('btn-save-cust',t('save-cont'));
+  _setTxt('lbl-warr-title',t('warr-title'));
+  _setTxt('lbl-w1',t('w1'));_setTxt('lbl-w1s',t('w1s'));
+  _setTxt('lbl-w2',t('w2'));_setTxt('lbl-w2s',t('w2s'));
+  _setTxt('lbl-w3',t('w3'));_setTxt('lbl-w3s',t('w3s'));
+  _setTxt('lbl-prod-title',t('prod-title'));
+  _setTxt('lbl-model',t('model')+' *');_setTxt('lbl-serial',t('serial'));
+  _setTxt('lbl-serial-photo',t('serial-photo'));_setTxt('lbl-camera',t('camera'));
+  _setTxt('lbl-problem',t('problem')+' *');_setTxt('lbl-remarks',t('remarks'));
+  _setTxt('lbl-model-hint',t('model-hint'));
+  _setTxt('lbl-sign-title',t('sign-title'));_setTxt('lbl-clear-sign',t('clear-sign'));
+  _setTxt('lbl-sign-note',t('sign-note'));_setTxt('btn-submit-txt',t('submit'));
+  _setTxt('lbl-inq-title',t('inq-title'));_setTxt('lbl-inq-remarks',t('inq-remarks')+' *');
+  ['lbl-back-lang','lbl-back-mob','lbl-back-warr','lbl-back-prod','lbl-back-inq'].forEach(function(id){_setTxt(id,t('back'));});
+  goPage('pg-mobile');
+}
+function _setTxt(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
+
+// ---- Mobile check ----
+async function checkMobile(){
+  var mob=document.getElementById('inp-mobile').value.trim();
+  var err=document.getElementById('err-mobile');
+  var res=document.getElementById('mob-result');
+  err.style.display='none';res.innerHTML='';
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  state.mobile=mob;
+  var btn=document.getElementById('btn-check-mob');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&order=updated_at.desc&limit=1');
+    if(custs&&custs.length){
+      var c=custs[0];state.existingCust=c;state.isNew=false;
+      res.innerHTML='<div class="cust-found"><div style="font-size:15px;font-weight:800;color:#166534;">👋 '+escHtml(c.cname||'Customer')+'</div><div style="font-size:12px;color:#16a34a;margin-top:3px;">📱 '+mob+'</div></div><div class="info-msg">✅ Customer found! Proceeding...</div>';
+      setTimeout(function(){routeAfterMobile();},1200);
+    } else {
+      state.existingCust=null;state.isNew=true;
+      res.innerHTML='<div class="info-msg">ℹ️ New customer — please fill your details.</div>';
+      document.getElementById('inp-mob2').value=mob;
+      setTimeout(function(){goPage('pg-customer');},900);
+    }
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+  btn.disabled=false;btn.textContent=t('check');
+}
+
+function routeAfterMobile(){
+  if(state.serviceType==='repair'){goPage('pg-warranty');}
+  else{buildInquiryForm();goPage('pg-inquiry');}
+}
+
+function backFromWarranty(){
+  if(state.isNew)goPage('pg-customer');else goPage('pg-mobile');
+}
+function backFromInquiry(){
+  if(state.isNew)goPage('pg-customer');else goPage('pg-mobile');
+}
+function backFromSign(){
+  if(state.signFor==='repair')goPage('pg-product');
+  else goPage('pg-inquiry');
+}
+
+// ---- Customer submit ----
+async function submitCustomer(){
+  var fname=document.getElementById('inp-fname').value.trim();
+  var lname=document.getElementById('inp-lname').value.trim();
+  var alt=document.getElementById('inp-alt').value.trim();
+  var addr=document.getElementById('inp-addr').value.trim();
+  var pin=document.getElementById('inp-pin').value.trim();
+  var city=document.getElementById('inp-city').value.trim();
+  var stateVal=document.getElementById('inp-state').value;
+  var err=document.getElementById('err-cust');err.style.display='none';
+  if(!fname){err.textContent='Please enter first name.';err.style.display='block';return;}
+  if(!lname){err.textContent='Please enter last name.';err.style.display='block';return;}
+  if(!addr){err.textContent='Please enter full address.';err.style.display='block';return;}
+  if(!pin||pin.length!==6){err.textContent='Please enter 6-digit pin code.';err.style.display='block';return;}
+  if(!city){err.textContent='Please enter city.';err.style.display='block';return;}
+  if(!stateVal){err.textContent='Please select state.';err.style.display='block';return;}
+  state.firstName=fname;state.lastName=lname;state.altMobile=alt;
+  state.address=addr;state.pin=pin;state.city=city;state.custState=stateVal;
+  if(state.serviceType==='repair'){goPage('pg-warranty');}
+  else{buildInquiryForm();goPage('pg-inquiry');}
+}
+
+// ---- Warranty ----
+function selectWarranty(type){
+  state.warrantyType=type;
+  if(type==='warranty'){goPage('pg-warr-info');}
+  else{loadModels();goPage('pg-product');}
+}
+
+// ---- Models ----
+async function loadModels(){
+  if(allModels.length)return;
+  try{allModels=await sbGet('models','?order=model_no&select=id,model_no,model_name&limit=1000');}catch(e){allModels=[];}
+}
+function searchModel(q){
+  var drop=document.getElementById('model-drop');
+  if(!q||q.length<2){drop.style.display='none';return;}
+  var m=allModels.filter(function(x){return(x.model_no||'').toLowerCase().includes(q.toLowerCase())||(x.model_name||'').toLowerCase().includes(q.toLowerCase());}).slice(0,10);
+  if(!m.length){drop.style.display='none';return;}
+  drop.innerHTML=m.map(function(x){return'<div onclick="pickModel(\''+escHtml(x.id)+'\',\''+escHtml(x.model_no)+'\')">'+'<b>'+escHtml(x.model_no)+'</b>'+(x.model_name?' — <span style="color:var(--muted)">'+escHtml(x.model_name)+'</span>':'')+'</div>';}).join('');
+  drop.style.display='block';
+}
+function pickModel(id,no){state.modelId=id;state.modelNo=no;document.getElementById('inp-model').value=no;document.getElementById('model-drop').style.display='none';}
+document.addEventListener('click',function(e){if(!e.target.closest('.model-wrap'))document.getElementById('model-drop').style.display='none';});
+
+// ---- Photo ----
+function handlePhoto(input){
+  var file=input.files[0];if(!file)return;
+  var r=new FileReader();r.onload=function(e){state.serialPhotoB64=e.target.result;var p=document.getElementById('preview-photo');p.src=e.target.result;p.style.display='block';};r.readAsDataURL(file);
+}
+
+// ---- Inquiry Form ----
+function buildInquiryForm(){
+  var svc=SERVICES[state.serviceId];if(!svc||!svc.fields)return;
+  var html='';
+  svc.fields.forEach(function(f){
+    html+='<div class="inp-group"><label>'+escHtml(f.label)+'</label>';
+    if(f.type==='select'){
+      html+='<select class="inp" id="'+f.id+'"><option value="">— Select —</option>';
+      (f.opts||[]).forEach(function(o){html+='<option>'+escHtml(o)+'</option>';});
+      html+='</select>';
+    } else {
+      html+='<input class="inp" type="text" id="'+f.id+'" placeholder="'+escHtml(f.placeholder||f.label)+'">';
+    }
+    html+='</div>';
+  });
+  document.getElementById('inq-fields').innerHTML=html;
+  // Update header
+  var svcName=svc.name;
+  _setTxt('hdr-inq',svcName);
+}
+
+function getInquiryFieldValues(){
+  var svc=SERVICES[state.serviceId];if(!svc||!svc.fields)return{};
+  var vals={};
+  svc.fields.forEach(function(f){var el=document.getElementById(f.id);if(el)vals[f.label]=el.value;});
+  return vals;
+}
+
+// ---- Validate & go to Sign ----
+function goToSign(mode){
+  state.signFor=mode;
+  if(mode==='repair'){
+    var model=document.getElementById('inp-model').value.trim();
+    var problem=document.getElementById('inp-problem').value;
+    var err=document.getElementById('err-prod');err.style.display='none';
+    if(!model){err.textContent='Please enter model number.';err.style.display='block';return;}
+    if(!problem){err.textContent='Please select the problem.';err.style.display='block';return;}
+    state.modelNo=model;state.serialNo=document.getElementById('inp-serial').value.trim();
+    state.problem=problem;state.remarks=document.getElementById('inp-remarks').value.trim();
+  } else {
+    var remarks=document.getElementById('inp-inq-remarks').value.trim();
+    var err2=document.getElementById('err-inq');err2.style.display='none';
+    if(!remarks){err2.textContent='Please add remarks / describe your requirement.';err2.style.display='block';return;}
+  }
+  goPage('pg-sign');
+}
+
+// ---- Signature ----
+var _sc,_sctx,_isDrawing=false,_signEmpty=true;
+function initSignCanvas(){
+  _sc=document.getElementById('sign-canvas');_sctx=_sc.getContext('2d');
+  _sc.width=_sc.offsetWidth||420;_sc.height=200;
+  _sctx.strokeStyle='#1a3fa8';_sctx.lineWidth=2.5;_sctx.lineCap='round';_sctx.lineJoin='round';
+  _signEmpty=true;
+  _sc.onmousedown=function(e){_isDrawing=true;var p=_pos(e);_sctx.beginPath();_sctx.moveTo(p.x,p.y);};
+  _sc.onmousemove=function(e){if(!_isDrawing)return;var p=_pos(e);_sctx.lineTo(p.x,p.y);_sctx.stroke();_signEmpty=false;_hideHint();};
+  _sc.onmouseup=_sc.onmouseleave=function(){_isDrawing=false;};
+  _sc.ontouchstart=function(e){e.preventDefault();var p=_posT(e);_isDrawing=true;_sctx.beginPath();_sctx.moveTo(p.x,p.y);};
+  _sc.ontouchmove=function(e){e.preventDefault();if(!_isDrawing)return;var p=_posT(e);_sctx.lineTo(p.x,p.y);_sctx.stroke();_signEmpty=false;_hideHint();};
+  _sc.ontouchend=function(){_isDrawing=false;};
+}
+function _pos(e){var r=_sc.getBoundingClientRect();return{x:(e.clientX-r.left)*(_sc.width/r.width),y:(e.clientY-r.top)*(_sc.height/r.height)};}
+function _posT(e){return _pos(e.touches[0]);}
+function _hideHint(){var h=document.getElementById('sign-hint-txt');if(h)h.style.display='none';}
+function clearSign(){if(_sctx)_sctx.clearRect(0,0,_sc.width,_sc.height);_signEmpty=true;var h=document.getElementById('sign-hint-txt');if(h)h.style.display='';}
+
+// ---- Submit ----
+async function submitForm(){
+  var err=document.getElementById('err-sign');err.style.display='none';
+  if(_signEmpty){err.textContent='Please sign before submitting.';err.style.display='block';return;}
+  state.signatureB64=_sc.toDataURL('image/png');
+  var btn=document.getElementById('btn-submit');btn.disabled=true;
+  document.getElementById('btn-submit-txt').innerHTML='<span class="spinner"></span>Submitting...';
+  try{
+    var svc=SERVICES[state.serviceId];
+    var custName=state.isNew?(state.firstName+' '+state.lastName):(state.existingCust&&state.existingCust.cname)||'Customer';
+    var addr=state.isNew?state.address:((state.existingCust&&state.existingCust.address)||'');
+    var city=state.isNew?state.city:((state.existingCust&&state.existingCust.city)||'');
+    var pin=state.isNew?state.pin:((state.existingCust&&state.existingCust.pin)||'');
+    var custSt=state.isNew?state.custState:((state.existingCust&&state.existingCust.state)||'');
+    var altMob=state.isNew?state.altMobile:((state.existingCust&&state.existingCust.alt_mobile)||'');
+    var now=new Date();
+    state.createdAt=now.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+    if(state.isNew){
+      try{await sbPostMin('customers',{cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',serial:'',model:'',updated_at:now.toISOString()});}catch(e){}
+    }
+
+    if(state.signFor==='repair'){
+      // Create ticket
+      var year=now.getFullYear();
+      var tickets=await sbGet('tickets','?id=like.BEA-'+year+'*&order=id.desc&limit=1');
+      var num=1;if(tickets&&tickets.length)num=parseInt(tickets[0].id.split('-').pop())+1;
+      state.ticketId='BEA-'+year+'-'+String(num).padStart(3,'0');
+      var desc='Customer Complaint (Self-Service Portal)\nModel: '+state.modelNo+(state.serialNo?'\nSerial: '+state.serialNo:'')+'\nWarranty: '+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+(state.remarks?'\nRemarks: '+state.remarks:'')+(state.serialPhotoB64?'\n[Serial Photo Attached]':'');
+      await sbPostMin('tickets',{id:state.ticketId,job_sheet:state.ticketId,call_type:state.warrantyType==='out_of_warranty'?'Non-Warranty':'Other',service_type:svc.repairCat==='scanner'?'Scanner Onsite':'Printer Onsite',status:'Pending Allocation',brand_name:'',model:state.modelNo,serial:state.serialNo||'',cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',problem:state.problem,description:desc,action:'',assigned_to:null,assigned_name:null,warranty_coverage:state.warrantyType==='out_of_warranty'?'NA':'Other',wc_type:'CSP',service_charges:649,rerepair:'No',rerepair_foc:false,serial_photo:state.serialPhotoB64||null,signature:state.signatureB64,spares:[],timeline:[{action:'Complaint Registered',by:'Customer Self-Service',at:now.toISOString(),note:'Via service portal — '+svc.name}],created_at:now.toISOString(),updated_at:now.toISOString()});
+
+      // Success UI
+      document.getElementById('success-hdr').textContent='✅ Complaint Registered!';
+      document.getElementById('success-badge').textContent='Job Sheet: '+state.ticketId;
+      document.getElementById('success-ticket-box').innerHTML='<div class="ticket-box"><div class="ticket-lbl">JOB SHEET NUMBER</div><div class="ticket-num">'+escHtml(state.ticketId)+'</div><div style="font-size:11px;opacity:.7;margin-top:6px;">'+state.createdAt+'</div></div>';
+      document.getElementById('success-info').innerHTML=_successRows(custName,svc.name,'Printer / Scanner Onsite',state.problem,'₹649/- (Visit Charges)');
+      document.getElementById('success-msg').textContent='Your complaint has been registered. Our engineer will contact you within 2–3 working days to confirm the visit timing.';
+      document.getElementById('btn-print').style.display='';
+
+    } else {
+      // Create inquiry
+      var fieldVals=getInquiryFieldValues();
+      var inqDesc='Inquiry via Service Portal — '+svc.name+'\n';
+      Object.keys(fieldVals).forEach(function(k){if(fieldVals[k])inqDesc+=k+': '+fieldVals[k]+'\n';});
+      var remarks=document.getElementById('inp-inq-remarks').value.trim();
+      if(remarks)inqDesc+='Remarks: '+remarks+'\n';
+      inqDesc+='Address: '+addr+(city?', '+city:'')+(custSt?', '+custSt:'');
+      await sbPostMin('auto_inquiries',{customer_name:custName,mobile:state.mobile,address:addr+(city?', '+city:'')+(custSt?', '+custSt:''),inquiry_type:svc.inqType,description:inqDesc,status:'Open',created_by:'Customer Portal',updated_at:now.toISOString()});
+      state.inquiryId='INQ-'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
+
+      // Success UI
+      document.getElementById('success-hdr').textContent='✅ Inquiry Submitted!';
+      document.getElementById('success-badge').textContent=svc.name;
+      document.getElementById('success-ticket-box').innerHTML='<div class="inq-box"><div class="ticket-lbl">INQUIRY RECEIVED</div><div style="font-size:44px;margin:10px 0;">'+svc.icon+'</div><div style="font-size:16px;font-weight:800;">'+escHtml(svc.name)+'</div><div style="font-size:11px;opacity:.7;margin-top:6px;">'+state.createdAt+'</div></div>';
+      document.getElementById('success-info').innerHTML=_successRows(custName,svc.name,svc.price,'','');
+      document.getElementById('success-msg').textContent='Thank you! Our team will review your inquiry and contact you shortly with a detailed quotation.';
+      document.getElementById('btn-print').style.display='none';
+    }
+    goPage('pg-success');
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+  btn.disabled=false;document.getElementById('btn-submit-txt').textContent=t('submit');
+}
+
+function _successRows(name,svc,sub,prob,charges){
+  var rows=[['👤 Name',name],['📱 Mobile',state.mobile],['🛠️ Service',svc]];
+  if(sub)rows.push(['📍 Type',sub]);if(prob)rows.push(['⚠️ Problem',prob]);if(charges)rows.push(['💰 Charges',charges]);
+  return rows.map(function(r){return'<div class="info-row"><span class="ir-lbl">'+r[0]+'</span><span class="ir-val">'+escHtml(r[1])+'</span></div>';}).join('');
+}
+
+// ---- Print Jobsheet (repair only) ----
+function printDoc(){
+  var svc=SERVICES[state.serviceId]||{};
+  var custName=state.isNew?(state.firstName+' '+state.lastName):(state.existingCust&&state.existingCust.cname)||'Customer';
+  var addr=state.isNew?state.address:((state.existingCust&&state.existingCust.address)||'');
+  var city=state.isNew?state.city:((state.existingCust&&state.existingCust.city)||'');
+  var pin=state.isNew?state.pin:((state.existingCust&&state.existingCust.pin)||'');
+  var custSt=state.isNew?state.custState:((state.existingCust&&state.existingCust.state)||'');
+  var alt=state.isNew?state.altMobile:((state.existingCust&&state.existingCust.alt_mobile)||'');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Job Sheet '+state.ticketId+'</title>'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:12px;color:#1e293b;}'
+    +'.page{max-width:700px;margin:0 auto;padding:20px;}'
+    +'.hdr{text-align:center;border-bottom:3px solid #1a3fa8;padding-bottom:14px;margin-bottom:14px;}'
+    +'.hdr h1{font-size:18px;font-weight:900;color:#1a3fa8;}'
+    +'.hdr .tag{font-size:10px;color:#64748b;letter-spacing:1px;margin-top:2px;}'
+    +'.js-no{font-size:22px;font-weight:900;color:#dc2626;border:2px dashed #dc2626;display:inline-block;padding:4px 16px;border-radius:8px;margin-top:8px;}'
+    +'.sec h3{font-size:11px;font-weight:700;color:#fff;background:#1a3fa8;padding:4px 10px;border-radius:4px;text-transform:uppercase;margin:12px 0 8px;}'
+    +'.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}'
+    +'.f{border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;}'
+    +'.f .fl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;}'
+    +'.f .fv{font-size:13px;font-weight:600;color:#1e293b;margin-top:1px;}'
+    +'.sign-area{border:2px solid #1a3fa8;border-radius:8px;padding:10px;text-align:center;min-height:80px;}'
+    +'.sign-area img{max-height:80px;max-width:100%;}'
+    +'.photo img{max-height:100px;border-radius:6px;border:1px solid #e2e8f0;}'
+    +'.terms-note{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:12px;margin-top:12px;font-size:10px;color:#92400e;line-height:1.7;}'
+    +'.footer-note{border-top:2px solid #e2e8f0;margin-top:14px;padding-top:10px;font-size:10px;color:#64748b;text-align:center;line-height:1.6;}'
+    +'</style></head><body><div class="page">'
+    +'<div class="hdr"><h1>BHAVI ELECTRONICS &amp; AUTOMATION</h1><div class="tag">WHERE CUSTOMER DELIGHT IS FIRST</div>'
+    +'<div style="font-size:13px;font-weight:700;color:#1a3fa8;margin-top:8px;">🛠️ SERVICE REQUEST JOB SHEET</div>'
+    +'<div class="js-no">'+escHtml(state.ticketId)+'</div>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:6px;">Date: '+state.createdAt+'</div></div>'
+    +'<div class="sec"><h3>Customer Details</h3><div class="grid2">'
+    +'<div class="f"><div class="fl">Name</div><div class="fv">'+escHtml(custName)+'</div></div>'
+    +'<div class="f"><div class="fl">Mobile</div><div class="fv">'+escHtml(state.mobile)+(alt?' / '+escHtml(alt):'')+'</div></div>'
+    +'<div class="f" style="grid-column:1/-1"><div class="fl">Address</div><div class="fv">'+escHtml(addr)+(city?', '+city:'')+(pin?' - '+pin:'')+(custSt?', '+custSt:'')+'</div></div>'
+    +'</div></div>'
+    +'<div class="sec"><h3>Product Details</h3><div class="grid2">'
+    +'<div class="f"><div class="fl">Service</div><div class="fv">'+escHtml(svc.name||'')+'</div></div>'
+    +'<div class="f"><div class="fl">Visit Charges</div><div class="fv" style="color:#dc2626;font-weight:800;">Rs. 649/- (Non-Refundable)</div></div>'
+    +'<div class="f"><div class="fl">Model Number</div><div class="fv">'+escHtml(state.modelNo)+'</div></div>'
+    +'<div class="f"><div class="fl">Serial Number</div><div class="fv">'+(state.serialNo||'—')+'</div></div>'
+    +'<div class="f"><div class="fl">Warranty Status</div><div class="fv">'+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+'</div></div>'
+    +'<div class="f"><div class="fl">Status</div><div class="fv">Pending Allocation</div></div>'
+    +'<div class="f" style="grid-column:1/-1"><div class="fl">Problem</div><div class="fv">'+escHtml(state.problem)+'</div></div>'
+    +(state.remarks?'<div class="f" style="grid-column:1/-1"><div class="fl">Remarks</div><div class="fv">'+escHtml(state.remarks)+'</div></div>':'')
+    +'</div></div>';
+  if(state.serialPhotoB64){html+='<div class="sec photo"><h3>Serial Number Photo</h3><img src="'+state.serialPhotoB64+'"></div>';}
+  html+='<div class="sec"><h3>Customer Signature</h3><div class="sign-area">'+(state.signatureB64?'<img src="'+state.signatureB64+'">':'<div style="color:#94a3b8;padding-top:20px;">Not captured</div>')+'</div></div>'
+    +'<div class="terms-note"><b>TERMS ACKNOWLEDGED:</b><br>1. Engineer Visit &amp; Inspection Charges: Rs. 649/- (Non-Refundable) — payable to engineer on arrival.<br>2. Spare parts / additional repair charged extra as per engineer estimate.<br>3. If estimate not accepted, Rs. 649/- visit charge still payable.</div>'
+    +'<div class="footer-note"><b>BHAVI ELECTRONICS &amp; AUTOMATION</b> | 📞 +91 63526 03399<br>Service within 2–3 working days | Job Sheet: <b>'+escHtml(state.ticketId)+'</b></div>'
+    +'</div></body></html>';
+  var win=window.open('','_blank','width=750,height=900');win.document.open();win.document.write(html);win.document.close();win.onload=function(){win.print();};
+}
+
+function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+window.addEventListener('load',function(){
+  var r=new XMLHttpRequest();r.open('GET',SB_URL+'/rest/v1/models?order=model_no&select=id,model_no,model_name&limit=1000');r.setRequestHeader('apikey',SB_KEY);r.setRequestHeader('Authorization','Bearer '+SB_KEY);
+  r.onload=function(){try{allModels=JSON.parse(r.responseText)||[];}catch(e){}};r.send();
+});
+</script>
+</body>
+</html>

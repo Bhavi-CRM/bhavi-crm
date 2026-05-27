@@ -8396,7 +8396,17 @@ async function renderWalkIn(){
   </div>
 
   <div class="card">
-    <div class="section-header"><h2>📋 Today's Walk-ins</h2><span style="font-size:12px;color:var(--text-muted);">${todayLogs.length} entries</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+      <h2 style="font-size:15px;font-weight:700;margin:0;">📋 Walk-in History</h2>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="date" id="wi-hist-date" value="${today}" onchange="loadWIDateView()" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;outline:none;cursor:pointer;">
+        ${_isAdm?`<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;">
+          <input type="checkbox" id="wi-hist-both" onchange="loadWIDateView()" style="cursor:pointer;"> Both WC
+        </label>`:''}
+        <button class="btn btn-outline btn-sm" onclick="loadWIDateView()" style="padding:5px 12px;">🔄</button>
+      </div>
+    </div>
+    <div id="wi-hist-info" style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">${todayLogs.length} entries for today</div>
     <div id="wi-today-list">${renderWalkInList(todayLogs)}</div>
   </div>`;
 
@@ -8409,6 +8419,46 @@ async function renderWalkIn(){
 
   // Add first product row
   addWalkInProduct();
+}
+
+async function loadWIDateView(){
+  var datePick=document.getElementById('wi-hist-date');
+  var bothChk=document.getElementById('wi-hist-both');
+  var infoEl=document.getElementById('wi-hist-info');
+  var listEl=document.getElementById('wi-today-list');
+  if(!datePick||!listEl)return;
+  var selDate=datePick.value||new Date().toLocaleDateString('en-CA');
+  var showBoth=bothChk&&bothChk.checked;
+  listEl.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var logs=[];
+    var _isAdm=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+    if(showBoth&&_isAdm){
+      // All WCs for selected date
+      logs=await sb('walkin_log','GET',null,'?visit_date=eq.'+selDate+'&order=arrival_time.desc');
+    } else {
+      // Same WC filter as renderWalkIn
+      var _wiSelfIds='SELF_CHECKIN_OTHER';
+      if(_isAdm){_wiSelfIds='SELF_CHECKIN_ICP,wc_id.eq.SELF_CHECKIN_CSP,wc_id.eq.SELF_CHECKIN_OTHER';}
+      else{
+        var _wcN=(currentUser.name||'').toUpperCase();
+        var _wcU=(currentUser.user_id||'').toUpperCase();
+        var _isCSP=_wcN.includes('CSP')||_wcU.includes('CSP');
+        _wiSelfIds=(_isCSP?'SELF_CHECKIN_CSP':'SELF_CHECKIN_ICP')+',wc_id.eq.SELF_CHECKIN_OTHER';
+      }
+      try{
+        logs=await sb('walkin_log','GET',null,'?visit_date=eq.'+selDate+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=created_at.desc.nullslast,arrival_time.desc');
+      }catch(e){
+        logs=await sb('walkin_log','GET',null,'?visit_date=eq.'+selDate+'&or=(wc_id.eq.'+encodeURIComponent(currentUser.user_id)+',wc_id.eq.'+_wiSelfIds+')&order=arrival_time.desc');
+      }
+    }
+    var dLabel=new Date(selDate+'T00:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    var isToday=selDate===new Date().toLocaleDateString('en-CA');
+    if(infoEl)infoEl.innerHTML='<b>'+logs.length+'</b> entries for <b>'+dLabel+'</b>'+(isToday?' (Today)':'')+(showBoth?' — <span style="color:#7c3aed;">Both WC</span>':'');
+    listEl.innerHTML=renderWalkInList(logs);
+  }catch(e){
+    listEl.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
+  }
 }
 
 // Global click handler — close all WI model dropdowns on outside click
