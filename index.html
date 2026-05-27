@@ -9151,6 +9151,10 @@ async function loadWalkInReport(){
   var res=document.getElementById('wir-results');
   if(!res)return;
   res.innerHTML='<div class="loading">Loading...</div>';
+  // Ensure allBrands is loaded for UUID→name resolution
+  if(!window.allBrands||!window.allBrands.length){
+    try{var br=await sb('brands','GET',null,'?order=name&select=id,name');window.allBrands=br||[];}catch(e){window.allBrands=[];}
+  }
   try{
     var q='?order=visit_date.desc,arrival_time.desc';
     if(from)q+='&visit_date=gte.'+from;
@@ -9204,11 +9208,16 @@ async function loadWalkInReport(){
           +'</div>'
           +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">'
           +products.map(function(p){
+            var bdisp=_brandDisplay(p.brand);
+            var typeColors={'Inward':'#1a56db','Outward':'#0e9f6e','Other':'#7c3aed','Purchase':'#d97706','For Checking Only':'#0369a1'};
+            var tc=typeColors[p.type]||'#7c3aed';
+            var secLabel=p.type==='Purchase'?(p.subtype||''):(p.type==='For Checking Only'?(p.subtype||p.warranty||''):p.warranty);
+            var wColor=(!secLabel)?'#374151':(secLabel==='In Warranty'||secLabel==='Warranty'?'#065f46':'#991b1b');
             return'<span style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;">'
-              +(p.brand?p.brand+' ':'')+cleanModelNo(p.model||'')
-              +' <span style="color:#1a56db;">['+p.type+']</span>'
-              +' <span style="color:'+(p.warranty==='In Warranty'?'#065f46':'#991b1b')+';">('+p.warranty+')</span>'
-              +(p.remarks?' — '+p.remarks:'')+'</span>';
+              +(bdisp?'<b>'+escHtml(bdisp)+'</b> ':'')+escHtml(cleanModelNo(p.model||''))
+              +' <span style="color:'+tc+';">['+p.type+']</span>'
+              +(secLabel?' <span style="color:'+wColor+';">('+secLabel+')</span>':'')
+              +(p.remarks?' — '+escHtml(p.remarks):'')+'</span>';
           }).join('')
           +'</div>'
           +(l.wc_name?'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">By: '+l.wc_name+'</div>':'')
@@ -9233,10 +9242,11 @@ async function downloadWalkInExcel(){
     entries.forEach(function(l){
       var products=l.products||[];
       if(!products.length){
-        rows.push({'Date':fmtD(l.visit_date),'Customer':l.customer_name,'Mobile':l.mobile,'Arrival':l.arrival_time,'Departure':l.departure_time||'','Brand':'','Model':'','Type':'','Warranty':'','Remarks':'','WC':l.wc_name||''});
+        rows.push({'Date':fmtD(l.visit_date),'Customer':l.customer_name,'Mobile':l.mobile,'Arrival':l.arrival_time,'Departure':l.departure_time||'','Brand':'','Model':'','Type':'','Warranty/Sub-type':'','Remarks':'','WC':l.wc_name||''});
       } else {
         products.forEach(function(p){
-          rows.push({'Date':fmtD(l.visit_date),'Customer':l.customer_name,'Mobile':l.mobile,'Arrival':l.arrival_time,'Departure':l.departure_time||'','Brand':p.brand||'','Model':p.model||'','Type':p.type||'','Warranty':p.warranty||'','Remarks':p.remarks||'','WC':l.wc_name||''});
+          var secVal=p.type==='Purchase'?(p.subtype||''):(p.type==='For Checking Only'?(p.subtype||p.warranty||''):(p.warranty||''));
+          rows.push({'Date':fmtD(l.visit_date),'Customer':l.customer_name,'Mobile':l.mobile,'Arrival':l.arrival_time,'Departure':l.departure_time||'','Brand':_brandDisplay(p.brand)||p.brand||'','Model':p.model||'','Type':p.type||'','Warranty/Sub-type':secVal,'Remarks':p.remarks||'','WC':l.wc_name||''});
         });
       }
     });

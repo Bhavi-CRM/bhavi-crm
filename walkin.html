@@ -7,114 +7,98 @@
 <link rel="icon" href="icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--primary:#1a3fa8;--primary-light:#2563eb;--accent:#e63946;--success:#059669;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
+:root{--primary:#1a3fa8;--primary-light:#2563eb;--success:#059669;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
 .page{display:none;width:100%;max-width:500px;min-height:100vh;background:var(--card);flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.08);}
 .page.active{display:flex;}
-
-/* HEADER */
-.header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:22px 20px 18px;text-align:center;position:relative;}
-.header-logo{width:68px;height:68px;border-radius:16px;margin:0 auto 10px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
-.header-logo-placeholder{width:68px;height:68px;border-radius:16px;margin:0 auto 10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;}
-.header h1{font-size:18px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
-.header .tagline{font-size:11px;opacity:.75;margin-top:4px;font-weight:400;letter-spacing:.4px;}
-.header .step-badge{display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
-
-/* BODY */
-.body{flex:1;padding:22px 20px;overflow-y:auto;}
-.section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;text-align:center;}
-
-/* LANGUAGE BUTTONS */
+.header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:20px 20px 16px;text-align:center;position:relative;}
+.header-logo{width:60px;height:60px;border-radius:14px;margin:0 auto 8px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+.header h1{font-size:17px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
+.header .tagline{font-size:10px;opacity:.75;margin-top:3px;font-weight:400;letter-spacing:.4px;}
+.header .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
+.body{flex:1;padding:20px 18px;overflow-y:auto;}
+.section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;text-align:center;}
+/* Language */
 .lang-grid{display:flex;flex-direction:column;gap:10px;}
-.lang-btn{display:flex;align-items:center;gap:16px;padding:16px 18px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;transition:all .18s;width:100%;}
-.lang-btn:hover,.lang-btn.selected{border-color:var(--primary-light);background:#eff6ff;box-shadow:0 2px 12px rgba(37,99,235,.12);}
-.lang-badge{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;letter-spacing:0;}
+.lang-btn{display:flex;align-items:center;gap:16px;padding:15px 16px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;transition:all .18s;width:100%;}
+.lang-btn:hover{border-color:var(--primary-light);background:#eff6ff;}
+.lang-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;}
 .lang-gu .lang-badge{background:#fff3e0;color:#e65100;}
 .lang-hi .lang-badge{background:#fce4ec;color:#c62828;}
 .lang-en .lang-badge{background:#e3f2fd;color:#1565c0;}
-.lang-name{font-size:16px;font-weight:700;color:var(--text);display:block;}
-.lang-sub{font-size:12px;color:var(--muted);display:block;margin-top:2px;}
+.lang-name{font-size:15px;font-weight:700;color:var(--text);display:block;}
+.lang-sub{font-size:11px;color:var(--muted);display:block;margin-top:2px;}
 .lang-arrow{margin-left:auto;color:var(--muted);font-size:18px;}
-
-/* FORM */
-.inp-group{margin-bottom:18px;}
-.inp-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.6px;}
-.inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;transition:border .18s;background:#fafcff;}
+/* Form */
+.inp-group{margin-bottom:16px;}
+.inp-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;}
+.inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);outline:none;transition:border .18s;background:#fafcff;}
 .inp:focus{border-color:var(--primary-light);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.08);}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
-
-/* OPTION CARDS */
-.option-card{display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;margin-bottom:10px;transition:all .18s;background:var(--card);}
-.option-card:hover,.option-card.active{border-color:var(--primary-light);background:#eff6ff;box-shadow:0 2px 12px rgba(37,99,235,.1);}
-.option-card .oc-icon{width:44px;height:44px;border-radius:11px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.option-card.active .oc-icon{background:#dbeafe;}
-.option-card .title{font-size:14px;font-weight:700;color:var(--text);}
-.option-card .sub{font-size:12px;color:var(--muted);margin-top:2px;}
-.option-card .oc-arr{margin-left:auto;color:var(--muted);font-size:16px;}
-
-/* SUB OPTIONS */
-.sub-option{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:9px;transition:all .18s;background:var(--card);}
-.sub-option:hover,.sub-option.selected{border-color:var(--primary-light);background:#eff6ff;}
-.sub-option .so-radio{width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .18s;}
-.sub-option.selected .so-radio{border-color:var(--primary-light);background:var(--primary-light);}
-.sub-option.selected .so-radio::after{content:'';width:7px;height:7px;border-radius:50%;background:#fff;}
-.sub-option .text{font-size:14px;font-weight:600;color:var(--text);}
-
-/* WARRANTY */
+/* Option Cards */
+.opt-card{display:flex;align-items:center;gap:14px;padding:15px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;margin-bottom:10px;transition:all .18s;background:var(--card);}
+.opt-card:hover,.opt-card.active{border-color:var(--primary-light);background:#eff6ff;box-shadow:0 2px 12px rgba(37,99,235,.1);}
+.opt-icon{width:48px;height:48px;border-radius:12px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.opt-card.active .opt-icon{background:#dbeafe;}
+.opt-title{font-size:14px;font-weight:700;color:var(--text);}
+.opt-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.opt-arr{margin-left:auto;color:var(--muted);font-size:18px;flex-shrink:0;}
+/* Brand grid */
+.brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.brand-card{padding:16px;border:1.5px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:center;transition:all .18s;background:var(--card);}
+.brand-card:hover,.brand-card.active{border-color:var(--primary-light);background:#eff6ff;}
+.brand-card .b-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.brand-card .b-wc{font-size:11px;color:var(--muted);}
+/* Warranty */
 .warranty-row{display:flex;gap:8px;margin-top:6px;}
-.w-btn{flex:1;padding:13px 6px;border:1.5px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .18s;font-size:12px;font-weight:600;color:var(--muted);}
+.w-btn{flex:1;padding:12px 6px;border:1.5px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .18s;font-size:12px;font-weight:600;color:var(--muted);}
 .w-btn .w-icon{font-size:20px;display:block;margin-bottom:4px;}
 .w-btn.selected{border-color:var(--primary-light);background:#eff6ff;color:var(--primary);}
-
-/* CUSTOMER CARD */
-.customer-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:var(--radius);padding:16px;margin-bottom:18px;}
-.customer-card .cname{font-size:17px;font-weight:800;color:#166534;}
-.customer-card .cmob{font-size:13px;color:#16a34a;margin-top:3px;}
-
-/* BUTTONS */
-.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(26,63,168,.25);}
+/* Customer card */
+.customer-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:var(--radius);padding:14px;margin-bottom:16px;}
+.customer-card .cname{font-size:16px;font-weight:800;color:#166534;}
+.customer-card .cmob{font-size:12px;color:#16a34a;margin-top:3px;}
+/* Buttons */
+.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(26,63,168,.25);}
 .btn-primary:hover{box-shadow:0 6px 20px rgba(26,63,168,.35);}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
-.btn-outline{width:100%;background:#fff;color:var(--primary);border:1.5px solid var(--primary-light);border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px;}
-.back-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:20px;}
+.btn-outline{width:100%;background:#fff;color:var(--primary);border:1.5px solid var(--primary-light);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;}
+.back-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:18px;}
 .back-btn:hover{color:var(--primary);}
-
-/* TOKEN / SUCCESS */
-.token-box{background:linear-gradient(135deg,#0f2d7a,#2563eb);color:#fff;border-radius:18px;padding:30px 20px;text-align:center;margin-bottom:18px;box-shadow:0 8px 24px rgba(26,63,168,.3);}
+/* Token */
+.token-box{background:linear-gradient(135deg,#0f2d7a,#2563eb);color:#fff;border-radius:18px;padding:28px 20px;text-align:center;margin-bottom:16px;box-shadow:0 8px 24px rgba(26,63,168,.3);}
 .token-num{font-size:64px;font-weight:900;letter-spacing:4px;line-height:1;}
 .token-label{font-size:13px;opacity:.8;margin-bottom:8px;font-weight:500;letter-spacing:.5px;}
 .token-time{font-size:12px;opacity:.65;margin-top:8px;}
-.summary-box{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
-.summary-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.summary-box{background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
+.summary-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
 .summary-row:last-child{border-bottom:none;}
 .summary-row .sr-icon{width:20px;text-align:center;flex-shrink:0;}
 .summary-row .sr-label{color:var(--muted);font-weight:600;width:90px;flex-shrink:0;}
 .summary-row .sr-val{color:var(--text);font-weight:500;}
 .wait-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;text-align:center;font-size:14px;color:#1e40af;font-weight:600;line-height:1.6;}
-
-/* FOOTER */
-.footer{padding:16px 20px;border-top:1px solid var(--border);background:#f9fafb;}
+.footer{padding:14px 18px;border-top:1px solid var(--border);background:#f9fafb;}
 .error-msg{color:#dc2626;font-size:13px;margin-bottom:10px;display:none;padding:10px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;}
-
-/* SPINNER */
 .spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .fade{animation:fadeIn .22s ease;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-
-/* DIVIDER */
-.divider{border:none;border-top:1px solid var(--border);margin:18px 0;}
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+/* Context pill */
+.ctx-pill{display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;color:#1e40af;margin-bottom:14px;}
+/* Model suggestions */
+.model-suggest{position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;margin-top:2px;}
+.model-suggest div{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
+.model-suggest div:hover{background:#f8fafc;}
 </style>
 </head>
 <body>
 
 <!-- PAGE 1: LANGUAGE -->
 <div class="page active fade" id="pg-lang">
-  <div class="header" style="padding-bottom:24px;">
-    <div id="header-logo-wrap">
-      <img src="icon-192.png" class="header-logo" alt="Bhavi Electronics"
-        onerror="this.outerHTML='<div class=\'header-logo-placeholder\' style=\'background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);\'>BE</div>'">
-    </div>
+  <div class="header" style="padding-bottom:22px;">
+    <img src="icon-192.png" class="header-logo" alt="Bhavi Electronics"
+      onerror="this.style.display='none'">
     <h1>Bhavi Electronics &amp; Automation</h1>
     <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
     <div class="step-badge">Customer Self Check-in</div>
@@ -139,7 +123,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </button>
     </div>
   </div>
-  <div style="padding:16px 20px;text-align:center;">
+  <div style="padding:14px 18px;text-align:center;">
     <div style="font-size:11px;color:#9ca3af;">© Bhavi Electronics &amp; Automation</div>
   </div>
 </div>
@@ -149,19 +133,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <div class="header">
     <h1 id="hdr-mobile">Welcome</h1>
     <div class="tagline" id="hdr-mobile-sub">Enter your mobile number to proceed</div>
-    <div class="step-badge">Step 1 of 4</div>
+    <div class="step-badge" id="badge-mobile">Step 1 of 5</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-lang')">&#8592; <span id="lbl-back-lang"></span></button>
+    <button class="back-btn" onclick="goPage('pg-lang')">&#8592; <span id="lbl-back-lang">Back</span></button>
     <div class="inp-group">
-      <label id="lbl-mobile"></label>
+      <label id="lbl-mobile">Mobile Number</label>
       <input class="inp" type="tel" id="inp-mobile" maxlength="10" inputmode="numeric" placeholder="e.g. 9876543210"
         oninput="this.value=this.value.replace(/\D/g,'')"
         onkeydown="if(event.key==='Enter'){event.preventDefault();submitMobile();}">
     </div>
     <div class="error-msg" id="mobile-error"></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:-8px;" id="lbl-mobile-hint"></div>
-    <button class="btn-primary" id="btn-mobile-next" onclick="submitMobile()" style="margin-top:20px;">
+    <button class="btn-primary" id="btn-mobile-next" onclick="submitMobile()" style="margin-top:18px;">
       <span id="lbl-next-mob">Next →</span>
     </button>
   </div>
@@ -172,133 +155,183 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <div class="header">
     <h1 id="hdr-customer">Your Details</h1>
     <div class="tagline" id="hdr-customer-sub">Please confirm or fill in your information</div>
-    <div class="step-badge">Step 2 of 4</div>
+    <div class="step-badge" id="badge-customer">Step 1 of 5</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-mobile')">&#8592; <span id="lbl-back-mob"></span></button>
+    <button class="back-btn" onclick="goPage('pg-mobile')">&#8592; <span id="lbl-back-mob">Back</span></button>
     <div id="found-customer-card" style="display:none;" class="customer-card fade">
-      <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;" id="lbl-found-msg"></div>
+      <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;" id="lbl-found-msg">Welcome back!</div>
       <div class="cname" id="found-name"></div>
       <div class="cmob" id="found-mob"></div>
     </div>
     <div id="new-customer-fields" class="fade">
       <div class="inp-group">
-        <label id="lbl-name-field"></label>
+        <label id="lbl-name-field">Full Name</label>
         <input class="inp" type="text" id="inp-name" autocomplete="name">
       </div>
       <div class="inp-group">
-        <label id="lbl-state-field"></label>
+        <label id="lbl-state-field">State</label>
         <select class="inp" id="wi-state" onchange="wiOnStateChange()">
           <option value="">— State —</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="inp-group">
-          <label id="lbl-city-field"></label>
+          <label id="lbl-city-field">City</label>
           <select class="inp" id="wi-city" onchange="wiOnCityChange()">
             <option value="">— City —</option>
           </select>
         </div>
         <div class="inp-group">
-          <label id="lbl-pin-field"></label>
+          <label id="lbl-pin-field">Pin Code</label>
           <input class="inp" type="tel" id="wi-pin" maxlength="6" autocomplete="postal-code" list="wi-pin-list" placeholder="Pin...">
           <datalist id="wi-pin-list"></datalist>
         </div>
       </div>
       <div class="inp-group">
-        <label id="lbl-area-field"></label>
+        <label id="lbl-area-field">Area / Society</label>
         <input class="inp" type="text" id="inp-area" autocomplete="address-line2">
       </div>
       <div class="inp-group">
-        <label id="lbl-address-field"></label>
+        <label id="lbl-address-field">Address</label>
         <input class="inp" type="text" id="inp-address" autocomplete="street-address">
       </div>
     </div>
-    <button class="btn-primary" onclick="submitCustomer()" style="margin-top:20px;"><span id="lbl-confirm">Confirm & Continue →</span></button>
+    <button class="btn-primary" onclick="submitCustomer()" style="margin-top:18px;"><span id="lbl-confirm">Confirm &amp; Continue →</span></button>
   </div>
 </div>
 
 <!-- PAGE 4: CATEGORY -->
 <div class="page fade" id="pg-category">
   <div class="header">
-    <h1 id="hdr-category">Purpose of Visit</h1>
-    <div class="tagline" id="hdr-category-sub">Select the product or service category</div>
-    <div class="step-badge">Step 3 of 4</div>
+    <h1 id="hdr-category">Select Product Category</h1>
+    <div class="tagline" id="hdr-category-sub">What product are you bringing today?</div>
+    <div class="step-badge" id="badge-category">Step 2 of 5</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-customer')">&#8592; <span id="lbl-back-cust"></span></button>
-    <div class="option-card" onclick="selectCategory('camera')">
-      <div class="oc-icon">📷</div>
-      <div>
-        <div class="title" id="cat-camera">Camera (ICP)</div>
-        <div class="sub" id="cat-camera-sub">Canon, Panasonic, Godox, Fujifilm</div>
-      </div>
-      <span class="oc-arr">›</span>
-    </div>
-    <div class="option-card" onclick="selectCategory('printer')">
-      <div class="oc-icon">🖨️</div>
-      <div>
-        <div class="title" id="cat-printer">Printer (CSP)</div>
-        <div class="sub" id="cat-printer-sub">Canon Printers &amp; Scanners</div>
-      </div>
-      <span class="oc-arr">›</span>
-    </div>
-    <div class="option-card" onclick="selectCategory('other')">
-      <div class="oc-icon">🛍️</div>
-      <div>
-        <div class="title" id="cat-other">Other</div>
-        <div class="sub" id="cat-other-sub">Ink, Accessories &amp; Other Purchases</div>
-      </div>
-      <span class="oc-arr">›</span>
-    </div>
+    <button class="back-btn" onclick="goPage('pg-customer')" id="back-to-customer">&#8592; <span id="lbl-back-cust">Back</span></button>
+    <div id="category-options"></div>
   </div>
 </div>
 
-<!-- PAGE 5: SUB-CATEGORY -->
-<div class="page fade" id="pg-subcategory">
+<!-- PAGE 5: BRAND -->
+<div class="page fade" id="pg-brand">
   <div class="header">
-    <h1 id="hdr-subcat">Select Purpose</h1>
-    <div class="tagline" id="hdr-subcat-sub"></div>
-    <div class="step-badge">Step 3 of 4</div>
+    <h1 id="hdr-brand">Select Brand</h1>
+    <div class="tagline" id="hdr-brand-sub">Choose your product brand</div>
+    <div class="step-badge" id="badge-brand">Step 3 of 5</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-category')">&#8592; <span id="lbl-back-cat"></span></button>
-    <div id="subcategory-options"></div>
-  </div>
-  <div class="footer">
-    <button class="btn-primary" id="btn-subcat-next" onclick="submitSubcategory()" disabled>
-      <span id="lbl-subcat-next">Continue</span>
-    </button>
+    <button class="back-btn" onclick="goPage('pg-category')">&#8592; <span id="lbl-back-cat">Back</span></button>
+    <div id="ctx-cat-pill" class="ctx-pill" style="margin-bottom:14px;"></div>
+    <div class="brand-grid" id="brand-options"></div>
   </div>
 </div>
 
-<!-- PAGE 6: PRODUCT DETAILS -->
+<!-- PAGE 6: PURPOSE -->
+<div class="page fade" id="pg-purpose">
+  <div class="header">
+    <h1 id="hdr-purpose">Purpose of Visit</h1>
+    <div class="tagline" id="hdr-purpose-sub">What do you need help with today?</div>
+    <div class="step-badge" id="badge-purpose">Step 4 of 5</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" id="back-to-brand-or-cat" onclick="backFromPurpose()">&#8592; <span id="lbl-back-brand">Back</span></button>
+    <div id="ctx-brand-pill" class="ctx-pill" style="display:none;margin-bottom:14px;"></div>
+
+    <div class="opt-card" onclick="selectPurpose('repair','Inward')">
+      <div class="opt-icon">🔧</div>
+      <div><div class="opt-title" id="lbl-repair">Problem in Product — Submit for Repair</div>
+      <div class="opt-sub" id="lbl-repair-sub">Product has an issue and needs service</div></div>
+      <span class="opt-arr">›</span>
+    </div>
+    <div class="opt-card" onclick="selectPurpose('eol','Inward')">
+      <div class="opt-icon">📦</div>
+      <div><div class="opt-title" id="lbl-eol">EOL Products — Old Products</div>
+      <div class="opt-sub" id="lbl-eol-sub">End-of-life or discontinued product service</div></div>
+      <span class="opt-arr">›</span>
+    </div>
+    <div class="opt-card" onclick="selectPurpose('cleaning','Inward')">
+      <div class="opt-icon">🧹</div>
+      <div><div class="opt-title" id="lbl-cleaning">Service / Cleaning Required</div>
+      <div class="opt-sub" id="lbl-cleaning-sub">Product needs routine service or cleaning</div></div>
+      <span class="opt-arr">›</span>
+    </div>
+    <div class="opt-card" onclick="selectPurpose('delivery','Outward')">
+      <div class="opt-icon">📤</div>
+      <div><div class="opt-title" id="lbl-delivery">Product Delivery</div>
+      <div class="opt-sub" id="lbl-delivery-sub">Collect your repaired product</div></div>
+      <span class="opt-arr">›</span>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 7: PRODUCT DETAILS -->
 <div class="page fade" id="pg-product">
   <div class="header">
     <h1 id="hdr-product">Product Information</h1>
     <div class="tagline" id="hdr-product-sub">Please provide your product details</div>
-    <div class="step-badge">Step 4 of 4</div>
+    <div class="step-badge" id="badge-product">Step 5 of 5</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-subcategory')">&#8592; <span id="lbl-back-subcat"></span></button>
-    <!-- Other purchase remark (no product needed) -->
-    <div id="other-remark-group" style="display:none;">
+    <button class="back-btn" onclick="goPage('pg-purpose')">&#8592; <span id="lbl-back-purpose">Back</span></button>
+    <div id="ctx-summary-pill" class="ctx-pill"></div>
+
+    <!-- Warranty (hidden for Outward) -->
+    <div id="warranty-group">
       <div class="inp-group">
-        <label id="lbl-other-remark"></label>
-        <input class="inp" type="text" id="inp-other-remark">
+        <label id="lbl-warranty">Warranty Status</label>
+        <div class="warranty-row">
+          <div class="w-btn" id="wb-in" onclick="setWarranty('In Warranty')"><span class="w-icon">✅</span><span id="lbl-w-yes">In Warranty</span></div>
+          <div class="w-btn" id="wb-out" onclick="setWarranty('Out of Warranty')"><span class="w-icon">⚠️</span><span id="lbl-w-no">Out of Warranty</span></div>
+          <div class="w-btn" id="wb-other" onclick="setWarranty('Other')"><span class="w-icon">❓</span><span id="lbl-w-other">Not Sure</span></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <!-- Model -->
+    <div class="inp-group" style="position:relative;">
+      <label id="lbl-model">Model Number</label>
+      <input class="inp" type="text" id="inp-model" autocomplete="off" placeholder="Type to search model..."
+        oninput="filterModelSug(this.value)" onfocus="filterModelSug(this.value)"
+        onblur="setTimeout(function(){var s=document.getElementById('model-suggestions');if(s)s.style.display='none';},200)">
+      <div class="model-suggest" id="model-suggestions" style="display:none;"></div>
+    </div>
+
+    <!-- Serial -->
+    <div class="inp-group">
+      <label id="lbl-serial">Serial No <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input class="inp" type="text" id="inp-serial" placeholder="Found on product label or box...">
+    </div>
+
+    <!-- Problem (only for Inward) -->
+    <div id="problem-group">
+      <div class="inp-group">
+        <label id="lbl-problem-sel">Problem Type</label>
+        <select class="inp" id="sel-problem" onchange="onProblemSelChange()">
+          <option value="">— Select problem —</option>
+        </select>
+      </div>
+      <div class="inp-group" id="problem-other-group" style="display:none;">
+        <label id="lbl-problem-text">Describe Problem</label>
+        <textarea class="inp" id="inp-problem" rows="2" placeholder="Please describe the issue with your product..."></textarea>
+      </div>
+      <div class="inp-group" id="problem-text-group">
+        <label id="lbl-problem-detail">Additional Details <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <textarea class="inp" id="inp-problem-detail" rows="2" placeholder="Any additional information..."></textarea>
       </div>
     </div>
-    <!-- Dynamic product cards -->
-    <div id="wi-products-wrap"></div>
-    <button id="btn-add-product" onclick="addProductCard()" style="display:none;width:100%;background:#eff6ff;color:#1a56db;border:1.5px dashed #93c5fd;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">+ Add Another Product</button>
-    <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:16px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
+
+    <div class="error-msg" id="product-error"></div>
+    <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:8px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
   </div>
 </div>
 
-<!-- PAGE 7: SUCCESS -->
+<!-- PAGE 8: SUCCESS -->
 <div class="page fade" id="pg-success">
   <div class="header" style="background:linear-gradient(160deg,#064e3b,#059669,#10b981);">
-    <div style="font-size:36px;margin-bottom:8px;">✅</div>
+    <div style="font-size:34px;margin-bottom:6px;">✅</div>
     <h1 id="hdr-success">Check-in Successful!</h1>
     <div class="tagline" id="hdr-success-sub">Our team will assist you shortly</div>
   </div>
@@ -309,7 +342,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="token-time" id="lbl-token-time"></div>
     </div>
     <div class="summary-box" id="summary-box"></div>
-    <div class="wait-box" id="lbl-wait-msg"></div>
+    <div class="wait-box" id="lbl-wait-msg">🙏 Please be seated. Our team will call your token number shortly.</div>
   </div>
   <div class="footer">
     <button class="btn-primary" style="background:linear-gradient(135deg,#064e3b,#059669);" onclick="startOver()">
@@ -325,174 +358,197 @@ var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbPost(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
 
+// ─── CATEGORY CONFIG ───────────────────────────────────────────────────────
+var CATS=[
+  {id:'camera', icon:'📷',
+    label:{en:'Camera', gu:'કૅમેરા', hi:'कैमरा'},
+    sub:{en:'Canon, Panasonic, Fujifilm, Instax', gu:'Canon, Panasonic, Fujifilm, Instax', hi:'Canon, Panasonic, Fujifilm, Instax'},
+    hasBrand:true},
+  {id:'printer', icon:'🖨️',
+    label:{en:'Printer / Scanner', gu:'પ્રિન્ટર / સ્કૅનર', hi:'प्रिंटर / स्कैनर'},
+    sub:{en:'Canon Printers & Scanners', gu:'Canon Printers & Scanners', hi:'Canon Printers & Scanners'},
+    hasBrand:false, wc:'CSP'},
+  {id:'flash', icon:'⚡',
+    label:{en:'Flash / Lights', gu:'ફ્લૅશ / લાઇટ', hi:'फ्लैश / लाइट'},
+    sub:{en:'Canon, Godox', gu:'Canon, Godox', hi:'Canon, Godox'},
+    hasBrand:true},
+  {id:'projector', icon:'📽️',
+    label:{en:'Projectors', gu:'પ્રોજૅક્ટર', hi:'प्रोजेक्टर'},
+    sub:{en:'Casio, Other Brands', gu:'Casio, Other Brands', hi:'Casio, Other Brands'},
+    hasBrand:true},
+  {id:'music', icon:'🎵',
+    label:{en:'Musical Instruments', gu:'સ્સ્ સ્ સ્ Musical Instruments', hi:'संगीत वाद्य'},
+    sub:{en:'All brands', gu:'All brands', hi:'All brands'},
+    hasBrand:false, wc:'ICP'},
+];
 
-// ── TRANSLATIONS ──
+var BRANDS={
+  camera:[
+    {name:'Canon',    emoji:'🔴', wc:'ICP'},
+    {name:'Panasonic',emoji:'🔵', wc:'ICP'},
+    {name:'Fujifilm', emoji:'🟢', wc:'CSP'},
+    {name:'Instax',   emoji:'🟡', wc:'CSP'},
+  ],
+  flash:[
+    {name:'Canon',   emoji:'🔴', wc:'ICP'},
+    {name:'Godox',   emoji:'🟠', wc:'ICP'},
+  ],
+  projector:[
+    {name:'Casio',        emoji:'🔵', wc:'ICP'},
+    {name:'Other Brands', emoji:'⚪', wc:'ICP'},
+  ],
+};
+
+var PROBLEM_OPTS={
+  camera:['Not turning on','Display / Screen issue','Lens error / Stuck lens','Not capturing / AF issue','Water damage','Physical damage','Error code','Cleaning required','Other'],
+  printer:['Paper jam','Not printing','Ink not recognized','Poor print quality','Scanner not working','Error code / Blinking lights','Physical damage','Service / Cleaning required','Other'],
+  flash:['Not firing','Power / Charging issue','Hot shoe damage','Display not working','Physical damage','Other'],
+  projector:['No display / No signal','Lamp warning','Remote not working','Poor image quality','Physical damage','Other'],
+  music:['Not working','Sound issue','Physical damage','Service required','Other'],
+};
+
+// ─── TRANSLATIONS ───────────────────────────────────────────────────────────
 var T={
   gu:{
-    mobile_hdr:'સ્વાગત છે',mobile_sub:'આગળ વધવા માટે કૃપા કરીને આપનો મોબાઇલ નંબર દાખલ કરો',
-    lbl_mobile:'મોબાઇલ નંબર',mobile_hint:'અમે આ નંબર ઓળખ પ્રક્રિયા માટે ઉપયોગ કરીશું',
-    customer_hdr:'આપની માહિતી',customer_sub:'કૃપા કરીને આપની વિગત પ્રમાણિત કરો',
-    lbl_found:'આપને આવકાર છે! અમારી પાસે આપની નોંધ છે:',
-    lbl_name:'પૂરું નામ',lbl_state:'રાજ્ય',lbl_city:'શહેર',lbl_pin:'પિન કોડ',lbl_area:'વિસ્તાર / સોસાયટી',lbl_address:'સરનામું',
-    confirm:'પ્રમાણિત કરો અને આગળ વધો →',
-    category_hdr:'આપની મુલાકાતનો હેતુ',category_sub:'ઉત્પાદન અથવા સેવા વિભાગ પસંદ કરો',
-    cat_camera:'કૅમેરા (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
-    cat_printer:'પ્રિન્ટર (CSP)',cat_printer_sub:'Canon Printers & Scanners',
-    cat_other:'અન્ય',cat_other_sub:'ઇન્ક, Accessories અને અન્ય ખરીદી',
-    subcat_hdr:'હેતુ પસંદ કરો',
+    mobile_hdr:'સ્વાગત છે', mobile_sub:'આગળ વધવા માટે આપનો મોબાઇલ નંબર દાખલ કરો',
+    lbl_mobile:'મોબાઇલ નંબર',
+    customer_hdr:'આપની માહિતી', customer_sub:'કૃપા કરીને આપની વિગત ભરો',
+    lbl_found:'આવકાર! અમારી પાસે આપની નોંધ છે:', lbl_name:'પૂરું નામ',
+    lbl_state:'રાજ્ય', lbl_city:'શહેર', lbl_pin:'પિન કોડ', lbl_area:'વિસ્તાર', lbl_address:'સરનામું',
+    confirm:'પ્રમાણિત કરો →',
+    category_hdr:'Product Category પસંદ કરો', category_sub:'આજે કયો Product લઈ આવ્યા?',
+    brand_hdr:'Brand પસંદ કરો', brand_sub:'આપનો Product Brand પસંદ કરો',
+    purpose_hdr:'મુલાકાતનો હેતુ', purpose_sub:'આજે શેના માટે આવ્યા?',
+    lbl_repair:'ઉત્પાદનમાં ખામી — સમારકામ માટે', lbl_repair_sub:'Product ની ખામી સર્વિસ માટે સોંપો',
+    lbl_eol:'EOL ઉત્પાદ — જૂના Products', lbl_eol_sub:'End-of-life અથવા જૂના Product ની સર્વિસ',
+    lbl_cleaning:'સર્વિસ / ક્લિનિંગ જોઈએ', lbl_cleaning_sub:'Product ની Routine Service/Cleaning',
+    lbl_delivery:'Product Delivery — Collection', lbl_delivery_sub:'સમારેલ Product લઈ જવા',
+    product_hdr:'Product ની વિગત', product_sub:'Product ની માહિતી ભરો',
     lbl_warranty:'વૉરન્ટી સ્થિતિ',
-    w_yes:'વૉરન્ટી હેઠળ',w_no:'વૉરન્ટી બહાર',w_other:'જાણ નથી',
-    lbl_brand:'બ્રાન્ડ',lbl_model:'મૉડેલ નંબર',
-    lbl_serial:'સીરિઅલ નંબર (જો ખ્યાલ હોય)',serial_ph:'ઉત્પાદ પર લખ્યો હશે...',
-    lbl_problem:'સમસ્યા / ફરિયાદ',problem_ph:'ઉત્પાદનની સમસ્યા જણાવો...',
-    lbl_other_remark:'વધુ વિગત',
-    submit:'ચેક-ઇન પૂર્ણ કરો ✓',
-    success_hdr:'ચેક-ઇન સફળ!',success_sub:'અમારી ટીમ ટૂંક સમયમાં આપની સહાય કરશે',
-    token_label:'આપનો ટોકન નંબર',
-    wait_msg:'🙏 કૃપા કરી બેઠક ગ્રહણ કરો. અમારી ટીમ આપનો ટોકન નંબર બોલાવશે ત્યારે પધારો.',
-    summary_title:'નોંધણી સારાંશ',new_entry:'નવી નોંધણી',
-    back:'પાછળ',next:'આગળ',continue:'ચાલુ રાખો',
-    err_mobile:'કૃપા કરીને 10 અંકનો માન્ય મોબાઇલ નંબર દાખલ કરો',
-    err_name:'નામ ફરજિયાત છે',err_subcat:'કૃપા કરીને એક વિકલ્પ પસંદ કરો',
-    err_warranty:'કૃપા કરીને વૉરન્ટી સ્થિતિ પસંદ કરો',err_model:'મૉડેલ નંબર ફરજિયાત છે',
+    w_yes:'વૉરન્ટી', w_no:'વૉ. બહાર', w_other:'ખ્યાલ નથી',
+    lbl_model:'Model Number', lbl_serial:'Serial No (જો ખ્યાલ હોય)',
+    lbl_problem_sel:'સમસ્યાનો પ્રકાર', lbl_problem_text:'સમસ્યા જણાવો', lbl_problem_detail:'વધુ માહિતી (optional)',
+    submit:'Check-in પૂર્ણ કરો ✓',
+    success_hdr:'Check-in સફળ!', success_sub:'અમારી ટીમ ટૂંક સમયમાં સહાય કરશે',
+    token_label:'આપનો Token Number',
+    wait_msg:'🙏 કૃપા કરી બેઠક ગ્રહણ કરો. Team આપનો Token Number બોલાવે ત્યારે આવો.',
+    new_entry:'નવી નોંધણી', back:'પાછળ', next:'આગળ',
+    err_mobile:'10 અંકનો મોબાઇલ નંબર દાખલ કરો',
+    err_name:'નામ ભરો',
+    err_warranty:'વૉરન્ટી સ્થિતિ પસંદ કરો',
+    err_model:'Model Number ભરો',
   },
   hi:{
-    mobile_hdr:'आपका स्वागत है',mobile_sub:'कृपया आगे बढ़ने के लिए अपना मोबाइल नंबर दर्ज करें',
-    lbl_mobile:'मोबाइल नंबर',mobile_hint:'हम इस नंबर का उपयोग आपकी पहचान के लिए करेंगे',
-    customer_hdr:'आपकी जानकारी',customer_sub:'कृपया अपनी जानकारी की पुष्टि करें',
-    lbl_found:'आपका स्वागत है! हमारे पास आपकी जानकारी उपलब्ध है:',
-    lbl_name:'पूरा नाम',lbl_state:'राज्य',lbl_city:'शहर',lbl_pin:'पिन कोड',lbl_area:'क्षेत्र / सोसायटी',lbl_address:'पता',
-    confirm:'पुष्टि करें और आगे बढ़ें →',
-    category_hdr:'आपके आने का उद्देश्य',category_sub:'उत्पाद या सेवा श्रेणी चुनें',
-    cat_camera:'कैमरा (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
-    cat_printer:'प्रिंटर (CSP)',cat_printer_sub:'Canon Printers & Scanners',
-    cat_other:'अन्य',cat_other_sub:'स्याही, Accessories एवं अन्य खरीदारी',
-    subcat_hdr:'उद्देश्य चुनें',
+    mobile_hdr:'आपका स्वागत है', mobile_sub:'कृपया अपना मोबाइल नंबर दर्ज करें',
+    lbl_mobile:'मोबाइल नंबर',
+    customer_hdr:'आपकी जानकारी', customer_sub:'कृपया अपनी जानकारी भरें',
+    lbl_found:'आपका स्वागत! हमारे पास आपकी जानकारी है:', lbl_name:'पूरा नाम',
+    lbl_state:'राज्य', lbl_city:'शहर', lbl_pin:'पिन कोड', lbl_area:'क्षेत्र', lbl_address:'पता',
+    confirm:'पुष्टि करें →',
+    category_hdr:'Product Category चुनें', category_sub:'आज कौन-सा Product लाए हैं?',
+    brand_hdr:'Brand चुनें', brand_sub:'अपना Product Brand चुनें',
+    purpose_hdr:'यात्रा का उद्देश्य', purpose_sub:'आज किस कारण आए हैं?',
+    lbl_repair:'Product में खराबी — मरम्मत हेतु', lbl_repair_sub:'Product की खराबी सर्विस के लिए जमा करें',
+    lbl_eol:'EOL उत्पाद — पुराने Products', lbl_eol_sub:'End-of-life या पुराने Product की सर्विस',
+    lbl_cleaning:'सर्विस / सफाई चाहिए', lbl_cleaning_sub:'Product की Routine Service/Cleaning',
+    lbl_delivery:'Product Delivery — Collection', lbl_delivery_sub:'मरम्मत किया हुआ Product लेना',
+    product_hdr:'Product की जानकारी', product_sub:'Product का विवरण भरें',
     lbl_warranty:'वारंटी स्थिति',
-    w_yes:'वारंटी में',w_no:'वारंटी से बाहर',w_other:'ज्ञात नहीं',
-    lbl_brand:'ब्रांड',lbl_model:'मॉडल नंबर',
-    lbl_serial:'Serial No (यदि मालूम हो)',serial_ph:'उत्पाद पर लिखा होगा...',
-    lbl_problem:'समस्या / शिकायत',problem_ph:'उत्पाद की समस्या बताएं...',
-    lbl_other_remark:'अतिरिक्त विवरण',
-    submit:'चेक-इन पूर्ण करें ✓',
-    success_hdr:'चेक-इन सफल रहा!',success_sub:'हमारी टीम शीघ्र ही आपकी सहायता करेगी',
-    token_label:'आपका टोकन नंबर',
-    wait_msg:'🙏 कृपया बैठें। हमारी टीम आपका टोकन नंबर बुलाए तब पधारें।',
-    summary_title:'पंजीकरण सारांश',new_entry:'नई प्रविष्टि',
-    back:'वापस',next:'आगे',continue:'जारी रखें',
-    err_mobile:'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें',
-    err_name:'नाम आवश्यक है',err_subcat:'कृपया एक विकल्प चुनें',
-    err_warranty:'कृपया वारंटी स्थिति चुनें',err_model:'मॉडल नंबर आवश्यक है',
+    w_yes:'वारंटी में', w_no:'वारंटी बाहर', w_other:'ज्ञात नहीं',
+    lbl_model:'Model Number', lbl_serial:'Serial No (यदि मालूम हो)',
+    lbl_problem_sel:'समस्या का प्रकार', lbl_problem_text:'समस्या बताएं', lbl_problem_detail:'अतिरिक्त जानकारी (optional)',
+    submit:'Check-in पूर्ण करें ✓',
+    success_hdr:'Check-in सफल!', success_sub:'हमारी टीम शीघ्र सहायता करेगी',
+    token_label:'आपका Token Number',
+    wait_msg:'🙏 कृपया बैठें। टीम आपका Token Number बुलाए तब पधारें।',
+    new_entry:'नई प्रविष्टि', back:'वापस', next:'आगे',
+    err_mobile:'10 अंकों का मोबाइल नंबर दर्ज करें',
+    err_name:'नाम भरें',
+    err_warranty:'वारंटी स्थिति चुनें',
+    err_model:'Model Number भरें',
   },
   en:{
-    mobile_hdr:'Welcome',mobile_sub:'Please enter your mobile number to proceed',
-    lbl_mobile:'Mobile Number',mobile_hint:'We will use this to retrieve your details if available',
-    customer_hdr:'Your Details',customer_sub:'Please confirm or complete your information',
-    lbl_found:'Welcome back! We found your details:',
-    lbl_name:'Full Name',lbl_state:'State',lbl_city:'City',lbl_pin:'Pin Code',lbl_area:'Area / Society',lbl_address:'Address',
+    mobile_hdr:'Welcome', mobile_sub:'Enter your mobile number to proceed',
+    lbl_mobile:'Mobile Number',
+    customer_hdr:'Your Details', customer_sub:'Please confirm or fill in your information',
+    lbl_found:'Welcome back! We found your details:', lbl_name:'Full Name',
+    lbl_state:'State', lbl_city:'City', lbl_pin:'Pin Code', lbl_area:'Area / Society', lbl_address:'Address',
     confirm:'Confirm &amp; Continue →',
-    category_hdr:'Purpose of Visit',category_sub:'Select the product or service category',
-    cat_camera:'Camera (ICP)',cat_camera_sub:'Canon, Panasonic, Godox, Fujifilm',
-    cat_printer:'Printer (CSP)',cat_printer_sub:'Canon Printers &amp; Scanners',
-    cat_other:'Other',cat_other_sub:'Ink, Accessories &amp; Other Purchases',
-    subcat_hdr:'Select Purpose',
+    category_hdr:'Select Product Category', category_sub:'What product are you bringing today?',
+    brand_hdr:'Select Brand', brand_sub:'Choose your product brand',
+    purpose_hdr:'Purpose of Visit', purpose_sub:'What do you need help with today?',
+    lbl_repair:'Problem in Product — Submit for Repair', lbl_repair_sub:'Product has an issue and needs service',
+    lbl_eol:'EOL Products — Old Products', lbl_eol_sub:'End-of-life or discontinued product service',
+    lbl_cleaning:'Service / Cleaning Required', lbl_cleaning_sub:'Product needs routine service or cleaning',
+    lbl_delivery:'Product Delivery — Collection', lbl_delivery_sub:'Collect your repaired product',
+    product_hdr:'Product Information', product_sub:'Please provide your product details',
     lbl_warranty:'Warranty Status',
-    w_yes:'In Warranty',w_no:'Out of Warranty',w_other:'Not Sure',
-    lbl_brand:'Brand',lbl_model:'Model Number',
-    lbl_serial:'Serial No (if known)',serial_ph:'Found on product label or box...',
-    lbl_problem:'Problem / Complaint',problem_ph:'Please describe the issue with your product...',
-    lbl_other_remark:'Additional Details',
+    w_yes:'In Warranty', w_no:'Out of Warranty', w_other:'Not Sure',
+    lbl_model:'Model Number', lbl_serial:'Serial No (if known)',
+    lbl_problem_sel:'Problem Type', lbl_problem_text:'Describe Problem', lbl_problem_detail:'Additional Details (optional)',
     submit:'Complete Check-in ✓',
-    success_hdr:'Check-in Successful!',success_sub:'Our team will assist you shortly',
+    success_hdr:'Check-in Successful!', success_sub:'Our team will assist you shortly',
     token_label:'Your Token Number',
     wait_msg:'🙏 Please be seated. Our team will call your token number shortly.',
-    summary_title:'Registration Summary',new_entry:'New Check-in',
-    back:'Back',next:'Next',continue:'Continue',
+    new_entry:'New Check-in', back:'Back', next:'Next',
     err_mobile:'Please enter a valid 10-digit mobile number',
-    err_name:'Full name is required',err_subcat:'Please select an option',
-    err_warranty:'Please select warranty status',err_model:'Model number is required',
+    err_name:'Full name is required',
+    err_warranty:'Please select warranty status',
+    err_model:'Model number is required',
   }
 };
-
-var SUBCATS={
-  camera:{
-    en:['Problem in Product — Submit for Repair','Service / Cleaning Required','Product Collection'],
-    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ / ક્લિનિંગ જોઈએ','ઉત્પાદ કલેકશન'],
-    hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस / सफाई चाहिए','उत्पाद संग्रह'],
-    types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
-  },
-  printer:{
-    en:['Problem in Product — Submit for Repair','Service Required','Product Collection'],
-    gu:['ઉત્પાદનમાં ખામી — સમારકામ માટે સોંપો','સર્વિસ જોઈએ','ઉત્પાદ કલેકશન'],
-    hi:['उत्पाद में खराबी — मरम्मत हेतु जमा करें','सर्विस चाहिए','उत्पाद संग्रह'],
-    types:['Inward','Inward','Outward'],needsProduct:[true,true,false]
-  },
-  other:{
-    en:['Ink Purchase','Accessories Purchase','Other Purchase (please specify)'],
-    gu:['ઇન્ક ખરીદી','Accessories ખરીદી','અન્ય ખરીદી (વિગત ભરો)'],
-    hi:['स्याही खरीद','Accessories खरीद','अन्य खरीद (विवरण दें)'],
-    types:['Other','Other','Other'],needsProduct:[false,false,false]
-  }
-};
-
-var BRANDS_BY_CAT={
-  camera:['Canon','Panasonic','Godox','Fujifilm','Sony','Nikon','Other'],
-  printer:['Canon','Epson','HP','Brother','Other'],
-  other:[]
-};
-
-var CSP_CAMERA_BRANDS=['fujifilm'];
-
-function getWcId(category,brand){
-  if(category==='printer')return 'SELF_CHECKIN_CSP';
-  if(category==='camera'){
-    if(CSP_CAMERA_BRANDS.indexOf((brand||'').toLowerCase().trim())>=0)return 'SELF_CHECKIN_CSP';
-    return 'SELF_CHECKIN_ICP';
-  }
-  return 'SELF_CHECKIN_OTHER';
-}
-function getWcName(wcId){
-  return wcId==='SELF_CHECKIN_ICP'?'Self Check-in (ICP)':wcId==='SELF_CHECKIN_CSP'?'Self Check-in (CSP)':'Self Check-in (Other)';
-}
 
 var lang='en';
-var state={mobile:'',name:'',state:'',city:'',pin:'',area:'',address:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true};
+var state={
+  mobile:'',name:'',state_:'',city:'',pin:'',area:'',address:'',
+  isNewCustomer:true,
+  catId:'',catLabel:'',catIcon:'',hasBrand:false,directWc:'',
+  brandName:'',brandWc:'',brandEmoji:'',
+  purposeId:'',purposeLabel:'',purposeType:'',
+  warranty:'',model:'',serial:'',problem:'',problemDetail:''
+};
 
-function t(key){return(T[lang]&&T[lang][key])||T['en'][key]||key;}
+function t(k){return(T[lang]&&T[lang][k])||T.en[k]||k;}
 
 function applyLang(){
-  var ids={
+  var m={
     'hdr-mobile':'mobile_hdr','hdr-mobile-sub':'mobile_sub','lbl-mobile':'lbl_mobile',
-    'lbl-mobile-hint':'mobile_hint','hdr-customer':'customer_hdr','hdr-customer-sub':'customer_sub',
-    'lbl-found-msg':'lbl_found','lbl-name-field':'lbl_name','lbl-state-field':'lbl_state','lbl-city-field':'lbl_city','lbl-pin-field':'lbl_pin','lbl-area-field':'lbl_area','lbl-address-field':'lbl_address',
-    'lbl-confirm':'confirm','hdr-category':'category_hdr','hdr-category-sub':'category_sub',
-    'cat-camera':'cat_camera','cat-camera-sub':'cat_camera_sub','cat-printer':'cat_printer',
-    'cat-printer-sub':'cat_printer_sub','cat-other':'cat_other','cat-other-sub':'cat_other_sub',
-    'hdr-subcat':'subcat_hdr','lbl-subcat-next':'continue','lbl-warranty':'lbl_warranty',
-    'lbl-w-yes':'w_yes','lbl-w-no':'w_no','lbl-w-other':'w_other',
-    'lbl-brand':'lbl_brand','lbl-model':'lbl_model','lbl-problem':'lbl_problem',
-    'lbl-other-remark':'lbl_other_remark','lbl-submit':'submit',
+    'hdr-customer':'customer_hdr','hdr-customer-sub':'customer_sub',
+    'lbl-found-msg':'lbl_found','lbl-name-field':'lbl_name','lbl-state-field':'lbl_state',
+    'lbl-city-field':'lbl_city','lbl-pin-field':'lbl_pin','lbl-area-field':'lbl_area','lbl-address-field':'lbl_address',
+    'lbl-confirm':'confirm',
+    'hdr-category':'category_hdr','hdr-category-sub':'category_sub',
+    'hdr-brand':'brand_hdr','hdr-brand-sub':'brand_sub',
+    'hdr-purpose':'purpose_hdr','hdr-purpose-sub':'purpose_sub',
+    'lbl-repair':'lbl_repair','lbl-repair-sub':'lbl_repair_sub',
+    'lbl-eol':'lbl_eol','lbl-eol-sub':'lbl_eol_sub',
+    'lbl-cleaning':'lbl_cleaning','lbl-cleaning-sub':'lbl_cleaning_sub',
+    'lbl-delivery':'lbl_delivery','lbl-delivery-sub':'lbl_delivery_sub',
+    'hdr-product':'product_hdr','hdr-product-sub':'product_sub',
+    'lbl-warranty':'lbl_warranty','lbl-w-yes':'w_yes','lbl-w-no':'w_no','lbl-w-other':'w_other',
+    'lbl-model':'lbl_model','lbl-serial':'lbl_serial',
+    'lbl-problem-sel':'lbl_problem_sel','lbl-problem-text':'lbl_problem_text','lbl-problem-detail':'lbl_problem_detail',
+    'lbl-submit':'submit',
     'hdr-success':'success_hdr','hdr-success-sub':'success_sub','lbl-token-label':'token_label',
     'lbl-wait-msg':'wait_msg','lbl-new-entry':'new_entry'
   };
-  Object.keys(ids).forEach(function(id){
-    var el=document.getElementById(id);
-    if(el)el.innerHTML=t(ids[id]);
-  });
-  ['lbl-back-lang','lbl-back-mob','lbl-back-cust','lbl-back-cat','lbl-back-subcat'].forEach(function(id){
+  Object.keys(m).forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=t(m[id]);});
+  ['lbl-back-lang','lbl-back-mob','lbl-back-cust','lbl-back-cat','lbl-back-brand','lbl-back-purpose'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.textContent=t('back');
   });
-  var ph=document.getElementById('inp-problem');
-  if(ph)ph.placeholder=t('problem_ph');
+  // Render category list
+  renderCategoryOptions();
 }
 
 function setLang(l){lang=l;applyLang();goPage('pg-mobile');document.getElementById('inp-mobile').focus();}
 
 function goPage(id){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
-  var pg=document.getElementById(id);pg.classList.add('active','fade');window.scrollTo(0,0);
+  var pg=document.getElementById(id);if(pg){pg.classList.add('active','fade');}
+  window.scrollTo(0,0);
 }
 
+// ─── STEP 2: MOBILE ─────────────────────────────────────────────────────────
 async function submitMobile(){
   var mob=document.getElementById('inp-mobile').value.trim();
   var errEl=document.getElementById('mobile-error');errEl.style.display='none';
@@ -502,12 +558,10 @@ async function submitMobile(){
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
     var foundName='',foundCity='';
-    // Check customers table first (master data)
     try{
       var custs=await sbGet('customers','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=name,city');
       if(custs&&custs.length&&custs[0].name){foundName=custs[0].name;foundCity=custs[0].city||'';}
     }catch(e1){}
-    // Fallback: check walkin_log
     if(!foundName){
       try{
         var logs=await sbGet('walkin_log','?mobile=eq.'+mob+'&order=created_at.desc&limit=1&select=customer_name');
@@ -520,11 +574,11 @@ async function submitMobile(){
       document.getElementById('found-name').textContent=foundName;
       document.getElementById('found-mob').textContent='📱 '+mob;
       document.getElementById('new-customer-fields').style.display='none';
-    }else{
+    } else {
       state.isNewCustomer=true;
       document.getElementById('found-customer-card').style.display='none';
       document.getElementById('new-customer-fields').style.display='';
-      document.getElementById('inp-name').value='';document.getElementById('inp-city').value='';
+      document.getElementById('inp-name').value='';
     }
     goPage('pg-customer');
   }catch(e){
@@ -535,12 +589,13 @@ async function submitMobile(){
   }finally{btn.disabled=false;btn.innerHTML='<span>'+t('next')+' &rarr;</span>';}
 }
 
+// ─── STEP 3: CUSTOMER ────────────────────────────────────────────────────────
 function submitCustomer(){
   if(!state.isNewCustomer){goPage('pg-category');return;}
   var name=document.getElementById('inp-name').value.trim();
   if(!name){alert(t('err_name'));return;}
   state.name=name;
-  state.state=(document.getElementById('wi-state')||{}).value||'';
+  state.state_=(document.getElementById('wi-state')||{}).value||'';
   state.city=(document.getElementById('wi-city')||{}).value||'';
   state.pin=(document.getElementById('wi-pin')||{}).value||'';
   state.area=(document.getElementById('inp-area')||{}).value||'';
@@ -548,225 +603,229 @@ function submitCustomer(){
   goPage('pg-category');
 }
 
-function selectCategory(cat){
-  state.category=cat;state.subcatIdx=-1;
-  var sc=SUBCATS[cat];
-  document.getElementById('hdr-subcat-sub').textContent=t('cat_'+cat);
-  var opts=sc[lang]||sc['en'];
-  document.getElementById('subcategory-options').innerHTML=opts.map(function(label,i){
-    return '<div class="sub-option" id="subopt-'+i+'" onclick="selectSubcat('+i+')">'
-      +'<div class="so-radio" id="sorad-'+i+'"></div>'
-      +'<span class="text">'+label+'</span>'
-    +'</div>';
+// ─── STEP 4: CATEGORY ────────────────────────────────────────────────────────
+function renderCategoryOptions(){
+  var container=document.getElementById('category-options');
+  if(!container)return;
+  container.innerHTML=CATS.map(function(c){
+    return '<div class="opt-card" onclick="selectCategory(\''+c.id+'\')"><div class="opt-icon">'+c.icon+'</div>'
+      +'<div><div class="opt-title">'+( c.label[lang]||c.label.en)+'</div>'
+      +'<div class="opt-sub">'+(c.sub[lang]||c.sub.en)+'</div></div>'
+      +'<span class="opt-arr">›</span></div>';
   }).join('');
-  document.getElementById('btn-subcat-next').disabled=true;
-  goPage('pg-subcategory');
 }
 
-function selectSubcat(idx){
-  state.subcatIdx=idx;
-  document.querySelectorAll('.sub-option').forEach(function(el,i){el.classList.toggle('selected',i===idx);});
-  document.getElementById('btn-subcat-next').disabled=false;
-}
-
-function submitSubcategory(){
-  if(state.subcatIdx<0){alert(t('err_subcat'));return;}
-  var sc=SUBCATS[state.category];
-  state.otherRemark='';
-  state.products=[{warranty:'',brand:'',model:'',problem:''}];
-  var needsProd=sc.needsProduct[state.subcatIdx];
-  var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
-  document.getElementById('other-remark-group').style.display=isOtherSpec?'':'none';
-  document.getElementById('wi-products-wrap').innerHTML='';
-  document.getElementById('btn-add-product').style.display='none';
-  document.getElementById('inp-other-remark').value='';
-  if(needsProd){
-    renderProductCards();
-    document.getElementById('btn-add-product').style.display='';
-    goPage('pg-product');
-  } else if(isOtherSpec){
-    goPage('pg-product');
+function selectCategory(catId){
+  var cat=CATS.find(function(c){return c.id===catId;});
+  if(!cat)return;
+  state.catId=catId;
+  state.catLabel=cat.label[lang]||cat.label.en;
+  state.catIcon=cat.icon;
+  state.hasBrand=cat.hasBrand;
+  state.directWc=cat.wc||'';
+  state.brandName='';state.brandWc='';state.brandEmoji='';
+  // Load problem options for this category
+  loadProblemOptions(catId);
+  // Load models filtered by category
+  filterModelsForCategory(catId);
+  if(cat.hasBrand){
+    // Show brand page
+    document.getElementById('ctx-cat-pill').innerHTML=cat.icon+' '+(cat.label[lang]||cat.label.en);
+    var brands=BRANDS[catId]||[];
+    document.getElementById('brand-options').innerHTML=brands.map(function(b){
+      return '<div class="brand-card" onclick="selectBrand(\''+b.name+'\',\''+b.wc+'\',\''+b.emoji+'\')">'
+        +'<div style="font-size:28px;margin-bottom:6px;">'+b.emoji+'</div>'
+        +'<div class="b-name">'+b.name+'</div>'
+        +'<div class="b-wc">'+b.wc+' Service Center</div>'
+        +'</div>';
+    }).join('');
+    goPage('pg-brand');
   } else {
-    submitEntry();
+    // Skip brand — go direct to purpose
+    goPage('pg-purpose');
+    updatePurposePill();
   }
 }
 
-function renderProductCards(){
-  var brands=BRANDS_BY_CAT[state.category]||[];
-  var brandOpts='<option value="">— '+t('lbl_brand')+' —</option>'+brands.map(function(b){return'<option>'+b+'</option>';}).join('');
-  var wrap=document.getElementById('wi-products-wrap');
-  wrap.innerHTML=state.products.map(function(p,i){
-    return'<div class="product-card-wi" id="pcard-'+i+'" style="border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;background:#fafcff;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-      +'<span style="font-weight:700;font-size:13px;color:var(--primary);">📦 '+t('lbl_brand').replace(/BRAND/i,'')+'Product '+(i+1)+'</span>'
-      +(state.products.length>1?'<button onclick="removeProductCard('+i+')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:18px;line-height:1;">✕</button>':'')
-      +'</div>'
-      // Warranty
-      +'<div class="inp-group"><label>'+t('lbl_warranty')+'</label>'
-      +'<div class="warranty-row">'
-      +'<div class="w-btn'+(p.warranty==='In Warranty'?' selected':'')+'" onclick="setProdWarranty('+i+',\'In Warranty\')"><span class="w-icon">✅</span><span>'+t('w_yes')+'</span></div>'
-      +'<div class="w-btn'+(p.warranty==='Out of Warranty'?' selected':'')+'" onclick="setProdWarranty('+i+',\'Out of Warranty\')"><span class="w-icon">⚠️</span><span>'+t('w_no')+'</span></div>'
-      +'<div class="w-btn'+(p.warranty==='Other'?' selected':'')+'" onclick="setProdWarranty('+i+',\'Other\')"><span class="w-icon">❓</span><span>'+t('w_other')+'</span></div>'
-      +'</div></div>'
-      // Brand
-      +(brands.length?'<div class="inp-group"><label>'+t('lbl_brand')+'</label>'
-      +'<select class="inp" id="pb-brand-'+i+'" onchange="setProdBrand('+i+',this.value)">'+brandOpts+'</select></div>':'')
-      // Model
-      +'<div class="inp-group" style="position:relative;"><label>'+t('lbl_model')+'</label>'
-      +'<input class="inp" type="text" id="pb-model-'+i+'" value="'+(p.model||'')+'" placeholder="'+t('lbl_model')+'..." autocomplete="off"'
-      +' oninput="filterProdModel('+i+',this.value)" onfocus="filterProdModel('+i+',this.value)"'
-      +' onblur="setTimeout(function(){var s=document.getElementById(\'pms-'+i+'\');if(s)s.style.display=\'none\';},200)">'
-      +'<div id="pms-'+i+'" style="display:none;position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:180px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;"></div>'
-      +'</div>'
-      // Problem
-      +'<div class="inp-group"><label>'+t('lbl_problem')+'</label>'
-      +'<textarea class="inp" id="pb-prob-'+i+'" rows="2" placeholder="'+t('problem_ph')+'"></textarea>'
-      +'</div>'
-      +'</div>';
-  }).join('');
+// ─── STEP 5: BRAND ───────────────────────────────────────────────────────────
+function selectBrand(name,wc,emoji){
+  state.brandName=name;state.brandWc=wc;state.brandEmoji=emoji||'';
+  goPage('pg-purpose');
+  updatePurposePill();
 }
 
-function setProdWarranty(i,val){
-  state.products[i].warranty=val;
-  var card=document.getElementById('pcard-'+i);
-  if(!card)return;
-  card.querySelectorAll('.w-btn').forEach(function(b,bi){
-    var vals=['In Warranty','Out of Warranty','Other'];
-    b.classList.toggle('selected',vals[bi]===val);
-  });
+function updatePurposePill(){
+  var pill=document.getElementById('ctx-brand-pill');
+  if(!pill)return;
+  var txt=state.catIcon+' '+state.catLabel;
+  if(state.brandName)txt+=' › '+state.brandEmoji+' '+state.brandName;
+  pill.innerHTML=txt;
+  pill.style.display='';
 }
 
-function setProdBrand(i,val){
-  state.products[i].brand=val;
-  filterProdModel(i,document.getElementById('pb-model-'+i)?document.getElementById('pb-model-'+i).value:'');
+function backFromPurpose(){
+  if(state.hasBrand)goPage('pg-brand');
+  else goPage('pg-category');
 }
 
-function filterProdModel(i,query){
-  var brand=state.products[i]?state.products[i].brand:'';
-  var brandObj=window._wiAllBrands&&window._wiAllBrands.find(function(b){return b.name===brand;});
-  var models=window._wiAllModels||[];
-  if(brandObj)models=models.filter(function(m){return m.brand_id===brandObj.id;});
-  var q=(query||'').toLowerCase().trim();
-  var filtered=q?models.filter(function(m){return(m.model_no||'').toLowerCase().indexOf(q)>=0||(m.model_name||'').toLowerCase().indexOf(q)>=0;}):models;
-  var sug=document.getElementById('pms-'+i);
-  if(!sug)return;
-  if(!filtered.length){sug.style.display='none';return;}
-  sug.innerHTML=filtered.slice(0,20).map(function(m){
-    var display=m.model_no+(m.model_name?' — '+m.model_name:'');
-    var safe=(m.model_no||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return'<div style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmousedown="selectProdModel('+i+',\''+safe+'\')">'+display+'</div>';
-  }).join('');
-  sug.style.display='';
+// ─── STEP 6: PURPOSE ─────────────────────────────────────────────────────────
+function selectPurpose(purposeId,type){
+  state.purposeId=purposeId;state.purposeType=type;
+  var labels={repair:t('lbl_repair'),eol:t('lbl_eol'),cleaning:t('lbl_cleaning'),delivery:t('lbl_delivery')};
+  state.purposeLabel=labels[purposeId]||purposeId;
+  // Reset product state
+  state.warranty='';state.model='';state.serial='';state.problem='';state.problemDetail='';
+  document.getElementById('inp-model').value='';
+  document.getElementById('inp-serial').value='';
+  document.getElementById('sel-problem').value='';
+  document.getElementById('inp-problem').value='';
+  document.getElementById('inp-problem-detail').value='';
+  document.querySelectorAll('.w-btn').forEach(function(b){b.classList.remove('selected');});
+  // Show/hide warranty and problem for Outward
+  var isOutward=type==='Outward';
+  document.getElementById('warranty-group').style.display=isOutward?'none':'';
+  document.getElementById('problem-group').style.display=isOutward?'none':'';
+  // Update context pill on product page
+  var ctxTxt=state.catIcon+' '+state.catLabel;
+  if(state.brandName)ctxTxt+=' › '+state.brandEmoji+' '+state.brandName;
+  ctxTxt+=' › '+state.purposeLabel;
+  document.getElementById('ctx-summary-pill').innerHTML=ctxTxt;
+  goPage('pg-product');
 }
 
-function selectProdModel(i,val){
-  var inp=document.getElementById('pb-model-'+i);
-  if(inp)inp.value=val;
-  var sug=document.getElementById('pms-'+i);
-  if(sug)sug.style.display='none';
+// ─── STEP 7: PRODUCT DETAILS ─────────────────────────────────────────────────
+function setWarranty(val){
+  state.warranty=val;
+  document.getElementById('wb-in').classList.toggle('selected',val==='In Warranty');
+  document.getElementById('wb-out').classList.toggle('selected',val==='Out of Warranty');
+  document.getElementById('wb-other').classList.toggle('selected',val==='Other');
 }
 
-function addProductCard(){
-  state.products.push({warranty:'',brand:'',model:'',problem:''});
-  renderProductCards();
-  // Scroll to new card
-  var wrap=document.getElementById('wi-products-wrap');
-  if(wrap)wrap.lastElementChild.scrollIntoView({behavior:'smooth',block:'start'});
+function loadProblemOptions(catId){
+  var opts=PROBLEM_OPTS[catId]||PROBLEM_OPTS.camera;
+  var sel=document.getElementById('sel-problem');
+  sel.innerHTML='<option value="">— '+t('lbl_problem_sel')+' —</option>'
+    +opts.map(function(o){return'<option value="'+o+'">'+o+'</option>';}).join('');
 }
 
-function removeProductCard(i){
-  state.products.splice(i,1);
-  renderProductCards();
+function onProblemSelChange(){
+  var val=document.getElementById('sel-problem').value;
+  var isOther=val==='Other'||val==='';
+  document.getElementById('problem-other-group').style.display=isOther&&val==='Other'?'':'none';
+  document.getElementById('problem-text-group').style.display='';
 }
 
 function submitProductDetails(){
-  var sc=SUBCATS[state.category];
-  var needsProd=sc.needsProduct[state.subcatIdx];
-  var isOtherSpec=state.category==='other'&&state.subcatIdx===2;
-  if(needsProd){
-    // Collect all products from DOM
-    for(var i=0;i<state.products.length;i++){
-      if(!state.products[i].warranty){alert(t('err_warranty')+' (Product '+(i+1)+')');return;}
-      var modelVal=(document.getElementById('pb-model-'+i)||{}).value||'';
-      if(!modelVal.trim()){alert(t('err_model')+' (Product '+(i+1)+')');return;}
-      state.products[i].model=modelVal.trim();
-      state.products[i].brand=(document.getElementById('pb-brand-'+i)||{}).value||'';
-      state.products[i].problem=((document.getElementById('pb-prob-'+i)||{}).value||'').trim();
-    }
-  } else if(isOtherSpec){
-    state.otherRemark=document.getElementById('inp-other-remark').value.trim();
-  }
+  var errEl=document.getElementById('product-error');errEl.style.display='none';
+  var isInward=state.purposeType==='Inward';
+  if(isInward&&!state.warranty){errEl.textContent=t('err_warranty');errEl.style.display='';return;}
+  var model=document.getElementById('inp-model').value.trim();
+  if(!model){errEl.textContent=t('err_model');errEl.style.display='';return;}
+  state.model=model;
+  state.serial=document.getElementById('inp-serial').value.trim();
+  var probSel=document.getElementById('sel-problem').value;
+  var probText=document.getElementById('inp-problem').value.trim();
+  var probDetail=document.getElementById('inp-problem-detail').value.trim();
+  state.problem=probSel==='Other'?(probText||probSel):probSel;
+  state.problemDetail=probDetail;
   submitEntry();
 }
 
+// ─── SUBMIT ───────────────────────────────────────────────────────────────────
 async function submitEntry(){
-  var sc=SUBCATS[state.category];
-  var subcatLabel=(sc['en']||[])[state.subcatIdx]||'';
-  var wiType=(sc.types||[])[state.subcatIdx]||'Other';
-  var firstBrand=(state.products&&state.products[0]&&state.products[0].brand)||'';
-  var wcId=getWcId(state.category,firstBrand);
-  var wcName=getWcName(wcId);
-  var catLabel=state.category==='printer'?'Printer (CSP)':state.category==='camera'?(wcId==='SELF_CHECKIN_CSP'?'Camera - Fujifilm (CSP)':'Camera (ICP)'):'Other';
-  var remarks=[catLabel,subcatLabel,state.otherRemark].filter(Boolean).join(' | ');
+  // WC assignment
+  var wcId,wcName;
+  if(state.directWc){
+    wcId='SELF_CHECKIN_'+state.directWc;
+  } else if(state.brandWc){
+    wcId='SELF_CHECKIN_'+state.brandWc;
+  } else {
+    wcId='SELF_CHECKIN_ICP';
+  }
+  wcName=wcId==='SELF_CHECKIN_CSP'?'Self Check-in (CSP)':wcId==='SELF_CHECKIN_ICP'?'Self Check-in (ICP)':'Self Check-in';
+
   var now=new Date();
   var arrivalTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var today=now.toLocaleDateString('en-CA');
-  // Sequential token: reset daily — count today's entries + 1
+
+  // Token: daily reset
   var tokenNum=1;
   try{
     var rows=await sbGet('walkin_log','?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
     tokenNum=((rows&&rows.length&&rows[0].token_no)||0)+1;
-  }catch(e){tokenNum=Math.floor(100+Math.random()*900);}
-  var allProducts=state.products.map(function(p){
-    return{brand:p.brand||catLabel,model:p.model||subcatLabel,type:wiType,warranty:p.warranty||'Other',remarks:(p.problem||remarks)};
-  });
+  }catch(e){tokenNum=Math.floor(10+Math.random()*90);}
+
+  // Build remarks
+  var remarksArr=[state.catLabel];
+  if(state.brandName)remarksArr.push(state.brandName);
+  remarksArr.push(state.purposeLabel);
+  if(state.problem)remarksArr.push(state.problem);
+  if(state.problemDetail)remarksArr.push(state.problemDetail);
+  var remarks=remarksArr.join(' | ');
+
+  var product={
+    brand:state.brandName||state.catLabel,
+    model:state.model,
+    type:state.purposeType,
+    warranty:state.warranty||'',
+    subtype:state.purposeId,
+    remarks:remarks,
+    serial:state.serial||''
+  };
+
   try{
     await sbPost('walkin_log',{
-      wc_id:wcId,wc_name:wcName,visit_date:today,mobile:state.mobile,
-      customer_name:state.name,state:state.state||null,city:state.city||null,pin:state.pin||null,
+      wc_id:wcId,wc_name:wcName,
+      visit_date:today,mobile:state.mobile,
+      customer_name:state.name,
+      state:state.state_||null,city:state.city||null,pin:state.pin||null,
       area:state.area||null,address:state.address||null,
       arrival_time:arrivalTime,departure_time:null,
-      products:allProducts,product_count:allProducts.length,
+      products:[product],product_count:1,
       token_no:tokenNum,created_at:now.toISOString()
     });
+
+    // Show success
     document.getElementById('token-number').textContent=tokenNum;
     document.getElementById('lbl-token-time').textContent=arrivalTime+' · '+today.split('-').reverse().join('-');
-    var rows=[
-      {icon:'👤',label:t('lbl_name'),val:state.name+(state.city?' ('+state.city+')':'')},
-      {icon:'📱',label:t('lbl_mobile'),val:state.mobile},
-      {icon:'🏷️',label:'Category',val:catLabel},
-      {icon:'📋',label:'Purpose',val:subcatLabel},
+
+    var summaryRows=[
+      {icon:'👤',label:'Name',val:state.name},
+      {icon:'📱',label:'Mobile',val:state.mobile},
+      {icon:state.catIcon,label:'Category',val:state.catLabel+(state.brandName?' — '+state.brandName:'')},
+      {icon:'🎯',label:'Purpose',val:state.purposeLabel},
     ];
-    if(state.otherRemark)rows.push({icon:'📝',label:t('lbl_other_remark'),val:state.otherRemark});
-    state.products.forEach(function(p,i){
-      var pLabel=state.products.length>1?'Product '+(i+1):'Product';
-      var pVal=(p.brand?p.brand+' — ':'')+p.model+(p.warranty?' ('+p.warranty+')':'');
-      rows.push({icon:'🔖',label:pLabel,val:pVal});
-      if(p.serial)rows.push({icon:'🔢',label:'Serial No',val:p.serial});
-      if(p.problem)rows.push({icon:'🔧',label:'Problem',val:p.problem});
-    });
-    document.getElementById('summary-box').innerHTML='<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">'+t('summary_title')+'</div>'
-      +rows.map(function(r){return'<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';}).join('');
+    if(state.model)summaryRows.push({icon:'🔖',label:'Model',val:state.model+(state.serial?' (S/N: '+state.serial+')':'')});
+    if(state.warranty)summaryRows.push({icon:'🛡️',label:'Warranty',val:state.warranty});
+    if(state.problem)summaryRows.push({icon:'🔧',label:'Problem',val:state.problem+(state.problemDetail?' — '+state.problemDetail:'')});
+    summaryRows.push({icon:'🏢',label:'Service',val:wcName.replace('Self Check-in ','')});
+
+    document.getElementById('summary-box').innerHTML=
+      '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Registration Summary</div>'
+      +summaryRows.map(function(r){
+        return '<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';
+      }).join('');
     goPage('pg-success');
-  }catch(e){alert('Submission failed. Please ask our staff for assistance.\nError: '+e.message);}
+  }catch(e){alert('Submission failed. Please ask our staff.\nError: '+e.message);}
 }
 
+// ─── START OVER ────────────────────────────────────────────────────────────────
 function startOver(){
-  state={mobile:'',name:'',state:'',city:'',pin:'',area:'',address:'',category:'',subcatIdx:-1,warranty:'',brand:'',model:'',problem:'',otherRemark:'',isNewCustomer:true,products:[{warranty:'',brand:'',model:'',problem:''}]};
+  state={mobile:'',name:'',state_:'',city:'',pin:'',area:'',address:'',isNewCustomer:true,
+    catId:'',catLabel:'',catIcon:'',hasBrand:false,directWc:'',
+    brandName:'',brandWc:'',brandEmoji:'',
+    purposeId:'',purposeLabel:'',purposeType:'',
+    warranty:'',model:'',serial:'',problem:'',problemDetail:''};
   document.getElementById('inp-mobile').value='';
   goPage('pg-lang');
 }
 
-document.addEventListener('keydown',function(e){
-  if(e.key==='Enter'){var pg=document.querySelector('.page.active');if(pg&&pg.id==='pg-mobile')submitMobile();}
-});
-
-// ── SEARCHABLE MODEL DROPDOWN ──
+// ─── MODEL SUGGESTIONS ─────────────────────────────────────────────────────────
 window._wiAllModels=[];
 window._wiAllBrands=[];
-window._wiModels=[];
+window._wiFilteredModels=[];
 
-(async function loadWiModelData(){
+(async function loadModelData(){
   try{
     var res=await Promise.all([
       sbGet('brands','?order=name&select=id,name'),
@@ -774,35 +833,39 @@ window._wiModels=[];
     ]);
     window._wiAllBrands=res[0]||[];
     window._wiAllModels=res[1]||[];
+    window._wiFilteredModels=window._wiAllModels.slice();
   }catch(e){window._wiAllModels=[];window._wiAllBrands=[];}
 })();
 
-function onBrandChange(){
-  var brand=document.getElementById('inp-brand').value;
-  document.getElementById('inp-model').value='';
-  document.getElementById('model-suggestions').style.display='none';
-  if(brand){
-    var bObj=null;
-    for(var i=0;i<window._wiAllBrands.length;i++){if(window._wiAllBrands[i].name===brand){bObj=window._wiAllBrands[i];break;}}
-    window._wiModels=bObj?window._wiAllModels.filter(function(m){return m.brand_id===bObj.id;}):window._wiAllModels.slice();
-  }else{
-    window._wiModels=window._wiAllModels.slice();
-  }
+function filterModelsForCategory(catId){
+  var brandNames=[];
+  if(BRANDS[catId])brandNames=BRANDS[catId].map(function(b){return b.name.toLowerCase();});
+  var allModels=window._wiAllModels||[];
+  if(!brandNames.length){window._wiFilteredModels=allModels.slice();return;}
+  var matchBrands=(window._wiAllBrands||[]).filter(function(b){return brandNames.indexOf(b.name.toLowerCase())>=0;});
+  var brandIds=matchBrands.map(function(b){return b.id;});
+  window._wiFilteredModels=brandIds.length?allModels.filter(function(m){return brandIds.indexOf(m.brand_id)>=0;}):allModels.slice();
 }
 
-function filterModelSuggestions(query){
+function filterModelsForBrand(brandName){
+  var allModels=window._wiAllModels||[];
+  var bObj=(window._wiAllBrands||[]).find(function(b){return b.name.toLowerCase()===brandName.toLowerCase();});
+  window._wiFilteredModels=bObj?allModels.filter(function(m){return m.brand_id===bObj.id;}):allModels.slice();
+}
+
+function filterModelSug(query){
   var sug=document.getElementById('model-suggestions');
-  var models=window._wiModels.length?window._wiModels:window._wiAllModels;
-  var q=(query||'').toLowerCase().trim();
-  var filtered=q?models.filter(function(m){
+  var q=(query||'').trim().toLowerCase();
+  if(!q){sug.style.display='none';return;}
+  var models=window._wiFilteredModels.length?window._wiFilteredModels:window._wiAllModels;
+  var filtered=models.filter(function(m){
     return(m.model_no||'').toLowerCase().indexOf(q)>=0||(m.model_name||'').toLowerCase().indexOf(q)>=0;
-  }):models;
+  }).slice(0,15);
   if(!filtered.length){sug.style.display='none';return;}
-  sug.innerHTML=filtered.slice(0,20).map(function(m){
+  sug.innerHTML=filtered.map(function(m){
     var display=m.model_no+(m.model_name?' — '+m.model_name:'');
-    var safe=(m.model_no||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return'<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;" '
-      +'onmousedown="selectWiModel(\''+safe+'\')">'+display+'</div>';
+    var safe=(m.model_no||'').replace(/'/g,"\\'");
+    return'<div onmousedown="selectWiModel(\''+safe+'\')"><b>'+m.model_no+'</b>'+(m.model_name?'<span style="color:var(--muted);font-size:12px;"> — '+m.model_name+'</span>':'')+'</div>';
   }).join('');
   sug.style.display='';
 }
@@ -812,154 +875,70 @@ function selectWiModel(val){
   document.getElementById('model-suggestions').style.display='none';
 }
 
-const INDIA_ADDR = {
-  'Gujarat': {
-    'Ahmedabad': ['380001','380002','380003','380004','380005','380006','380007','380008','380009','380013','380014','380015','380016','380018','380019','380021','380022','380023','380024','380025','380026','380027','380028','380050','380051','380052','380054','380055','380058','380059','380060','380061','380063'],
-    'Surat': ['395001','395002','395003','395004','395005','395006','395007','395008','395009','395010','395011','395012','395017','395023'],
-    'Vadodara': ['390001','390002','390003','390004','390005','390006','390007','390008','390009','390010','390011','390012','390013','390014','390015','390016','390017','390018','390019','390020','390021','390022','390023','390024','390025'],
-    'Rajkot': ['360001','360002','360003','360004','360005','360006','360007'],
-    'Gandhinagar': ['382001','382002','382006','382007','382010','382011','382016','382020','382021','382023','382024','382025','382028','382029','382030'],
-    'Bhavnagar': ['364001','364002','364003','364004','364005','364006'],
-    'Jamnagar': ['361001','361002','361003','361004','361005','361006','361007'],
-    'Junagadh': ['362001','362002','362003','362004','362005','362006'],
-    'Anand': ['388001','388002','388003','388004','388005','388006','388007'],
-    'Mehsana': ['384001','384002','384003','384004','384005'],
-    'Nadiad': ['387001','387002','387003'],
-    'Surendranagar': ['363001','363002','363003','363004'],
-    'Bharuch': ['392001','392002','392010','392011','392012','392015'],
-    'Valsad': ['396001','396002','396003','396004','396005'],
-    'Navsari': ['396445','396450','396451','396460'],
-    'Morbi': ['363641','363642','363650'],
-    'Palanpur': ['385001','385002','385003','385004'],
-    'Himmatnagar': ['383001','383002','383003'],
-    'Amreli': ['365601','365602','365603'],
-    'Botad': ['364710','364720','364730'],
-    'Dahod': ['389151','389152','389155'],
-    'Patan': ['384265','384266','384267'],
-    'Modasa': ['383315','383316','383317'],
-    'Porbandar': ['360575','360576','360577'],
-    'Veraval': ['362265','362266','362267'],
-    'Gondal': ['360311','360312','360313'],
-    'Wadhwan': ['363030','363031','363032'],
+// ─── ADDRESS DATA ──────────────────────────────────────────────────────────────
+var INDIA_ADDR={
+  'Gujarat':{
+    'Ahmedabad':['380001','380002','380003','380004','380005','380006','380007','380008','380009','380013','380014','380015','380016','380018','380019','380021','380022','380023','380024','380025','380026','380027','380028','380050','380051','380052','380054','380055','380058','380059','380060','380061','380063'],
+    'Surat':['395001','395002','395003','395004','395005','395006','395007','395008','395009','395010'],
+    'Vadodara':['390001','390002','390003','390004','390005','390006','390007','390008','390009','390010'],
+    'Rajkot':['360001','360002','360003','360004','360005'],
+    'Gandhinagar':['382001','382006','382007','382010','382016','382020','382021','382023','382024','382025'],
+    'Bhavnagar':['364001','364002','364003','364004','364005'],
+    'Jamnagar':['361001','361002','361003','361004','361005'],
+    'Junagadh':['362001','362002','362003','362004'],
+    'Anand':['388001','388002','388003','388004','388005'],
+    'Mehsana':['384001','384002','384003','384004'],
+    'Nadiad':['387001','387002','387003'],
+    'Morbi':['363641','363642','363650'],
+    'Palanpur':['385001','385002','385003'],
+    'Himmatnagar':['383001','383002','383003'],
   },
-  'Rajasthan': {
-    'Jaipur': ['302001','302002','302003','302004','302005','302006','302007','302008','302009','302010','302011','302012','302013','302014','302015','302016','302017','302018','302019','302020','302021','302022','302023','302024','302025','302026','302027','302028','302029','302031','302033','302034','302036','302039'],
-    'Jodhpur': ['342001','342002','342003','342004','342005','342006','342007','342008','342009','342010','342011','342012','342013','342014','342015'],
-    'Udaipur': ['313001','313002','313003','313004','313005','313006','313007','313008'],
-    'Kota': ['324001','324002','324003','324004','324005','324006','324007','324008','324009','324010'],
-    'Ajmer': ['305001','305002','305003','305004','305005','305006','305007','305008','305009'],
-    'Bikaner': ['334001','334002','334003','334004','334005','334006'],
-    'Alwar': ['301001','301002','301003','301004','301005','301006'],
-    'Bharatpur': ['321001','321002','321003','321004','321005'],
-    'Sikar': ['332001','332002','332003','332004','332005'],
-    'Sri Ganganagar': ['335001','335002','335003','335004','335005'],
-    'Tonk': ['304001','304002','304003','304004'],
-    'Bhilwara': ['311001','311002','311003','311004'],
-    'Pali': ['306001','306002','306003','306004'],
-    'Barmer': ['344001','344002','344003','344004'],
-    'Nagaur': ['341001','341002','341003','341004'],
-    'Dausa': ['303303','303304','303305'],
-    'Sawai Madhopur': ['322001','322002','322003'],
-    'Dholpur': ['328001','328002','328003'],
-    'Bundi': ['323001','323002','323003'],
-    'Chittorgarh': ['312001','312002','312003'],
+  'Rajasthan':{
+    'Jaipur':['302001','302002','302003','302004','302005','302006','302007','302012','302015','302017','302019','302020'],
+    'Jodhpur':['342001','342002','342003','342004','342005'],
+    'Udaipur':['313001','313002','313003','313004'],
+    'Kota':['324001','324002','324003','324004'],
+    'Ajmer':['305001','305002','305003','305004'],
   },
-  'Maharashtra': {
-    'Mumbai': ['400001','400002','400003','400004','400005','400006','400007','400008','400009','400010','400011','400012','400013','400014','400015','400016','400017','400018','400019','400020','400021','400022','400023','400024','400025','400026','400027','400028','400029','400030','400031','400032','400033','400034','400035','400036','400037','400038','400039','400040','400041','400042','400043','400044','400045','400046','400047','400048','400049','400050','400051','400052','400053','400054','400055','400056','400057','400058','400059','400060','400061','400062','400063','400064','400065','400066','400067','400068','400069','400070','400071','400072','400073','400074','400075','400076','400077','400078','400079','400080','400081','400082','400083','400084','400085','400086','400087','400088','400089','400090','400091','400092','400093','400094','400095','400096','400097','400098','400099','400100','400101','400102','400103','400104','400105'],
-    'Pune': ['411001','411002','411003','411004','411005','411006','411007','411008','411009','411010','411011','411012','411013','411014','411015','411016','411017','411018','411019','411020','411021','411022','411023','411024','411025','411026','411027','411028','411029','411030','411031','411032','411033','411034','411035','411036','411037','411038','411039','411040','411041','411042','411043','411044','411045','411046','411047','411048','411049','411050','411051','411052','411053','411054','411055','411056','411057','411058','411059','411060','411061','411062'],
-    'Nagpur': ['440001','440002','440003','440004','440005','440006','440007','440008','440009','440010','440011','440012','440013','440014','440015','440016','440017','440018','440019','440020','440021','440022','440023','440024','440025','440026','440027','440028','440029','440030','440032','440033','440034','440035','440036'],
-    'Nashik': ['422001','422002','422003','422004','422005','422006','422007','422008','422009','422010','422011','422012','422013','422014','422015'],
-    'Aurangabad': ['431001','431002','431003','431004','431005','431006','431007','431008','431009','431010'],
-    'Solapur': ['413001','413002','413003','413004','413005','413006','413007','413008'],
-    'Amravati': ['444601','444602','444603','444604','444605','444606','444607'],
-    'Kolhapur': ['416001','416002','416003','416004','416005','416006','416007','416008'],
-    'Thane': ['400601','400602','400603','400604','400605','400606','400607','400608','400609','400610','400611','400612','400613','400614','400615','400616','400617','400618','400619','400620','400621'],
-    'Navi Mumbai': ['400701','400702','400703','400704','400705','400706','400707','400708','400709','400710','400711','400712','400713','400714','400715','400716','400717','400718','400719','400720','400721','400722','400723','400724','400725','400726','400727','400728','400729','400730','400731'],
-    'Nanded': ['431601','431602','431603','431604','431605'],
-    'Akola': ['444001','444002','444003','444004','444005'],
-    'Latur': ['413512','413513','413514','413515','413516'],
-    'Dhule': ['424001','424002','424003','424004','424005'],
-    'Jalgaon': ['425001','425002','425003','425004','425005'],
-    'Sangli': ['416416','416417','416418','416419','416420'],
-    'Satara': ['415001','415002','415003','415004','415005'],
-    'Ratnagiri': ['415612','415613','415614','415615','415616'],
-    'Chandrapur': ['442401','442402','442403','442404','442405'],
-    'Yavatmal': ['445001','445002','445003','445004','445005'],
+  'Maharashtra':{
+    'Mumbai':['400001','400002','400003','400004','400005','400050','400051','400052','400053','400054','400055','400056','400057','400058','400059'],
+    'Pune':['411001','411002','411003','411004','411005','411014','411015','411016','411017','411021'],
+    'Nagpur':['440001','440002','440003','440010','440012','440013'],
+    'Nashik':['422001','422002','422003','422004'],
+    'Thane':['400601','400602','400603','400604'],
   }
-};
-
-const PIN_AREAS={
-  '380001':'Lal Darwaja','380002':'Kalupur','380003':'Dariyapur','380004':'Khanpur',
-  '380005':'Paldi','380006':'Navrangpura','380007':'Ellis Bridge','380008':'Maninagar',
-  '380009':'Vatva','380013':'Bapunagar','380014':'Naroda','380015':'Ambawadi',
-  '380016':'Satellite','380018':'Isanpur','380019':'Odhav','380021':'Rakhial',
-  '380022':'Shahibaug','380023':'Chandkheda','380024':'Gota','380025':'Ghatlodiya',
-  '380026':'Nikol','380027':'Naranpura','380028':'Thaltej','380050':'Bopal',
-  '380051':'Ghatlodia','380052':'Ranip','380054':'Sabarmati','380055':'Motera',
-  '380058':'Vastral','380059':'Bavla','380060':'Vejalpur','380061':'Jodhpur',
-  '380063':'Sarkhej',
-  '395001':'Surat City','395002':'Athwa','395003':'Katargam','395004':'Varachha',
-  '395005':'Rander','395006':'Udhna','395007':'Piplod','395008':'Adajan',
-  '390001':'Vadodara City','390002':'Alkapuri','390003':'Sayajigunj','390004':'Manjalpur',
-  '390005':'Gotri','390007':'Waghodia Road','390008':'Nizampura','390010':'Akota',
-  '360001':'Rajkot City','360002':'Aji Road','360003':'Kalawad Road','360004':'150 Feet Ring Road',
-  '302001':'Jaipur City','302002':'Bani Park','302003':'Civil Lines','302004':'Gopalpura',
-  '302005':'Vaishali Nagar','302006':'Malviya Nagar','302007':'C Scheme','302012':'Mansarovar',
-  '302015':'Pratap Nagar','302017':'Jagatpura','302019':'Sanganer','302020':'Sitapura',
-  '400001':'Fort','400002':'Mandvi','400003':'Masjid','400004':'Girgaon','400005':'Malabar Hill',
-  '400006':'Breach Candy','400007':'Grant Road','400008':'Kalbadevi','400009':'Marine Lines',
-  '400010':'Worli','400011':'Prabhadevi','400012':'Dadar','400013':'Sion','400014':'Mahim',
-  '400015':'Sewri','400016':'Wadala','400017':'Matunga','400018':'Dharavi','400019':'Chembur',
-  '400020':'Colaba','400021':'Cuffe Parade','400050':'Bandra','400051':'Santacruz',
-  '400052':'Vile Parle','400053':'Andheri','400054':'Jogeshwari','400055':'Goregaon',
-  '400056':'Malad','400057':'Kandivali','400058':'Borivali','400059':'Dahisar',
-  '400060':'Mulund','400061':'Bhandup','400062':'Kanjurmarg','400063':'Vikhroli',
-  '400064':'Ghatkopar','400065':'Kurla','400066':'Chembur East','400067':'Govandi',
-  '400068':'Mankhurd','400069':'Trombay','400070':'Deonar','400071':'Tilaknagar',
-  '400072':'Tilak Nagar','400073':'Chunabhatti','400074':'King Circle','400075':'Parel',
-  '400076':'Lower Parel','400077':'Elphinstone','400080':'Thane','400081':'Dombivli',
-  '400086':'Powai','400087':'Chandivali','400088':'Vikhroli West','400089':'Kanjurmarg',
-  '400093':'Navi Mumbai','400094':'Vashi','400095':'Belapur','400096':'Airoli',
-  '400097':'Ghansoli','400098':'Mahape','400099':'Turbhe',
-  '411001':'Pune Camp','411002':'Sadashiv Peth','411003':'Shivajinagar','411004':'Deccan',
-  '411005':'Kothrud','411006':'Karve Nagar','411007':'Sinhagad Road','411008':'Warje',
-  '411009':'Dhankawadi','411014':'Aundh','411015':'Baner','411016':'Balewadi',
-  '411017':'Wakad','411018':'Pimple Nilakh','411019':'Pimple Saudagar',
-  '411020':'Pimple Gurav','411021':'Chinchwad','411022':'Akurdi','411023':'Nigdi',
-  '411024':'Pimpri','411025':'Bhosari','411026':'Moshi','411027':'Chakan',
-  '411028':'Ravet','411029':'Hinjewadi','411030':'Bavdhan',
-  '440001':'Nagpur City','440002':'Dharampeth','440003':'Sitabuldi','440010':'Gandhibagh',
-  '440012':'Sadar','440013':'Ramdaspeth','440015':'Byramji Town','440016':'Pratapnagar',
 };
 
 function wiGetCities(s){return Object.keys(INDIA_ADDR[s]||{});}
 function wiGetPins(s,c){return(INDIA_ADDR[s]||{})[c]||[];}
-
 function wiOnStateChange(){
   var s=document.getElementById('wi-state').value;
-  var cityEl=document.getElementById('wi-city');
-  cityEl.innerHTML='<option value="">— City —</option>'+wiGetCities(s).map(function(c){return'<option>'+c+'</option>';}).join('');
-  document.getElementById('wi-pin').value='';
-  document.getElementById('wi-pin-list').innerHTML='';
+  document.getElementById('wi-city').innerHTML='<option value="">— City —</option>'+wiGetCities(s).map(function(c){return'<option>'+c+'</option>';}).join('');
+  document.getElementById('wi-pin').value='';document.getElementById('wi-pin-list').innerHTML='';
 }
 function wiOnCityChange(){
-  var s=document.getElementById('wi-state').value;
-  var c=document.getElementById('wi-city').value;
-  var pins=wiGetPins(s,c);
-  var dl=document.getElementById('wi-pin-list');
-  dl.innerHTML=pins.map(function(p){var a=PIN_AREAS[p]||'';return'<option value="'+p+'">'+(a?a+' — '+p:p)+'</option>';}).join('');
+  var s=document.getElementById('wi-state').value,c=document.getElementById('wi-city').value;
+  document.getElementById('wi-pin-list').innerHTML=wiGetPins(s,c).map(function(p){return'<option value="'+p+'">'+p+'</option>';}).join('');
 }
-// Populate state dropdown on page load
-(function initWiStateDropdown(){
-  var sel=document.getElementById('wi-state');
-  if(!sel)return;
+
+// Init state dropdown
+(function(){
+  var sel=document.getElementById('wi-state');if(!sel)return;
   var states=Object.keys(INDIA_ADDR);
   sel.innerHTML='<option value="">— State —</option>'+states.map(function(s){return'<option'+(s==='Gujarat'?' selected':'')+'>'+s+'</option>';}).join('');
-  // Pre-select Gujarat and populate cities
-  sel.value='Gujarat';
-  wiOnStateChange();
+  sel.value='Gujarat';wiOnStateChange();
 })();
 
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){
+    var pg=document.querySelector('.page.active');
+    if(pg&&pg.id==='pg-mobile')submitMobile();
+  }
+});
+
+// Render category list on load
+renderCategoryOptions();
 </script>
 </body>
 </html>
