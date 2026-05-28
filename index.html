@@ -2494,9 +2494,9 @@ async function navigate(page){
 }
 
 // STATUS SYSTEM
-const STATUS_FLOW=['Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed'];
+const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed'];
 function statusBadge(s){
-  const m={'Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress'};
+  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
 // Workflow-based status transitions
@@ -2517,6 +2517,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   // ADMIN / WC — only handle approvals and allocation
   if(isAdminOrWC){
     switch(current){
+      case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
       case 'Pending Allocation': return['Assigned','Call Cancel'];
       case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
       default: return[];
@@ -2706,7 +2707,7 @@ async function renderDashboard(){
       </div>
       <!-- ROW 4: Carry In vs On Site breakdown -->
       ${(()=>{
-        const activeStatuses=['Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
+        const activeStatuses=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
         const activeTickets=allTickets.filter(t=>activeStatuses.includes(t.status));
         const ciTotal=allTickets.filter(t=>t.service_type==='Carry In').length;
         const osTotal=allTickets.filter(t=>t.service_type==='On Site').length;
@@ -3324,7 +3325,7 @@ function renderTicketTable(filtered){
         <input type="text" id="ticket-search" placeholder="Search..." oninput="filterTickets()" style="flex:1;min-width:180px;">
         <select id="ticket-status-filter" onchange="filterTickets()">
           <option value="">All Status</option>
-          <option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
+          <option>Pending Customer Arrival</option><option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
           <option>Pending Customer Approval</option><option>Customer Approved</option>
           <option>Customer Reject</option><option>Pending Parts</option>
           <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
@@ -3685,10 +3686,17 @@ async function viewTicket(id,autoPrint=false){
   // Admin actions
   let adminActions='';
   if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){
+    const isPendingArrival = t.status==='Pending Customer Arrival';
     const isPendingAlloc = t.status==='Pending Allocation';
     const isPendingApproval = t.status==='Pending Customer Approval';
-    const isCancelable = ['Pending Allocation','Assigned'].includes(t.status);
+    const isCancelable = ['Pending Customer Arrival','Pending Allocation','Assigned'].includes(t.status);
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${isPendingArrival?`
+        <div style="width:100%;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-bottom:4px;font-size:12px;color:#92400e;">
+          ⏳ <b>Waiting for customer to bring in the device.</b> Once the customer arrives with their device, click the button below.
+        </div>
+        <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Pending Allocation')">✅ Customer Arrived → Move to Allocation</button>
+      `:''}
       ${isPendingAlloc?`
         <select onchange="quickStatusChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;">
           <option value="">Allocate Engineer via Assign...</option>
@@ -3697,7 +3705,7 @@ async function viewTicket(id,autoPrint=false){
       ${isPendingApproval?`
         <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>
       `:''}
-      ${!isPendingAlloc&&!isPendingApproval&&!isClosed?`<span style="font-size:12px;color:var(--text-muted);padding:6px 0;">Status managed by Engineer</span>`:''}
+      ${!isPendingArrival&&!isPendingAlloc&&!isPendingApproval&&!isClosed?`<span style="font-size:12px;color:var(--text-muted);padding:6px 0;">Status managed by Engineer</span>`:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
         <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
@@ -5452,6 +5460,7 @@ async function renderReportFilter(c){
             <label>Status</label>
             <select id="f-status" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;width:100%;">
               <option value="">All Status</option>
+              <option>Pending Customer Arrival</option><option>Pending Allocation</option>
               <option>Assigned</option><option>In Progress</option><option>Closed</option>
               <option>Pending Customer Approval</option><option>Pending Parts</option>
               <option>Customer Reject</option><option>Call Cancel</option>
