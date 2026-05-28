@@ -849,6 +849,8 @@ var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 async function sbGet(t,q){var r=await fetch(SB_URL+'/rest/v1/'+t+(q||''),{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbPostMin(t,d){var r=await fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
+async function hashPin(pin){try{var data=new TextEncoder().encode('bhavi_pin_v1:'+pin);var buf=await crypto.subtle.digest('SHA-256',data);return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');}catch(e){return pin;}}
+function isHashed(p){return p&&p.length===64;}
 
 // ---- Service config ----
 var SERVICES={
@@ -1668,7 +1670,16 @@ async function doSignIn(){
     var c=custs&&custs[0];
     if(!c){err.textContent='No account found for this mobile. Please sign up.';err.style.display='block';return;}
     if(!c.portal_pin){err.textContent='No PIN set. Please sign up to set your PIN.';err.style.display='block';return;}
-    if(c.portal_pin!==pin){err.textContent='Incorrect PIN. Please try again.';err.style.display='block';return;}
+    var hashed=await hashPin(pin);
+    var match=false;
+    if(isHashed(c.portal_pin)){
+      match=(c.portal_pin===hashed);
+    } else {
+      // Plain text PIN (old account) — check and auto-upgrade to hash
+      match=(c.portal_pin===pin);
+      if(match){fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:hashed,updated_at:new Date().toISOString()})}).catch(function(){});}
+    }
+    if(!match){err.textContent='Incorrect PIN. Please try again.';err.style.display='block';return;}
     setSession({mobile:mob,name:c.cname||'Customer',custId:c.id});
     goPage('pg-home');
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
@@ -1736,17 +1747,17 @@ async function doSignUp(){
       return;
     }
     // Always try PATCH first (handles existing customers, even if SELECT is blocked by RLS)
-    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal,count=exact'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+    var hPin=await hashPin(pin);
+    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal,count=exact'},body:JSON.stringify({portal_pin:hPin,cname:cname,updated_at:new Date().toISOString()})});
     var patchedRows=0;
     if(pr.ok){var cr=pr.headers.get('Content-Range')||'';patchedRows=parseInt(cr.split('/')[1]||'0')||0;}
     if(patchedRows===0){
       // No existing customer found — insert new one
-      var ir=await fetch(SB_URL+'/rest/v1/customers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cname:cname,mobile:mob,portal_pin:pin,serial:'',model:'',area:'',updated_at:new Date().toISOString()})});
+      var ir=await fetch(SB_URL+'/rest/v1/customers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cname:cname,mobile:mob,portal_pin:hPin,serial:'',model:'',area:'',updated_at:new Date().toISOString()})});
       if(!ir.ok){
         var et=await ir.text();
         if(et.includes('23505')||et.includes('duplicate')){
-          // Customer exists but RLS hid it from SELECT & count — force PATCH
-          var pr2=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+          var pr2=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:hPin,cname:cname,updated_at:new Date().toISOString()})});
           if(!pr2.ok){var et2=await pr2.text();throw new Error(et2);}
         } else {throw new Error(et);}
       }
@@ -1773,7 +1784,8 @@ async function doResetPin(){
   try{
     var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
     if(!custs||!custs[0]){err.textContent='No account found for this mobile number.';err.style.display='block';return;}
-    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,updated_at:new Date().toISOString()})});
+    var hPin=await hashPin(pin);
+    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:hPin,updated_at:new Date().toISOString()})});
     if(!pr.ok){var et=await pr.text();throw new Error(et);}
     err.textContent='';err.style.display='none';
     alert('✅ PIN reset successfully! Please sign in with your new PIN.');
