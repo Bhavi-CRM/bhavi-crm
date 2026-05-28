@@ -18,7 +18,8 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 /* Header */
 .header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
-.header-logo{width:56px;height:56px;border-radius:13px;margin:0 auto 10px;display:block;object-fit:cover;box-shadow:0 4px 18px rgba(0,0,0,.28);}
+.header-logo{width:48px;height:48px;border-radius:12px;margin:0 auto 8px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 18px rgba(0,0,0,.28);}
+.header-logo-auth{width:90px;height:90px;border-radius:22px;margin:0 auto 18px;display:block;background:#fff;object-fit:contain;padding:8px;box-shadow:0 10px 40px rgba(0,0,0,.35);border:3px solid rgba(255,255,255,.25);}
 .header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
 .header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
 .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
@@ -681,14 +682,17 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 
 <!-- ========== PAGE: AUTH (Sign In / Sign Up) ========== -->
 <div class="page active fade" id="pg-auth">
-  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
-  <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);text-align:center;padding:28px 20px 24px;">
-    <img class="header-logo" src="icon-192.png" onerror="this.style.display='none'">
-    <h1 style="font-size:18px;">Bhavi Electronics</h1>
-    <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
-    <div class="step-badge" style="margin-top:10px;">Sign In to Continue</div>
+  <div class="header" style="background:linear-gradient(160deg,#0a1f5c 0%,#1a3fa8 55%,#2563eb 100%);text-align:center;padding:44px 24px 36px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:rgba(255,255,255,0.05);border-radius:50%;pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-50px;left:-50px;width:160px;height:160px;background:rgba(255,255,255,0.04);border-radius:50%;pointer-events:none;"></div>
+    <div style="position:absolute;top:30px;left:20px;width:60px;height:60px;background:rgba(255,255,255,0.04);border-radius:50%;pointer-events:none;"></div>
+    <img class="header-logo-auth" src="icon-192.png" onerror="this.style.display='none'">
+    <h1 style="font-size:22px;font-weight:900;color:#fff;letter-spacing:0.3px;margin-bottom:4px;">Bhavi Electronics</h1>
+    <div style="font-size:11px;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;">&amp; Automation</div>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.25);border-radius:99px;padding:6px 18px;font-size:12px;color:#fff;font-weight:600;letter-spacing:0.3px;">🔐 Customer Portal</div>
   </div>
-  <div class="body">
+  <div class="body" style="background:#f4f6fb;padding:0;">
+    <div style="background:#fff;border-radius:0 0 20px 20px;padding:24px 20px 8px;box-shadow:0 4px 20px rgba(0,0,0,.07);margin-bottom:0;">
     <div class="auth-tab-bar">
       <button class="auth-tab active" id="authtab-signin" onclick="switchAuthTab('signin')">Sign In</button>
       <button class="auth-tab" id="authtab-signup" onclick="switchAuthTab('signup')">New Account</button>
@@ -783,6 +787,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
         <button onclick="switchAuthTab('signin')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">‹ Back to Sign In</button>
       </div>
     </div>
+    </div><!-- /white card -->
   </div>
 </div>
 
