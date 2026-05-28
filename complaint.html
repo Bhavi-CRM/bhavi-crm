@@ -1254,7 +1254,8 @@ async function submitForm(){
       var svcCharges=isCarryIn?413:649;
       var svcTypeStr=isCarryIn?(svc.repairCat==='scanner'?'Scanner Carry In':'Printer Carry In'):(svc.repairCat==='scanner'?'Scanner Onsite':'Printer Onsite');
       var desc='Customer Complaint (Self-Service Portal)\nService Type: '+(isCarryIn?'Carry In':'Onsite Visit')+'\nModel: '+state.modelNo+(state.serialNo?'\nSerial: '+state.serialNo:'')+'\nWarranty: '+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+(state.remarks?'\nRemarks: '+state.remarks:'')+(state.serialPhotoB64?'\n[Serial Photo Attached]':'');
-      var tData={id:state.ticketId,job_sheet:state.ticketId,call_type:state.warrantyType==='out_of_warranty'?'Non-Warranty':'Other',service_type:svcTypeStr,status:'Pending Allocation',brand_name:'',model:state.modelNo,serial:state.serialNo||'',cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',problem:state.problem,description:desc,action:'',assigned_to:null,assigned_name:null,warranty_coverage:state.warrantyType==='out_of_warranty'?'NA':'Other',wc_type:'CSP',service_charges:svcCharges,rerepair:'No',rerepair_foc:false,serial_photo:state.serialPhotoB64||null,signature:state.signatureB64,spares:[],timeline:[{action:'Complaint Registered',by:'Customer Self-Service',at:now.toISOString(),note:'Via service portal — '+svc.name+' ('+(isCarryIn?'Carry In':'Onsite')+')'}],created_at:now.toISOString(),updated_at:now.toISOString()};
+      var initStatus=isCarryIn?'Pending Customer Arrival':'Pending Allocation';
+      var tData={id:state.ticketId,job_sheet:state.ticketId,call_type:state.warrantyType==='out_of_warranty'?'Non-Warranty':'Other',service_type:svcTypeStr,status:initStatus,brand_name:'',model:state.modelNo,serial:state.serialNo||'',cname:custName,mobile:state.mobile,alt_mobile:altMob,address:addr,city:city,pin:pin,state:custSt,area:'',problem:state.problem,description:desc,action:'',assigned_to:null,assigned_name:null,warranty_coverage:state.warrantyType==='out_of_warranty'?'NA':'Other',wc_type:'CSP',service_charges:svcCharges,rerepair:'No',rerepair_foc:false,serial_photo:state.serialPhotoB64||null,signature:state.signatureB64,spares:[],timeline:[{action:'Complaint Registered',by:'Customer Self-Service',at:now.toISOString(),note:'Via service portal — '+svc.name+' ('+(isCarryIn?'Carry In — waiting for customer to bring device':'Onsite')+')'}],created_at:now.toISOString(),updated_at:now.toISOString()};
       try{await sbPostMin('tickets',tData);}catch(e2){
         if(e2.message&&(e2.message.includes('serial_photo')||e2.message.includes('signature')||e2.message.includes('PGRST204'))){
           var tData2=Object.assign({},tData);delete tData2.serial_photo;delete tData2.signature;
@@ -1730,7 +1731,7 @@ async function doSignUp(){
       if(!pr.ok){var et=await pr.text();throw new Error('Could not save PIN. Please ask admin to run: ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_pin TEXT;\n\nDetails: '+et);}
     } else {
       // Create new customer
-      await sbPostMin('customers',{cname:cname,mobile:mob,portal_pin:pin,updated_at:new Date().toISOString()});
+      await sbPostMin('customers',{cname:cname,mobile:mob,portal_pin:pin,serial:'',model:'',area:'',updated_at:new Date().toISOString()});
     }
     setSession({mobile:mob,name:cname});
     goPage('pg-home');
@@ -1951,7 +1952,7 @@ async function loadMyOrders(){
       var clr=statusColor[o.status]||'#64748b';
       var lbl=statusLabel[o.status]||o.status||'Processing';
       var items=(o.items||[]).map(function(i){return escHtml(i.name||'')+(i.qty>1?' ×'+i.qty:'');}).join(', ');
-      return '<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
+      return '<div style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:box-shadow .15s;" onclick="openOrderDetail('+JSON.stringify(o).replace(/"/g,'&quot;')+')" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
         +'<div><div style="font-size:14px;font-weight:800;color:var(--text);">'+escHtml(o.order_no||'')+'</div>'
         +'<div style="font-size:11px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
@@ -1963,9 +1964,64 @@ async function loadMyOrders(){
         +(o.tracking_info?'<div style="font-size:11px;color:#7c3aed;font-weight:600;">🚚 '+escHtml(o.tracking_info)+'</div>':'')
         +'</div>'
         +(o.notes?'<div style="font-size:11px;color:var(--muted);margin-top:6px;background:#f8fafc;border-radius:6px;padding:5px 8px;">📝 '+escHtml(o.notes)+'</div>':'')
+        +'<div style="font-size:11px;color:var(--primary);font-weight:700;margin-top:8px;text-align:right;">Tap to view details →</div>'
         +'</div>';
     }).join('');
   }catch(e){list.innerHTML='<div style="text-align:center;color:var(--danger);padding:20px;font-size:13px;">Error: '+escHtml(e.message)+'</div>';}
+}
+
+function openOrderDetail(o){
+  if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return;}}
+  var statusColor={'inquiry':'#d97706','confirmed':'#1a3fa8','payment_received':'#059669','dispatched':'#7c3aed','delivered':'#059669','cancelled':'#dc2626'};
+  var statusLabel={'inquiry':'Inquiry Received','confirmed':'Order Confirmed','payment_received':'Payment Done','dispatched':'Dispatched','delivered':'Delivered','cancelled':'Cancelled'};
+  var clr=statusColor[o.status]||'#64748b';
+  var lbl=statusLabel[o.status]||o.status||'Processing';
+  var items=o.items||[];
+  var subtotal=items.reduce(function(s,i){return s+(parseFloat(i.price||0)*parseInt(i.qty||1));},0);
+  var total=parseFloat(o.total_amount||subtotal||0);
+  var itemsHtml=items.length?'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'
+    +'<thead><tr style="background:#f4f6fb;"><th style="padding:7px 8px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;">Item</th>'
+    +'<th style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;font-weight:700;">Qty</th>'
+    +'<th style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;font-weight:700;">Price</th>'
+    +'<th style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;font-weight:700;">Amount</th></tr></thead>'
+    +'<tbody>'+items.map(function(i){
+      var qty=parseInt(i.qty||1);var price=parseFloat(i.price||0);
+      return '<tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">'+escHtml(i.name||'Item')+(i.code?'<br><span style="font-size:10px;color:#94a3b8;">'+escHtml(i.code)+'</span>':'')+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">'+qty+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">₹'+price.toLocaleString('en-IN')+'</td>'
+        +'<td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;font-weight:700;">₹'+(qty*price).toLocaleString('en-IN')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table>'
+    +'<div style="text-align:right;padding:8px 8px 0;font-size:14px;font-weight:800;color:var(--primary);">Total: ₹'+Math.round(total).toLocaleString('en-IN')+'</div>'
+    :'<div style="color:var(--muted);font-size:12px;padding:8px 0;">No item details available.</div>';
+
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  ov.innerHTML='<div style="background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;max-height:90vh;overflow-y:auto;padding-bottom:24px;">'
+    +'<div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:22px 22px 0 0;padding:18px 20px 14px;position:relative;">'
+    +'<button onclick="this.closest(\'[style*=fixed]\').remove()" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer;line-height:1;">✕</button>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.7);font-weight:700;letter-spacing:1px;">ORDER DETAILS</div>'
+    +'<div style="font-size:18px;font-weight:900;color:#fff;margin-top:2px;">'+escHtml(o.order_no||'—')+'</div>'
+    +'<div style="margin-top:6px;"><span style="background:'+clr+'33;color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;">'+escHtml(lbl)+'</span></div>'
+    +'</div>'
+    +'<div style="padding:16px 18px 0;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
+    +'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Order Date</div><div style="font-size:13px;font-weight:700;color:var(--text);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
+    +'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Total Amount</div><div style="font-size:16px;font-weight:800;color:var(--primary);">₹'+Math.round(total).toLocaleString('en-IN')+'</div></div>'
+    +(o.payment_mode?'<div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Payment</div><div style="font-size:13px;font-weight:700;color:#059669;">'+escHtml(o.payment_mode)+'</div></div>':'')
+    +(o.delivery_date?'<div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Delivered</div><div style="font-size:13px;font-weight:700;color:#059669;">✅ '+escHtml(o.delivery_date)+'</div></div>':'')
+    +'</div>'
+    +(o.customer_name||o.customer_mobile?'<div style="background:#f4f6fb;border-radius:10px;padding:10px 14px;margin-bottom:12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Customer</div>'+(o.customer_name?'<div style="font-size:13px;font-weight:700;color:var(--text);">'+escHtml(o.customer_name)+'</div>':'')+(o.customer_mobile?'<div style="font-size:12px;color:var(--muted);">📱 '+escHtml(o.customer_mobile)+'</div>':'')+(o.customer_address?'<div style="font-size:12px;color:var(--muted);">📍 '+escHtml(o.customer_address)+'</div>':'')+'</div>':'')
+    +'<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">📦 Items Ordered</div>'
+    +itemsHtml
+    +(o.tracking_info||o.tracking_url?'<div style="background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:12px 14px;margin-top:12px;"><div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:4px;">🚚 Shipping / Tracking</div>'+(o.tracking_info?'<div style="font-size:13px;font-weight:700;color:var(--text);">'+escHtml(o.tracking_info)+'</div>':'')+(o.tracking_url?'<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="font-size:12px;color:#7c3aed;font-weight:700;display:inline-block;margin-top:4px;">🔗 Track Shipment →</a>':'')+'</div>':'')
+    +(o.delivery_note?'<div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#065f46;">📝 '+escHtml(o.delivery_note)+'</div>':'')
+    +(o.notes?'<div style="background:#fff7ed;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#92400e;">📋 '+escHtml(o.notes)+'</div>':'')
+    +'</div>'
+    +'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
 }
 
 // ---- Auto-search customer by mobile (CRM helper) ----
