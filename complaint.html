@@ -1306,6 +1306,9 @@ function _successRows(name,svc,sub,prob,charges){
 // ---- Print Jobsheet (repair only) ----
 function printDoc(){
   var svc=SERVICES[state.serviceId]||{};
+  var isCarryIn=state.repairType==='carry-in';
+  var jsCharges=isCarryIn?413:649;
+  var jsChargesLabel=isCarryIn?'Service Charges (Carry In)':'Visit Charges (Onsite)';
   var custName=state.isNew?(state.firstName+' '+state.lastName):(state.existingCust&&state.existingCust.cname)||'Customer';
   var addr=state.isNew?state.address:((state.existingCust&&state.existingCust.address)||'');
   var city=state.isNew?state.city:((state.existingCust&&state.existingCust.city)||'');
@@ -1341,7 +1344,7 @@ function printDoc(){
     +'</div></div>'
     +'<div class="sec"><h3>Product Details</h3><div class="grid2">'
     +'<div class="f"><div class="fl">Service</div><div class="fv">'+escHtml(svc.name||'')+'</div></div>'
-    +'<div class="f"><div class="fl">Visit Charges</div><div class="fv" style="color:#dc2626;font-weight:800;">Rs. 649/- (Non-Refundable)</div></div>'
+    +'<div class="f"><div class="fl">'+jsChargesLabel+'</div><div class="fv" style="color:#dc2626;font-weight:800;">Rs. '+jsCharges+'/- (Non-Refundable)</div></div>'
     +'<div class="f"><div class="fl">Model Number</div><div class="fv">'+escHtml(state.modelNo)+'</div></div>'
     +'<div class="f"><div class="fl">Serial Number</div><div class="fv">'+(state.serialNo||'—')+'</div></div>'
     +'<div class="f"><div class="fl">Warranty Status</div><div class="fv">'+(state.warrantyType==='out_of_warranty'?'Out of Warranty':'Not Sure')+'</div></div>'
@@ -1351,7 +1354,7 @@ function printDoc(){
     +'</div></div>';
   if(state.serialPhotoB64){html+='<div class="sec photo"><h3>Serial Number Photo</h3><img src="'+state.serialPhotoB64+'"></div>';}
   html+='<div class="sec"><h3>Customer Signature</h3><div class="sign-area">'+(state.signatureB64?'<img src="'+state.signatureB64+'">':'<div style="color:#94a3b8;padding-top:20px;">Not captured</div>')+'</div></div>'
-    +'<div class="terms-note"><b>TERMS ACKNOWLEDGED:</b><br>1. Engineer Visit &amp; Inspection Charges: Rs. 649/- (Non-Refundable) — payable to engineer on arrival.<br>2. Spare parts / additional repair charged extra as per engineer estimate.<br>3. If estimate not accepted, Rs. 649/- visit charge still payable.</div>'
+    +'<div class="terms-note"><b>TERMS ACKNOWLEDGED:</b><br>1. '+jsChargesLabel+': Rs. '+jsCharges+'/- (Non-Refundable)'+(isCarryIn?' — payable at our office when device is dropped.'  :' — payable to engineer on arrival.')+'<br>2. Spare parts / additional repair charged extra as per estimate.<br>3. If estimate not accepted, Rs. '+jsCharges+'/- charge still payable.</div>'
     +'<div class="footer-note"><b>BHAVI ELECTRONICS &amp; AUTOMATION</b> | 📞 +91 9574004969<br>Service within 2–3 working days | Job Sheet: <b>'+escHtml(state.ticketId)+'</b></div>'
     +'</div></body></html>';
   var win=window.open('','_blank','width=750,height=900');win.document.open();win.document.write(html);win.document.close();win.onload=function(){win.print();};

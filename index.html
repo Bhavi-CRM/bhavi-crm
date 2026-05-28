@@ -2823,7 +2823,7 @@ async function renderDashboard(){
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
           <button onclick="showPortalQR()" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📷 QR Code</button>
-          <button onclick="window.open('https://bhavi-crm.github.io/bhavi-crm/complaint.html','_blank')" style="background:#fff;color:#1d4ed8;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🔗 Open</button>
+          <button onclick="navigator.clipboard&&navigator.clipboard.writeText('https://bhavi-crm.github.io/bhavi-crm/complaint.html').then(function(){alert('Link copied!');}).catch(function(){prompt('Copy this link:','https://bhavi-crm.github.io/bhavi-crm/complaint.html');})" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🔗 Copy Link</button>
         </div>
       </div>
       <div class="kpi-grid">
@@ -3257,7 +3257,7 @@ async function savePunchOut(key){
   }catch(e){}
   var workMins=0;var otMins=0;
   if(ps.punch_in_time&&punchOutTime){
-    function toMins(t){var p=(t||'').split(':');return(parseInt(p[0])||0)*60+(parseInt(p[1])||0);}
+    function toMins(t){var s=(t||'').trim();var isPM=/pm/i.test(s);var isAM=/am/i.test(s);var clean=s.replace(/[^0-9:]/g,'');var p=clean.split(':');var h=parseInt(p[0])||0;var m=parseInt(p[1])||0;if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;return h*60+m;}
     var inM=toMins(ps.punch_in_time);var outM=toMins(punchOutTime);
     workMins=outM-inM;if(workMins<0)workMins+=1440;
     var shiftMins=shiftSettings?toMins(shiftSettings.shift_end)-toMins(shiftSettings.shift_start):480;
@@ -6234,6 +6234,7 @@ async function renderPortalServicesTab(){
 }
 
 async function openPortalSvcModal(id){
+  var prev=document.getElementById('modal-portal-svc');if(prev)prev.remove();
   var existing=null;
   if(id){
     try{var r=await sb('portal_services','GET',null,'?id=eq.'+encodeURIComponent(id));existing=r&&r[0];}catch(e){}
