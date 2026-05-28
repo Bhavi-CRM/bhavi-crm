@@ -14853,8 +14853,13 @@ async function loadUpiQrUrl(){
 }
 async function saveUpiQrUrl(url){
   window._upiQrUrl=url;
-  try{await sb('company_info','PATCH',{upi_qr_url:url},'?id=eq.1');}
-  catch(e){alert('Saved locally but could not sync to server: '+e.message);}
+  try{
+    // UPSERT: insert if row doesn't exist, update if it does
+    var r=await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,upi_qr_url:url,updated_at:new Date().toISOString()})});
+    if(!r.ok){var et=await r.text();throw new Error(et);}
+  }catch(e){alert('QR uploaded but could not save URL to database.\n\nPlease run this SQL in Supabase:\n\nCREATE TABLE IF NOT EXISTS public.company_info (\n  id INTEGER PRIMARY KEY DEFAULT 1,\n  upi_qr_url TEXT,\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\nINSERT INTO public.company_info (id) VALUES (1) ON CONFLICT (id) DO NOTHING;\n\nError: '+e.message);}
 }
 
 async function uploadProductImgFile(file){
@@ -14936,7 +14941,7 @@ async function renderSales(){
     +'<button onclick="salesTab(\'products\')" style="background:'+(tab==='products'?'#1a56db':'#f1f5f9')+';color:'+(tab==='products'?'#fff':'#475569')+';border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;">🛍️ Products</button>'
     +'<button onclick="salesTab(\'setup\')" style="background:'+(tab==='setup'?'#1a56db':'#f1f5f9')+';color:'+(tab==='setup'?'#fff':'#475569')+';border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;">⚙️ Setup</button>'
     +'<div style="flex:1;"></div>'
-    +'<button onclick="showShopLink()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">🔗 Shop Link & QR</button>'
+    +'<button onclick="showPortalQR()" style="background:#1a3fa8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📱 Customer Portal</button>'
     +'</div><div id="sales-tab-content"></div></div>';
   if(tab==='products')renderSalesProductsAdmin();
   else if(tab==='setup')renderSalesSetup();
@@ -15282,8 +15287,8 @@ function _paymentBlock(orderNo,total){
 }
 
 async function salesWA_Brochure(orderId,mob){
-  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=customer_name');var o=ord&&ord[0]?ord[0]:{};var shopUrl=window.location.origin+window.location.pathname+'?shop';
-    _waOpen(mob,'Dear '+(o.customer_name||'Valued Customer')+',\n\nThank you for your interest in Bhavi Electronics! 🙏\n\nPlease visit our online product catalog to browse all available products and place your order:\n\n🛍️ *Bhavi Electronics — Online Shop*\n🔗 '+shopUrl+'\n\n✅ Easy online ordering | 100% Advance | GST Invoice | Fast Dispatch\n\nWarm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_');}
+  try{var ord=await sb('sales_orders','GET',null,'?id=eq.'+orderId+'&select=customer_name');var o=ord&&ord[0]?ord[0]:{};
+    _waOpen(mob,'Dear '+(o.customer_name||'Valued Customer')+',\n\nThank you for your interest in Bhavi Electronics! 🙏\n\nPlease visit our customer portal to browse products, place your order, and track it anytime:\n\n🛍️ *Bhavi Electronics — Customer Portal*\n🔗 '+_PORTAL_URL+'\n\n✅ Services • Products • Order Tracking — all in one place!\n\nWarm regards,\n*Bhavi Electronics*\n_Where Customer Delight is First_');}
   catch(e){alert(e.message);}
 }
 async function salesWA_Quote(orderId,cname,mob,total){

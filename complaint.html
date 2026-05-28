@@ -18,7 +18,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 /* Header */
 .header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
-.header-logo{width:52px;height:52px;border-radius:12px;margin:0 auto 8px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+.header-logo{width:56px;height:56px;border-radius:13px;margin:0 auto 10px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 18px rgba(0,0,0,.28);}
 .header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
 .header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
 .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
@@ -683,7 +683,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 <div class="page active fade" id="pg-auth">
   <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
   <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);text-align:center;padding:28px 20px 24px;">
-    <img src="icon-192.png" style="width:56px;height:56px;border-radius:14px;background:#fff;padding:5px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;" onerror="this.style.display='none'">
+    <img class="header-logo" src="icon-192.png" onerror="this.style.display='none'">
     <h1 style="font-size:18px;">Bhavi Electronics</h1>
     <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
     <div class="step-badge" style="margin-top:10px;">Sign In to Continue</div>
@@ -1707,7 +1707,6 @@ async function doSignUp(){
 }
 
 function doSignOut(){
-  if(!confirm('Sign out from your account?'))return;
   clearSession();
   goPage('pg-auth');
 }
@@ -1931,6 +1930,18 @@ async function autoFillCustomerByMobile(mob,targetFields){
   return null;
 }
 
+function injectHeaderLogos(){
+  document.querySelectorAll('.page .header').forEach(function(h){
+    if(h.querySelector('.header-logo'))return; // already has logo
+    var img=document.createElement('img');
+    img.className='header-logo';
+    img.src='icon-192.png';
+    img.alt='Bhavi Electronics';
+    img.onerror=function(){this.style.display='none';};
+    h.insertBefore(img,h.firstChild);
+  });
+}
+
 window.addEventListener('load',function(){
   // Load models
   var r=new XMLHttpRequest();r.open('GET',SB_URL+'/rest/v1/models?order=model_no&select=id,model_no,model_name&limit=1000');r.setRequestHeader('apikey',SB_KEY);r.setRequestHeader('Authorization','Bearer '+SB_KEY);
@@ -1938,6 +1949,8 @@ window.addEventListener('load',function(){
   // Load services and UPI QR from DB
   loadPortalServices();
   loadPortalUpiQr();
+  // Inject Bhavi logo into all page headers
+  injectHeaderLogos();
   // Route based on session — login required to access portal
   var sess=getSession();
   if(sess&&sess.mobile){
