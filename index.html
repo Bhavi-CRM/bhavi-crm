@@ -5761,6 +5761,7 @@ async function renderMaster(){
       <button class="tab" onclick="switchMasterTab('subcats',this)">Sub-Categories</button>
       <button class="tab" onclick="switchMasterTab('models',this)">Models</button>
       <button class="tab" onclick="switchMasterTab('problems',this)">Problem Types</button>
+      <button class="tab" onclick="switchMasterTab('gallery',this)">📸 Service Gallery</button>
     </div>
     <div id="master-content"></div>`;
   switchMasterTab('brands',document.querySelector('.tab.active'));
@@ -5805,6 +5806,30 @@ async function switchMasterTab(tab,el){
     </div>
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Problem Type</th><th>Action</th></tr></thead>
     <tbody id="prob-tbody">${problems.map(p=>`<tr><td>${p.problem}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="editProblemById(\`${p.id}\`)">✏️</button><button class="btn-icon" onclick="deleteProblem(\`${p.id}\`)" style="color:var(--danger);">🗑️</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  }else if(tab==='gallery'){
+    const svcOptions=['camera-repair','home-automation','cctv-install','printer-amc','printer-repair','scanner-repair'];
+    const svcNames={'camera-repair':'Camera Repair','home-automation':'Home Automation','cctv-install':'CCTV Install','printer-amc':'Printer AMC','printer-repair':'Printer Repair','scanner-repair':'Scanner Service'};
+    let photos=[];try{photos=await sb('service_gallery','GET',null,'?order=service_id,created_at.asc&limit=100');}catch(e){}
+    c.innerHTML=`<div class="card" style="margin-bottom:12px;">
+      <h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📸 Add Service Photo</h3>
+      <div style="display:grid;gap:10px;">
+        <div class="form-group"><label>Service</label><select id="gal-svc" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">${svcOptions.map(s=>`<option value="${s}">${svcNames[s]}</option>`).join('')}</select></div>
+        <div class="form-group"><label>Photo URL (Supabase Storage ya koi bhi public URL)</label><input type="url" id="gal-url" placeholder="https://..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>
+        <div class="form-group"><label>Caption (optional)</label><input type="text" id="gal-caption" placeholder="e.g. Home automation project in Ahmedabad" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>
+        <button class="btn btn-primary" onclick="addGalleryPhoto()">➕ Add Photo</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">Current Photos</h3>
+      <div id="gal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+        ${photos.length?photos.map(p=>`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <img src="${p.image_url}" style="width:100%;height:100px;object-fit:cover;" onerror="this.style.background='#f1f5f9'">
+          <div style="padding:6px 8px;"><div style="font-size:11px;font-weight:700;color:var(--primary);">${svcNames[p.service_id]||p.service_id}</div>
+          ${p.caption?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${p.caption}</div>`:''}
+          <button onclick="deleteGalleryPhoto('${p.id}')" style="margin-top:6px;background:none;border:none;color:var(--danger);font-size:11px;cursor:pointer;padding:0;">🗑️ Delete</button></div>
+        </div>`).join(''):'<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:30px;">Koi photos nahi abhi tak.</div>'}
+      </div>
+    </div>`;
   }
 }
 function filterModels(){var q=(document.getElementById('model-search')?.value||'').toLowerCase();var ms=(window._mModels||[]).filter(function(m){return m.model_no.toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);});var b=window._mBrands||[];var tb=document.getElementById('model-tbody');if(!tb)return;var html='';ms.forEach(function(m){var bn='-';for(var bi=0;bi<b.length;bi++){if(b[bi].id===m.brand_id){bn=b[bi].name;break;}}html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});tb.innerHTML=html;}
@@ -5914,6 +5939,18 @@ async function editModelById(btn){
 }
 async function deleteModel(id){if(!confirm('Delete?'))return;await sb('models','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('models',null);}
 async function addProblem(){const p=document.getElementById('new-prob')?.value.trim();if(!p)return;await sb('problem_types','POST',{problem:p,is_active:true});await loadMasterData();switchMasterTab('problems',null);}
+async function addGalleryPhoto(){
+  var svc=document.getElementById('gal-svc')?.value;
+  var url=(document.getElementById('gal-url')?.value||'').trim();
+  var cap=(document.getElementById('gal-caption')?.value||'').trim();
+  if(!svc||!url){alert('Service and URL required');return;}
+  try{await sb('service_gallery','POST',{service_id:svc,image_url:url,caption:cap,created_at:new Date().toISOString()});
+    switchMasterTab('gallery',null);}catch(e){alert('Error: '+e.message);}
+}
+async function deleteGalleryPhoto(id){
+  if(!confirm('Delete this photo?'))return;
+  try{await sb('service_gallery','DELETE',null,'?id=eq.'+id);switchMasterTab('gallery',null);}catch(e){alert('Error: '+e.message);}
+}
 async function deleteProblem(id){if(!confirm('Delete?'))return;await sb('problem_types','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('problems',null);}
 async function importBrands(){const f=document.getElementById('brand-file')?.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{const wb=XLSX.read(e.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0;for(const row of data){try{await sb('brands','POST',{name:row['Brand Name']||''});c++;}catch(e){}}alert(`Imported ${c}`);await loadMasterData();switchMasterTab('brands',null);};r.readAsBinaryString(f);}
 async function importSubcats(){const f=document.getElementById('sc-file')?.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{const wb=XLSX.read(e.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0;for(const row of data){try{const b=allBrands.find(x=>x.name.toLowerCase()===(row['Brand']||'').toLowerCase());await sb('subcategories','POST',{brand_id:b?.id||null,name:row['Sub-Category']||''});c++;}catch(e){}}alert(`Imported ${c}`);await loadMasterData();switchMasterTab('subcats',null);};r.readAsBinaryString(f);}
