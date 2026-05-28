@@ -26,8 +26,8 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 /* Home page header */
 .home-header{background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%);color:#fff;padding:24px 20px 22px;position:relative;overflow:hidden;}
-.home-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;}
-.home-header::after{content:'';position:absolute;bottom:-20px;left:-20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;}
+.home-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;pointer-events:none;}
+.home-header::after{content:'';position:absolute;bottom:-20px;left:-20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;pointer-events:none;}
 .home-header .welcome{font-size:22px;font-weight:900;margin-bottom:4px;}
 .home-header .subtitle{font-size:12px;opacity:.8;margin-bottom:16px;font-weight:400;}
 .btn-book{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(217,119,6,.4);letter-spacing:.3px;}
@@ -185,7 +185,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 <div class="page fade" id="pg-home">
   <div class="home-header">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-      <img src="icon-192.png" style="width:44px;height:44px;border-radius:10px;background:#fff;padding:3px;object-fit:contain;" onerror="this.style.display='none'">
+      <img src="icon-192.png" style="width:54px;height:54px;border-radius:12px;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">
       <div>
         <div style="font-size:13px;font-weight:800;opacity:.9;">Bhavi Electronics &amp; Automation</div>
         <div style="font-size:10px;opacity:.65;letter-spacing:.4px;">WHERE CUSTOMER DELIGHT IS FIRST</div>
@@ -218,8 +218,6 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       <div class="svc-card" onclick="selectService('printer-amc')"><span class="s-icon">📋</span><div class="s-name">Printer AMC</div><div class="s-price">₹5000+</div></div>
       <div class="svc-card" onclick="selectService('home-automation')"><span class="s-icon">🏠</span><div class="s-name">Home Automation</div><div class="s-price">₹3000+</div></div>
       <div class="svc-card" onclick="selectService('cctv-install')"><span class="s-icon">📹</span><div class="s-name">CCTV Install</div><div class="s-price">₹2500+</div></div>
-      <div class="svc-card" onclick="selectService('ink-purchase')" style="border-color:#fde68a;"><span class="s-icon">🖊️</span><div class="s-name">Ink / Cartridge</div><div class="s-price" style="color:#d97706;">Buy Now</div></div>
-      <div class="svc-card" onclick="selectService('printer-purchase')" style="border-color:#fde68a;"><span class="s-icon">🛒</span><div class="s-name">Buy Printer</div><div class="s-price" style="color:#d97706;">Get Quote</div></div>
     </div>
     <div style="margin-top:16px;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
       <span style="font-size:22px;">📞</span>
