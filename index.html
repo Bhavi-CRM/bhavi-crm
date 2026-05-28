@@ -15123,8 +15123,9 @@ function buildSalesActions(o){
     btns+='<button onclick="salesWA_PaymentDetails(\''+cn+'\',\''+mob+'\','+tot+',\''+on+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Payment Details</button>';
   }
   if(s==='confirmed'){
-    btns+='<button onclick="openPaymentModal(\''+id+'\',\''+cn+'\','+tot+',\''+mob+'\')" style="background:#10b981;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">Mark Paid</button>';
-    btns+='<button onclick="salesWA_PaymentDetails(\''+cn+'\',\''+mob+'\','+tot+',\''+on+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Payment Details</button>';
+    btns='<div style="width:100%;background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:7px 11px;font-size:12px;color:#92400e;margin-bottom:6px;">⏳ Payment Details sent to customer. Once they pay → click <strong>✅ Mark Paid</strong> to confirm receipt.</div>'+btns;
+    btns+='<button onclick="openPaymentModal(\''+id+'\',\''+cn+'\','+tot+',\''+mob+'\')" style="background:#10b981;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✅ Mark Paid</button>';
+    btns+='<button onclick="salesWA_PaymentDetails(\''+cn+'\',\''+mob+'\','+tot+',\''+on+'\')" style="background:#25d366;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">📲 Resend Payment Link</button>';
   }
   if(s==='paid'){
     btns+='<button onclick="openDispatchModal(\''+id+'\',\''+cn+'\',\''+mob+'\')" style="background:#0ea5e9;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;">🚚 Dispatch</button>';

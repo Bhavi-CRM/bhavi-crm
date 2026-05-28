@@ -181,7 +181,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 <body>
 
 <!-- ========== PAGE: HOME ========== -->
-<div class="page active fade" id="pg-home">
+<div class="page fade" id="pg-home">
   <div class="home-header">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
       <img src="icon-192.png" style="width:44px;height:44px;border-radius:10px;background:#fff;padding:3px;object-fit:contain;" onerror="this.style.display='none'">
@@ -192,8 +192,9 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       <div style="margin-left:auto;display:flex;gap:7px;align-items:center;">
         <!-- Cart badge (shown in shop tab) -->
         <button id="home-cart-btn" onclick="showCartDrawer()" style="display:none;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;">🛒 <span id="home-cart-count">0</span></button>
-        <!-- Account button -->
-        <button id="btn-acct-home" onclick="goAccountOrAuth()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👤 <span id="acct-btn-label">Sign In</span></button>
+        <!-- Account menu -->
+        <button id="btn-acct-home" onclick="goAccountOrAuth()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👤 <span id="acct-btn-label">Account</span></button>
+        <button onclick="doSignOut()" style="background:rgba(220,38,38,.5);border:1.5px solid rgba(220,38,38,.6);color:#fff;border-radius:20px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Sign Out</button>
       </div>
     </div>
     <div class="welcome" id="home-welcome-txt">👋 Welcome!</div>
@@ -679,15 +680,15 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 </div>
 
 <!-- ========== PAGE: AUTH (Sign In / Sign Up) ========== -->
-<div class="page fade" id="pg-auth">
+<div class="page active fade" id="pg-auth">
   <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
-  <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);">
-    <h1>My Account</h1>
-    <div class="tagline">Bhavi Electronics &amp; Automation</div>
-    <div class="step-badge">Customer Login</div>
+  <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);text-align:center;padding:28px 20px 24px;">
+    <img src="icon-192.png" style="width:56px;height:56px;border-radius:14px;background:#fff;padding:5px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;" onerror="this.style.display='none'">
+    <h1 style="font-size:18px;">Bhavi Electronics</h1>
+    <div class="tagline">WHERE CUSTOMER DELIGHT IS FIRST</div>
+    <div class="step-badge" style="margin-top:10px;">Sign In to Continue</div>
   </div>
   <div class="body">
-    <button class="back-btn" onclick="goPage('pg-home')">‹ Back to Home</button>
     <div class="auth-tab-bar">
       <button class="auth-tab active" id="authtab-signin" onclick="switchAuthTab('signin')">Sign In</button>
       <button class="auth-tab" id="authtab-signup" onclick="switchAuthTab('signup')">New Account</button>
@@ -1543,7 +1544,7 @@ function updateHomeAuthUI(){
     if(lbl)lbl.textContent=s.name.split(' ')[0];
     if(wtxt)wtxt.textContent='👋 Hi, '+s.name.split(' ')[0]+'!';
   } else {
-    if(lbl)lbl.textContent='Sign In';
+    if(lbl)lbl.textContent='Account';
     if(wtxt)wtxt.textContent='👋 Welcome!';
   }
 }
@@ -1583,7 +1584,7 @@ async function doSignIn(){
     if(!c.portal_pin){err.textContent='No PIN set. Please sign up to set your PIN.';err.style.display='block';return;}
     if(c.portal_pin!==pin){err.textContent='Incorrect PIN. Please try again.';err.style.display='block';return;}
     setSession({mobile:mob,name:c.cname||'Customer',custId:c.id});
-    loadAccountDashboard();goPage('pg-account');
+    goPage('pg-home');
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
 }
 
@@ -1637,20 +1638,21 @@ async function doSignUp(){
     var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
     if(custs&&custs[0]){
       // Update existing customer with PIN
-      await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+      var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+      if(!pr.ok){var et=await pr.text();throw new Error('Could not save PIN. Please ask admin to run: ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_pin TEXT;\n\nDetails: '+et);}
     } else {
       // Create new customer
-      await sbPostMin('customers',{cname:cname,mobile:mob,alt_mobile:'',address:'',city:'',pin:'',state:'',area:'',serial:'',model:'',portal_pin:pin,updated_at:new Date().toISOString()});
+      await sbPostMin('customers',{cname:cname,mobile:mob,portal_pin:pin,updated_at:new Date().toISOString()});
     }
     setSession({mobile:mob,name:cname});
-    loadAccountDashboard();goPage('pg-account');
+    goPage('pg-home');
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
 }
 
 function doSignOut(){
   if(!confirm('Sign out from your account?'))return;
   clearSession();
-  goPage('pg-home');
+  goPage('pg-auth');
 }
 
 // ======= ACCOUNT DASHBOARD =======
@@ -1807,8 +1809,14 @@ window.addEventListener('load',function(){
   r.onload=function(){try{allModels=JSON.parse(r.responseText)||[];}catch(e){}};r.send();
   // Load services from DB
   loadPortalServices();
-  // Restore auth session
-  updateHomeAuthUI();
+  // Route based on session — login required to access portal
+  var sess=getSession();
+  if(sess&&sess.mobile){
+    updateHomeAuthUI();
+    goPage('pg-home');
+  } else {
+    goPage('pg-auth');
+  }
 });
 </script>
 </body>
