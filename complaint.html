@@ -1723,19 +1723,28 @@ async function doSignUp(){
   if(confirmPin.length!==4){err.textContent='Please confirm your PIN in the second box.';err.style.display='block';return;}
   if(pin!==confirmPin){err.textContent='PINs do not match. Please re-enter both PINs.';err.style.display='block';return;}
   var cname=(fname+' '+(lname||'')).trim();
+  var btn=document.getElementById('btn-signup');if(btn)btn.disabled=true;
   try{
-    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
-    if(custs&&custs[0]){
-      // Update existing customer with PIN
-      var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
-      if(!pr.ok){var et=await pr.text();throw new Error('Could not save PIN. Please ask admin to run: ALTER TABLE customers ADD COLUMN IF NOT EXISTS portal_pin TEXT;\n\nDetails: '+et);}
-    } else {
-      // Create new customer
-      await sbPostMin('customers',{cname:cname,mobile:mob,portal_pin:pin,serial:'',model:'',area:'',updated_at:new Date().toISOString()});
+    // Always try PATCH first (handles existing customers, even if SELECT is blocked by RLS)
+    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal,count=exact'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+    var patchedRows=0;
+    if(pr.ok){var cr=pr.headers.get('Content-Range')||'';patchedRows=parseInt(cr.split('/')[1]||'0')||0;}
+    if(patchedRows===0){
+      // No existing customer found — insert new one
+      var ir=await fetch(SB_URL+'/rest/v1/customers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cname:cname,mobile:mob,portal_pin:pin,serial:'',model:'',area:'',updated_at:new Date().toISOString()})});
+      if(!ir.ok){
+        var et=await ir.text();
+        if(et.includes('23505')||et.includes('duplicate')){
+          // Customer exists but RLS hid it from SELECT & count — force PATCH
+          var pr2=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+          if(!pr2.ok){var et2=await pr2.text();throw new Error(et2);}
+        } else {throw new Error(et);}
+      }
     }
     setSession({mobile:mob,name:cname});
     goPage('pg-home');
   }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+  if(btn)btn.disabled=false;
 }
 
 function doSignOut(){
