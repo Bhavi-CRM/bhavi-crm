@@ -1827,6 +1827,8 @@ function getUpiQrHtml(note){
 
 // ======= ACCOUNT DASHBOARD =======
 var _acctTab='tickets';
+var _cachedTickets=[];
+var _cachedOrders=[];
 function acctTab(tab){
   _acctTab=tab;
   document.getElementById('acctab-tickets').classList.toggle('active',tab==='tickets');
@@ -1866,16 +1868,16 @@ async function renderAcctContent(){
     if(_acctTab==='tickets'){
       var tks=await sbGet('tickets','?mobile=eq.'+s.mobile+'&order=created_at.desc&limit=50')||[];
       if(!tks.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">No service tickets yet.<br><br><button class="btn-primary" style="width:auto;padding:10px 20px;" onclick="goPage(\'pg-home\')">Book a Service →</button></div>';return;}
+      _cachedTickets=tks;
       var statusColors={
-        'Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6',
+        'Pending Customer Arrival':'#f59e0b','Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6',
         'Pending Parts':'#d97706','Pending Customer Approval':'#8b5cf6','Customer Approved':'#6366f1',
         'Closed':'#059669','Call Cancel':'#94a3b8','Customer Reject':'#dc2626'
       };
-      el.innerHTML=tks.map(function(t){
+      el.innerHTML=tks.map(function(t,idx){
         var clr=statusColors[t.status]||'#64748b';
         var isActive=!['Closed','Call Cancel','Customer Reject'].includes(t.status);
-        var tJson=JSON.stringify(t).replace(/"/g,'&quot;');
-        return '<div class="acct-item" onclick="openTicketDetail(\''+tJson.replace(/'/g,'&#39;')+'\')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
+        return '<div class="acct-item" onclick="_openCachedTicket('+idx+')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
           +'<div><div style="font-size:14px;font-weight:800;color:var(--text);">'+escHtml(t.id)+'</div>'
           +'<div style="font-size:11px;color:var(--muted);">'+new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
@@ -1892,7 +1894,8 @@ async function renderAcctContent(){
     } else {
       var ords=await sbGet('sales_orders','?customer_mobile=eq.'+s.mobile+'&order=created_at.desc&limit=50')||[];
       if(!ords.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">No orders yet.<br><br><button class="btn-primary" style="width:auto;padding:10px 20px;" onclick="goPage(\'pg-home\');homeTab(\'shop\')">Shop Now →</button></div>';return;}
-      el.innerHTML=ords.map(function(o){
+      _cachedOrders=ords;
+      el.innerHTML=ords.map(function(o,idx){
         var st=o.status||'inquiry';
         var statusOrder=['inquiry','quoted','confirmed','paid','dispatched','done'];
         var si=statusOrder.indexOf(st);
@@ -1928,8 +1931,7 @@ async function renderAcctContent(){
         else if(st==='paid')statusMsg='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;font-size:12px;color:#166534;margin-top:8px;">✅ Payment received! Your order is being packed for dispatch.</div>';
         else if(st==='dispatched')statusMsg='<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px;font-size:12px;color:#075985;margin-top:8px;">🚚 Your order is on the way! Estimated delivery: 1–2 working days.</div>';
         else if(st==='done')statusMsg='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;font-size:12px;color:#166534;margin-top:8px;">🎉 Order delivered! Thank you for shopping with Bhavi Electronics.</div>';
-        var oJson=JSON.stringify(o).replace(/"/g,'&quot;');
-        return '<div class="acct-item" onclick="openOrderDetail(\''+oJson.replace(/'/g,'&#39;')+'\')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
+        return '<div class="acct-item" onclick="_openCachedOrder('+idx+')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">'
           +'<div><div style="font-size:14px;font-weight:800;color:var(--primary);">'+escHtml(o.order_no||'—')+'</div>'
           +'<div style="font-size:11px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
@@ -1993,6 +1995,8 @@ async function loadMyOrders(){
   }catch(e){list.innerHTML='<div style="text-align:center;color:var(--danger);padding:20px;font-size:13px;">Error: '+escHtml(e.message)+'</div>';}
 }
 
+function _openCachedTicket(idx){openTicketDetail(_cachedTickets[idx]);}
+function _openCachedOrder(idx){openOrderDetail(_cachedOrders[idx]);}
 function openOrderDetail(o){
   if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return;}}
   var statusColor={'inquiry':'#d97706','confirmed':'#1a3fa8','payment_received':'#059669','dispatched':'#7c3aed','delivered':'#059669','cancelled':'#dc2626'};
