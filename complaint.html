@@ -159,6 +159,23 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 .divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
 @media print{body{background:#fff;}.no-print{display:none!important;}}
+
+/* Auth */
+.auth-tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;}
+.auth-tab{flex:1;padding:11px;font-size:14px;font-weight:700;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;}
+.auth-tab.active{color:var(--primary);border-bottom-color:var(--primary);}
+.pin-inputs{display:flex;gap:10px;justify-content:center;margin:10px 0;}
+.pin-input{width:52px;height:56px;border:2px solid var(--border);border-radius:12px;font-size:24px;font-weight:800;text-align:center;outline:none;color:var(--text);background:#fafcff;}
+.pin-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+
+/* Account dashboard */
+.acct-stat{background:#f8fafc;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center;flex:1;}
+.acct-stat .n{font-size:26px;font-weight:900;color:var(--primary);}
+.acct-stat .l{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+.acct-tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:14px;}
+.acct-tab{flex:1;padding:10px;font-size:13px;font-weight:700;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;}
+.acct-tab.active{color:var(--primary);border-bottom-color:var(--primary);}
+.acct-item{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -172,10 +189,14 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
         <div style="font-size:13px;font-weight:800;opacity:.9;">Bhavi Electronics &amp; Automation</div>
         <div style="font-size:10px;opacity:.65;letter-spacing:.4px;">WHERE CUSTOMER DELIGHT IS FIRST</div>
       </div>
-      <!-- Cart badge (shown in shop tab) -->
-      <button id="home-cart-btn" onclick="showCartDrawer()" style="display:none;margin-left:auto;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;">🛒 <span id="home-cart-count">0</span></button>
+      <div style="margin-left:auto;display:flex;gap:7px;align-items:center;">
+        <!-- Cart badge (shown in shop tab) -->
+        <button id="home-cart-btn" onclick="showCartDrawer()" style="display:none;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;">🛒 <span id="home-cart-count">0</span></button>
+        <!-- Account button -->
+        <button id="btn-acct-home" onclick="goAccountOrAuth()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👤 <span id="acct-btn-label">Sign In</span></button>
+      </div>
     </div>
-    <div class="welcome">👋 Welcome!</div>
+    <div class="welcome" id="home-welcome-txt">👋 Welcome!</div>
     <div class="subtitle">Printers &nbsp;·&nbsp; Cameras &nbsp;·&nbsp; Home Automation &nbsp;·&nbsp; CCTV</div>
   </div>
 
@@ -654,6 +675,98 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <button class="btn-primary" onclick="goPage('pg-home');homeTab('shop')">🛍️ Continue Shopping</button>
     <button class="btn-outline" onclick="goMyOrders()" style="margin-top:8px;">📦 Track My Orders</button>
     <button class="btn-outline" onclick="goPage('pg-home');homeTab('services')" style="margin-top:8px;">🔧 Book a Service</button>
+  </div>
+</div>
+
+<!-- ========== PAGE: AUTH (Sign In / Sign Up) ========== -->
+<div class="page fade" id="pg-auth">
+  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+  <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);">
+    <h1>My Account</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge">Customer Login</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goPage('pg-home')">‹ Back to Home</button>
+    <div class="auth-tab-bar">
+      <button class="auth-tab active" id="authtab-signin" onclick="switchAuthTab('signin')">Sign In</button>
+      <button class="auth-tab" id="authtab-signup" onclick="switchAuthTab('signup')">New Account</button>
+    </div>
+
+    <!-- SIGN IN -->
+    <div id="auth-signin-form">
+      <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
+        <input class="inp" type="tel" id="si-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+      </div>
+      <div class="inp-group">
+        <label>Your 4-digit PIN <span class="req">*</span></label>
+        <div class="pin-inputs">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p1" oninput="pinMove(this,'si-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p2" oninput="pinMove(this,'si-p3')" onkeydown="pinBack(event,'si-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p3" oninput="pinMove(this,'si-p4')" onkeydown="pinBack(event,'si-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p4" onkeydown="pinBack(event,'si-p3')">
+        </div>
+      </div>
+      <div class="err-msg" id="err-signin"></div>
+      <button class="btn-primary" onclick="doSignIn()">🔐 Sign In →</button>
+      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--muted);">Don't have an account? <button onclick="switchAuthTab('signup')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign Up</button></div>
+    </div>
+
+    <!-- SIGN UP -->
+    <div id="auth-signup-form" style="display:none;">
+      <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
+        <input class="inp" type="tel" id="su-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" oninput="if(this.value.length===10)checkMobileForSignup()">
+      </div>
+      <div id="su-cust-found" style="display:none;margin-bottom:12px;"></div>
+      <div id="su-new-fields">
+        <div class="form-row">
+          <div class="inp-group"><label>First Name <span class="req">*</span></label><input class="inp" type="text" id="su-fname" placeholder="First name"></div>
+          <div class="inp-group"><label>Last Name <span class="req">*</span></label><input class="inp" type="text" id="su-lname" placeholder="Last name"></div>
+        </div>
+      </div>
+      <div class="inp-group">
+        <label>Set 4-digit PIN <span class="req">*</span></label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Choose a 4-digit PIN to secure your account.</div>
+        <div class="pin-inputs">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p1" oninput="pinMove(this,'su-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p2" oninput="pinMove(this,'su-p3')" onkeydown="pinBack(event,'su-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p3" oninput="pinMove(this,'su-p4')" onkeydown="pinBack(event,'su-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p4" onkeydown="pinBack(event,'su-p3')">
+        </div>
+      </div>
+      <div class="err-msg" id="err-signup"></div>
+      <button class="btn-primary" onclick="doSignUp()" id="btn-signup">✅ Create Account →</button>
+      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--muted);">Already have an account? <button onclick="switchAuthTab('signin')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign In</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PAGE: MY ACCOUNT DASHBOARD ========== -->
+<div class="page fade" id="pg-account">
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="header" style="background:linear-gradient(135deg,#1a3fa8,#2563eb);">
+    <h1 id="acct-hdr-name">My Account</h1>
+    <div class="tagline">Bhavi Electronics &amp; Automation</div>
+    <div class="step-badge" id="acct-hdr-mob">—</div>
+  </div>
+  <div class="body">
+    <!-- Stats row -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <div class="acct-stat"><div class="n" id="acct-stat-tickets">—</div><div class="l">Tickets</div></div>
+      <div class="acct-stat"><div class="n" id="acct-stat-orders">—</div><div class="l">Orders</div></div>
+      <div class="acct-stat"><div class="n" id="acct-stat-active">—</div><div class="l">Active</div></div>
+    </div>
+    <!-- Tabs -->
+    <div class="acct-tab-bar">
+      <button class="acct-tab active" id="acctab-tickets" onclick="acctTab('tickets')">🔧 My Tickets</button>
+      <button class="acct-tab" id="acctab-orders" onclick="acctTab('orders')">📦 My Orders</button>
+    </div>
+    <!-- Content -->
+    <div id="acct-content"><div style="text-align:center;color:var(--muted);padding:30px;">Loading...</div></div>
+  </div>
+  <div class="footer" style="display:flex;flex-direction:column;gap:8px;">
+    <button class="btn-outline" onclick="goPage('pg-home')">🏠 Back to Home</button>
+    <button style="background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;padding:6px;" onclick="doSignOut()">🚪 Sign Out</button>
   </div>
 </div>
 
@@ -1408,6 +1521,226 @@ function renderHomeServices(rows){
   }).join('');
 }
 
+// ======= CUSTOMER AUTH =======
+var _SESSION_KEY='bea_portal_v1';
+
+function getSession(){
+  try{return JSON.parse(localStorage.getItem(_SESSION_KEY)||'null');}catch(e){return null;}
+}
+function setSession(data){
+  localStorage.setItem(_SESSION_KEY,JSON.stringify(data));
+  updateHomeAuthUI();
+}
+function clearSession(){
+  localStorage.removeItem(_SESSION_KEY);
+  updateHomeAuthUI();
+}
+function updateHomeAuthUI(){
+  var s=getSession();
+  var lbl=document.getElementById('acct-btn-label');
+  var wtxt=document.getElementById('home-welcome-txt');
+  if(s&&s.name){
+    if(lbl)lbl.textContent=s.name.split(' ')[0];
+    if(wtxt)wtxt.textContent='👋 Hi, '+s.name.split(' ')[0]+'!';
+  } else {
+    if(lbl)lbl.textContent='Sign In';
+    if(wtxt)wtxt.textContent='👋 Welcome!';
+  }
+}
+function goAccountOrAuth(){
+  var s=getSession();
+  if(s&&s.mobile){loadAccountDashboard();goPage('pg-account');}
+  else{goPage('pg-auth');}
+}
+
+function switchAuthTab(tab){
+  document.getElementById('authtab-signin').classList.toggle('active',tab==='signin');
+  document.getElementById('authtab-signup').classList.toggle('active',tab==='signup');
+  document.getElementById('auth-signin-form').style.display=tab==='signin'?'':'none';
+  document.getElementById('auth-signup-form').style.display=tab==='signup'?'':'none';
+}
+
+function pinMove(el,nextId){
+  if(el.value&&nextId){var n=document.getElementById(nextId);if(n)n.focus();}
+}
+function pinBack(e,prevId){
+  if(e.key==='Backspace'&&!e.target.value&&prevId){var p=document.getElementById(prevId);if(p){p.value='';p.focus();}}
+}
+function getPin(prefix){
+  return ['p1','p2','p3','p4'].map(function(s){return(document.getElementById(prefix+'-'+s)||{}).value||'';}).join('');
+}
+
+async function doSignIn(){
+  var mob=(document.getElementById('si-mob')?.value||'').trim();
+  var pin=getPin('si');
+  var err=document.getElementById('err-signin');err.style.display='none';
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  if(pin.length!==4){err.textContent='Please enter your 4-digit PIN.';err.style.display='block';return;}
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
+    var c=custs&&custs[0];
+    if(!c){err.textContent='No account found for this mobile. Please sign up.';err.style.display='block';return;}
+    if(!c.portal_pin){err.textContent='No PIN set. Please sign up to set your PIN.';err.style.display='block';return;}
+    if(c.portal_pin!==pin){err.textContent='Incorrect PIN. Please try again.';err.style.display='block';return;}
+    setSession({mobile:mob,name:c.cname||'Customer',custId:c.id});
+    loadAccountDashboard();goPage('pg-account');
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+}
+
+async function checkMobileForSignup(){
+  var mob=(document.getElementById('su-mob')?.value||'').trim();
+  if(!/^\d{10}$/.test(mob))return;
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
+    var found=document.getElementById('su-cust-found');
+    var newFields=document.getElementById('su-new-fields');
+    if(custs&&custs[0]){
+      var c=custs[0];
+      // Pre-fill name
+      if(c.cname){
+        var parts=(c.cname||'').split(' ');
+        var fn=document.getElementById('su-fname');var ln=document.getElementById('su-lname');
+        if(fn)fn.value=parts[0]||'';
+        if(ln)ln.value=parts.slice(1).join(' ')||'';
+      }
+      if(c.portal_pin){
+        // Already has PIN
+        found.innerHTML='<div class="info-msg">✅ Account found for this mobile. Please <button onclick="switchAuthTab(\'signin\')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign In</button> instead.</div>';
+        found.style.display='';
+        newFields.style.display='none';
+        document.getElementById('btn-signup').disabled=true;
+      } else {
+        found.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;font-size:12px;color:#166534;">✅ <b>'+escHtml(c.cname||'Customer')+'</b> — account found! Set a PIN to activate your account.</div>';
+        found.style.display='';
+        newFields.style.display='';
+        document.getElementById('btn-signup').disabled=false;
+      }
+    } else {
+      found.style.display='none';
+      newFields.style.display='';
+      document.getElementById('btn-signup').disabled=false;
+    }
+  }catch(e){}
+}
+
+async function doSignUp(){
+  var mob=(document.getElementById('su-mob')?.value||'').trim();
+  var fname=(document.getElementById('su-fname')?.value||'').trim();
+  var lname=(document.getElementById('su-lname')?.value||'').trim();
+  var pin=getPin('su');
+  var err=document.getElementById('err-signup');err.style.display='none';
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  if(!fname){err.textContent='Please enter your first name.';err.style.display='block';return;}
+  if(pin.length!==4||!/^\d{4}$/.test(pin)){err.textContent='Please enter a valid 4-digit PIN.';err.style.display='block';return;}
+  var cname=(fname+' '+(lname||'')).trim();
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
+    if(custs&&custs[0]){
+      // Update existing customer with PIN
+      await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
+    } else {
+      // Create new customer
+      await sbPostMin('customers',{cname:cname,mobile:mob,alt_mobile:'',address:'',city:'',pin:'',state:'',area:'',serial:'',model:'',portal_pin:pin,updated_at:new Date().toISOString()});
+    }
+    setSession({mobile:mob,name:cname});
+    loadAccountDashboard();goPage('pg-account');
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+}
+
+function doSignOut(){
+  if(!confirm('Sign out from your account?'))return;
+  clearSession();
+  goPage('pg-home');
+}
+
+// ======= ACCOUNT DASHBOARD =======
+var _acctTab='tickets';
+function acctTab(tab){
+  _acctTab=tab;
+  document.getElementById('acctab-tickets').classList.toggle('active',tab==='tickets');
+  document.getElementById('acctab-orders').classList.toggle('active',tab==='orders');
+  renderAcctContent();
+}
+
+async function loadAccountDashboard(){
+  var s=getSession();if(!s||!s.mobile)return;
+  // Set header
+  var hdr=document.getElementById('acct-hdr-name');if(hdr)hdr.textContent='👤 '+s.name;
+  var mob=document.getElementById('acct-hdr-mob');if(mob)mob.textContent=s.mobile;
+  document.getElementById('acct-stat-tickets').textContent='—';
+  document.getElementById('acct-stat-orders').textContent='—';
+  document.getElementById('acct-stat-active').textContent='—';
+  _acctTab='tickets';
+  document.getElementById('acctab-tickets').classList.add('active');
+  document.getElementById('acctab-orders').classList.remove('active');
+  renderAcctContent();
+  // Load counts in background
+  try{
+    var tks=await sbGet('tickets','?mobile=eq.'+s.mobile+'&select=id,status&order=created_at.desc&limit=100')||[];
+    var ords=await sbGet('sales_orders','?customer_mobile=eq.'+s.mobile+'&select=id,status&order=created_at.desc&limit=100')||[];
+    var active=tks.filter(function(t){return!['Closed','Call Cancel','Customer Reject'].includes(t.status);}).length;
+    document.getElementById('acct-stat-tickets').textContent=tks.length;
+    document.getElementById('acct-stat-orders').textContent=ords.length;
+    document.getElementById('acct-stat-active').textContent=active;
+  }catch(e){}
+}
+
+async function renderAcctContent(){
+  var s=getSession();if(!s||!s.mobile)return;
+  var el=document.getElementById('acct-content');
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;color:var(--muted);padding:20px;"><span class="spinner" style="border-top-color:var(--primary);border-color:var(--border);"></span></div>';
+  try{
+    if(_acctTab==='tickets'){
+      var tks=await sbGet('tickets','?mobile=eq.'+s.mobile+'&order=created_at.desc&limit=50')||[];
+      if(!tks.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">No service tickets yet.<br><br><button class="btn-primary" style="width:auto;padding:10px 20px;" onclick="goPage(\'pg-home\')">Book a Service →</button></div>';return;}
+      var statusColors={
+        'Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6',
+        'Pending Parts':'#d97706','Pending Customer Approval':'#8b5cf6','Customer Approved':'#6366f1',
+        'Closed':'#059669','Call Cancel':'#94a3b8','Customer Reject':'#dc2626'
+      };
+      el.innerHTML=tks.map(function(t){
+        var clr=statusColors[t.status]||'#64748b';
+        var isActive=!['Closed','Call Cancel','Customer Reject'].includes(t.status);
+        return '<div class="acct-item">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+          +'<div><div style="font-size:14px;font-weight:800;color:var(--text);">'+escHtml(t.id)+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);">'+new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
+          +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+escHtml(t.status)+'</span>'
+          +'</div>'
+          +(t.model?'<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">📱 '+escHtml(t.model)+'</div>':'')
+          +(t.problem?'<div style="font-size:12px;color:var(--text);margin-bottom:4px;">⚠️ '+escHtml(t.problem)+'</div>':'')
+          +(t.assigned_name?'<div style="font-size:12px;color:#2563eb;font-weight:600;">👷 Engineer: '+escHtml(t.assigned_name)+'</div>':'')
+          +(t.action?'<div style="font-size:11px;color:var(--muted);margin-top:4px;background:#f8fafc;border-radius:6px;padding:5px 8px;">📝 '+escHtml(t.action)+'</div>':'')
+          +(isActive?'<div style="margin-top:8px;font-size:11px;color:#d97706;font-weight:600;">🔄 In Progress — we will contact you soon</div>':'')
+          +'</div>';
+      }).join('');
+    } else {
+      var ords=await sbGet('sales_orders','?customer_mobile=eq.'+s.mobile+'&order=created_at.desc&limit=50')||[];
+      if(!ords.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">No orders yet.<br><br><button class="btn-primary" style="width:auto;padding:10px 20px;" onclick="goPage(\'pg-home\');homeTab(\'shop\')">Shop Now →</button></div>';return;}
+      var statusLabel={'inquiry':'Inquiry Received','quoted':'Quoted','confirmed':'Confirmed','paid':'Payment Done','dispatched':'Dispatched 🚚','done':'Delivered ✅','cancelled':'Cancelled'};
+      var statusCol={'inquiry':'#d97706','quoted':'#3b82f6','confirmed':'#8b5cf6','paid':'#059669','dispatched':'#0ea5e9','done':'#059669','cancelled':'#dc2626'};
+      el.innerHTML=ords.map(function(o){
+        var clr=statusCol[o.status]||'#64748b';
+        var lbl=statusLabel[o.status]||o.status||'Processing';
+        var items=(o.items||[]).map(function(i){return escHtml((i.name||''))+(i.qty>1?' ×'+i.qty:'');}).join(', ');
+        return '<div class="acct-item">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+          +'<div><div style="font-size:14px;font-weight:800;">'+escHtml(o.order_no||'')+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
+          +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;">'+escHtml(lbl)+'</span>'
+          +'</div>'
+          +(items?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📦 '+items+'</div>':'')
+          +'<div style="font-size:16px;font-weight:800;color:var(--primary);">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</div>'
+          +(o.courier_name?'<div style="font-size:12px;color:#0ea5e9;margin-top:5px;font-weight:600;">🚚 '+escHtml(o.courier_name)+' — AWB: '+escHtml(o.awb_number||'')+'</div>':'')
+          +(o.tracking_url?'<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="font-size:12px;color:var(--primary);display:block;margin-top:3px;font-weight:600;">🔗 Track Shipment →</a>':'')
+          +(o.delivery_date?'<div style="font-size:11px;color:#059669;font-weight:600;margin-top:4px;">✅ Delivered: '+o.delivery_date+'</div>':'')
+          +'</div>';
+      }).join('');
+    }
+  }catch(e){el.innerHTML='<div style="color:var(--danger);padding:16px;font-size:13px;">Error: '+escHtml(e.message)+'</div>';}
+}
+
 // ---- My Orders ----
 function goMyOrders(){
   // Pre-fill mobile if we know it
@@ -1474,6 +1807,8 @@ window.addEventListener('load',function(){
   r.onload=function(){try{allModels=JSON.parse(r.responseText)||[];}catch(e){}};r.send();
   // Load services from DB
   loadPortalServices();
+  // Restore auth session
+  updateHomeAuthUI();
 });
 </script>
 </body>
