@@ -1725,6 +1725,16 @@ async function doSignUp(){
   var cname=(fname+' '+(lname||'')).trim();
   var btn=document.getElementById('btn-signup');if(btn)btn.disabled=true;
   try{
+    // Check if account already exists (portal_pin already set)
+    var custs=[];
+    try{custs=await sbGet('customers','?mobile=eq.'+mob+'&select=mobile,portal_pin&limit=1');}catch(e){}
+    if(custs&&custs[0]&&custs[0].portal_pin){
+      err.textContent='An account already exists for this mobile number. Please use Sign In instead.';
+      err.style.display='block';
+      if(btn)btn.disabled=false;
+      switchAuthTab('signin');
+      return;
+    }
     // Always try PATCH first (handles existing customers, even if SELECT is blocked by RLS)
     var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal,count=exact'},body:JSON.stringify({portal_pin:pin,cname:cname,updated_at:new Date().toISOString()})});
     var patchedRows=0;
@@ -1864,17 +1874,19 @@ async function renderAcctContent(){
       el.innerHTML=tks.map(function(t){
         var clr=statusColors[t.status]||'#64748b';
         var isActive=!['Closed','Call Cancel','Customer Reject'].includes(t.status);
-        return '<div class="acct-item">'
+        var tJson=JSON.stringify(t).replace(/"/g,'&quot;');
+        return '<div class="acct-item" onclick="openTicketDetail(\''+tJson.replace(/'/g,'&#39;')+'\')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow=\'0 4px 18px rgba(29,78,216,.12)\'" onmouseout="this.style.boxShadow=\'none\'">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
           +'<div><div style="font-size:14px;font-weight:800;color:var(--text);">'+escHtml(t.id)+'</div>'
           +'<div style="font-size:11px;color:var(--muted);">'+new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
           +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+escHtml(t.status)+'</span>'
           +'</div>'
-          +(t.model?'<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">📱 '+escHtml(t.model)+'</div>':'')
+          +(t.model?'<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">🖨️ '+escHtml(t.model)+(t.serial?' · '+escHtml(t.serial):'')+'</div>':'')
           +(t.problem?'<div style="font-size:12px;color:var(--text);margin-bottom:4px;">⚠️ '+escHtml(t.problem)+'</div>':'')
           +(t.assigned_name?'<div style="font-size:12px;color:#2563eb;font-weight:600;">👷 Engineer: '+escHtml(t.assigned_name)+'</div>':'')
           +(t.action?'<div style="font-size:11px;color:var(--muted);margin-top:4px;background:#f8fafc;border-radius:6px;padding:5px 8px;">📝 '+escHtml(t.action)+'</div>':'')
-          +(isActive?'<div style="margin-top:8px;font-size:11px;color:#d97706;font-weight:600;">🔄 In Progress — we will contact you soon</div>':'')
+          +(isActive?'<div style="margin-top:8px;font-size:11px;color:#d97706;font-weight:600;">🔄 In progress — our team will contact you soon</div>':'')
+          +'<div style="font-size:11px;color:var(--primary);font-weight:700;margin-top:8px;text-align:right;">Tap to view details →</div>'
           +'</div>';
       }).join('');
     } else {
@@ -2029,6 +2041,49 @@ function openOrderDetail(o){
     +(o.tracking_info||o.tracking_url||o.courier_name?'<div style="background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:10px;padding:12px 14px;margin-top:12px;"><div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:4px;">🚚 Shipping / Tracking</div>'+(o.courier_name?'<div style="font-size:13px;font-weight:700;color:var(--text);">'+escHtml(o.courier_name)+(o.awb_number?' — AWB: '+escHtml(o.awb_number):'')+'</div>':'')+(o.tracking_info?'<div style="font-size:13px;font-weight:700;color:var(--text);">'+escHtml(o.tracking_info)+'</div>':'')+(o.dispatch_date?'<div style="font-size:11px;color:#64748b;margin-top:2px;">Dispatched: '+escHtml(o.dispatch_date)+'</div>':'')+(o.tracking_url?'<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="font-size:12px;color:#7c3aed;font-weight:700;display:inline-block;margin-top:4px;">🔗 Track Shipment →</a>':'')+'</div>':'')
     +(o.delivery_note?'<div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#065f46;">📝 '+escHtml(o.delivery_note)+'</div>':'')
     +(o.notes?'<div style="background:#fff7ed;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#92400e;">📋 '+escHtml(o.notes)+'</div>':'')
+    +'</div>'
+    +'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
+function openTicketDetail(t){
+  if(typeof t==='string'){try{t=JSON.parse(t);}catch(e){return;}}
+  var statusColors={'Pending Customer Arrival':'#f59e0b','Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6','Pending Parts':'#d97706','Pending Customer Approval':'#8b5cf6','Customer Approved':'#6366f1','Closed':'#059669','Call Cancel':'#94a3b8','Customer Reject':'#dc2626'};
+  var clr=statusColors[t.status]||'#64748b';
+  var timeline=Array.isArray(t.timeline)?t.timeline:[];
+  var tlHtml=timeline.length?timeline.slice().reverse().map(function(e){
+    var dt=e.at?new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    return '<div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--text);">'+escHtml(e.action||'')+'</div>'
+      +(e.note?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+escHtml(e.note)+'</div>':'')
+      +'<div style="font-size:10px;color:#94a3b8;margin-top:3px;">'+escHtml(e.by||'')+(dt?' · '+dt:'')+'</div>'
+      +'</div>';
+  }).join(''):'<div style="font-size:12px;color:var(--muted);padding:8px 0;">No activity recorded yet.</div>';
+
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  ov.innerHTML='<div style="background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;max-height:90vh;overflow-y:auto;padding-bottom:24px;">'
+    +'<div style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border-radius:22px 22px 0 0;padding:18px 20px 14px;position:relative;">'
+    +'<button onclick="this.closest(\'[style*=fixed]\').remove()" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer;line-height:1;">✕</button>'
+    +'<div style="font-size:12px;color:rgba(255,255,255,.7);font-weight:700;letter-spacing:1px;">SERVICE TICKET</div>'
+    +'<div style="font-size:18px;font-weight:900;color:#fff;margin-top:2px;">'+escHtml(t.id||'—')+'</div>'
+    +'<div style="margin-top:6px;"><span style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;">'+escHtml(t.status||'')+'</span></div>'
+    +'</div>'
+    +'<div style="padding:16px 18px 0;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
+    +'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Date</div><div style="font-size:13px;font-weight:700;color:var(--text);">'+new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
+    +'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Service</div><div style="font-size:12px;font-weight:700;color:var(--text);">'+escHtml(t.service_type||t.call_type||'—')+'</div></div>'
+    +(t.model?'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Model</div><div style="font-size:13px;font-weight:700;color:var(--text);">'+escHtml(t.model)+'</div></div>':'')
+    +(t.serial?'<div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Serial</div><div style="font-size:12px;font-weight:700;color:var(--text);">'+escHtml(t.serial)+'</div></div>':'')
+    +(t.service_charges?'<div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Charges</div><div style="font-size:14px;font-weight:800;color:var(--primary);">₹'+t.service_charges+'/-</div></div>':'')
+    +(t.assigned_name?'<div style="background:#eff6ff;border-radius:10px;padding:10px 12px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:2px;">Engineer</div><div style="font-size:13px;font-weight:700;color:#1d4ed8;">👷 '+escHtml(t.assigned_name)+'</div></div>':'')
+    +'</div>'
+    +(t.problem?'<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;margin-bottom:12px;"><div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;margin-bottom:4px;">⚠️ Problem Reported</div><div style="font-size:13px;color:var(--text);">'+escHtml(t.problem)+'</div>'+(t.description?'<div style="font-size:11px;color:var(--muted);margin-top:6px;white-space:pre-line;">'+escHtml(t.description)+'</div>':'')+'</div>':'')
+    +(t.action||t.work_done?'<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:12px;"><div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;margin-bottom:4px;">🔧 Work Done</div><div style="font-size:13px;color:var(--text);">'+escHtml(t.action||t.work_done||'')+'</div></div>':'')
+    +(t.remarks?'<div style="background:#f8fafc;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--muted);">📋 '+escHtml(t.remarks)+'</div>':'')
+    +'<div style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">📋 Activity History</div>'
+    +tlHtml
     +'</div>'
     +'</div>';
   ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
