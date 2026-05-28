@@ -7,25 +7,25 @@
 <link rel="icon" href="icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--primary:#0d9488;--primary-light:#14b8a6;--success:#059669;--danger:#dc2626;--orange:#f59e0b;--bg:#f0fdfa;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
+:root{--primary:#1d4ed8;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--orange:#f59e0b;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
 .page{display:none;width:100%;max-width:500px;min-height:100vh;background:var(--card);flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.08);}
 .page.active{display:flex;}
 
 /* Progress */
 .progress-bar{height:4px;background:#dbeafe;overflow:hidden;}
-.progress-fill{height:100%;background:linear-gradient(90deg,#0d9488,#14b8a6);transition:width .4s;border-radius:2px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#1e3a8a,#1d4ed8);transition:width .4s;border-radius:2px;}
 
 /* Header */
-.header{background:linear-gradient(160deg,#065f52 0%,#0d9488 60%,#14b8a6 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
-.header-logo{width:48px;height:48px;border-radius:12px;margin:0 auto 8px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 18px rgba(0,0,0,.28);}
-.header-logo-auth{width:90px;height:90px;border-radius:22px;margin:0 auto 20px;display:block;background:#fff;object-fit:contain;padding:8px;box-shadow:0 6px 28px rgba(0,0,0,.13);border:2px solid #ccfbf1;}
+.header{background:linear-gradient(160deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
+.header-logo{width:44px;height:44px;border-radius:10px;margin:0 auto 8px;display:block;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));}
+.header-logo-auth{width:110px;height:110px;margin:0 auto 18px;display:block;object-fit:contain;}
 .header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
 .header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
 .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
 
 /* Home page header */
-.home-header{background:linear-gradient(135deg,#065f52 0%,#0d9488 60%,#14b8a6 100%);color:#fff;padding:24px 20px 22px;position:relative;overflow:hidden;}
+.home-header{background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%);color:#fff;padding:24px 20px 22px;position:relative;overflow:hidden;}
 .home-header::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(255,255,255,.07);border-radius:50%;}
 .home-header::after{content:'';position:absolute;bottom:-20px;left:-20px;width:80px;height:80px;background:rgba(255,255,255,.05);border-radius:50%;}
 .home-header .welcome{font-size:22px;font-weight:900;margin-bottom:4px;}
@@ -38,7 +38,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .services-title{font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px;}
 .services-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .svc-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:16px 12px;text-align:center;cursor:pointer;transition:all .18s;box-shadow:0 2px 8px rgba(0,0,0,.05);}
-.svc-card:hover{border-color:var(--primary-light);box-shadow:0 4px 18px rgba(13,148,136,.14);transform:translateY(-2px);}
+.svc-card:hover{border-color:var(--primary-light);box-shadow:0 4px 18px rgba(29,78,216,.14);transform:translateY(-2px);}
 .svc-card:active{transform:translateY(0);}
 .svc-card .s-icon{font-size:30px;margin-bottom:8px;display:block;}
 .svc-card .s-name{font-size:13px;font-weight:800;color:var(--text);margin-bottom:4px;}
@@ -54,7 +54,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .inp-group{margin-bottom:14px;}
 .inp-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px;}
 .inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:15px;color:var(--text);outline:none;transition:border .18s;background:#fafcff;}
-.inp:focus{border-color:var(--primary-light);background:#fff;box-shadow:0 0 0 3px rgba(13,148,136,.1);}
+.inp:focus{border-color:var(--primary-light);background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;cursor:pointer;}
 textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -85,7 +85,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 /* Warranty */
 .warr-grid{display:flex;flex-direction:column;gap:10px;}
 .warr-card{padding:14px;border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .18s;}
-.warr-card:hover{border-color:var(--primary-light);background:#f0fdfa;}
+.warr-card:hover{border-color:var(--primary-light);background:#eff6ff;}
 .warr-card.w1:hover,.warr-card.w1.sel{border-color:#059669;background:#f0fdf4;}
 .warr-card.w2:hover,.warr-card.w2.sel{border-color:#dc2626;background:#fef2f2;}
 .warr-card.w3:hover,.warr-card.w3.sel{border-color:#d97706;background:#fffbeb;}
@@ -105,7 +105,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 
 /* Model search */
 .model-wrap{position:relative;}
-.model-drop{position:absolute;z-index:500;background:#fff;border:1.5px solid var(--primary-light);border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(13,148,136,.15);top:100%;left:0;margin-top:2px;}
+.model-drop{position:absolute;z-index:500;background:#fff;border:1.5px solid var(--primary-light);border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(29,78,216,.12);top:100%;left:0;margin-top:2px;}
 .model-drop div{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
 .model-drop div:hover{background:#eff6ff;}
 .model-drop div:last-child{border-bottom:none;}
@@ -121,7 +121,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 .sign-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#cbd5e1;font-size:13px;font-weight:600;pointer-events:none;text-align:center;line-height:1.5;}
 
 /* Ticket box */
-.ticket-box{background:linear-gradient(135deg,#065f52,#0d9488);color:#fff;border-radius:16px;padding:24px 20px;text-align:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(13,148,136,.3);}
+.ticket-box{background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;border-radius:16px;padding:24px 20px;text-align:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(29,78,216,.3);}
 .ticket-num{font-size:28px;font-weight:900;letter-spacing:3px;margin:6px 0;}
 .ticket-lbl{font-size:11px;opacity:.8;letter-spacing:.5px;}
 .inq-box{background:linear-gradient(135deg,#065f46,#059669);color:#fff;border-radius:16px;padding:24px 20px;text-align:center;margin-bottom:14px;box-shadow:0 8px 24px rgba(5,150,105,.3);}
@@ -134,8 +134,8 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 .info-row .ir-val{color:var(--text);font-weight:500;}
 
 /* Buttons */
-.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(13,148,136,.25);}
-.btn-primary:hover{box-shadow:0 6px 20px rgba(13,148,136,.35);}
+.btn-primary{width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.2px;box-shadow:0 4px 14px rgba(29,78,216,.25);}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(29,78,216,.4);}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
 .btn-outline{width:100%;background:#fff;color:var(--primary);border:1.5px solid var(--primary-light);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;}
 .btn-outline:hover{background:#eff6ff;}
@@ -682,14 +682,14 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 
 <!-- ========== PAGE: AUTH (Sign In / Sign Up) ========== -->
 <div class="page active fade" id="pg-auth">
-  <div style="height:5px;background:linear-gradient(90deg,#065f52,#0d9488,#14b8a6);"></div>
-  <div style="background:#fff;text-align:center;padding:44px 24px 28px;box-shadow:0 2px 16px rgba(0,0,0,.06);">
-    <img class="header-logo-auth" src="icon-192.png" onerror="this.style.display='none'">
-    <h1 style="font-size:22px;font-weight:900;color:#1e293b;letter-spacing:0.3px;margin-bottom:5px;">Bhavi Electronics</h1>
-    <div style="font-size:11px;color:#64748b;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;">&amp; Automation</div>
-    <div style="display:inline-flex;align-items:center;gap:6px;background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:99px;padding:5px 16px;font-size:12px;color:#0d9488;font-weight:700;">🔐 Customer Portal</div>
+  <div style="height:6px;background:linear-gradient(90deg,#1e3a8a,#1d4ed8,#3b82f6);"></div>
+  <div style="background:#fff;text-align:center;padding:40px 24px 30px;border-bottom:1px solid #e2e8f0;">
+    <img class="header-logo-auth" src="icon-192.png" alt="Bhavi Electronics" onerror="this.style.display='none'">
+    <h1 style="font-size:24px;font-weight:900;color:#1e293b;letter-spacing:-0.3px;margin-bottom:4px;">Bhavi Electronics</h1>
+    <div style="font-size:12px;color:#64748b;letter-spacing:1.8px;text-transform:uppercase;margin-bottom:18px;">&amp; Automation</div>
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:99px;padding:6px 18px;font-size:12px;color:#1d4ed8;font-weight:700;letter-spacing:.3px;">🔐 Customer Portal — Sign in to continue</div>
   </div>
-  <div class="body" style="background:#f0fdfa;padding:0;">
+  <div class="body" style="background:#f4f6fb;padding:0;">
     <div style="background:#fff;padding:24px 20px 8px;border-bottom:1px solid #e2e8f0;">
     <div class="auth-tab-bar">
       <button class="auth-tab active" id="authtab-signin" onclick="switchAuthTab('signin')">Sign In</button>
