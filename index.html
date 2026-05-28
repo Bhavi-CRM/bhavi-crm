@@ -372,7 +372,7 @@ tr:hover td{background:#f8fafc;}
       <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">👤 Customer</h3>
       <div class="form-grid">
         <div class="form-group"><label>Name <span class="req">*</span></label><input type="text" id="call-cname"></div>
-        <div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="call-mobile"></div>
+        <div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="call-mobile" oninput="debounceCallMobile(this.value)" maxlength="10" inputmode="numeric"><div id="call-cust-hint" style="font-size:11px;margin-top:4px;display:none;"></div></div>
         <div class="form-group"><label>Alternate</label><input type="tel" id="call-alt"></div>
         <div class="form-group">
           <label>State <span class="req">*</span></label>
@@ -2234,6 +2234,32 @@ function setAddressDropdowns(state,city,pin){
   },100);
 }
 
+var _callMobTimer=null;
+function debounceCallMobile(val){
+  clearTimeout(_callMobTimer);
+  var hint=document.getElementById('call-cust-hint');
+  if(!hint)return;
+  if(!/^\d{10}$/.test(val)){hint.style.display='none';return;}
+  hint.style.display='';hint.style.color='#64748b';hint.textContent='🔍 Looking up customer...';
+  _callMobTimer=setTimeout(function(){autoFillCallForm(val);},500);
+}
+async function autoFillCallForm(mob){
+  var hint=document.getElementById('call-cust-hint');
+  if(!/^\d{10}$/.test(mob)){if(hint)hint.style.display='none';return;}
+  try{
+    const res=await sb('customers','GET',null,'?mobile=eq.'+mob+'&limit=1');
+    const c=res&&res[0];
+    if(!c){if(hint){hint.style.display='';hint.style.color='#f59e0b';hint.textContent='⚠️ New customer — fill details manually';}return;}
+    // Fill fields
+    const ne=document.getElementById('call-cname');if(ne&&!ne.value)ne.value=c.cname||'';
+    const ae=document.getElementById('call-alt');if(ae&&!ae.value)ae.value=c.alt_mobile||'';
+    const addr=document.getElementById('call-address');if(addr&&!addr.value)addr.value=c.address||'';
+    const area=document.getElementById('call-area');if(area&&!area.value)area.value=c.area||'';
+    if(c.state||c.city||c.pin)setAddressDropdowns(c.state||'',c.city||'',c.pin||'');
+    if(hint){hint.style.display='';hint.style.color='#059669';hint.innerHTML='✅ Customer found: <b>'+escHtml(c.cname||'')+'</b>'+(c.city?' · '+escHtml(c.city):'');}
+  }catch(e){if(hint){hint.style.display='';hint.style.color='#dc2626';hint.textContent='Error looking up customer';}}
+}
+
 function filterPinList(val){
   var pinEl=document.getElementById('call-pin');
   var dl=document.getElementById('pin-datalist');
@@ -3446,6 +3472,7 @@ async function openNewCall(){
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
   ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
   const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value='';
