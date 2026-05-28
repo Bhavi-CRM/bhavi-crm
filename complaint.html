@@ -660,11 +660,11 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       <div style="font-size:13px;color:var(--muted);" id="ord-success-no"></div>
     </div>
     <div class="info-box" id="ord-success-info"></div>
+    <div id="ord-success-upi-qr"></div>
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;font-size:13px;color:#166534;margin-bottom:14px;line-height:1.8;">
       <b>What happens next?</b><br>
       ✅ Your order has been received.<br>
-      📞 We will contact you within 24 hours.<br>
-      💳 Payment details via WhatsApp.<br>
+      💳 Scan QR above to pay, or wait for our WhatsApp message.<br>
       🚚 Dispatched after payment confirmation.
     </div>
     <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);text-align:center;">
@@ -710,7 +710,10 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       </div>
       <div class="err-msg" id="err-signin"></div>
       <button class="btn-primary" onclick="doSignIn()">🔐 Sign In →</button>
-      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--muted);">Don't have an account? <button onclick="switchAuthTab('signup')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign Up</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+        <span style="font-size:13px;color:var(--muted);">No account? <button onclick="switchAuthTab('signup')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign Up</button></span>
+        <button onclick="showForgotPin()" style="background:none;border:none;color:#d97706;font-weight:600;cursor:pointer;font-size:12px;">🔑 Forgot PIN?</button>
+      </div>
     </div>
 
     <!-- SIGN UP -->
@@ -722,7 +725,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       <div id="su-new-fields">
         <div class="form-row">
           <div class="inp-group"><label>First Name <span class="req">*</span></label><input class="inp" type="text" id="su-fname" placeholder="First name"></div>
-          <div class="inp-group"><label>Last Name <span class="req">*</span></label><input class="inp" type="text" id="su-lname" placeholder="Last name"></div>
+          <div class="inp-group"><label>Last Name</label><input class="inp" type="text" id="su-lname" placeholder="Last name"></div>
         </div>
       </div>
       <div class="inp-group">
@@ -735,9 +738,50 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
           <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p4" onkeydown="pinBack(event,'su-p3')">
         </div>
       </div>
+      <div class="inp-group" style="margin-top:4px;">
+        <label>Confirm PIN <span class="req">*</span></label>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Re-enter the same PIN to confirm.</div>
+        <div class="pin-inputs">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p1" oninput="pinMove(this,'suc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p2" oninput="pinMove(this,'suc-p3')" onkeydown="pinBack(event,'suc-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p3" oninput="pinMove(this,'suc-p4')" onkeydown="pinBack(event,'suc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p4" onkeydown="pinBack(event,'suc-p3')">
+        </div>
+      </div>
       <div class="err-msg" id="err-signup"></div>
       <button class="btn-primary" onclick="doSignUp()" id="btn-signup">✅ Create Account →</button>
       <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--muted);">Already have an account? <button onclick="switchAuthTab('signin')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">Sign In</button></div>
+    </div>
+
+    <!-- FORGOT PIN -->
+    <div id="auth-forgot-form" style="display:none;">
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px;">🔑 Enter your mobile number and set a new PIN. Your account details remain safe.</div>
+      <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
+        <input class="inp" type="tel" id="fp-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+      </div>
+      <div class="inp-group">
+        <label>New 4-digit PIN <span class="req">*</span></label>
+        <div class="pin-inputs">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p1" oninput="pinMove(this,'fp-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p2" oninput="pinMove(this,'fp-p3')" onkeydown="pinBack(event,'fp-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p3" oninput="pinMove(this,'fp-p4')" onkeydown="pinBack(event,'fp-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p4" onkeydown="pinBack(event,'fp-p3')">
+        </div>
+      </div>
+      <div class="inp-group" style="margin-top:4px;">
+        <label>Confirm New PIN <span class="req">*</span></label>
+        <div class="pin-inputs">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p1" oninput="pinMove(this,'fpc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p2" oninput="pinMove(this,'fpc-p3')" onkeydown="pinBack(event,'fpc-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p3" oninput="pinMove(this,'fpc-p4')" onkeydown="pinBack(event,'fpc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p4" onkeydown="pinBack(event,'fpc-p3')">
+        </div>
+      </div>
+      <div class="err-msg" id="err-forgot"></div>
+      <button class="btn-primary" onclick="doResetPin()" style="background:linear-gradient(135deg,#d97706,#b45309);">🔑 Reset PIN →</button>
+      <div style="text-align:center;margin-top:12px;">
+        <button onclick="switchAuthTab('signin')" style="background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;font-size:13px;">‹ Back to Sign In</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1475,7 +1519,9 @@ async function submitShopOrder(){
       +'<div class="info-row"><span class="ir-lbl">📍 Address</span><span class="ir-val">'+escHtml(addr)+'</span></div>'
       +'<div class="info-row"><span class="ir-lbl">💰 Total</span><span class="ir-val" style="font-weight:800;color:var(--primary);">₹'+Math.round(total).toLocaleString('en-IN')+'</span></div>';
     _cart=[];updateCartUI();
-    if(mob&&!state.mobile)state.mobile=mob; // save for My Orders
+    if(mob&&!state.mobile)state.mobile=mob;
+    var upiEl=document.getElementById('ord-success-upi-qr');
+    if(upiEl)upiEl.innerHTML=getUpiQrHtml('After payment, WhatsApp your transaction screenshot to us.');
     goPage('pg-order-success');
   }catch(e){err.textContent='Error placing order: '+e.message;err.style.display='block';}
   btn.disabled=false;btn.textContent='✅ Place Order';
@@ -1559,6 +1605,14 @@ function switchAuthTab(tab){
   document.getElementById('authtab-signup').classList.toggle('active',tab==='signup');
   document.getElementById('auth-signin-form').style.display=tab==='signin'?'':'none';
   document.getElementById('auth-signup-form').style.display=tab==='signup'?'':'none';
+  document.getElementById('auth-forgot-form').style.display='none';
+}
+function showForgotPin(){
+  document.getElementById('authtab-signin').classList.remove('active');
+  document.getElementById('authtab-signup').classList.remove('active');
+  document.getElementById('auth-signin-form').style.display='none';
+  document.getElementById('auth-signup-form').style.display='none';
+  document.getElementById('auth-forgot-form').style.display='';
 }
 
 function pinMove(el,nextId){
@@ -1633,6 +1687,9 @@ async function doSignUp(){
   if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
   if(!fname){err.textContent='Please enter your first name.';err.style.display='block';return;}
   if(pin.length!==4||!/^\d{4}$/.test(pin)){err.textContent='Please enter a valid 4-digit PIN.';err.style.display='block';return;}
+  var confirmPin=getPin('suc');
+  if(confirmPin.length!==4){err.textContent='Please confirm your PIN in the second box.';err.style.display='block';return;}
+  if(pin!==confirmPin){err.textContent='PINs do not match. Please re-enter both PINs.';err.style.display='block';return;}
   var cname=(fname+' '+(lname||'')).trim();
   try{
     var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
@@ -1653,6 +1710,43 @@ function doSignOut(){
   if(!confirm('Sign out from your account?'))return;
   clearSession();
   goPage('pg-auth');
+}
+
+async function doResetPin(){
+  var mob=(document.getElementById('fp-mob')?.value||'').trim();
+  var pin=getPin('fp');var confirmPin=getPin('fpc');
+  var err=document.getElementById('err-forgot');err.style.display='none';
+  if(!/^\d{10}$/.test(mob)){err.textContent='Please enter a valid 10-digit mobile number.';err.style.display='block';return;}
+  if(pin.length!==4||!/^\d{4}$/.test(pin)){err.textContent='Please enter a valid 4-digit new PIN.';err.style.display='block';return;}
+  if(pin!==confirmPin){err.textContent='PINs do not match. Please re-enter both PINs.';err.style.display='block';return;}
+  try{
+    var custs=await sbGet('customers','?mobile=eq.'+mob+'&limit=1');
+    if(!custs||!custs[0]){err.textContent='No account found for this mobile number.';err.style.display='block';return;}
+    var pr=await fetch(SB_URL+'/rest/v1/customers?mobile=eq.'+mob,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({portal_pin:pin,updated_at:new Date().toISOString()})});
+    if(!pr.ok){var et=await pr.text();throw new Error(et);}
+    err.textContent='';err.style.display='none';
+    alert('✅ PIN reset successfully! Please sign in with your new PIN.');
+    switchAuthTab('signin');
+    document.getElementById('si-mob').value=mob;
+  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';}
+}
+
+// ======= UPI QR =======
+var _portalUpiQrUrl='';
+async function loadPortalUpiQr(){
+  try{
+    var r=await sbGet('company_info','?id=eq.1&select=upi_qr_url');
+    _portalUpiQrUrl=(r&&r[0]&&r[0].upi_qr_url)||'';
+  }catch(e){_portalUpiQrUrl='';}
+}
+function getUpiQrHtml(note){
+  if(!_portalUpiQrUrl)return '';
+  return '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:14px;text-align:center;margin-top:12px;">'
+    +'<div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px;">💳 Pay via UPI — Scan QR Code</div>'
+    +'<img src="'+_portalUpiQrUrl+'" style="width:160px;height:160px;border-radius:8px;border:2px solid #86efac;display:block;margin:0 auto 8px;" onerror="this.parentElement.style.display=\'none\'">'
+    +'<div style="font-size:11px;color:#166534;margin-bottom:4px;">GPay · PhonePe · Paytm · BHIM · Any UPI App</div>'
+    +(note?'<div style="font-size:11px;color:#64748b;margin-top:4px;">'+note+'</div>':'')
+    +'</div>';
 }
 
 // ======= ACCOUNT DASHBOARD =======
@@ -1720,23 +1814,57 @@ async function renderAcctContent(){
     } else {
       var ords=await sbGet('sales_orders','?customer_mobile=eq.'+s.mobile+'&order=created_at.desc&limit=50')||[];
       if(!ords.length){el.innerHTML='<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">No orders yet.<br><br><button class="btn-primary" style="width:auto;padding:10px 20px;" onclick="goPage(\'pg-home\');homeTab(\'shop\')">Shop Now →</button></div>';return;}
-      var statusLabel={'inquiry':'Inquiry Received','quoted':'Quoted','confirmed':'Confirmed','paid':'Payment Done','dispatched':'Dispatched 🚚','done':'Delivered ✅','cancelled':'Cancelled'};
-      var statusCol={'inquiry':'#d97706','quoted':'#3b82f6','confirmed':'#8b5cf6','paid':'#059669','dispatched':'#0ea5e9','done':'#059669','cancelled':'#dc2626'};
       el.innerHTML=ords.map(function(o){
-        var clr=statusCol[o.status]||'#64748b';
-        var lbl=statusLabel[o.status]||o.status||'Processing';
-        var items=(o.items||[]).map(function(i){return escHtml((i.name||''))+(i.qty>1?' ×'+i.qty:'');}).join(', ');
+        var st=o.status||'inquiry';
+        var statusOrder=['inquiry','quoted','confirmed','paid','dispatched','done'];
+        var si=statusOrder.indexOf(st);
+        // Step definitions: [label, minStatus index to be "done"]
+        var steps=[
+          {icon:'🛒',lbl:'Order Placed',done:si>=0},
+          {icon:'💳',lbl:'Payment',done:si>=3},
+          {icon:'🚚',lbl:'Dispatched',done:si>=4},
+          {icon:'📦',lbl:'Delivered',done:si>=5}
+        ];
+        // current active step (first not done)
+        var activeStep=steps.findIndex(function(s){return !s.done;});
+        if(activeStep===-1)activeStep=steps.length-1;
+        var items=(o.items||[]).map(function(i){return escHtml(i.name||'')+(i.qty>1?' ×'+i.qty:'');}).join(', ');
+        var stepsHtml='<div style="display:flex;align-items:center;gap:0;margin:12px 0 10px;">';
+        steps.forEach(function(step,idx){
+          var isDone=step.done;
+          var isActive=idx===activeStep&&!isDone;
+          var dotBg=isDone?'#059669':isActive?'#1a3fa8':'#e2e8f0';
+          var dotClr=isDone||isActive?'#fff':'#94a3b8';
+          var lblClr=isDone?'#059669':isActive?'#1a3fa8':'#94a3b8';
+          var lnClr=isDone&&idx<steps.length-1?'#059669':'#e2e8f0';
+          stepsHtml+='<div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">'
+            +'<div style="width:28px;height:28px;border-radius:50%;background:'+dotBg+';color:'+dotClr+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;position:relative;z-index:1;">'+(isDone?'✓':step.icon)+'</div>'
+            +'<div style="font-size:9px;font-weight:700;color:'+lblClr+';margin-top:4px;text-align:center;line-height:1.2;">'+step.lbl+'</div>'
+            +'</div>';
+          if(idx<steps.length-1){stepsHtml+='<div style="flex:0 0 auto;width:24px;height:2px;background:'+lnClr+';margin-bottom:16px;margin-left:-4px;margin-right:-4px;"></div>';}
+        });
+        stepsHtml+='</div>';
+        var statusMsg='';
+        if(st==='inquiry'||st==='quoted')statusMsg='<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e;margin-top:8px;">⏳ Order is being processed. We will send payment details on WhatsApp.</div>';
+        else if(st==='confirmed')statusMsg='<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;font-size:12px;color:#92400e;margin-top:8px;">💳 Payment details sent on WhatsApp. Please complete payment to proceed.</div>'+getUpiQrHtml('Scan to pay • After payment share screenshot on WhatsApp');
+        else if(st==='paid')statusMsg='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;font-size:12px;color:#166534;margin-top:8px;">✅ Payment received! Your order is being packed for dispatch.</div>';
+        else if(st==='dispatched')statusMsg='<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px;font-size:12px;color:#075985;margin-top:8px;">🚚 Your order is on the way! Estimated delivery: 1–2 working days.</div>';
+        else if(st==='done')statusMsg='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;font-size:12px;color:#166534;margin-top:8px;">🎉 Order delivered! Thank you for shopping with Bhavi Electronics.</div>';
         return '<div class="acct-item">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
-          +'<div><div style="font-size:14px;font-weight:800;">'+escHtml(o.order_no||'')+'</div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">'
+          +'<div><div style="font-size:14px;font-weight:800;color:var(--primary);">'+escHtml(o.order_no||'—')+'</div>'
           +'<div style="font-size:11px;color:var(--muted);">'+new Date(o.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+'</div></div>'
-          +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;">'+escHtml(lbl)+'</span>'
+          +'<div style="font-size:17px;font-weight:900;color:var(--text);">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</div>'
           +'</div>'
-          +(items?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📦 '+items+'</div>':'')
-          +'<div style="font-size:16px;font-weight:800;color:var(--primary);">₹'+Math.round(o.total_amount||0).toLocaleString('en-IN')+'</div>'
-          +(o.courier_name?'<div style="font-size:12px;color:#0ea5e9;margin-top:5px;font-weight:600;">🚚 '+escHtml(o.courier_name)+' — AWB: '+escHtml(o.awb_number||'')+'</div>':'')
-          +(o.tracking_url?'<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="font-size:12px;color:var(--primary);display:block;margin-top:3px;font-weight:600;">🔗 Track Shipment →</a>':'')
-          +(o.delivery_date?'<div style="font-size:11px;color:#059669;font-weight:600;margin-top:4px;">✅ Delivered: '+o.delivery_date+'</div>':'')
+          +(items?'<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">📦 '+items+'</div>':'')
+          +stepsHtml
+          +(o.courier_name?'<div style="background:#f0f9ff;border-radius:8px;padding:8px 10px;margin-top:4px;">'
+            +'<div style="font-size:12px;font-weight:700;color:#0369a1;">🚚 '+escHtml(o.courier_name)+' — AWB: <b>'+escHtml(o.awb_number||'')+'</b></div>'
+            +(o.dispatch_date?'<div style="font-size:11px;color:#64748b;margin-top:2px;">Dispatched: '+o.dispatch_date+'</div>':'')
+            +(o.tracking_url?'<a href="'+escHtml(o.tracking_url)+'" target="_blank" style="font-size:12px;color:#1a3fa8;display:block;margin-top:4px;font-weight:700;">🔗 Track Shipment →</a>':'')
+            +'</div>':'')
+          +(o.delivery_date?'<div style="font-size:11px;color:#059669;font-weight:700;margin-top:6px;">✅ Delivered on: '+o.delivery_date+'</div>':'')
+          +statusMsg
           +'</div>';
       }).join('');
     }
@@ -1807,8 +1935,9 @@ window.addEventListener('load',function(){
   // Load models
   var r=new XMLHttpRequest();r.open('GET',SB_URL+'/rest/v1/models?order=model_no&select=id,model_no,model_name&limit=1000');r.setRequestHeader('apikey',SB_KEY);r.setRequestHeader('Authorization','Bearer '+SB_KEY);
   r.onload=function(){try{allModels=JSON.parse(r.responseText)||[];}catch(e){}};r.send();
-  // Load services from DB
+  // Load services and UPI QR from DB
   loadPortalServices();
+  loadPortalUpiQr();
   // Route based on session — login required to access portal
   var sess=getSession();
   if(sess&&sess.mobile){
