@@ -6240,34 +6240,64 @@ async function openPortalSvcModal(id){
   }
   var inc=(existing&&existing.includes&&Array.isArray(existing.includes))?existing.includes.join('\n'):'';
   var flds=(existing&&existing.form_fields)?JSON.stringify(existing.form_fields,null,2):'[]';
+  var isRepair=existing&&existing.service_type==='repair';
   var html='<div class="modal-overlay" id="modal-portal-svc" onclick="if(event.target===this)closeModal(\'modal-portal-svc\')">'
-    +'<div class="modal-box" style="max-width:540px;">'
-    +'<div class="modal-header"><h3>'+(id?'✏️ Edit Service':'➕ Add New Service')+'</h3><button onclick="closeModal(\'modal-portal-svc\')" class="modal-close">✕</button></div>'
-    +'<div class="modal-body" style="max-height:70vh;overflow-y:auto;">'
-    +'<div class="form-grid">'
-    +'<div class="form-group"><label>Service ID (unique key) *</label><input id="ps-id" value="'+escHtml(id||'')+'" placeholder="e.g. printer-repair" '+(id?'readonly style="background:#f3f4f6"':'')+'></div>'
-    +'<div class="form-group"><label>Icon (emoji) *</label><input id="ps-icon" value="'+escHtml((existing&&existing.icon)||'🔧')+'" placeholder="🔧" style="font-size:20px;"></div>'
-    +'<div class="form-group"><label>Service Name *</label><input id="ps-name" value="'+escHtml((existing&&existing.name)||'')+'" placeholder="e.g. Printer Repair"></div>'
-    +'<div class="form-group"><label>Price Display *</label><input id="ps-price-disp" value="'+escHtml((existing&&existing.price_display)||'')+'" placeholder="e.g. ₹649/- or ₹1500+"></div>'
-    +'<div class="form-group"><label>Price Amount (₹)</label><input id="ps-price-amt" type="number" value="'+(existing?existing.price_amount||0:0)+'" placeholder="649"></div>'
-    +'<div class="form-group"><label>Service Type *</label>'
-    +'<select id="ps-type" onchange="_psTypeChange()"><option value="inquiry"'+((!existing||existing.service_type==='inquiry')?' selected':'')+'> Inquiry</option><option value="repair"'+((existing&&existing.service_type==='repair')?' selected':'')+'>⚙️ Repair (Onsite)</option></select></div>'
+    +'<div class="modal-box" style="max-width:520px;">'
+    +'<div class="modal-header"><h3>'+(id?'✏️ Service Edit karo':'➕ New Service Umero')+'</h3><button onclick="closeModal(\'modal-portal-svc\')" class="modal-close">✕</button></div>'
+    +'<div class="modal-body" style="max-height:75vh;overflow-y:auto;padding:18px 20px;">'
+
+    // Row 1: Icon + Name
+    +'<div style="display:grid;grid-template-columns:80px 1fr;gap:12px;margin-bottom:14px;">'
+    +'<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Icon (Emoji)</label>'
+    +'<input id="ps-icon" value="'+escHtml((existing&&existing.icon)||'🔧')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:28px;text-align:center;outline:none;"></div>'
+    +'<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Service નું નામ <span style="color:red;">*</span></label>'
+    +'<input id="ps-name" value="'+escHtml((existing&&existing.name)||'')+'" placeholder="દા.ત. Printer Repair" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:14px;outline:none;"></div>'
     +'</div>'
-    +'<div id="ps-repair-fields" style="display:'+(existing&&existing.service_type==='repair'?'block':'none')+';">'
-    +'<div class="form-group"><label>Repair Category</label><select id="ps-repair-cat"><option value="printer"'+((existing&&existing.repair_cat==='printer')?' selected':'')+'>🖨️ Printer</option><option value="scanner"'+((existing&&existing.repair_cat==='scanner')?' selected':'')+'>🖻 Scanner</option></select></div>'
+
+    // Row 2: Price Display + Price Amount
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">'
+    +'<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Portal par Price બતાવો <span style="color:red;">*</span></label>'
+    +'<input id="ps-price-disp" value="'+escHtml((existing&&existing.price_display)||'')+'" placeholder="દા.ત. ₹649/- અથવા Starting ₹1500/-" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:14px;outline:none;"></div>'
+    +'<div><label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Price Amount (₹) — Comparison માટે</label>'
+    +'<input id="ps-price-amt" type="number" value="'+(existing?existing.price_amount||0:0)+'" placeholder="649" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:14px;outline:none;"></div>'
     +'</div>'
-    +'<div id="ps-inquiry-fields" style="display:'+((!existing||existing.service_type==='inquiry')?'block':'none')+';">'
-    +'<div class="form-group"><label>Inquiry Type Label</label><input id="ps-inq-type" value="'+escHtml((existing&&existing.inquiry_type)||'')+'" placeholder="e.g. Camera Repair"></div>'
+
+    // Row 3: Service Type
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Service Type <span style="color:red;">*</span></label>'
+    +'<select id="ps-type" onchange="_psTypeChange()" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:14px;outline:none;background:#fff;">'
+    +'<option value="repair"'+((existing&&existing.service_type==='repair')?' selected':'')+'>⚙️ Repair — Customer ઘરે engineer આવે (Printer / Scanner)</option>'
+    +'<option value="inquiry"'+((!existing||existing.service_type==='inquiry')?' selected':'')+'>📋 Inquiry — Customer form ભરે, team contact કરે (Camera / CCTV / AMC etc.)</option>'
+    +'</select></div>'
+
+    // Repair-only: category
+    +'<div id="ps-repair-fields" style="display:'+(isRepair?'block':'none')+';margin-bottom:14px;">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Repair Category</label>'
+    +'<select id="ps-repair-cat" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:14px;outline:none;background:#fff;">'
+    +'<option value="printer"'+((existing&&existing.repair_cat==='printer')?' selected':'')+'>🖨️ Printer</option>'
+    +'<option value="scanner"'+((existing&&existing.repair_cat==='scanner')?' selected':'')+'>🖻 Scanner</option>'
+    +'</select></div>'
+
+    // Subtitle
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">Short Description (Portal par service card નીચે)</label>'
+    +'<input id="ps-subtitle" value="'+escHtml((existing&&existing.subtitle)||'')+'" placeholder="દા.ત. Expert printer repair at your doorstep" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:13px;outline:none;"></div>'
+
+    // What's Included
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:5px;text-transform:uppercase;">શું Included છે (Portal service page par ✅ list) — દરેક item નવી line</label>'
+    +'<textarea id="ps-includes" rows="5" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:13px;outline:none;resize:vertical;" placeholder="Engineer visits your home or office&#10;Service within 24 working hours&#10;Detailed estimate before any work begins">'+escHtml(inc)+'</textarea></div>'
+
+    // Sort order (hidden — keep as hidden input)
+    +'<input type="hidden" id="ps-order" value="'+(existing?existing.sort_order||0:99)+'">'
+    +'<input type="hidden" id="ps-id" value="'+escHtml(id||'')+'">'
+    +'<input type="hidden" id="ps-inq-type" value="'+escHtml((existing&&existing.inquiry_type)||'')+'">'
+    +'<input type="hidden" id="ps-fields" value="'+escHtml(flds)+'">'
+
     +'</div>'
-    +'<div class="form-group"><label>Subtitle (short description)</label><input id="ps-subtitle" value="'+escHtml((existing&&existing.subtitle)||'')+'" placeholder="One-line description"></div>'
-    +'<div class="form-group"><label>Sort Order</label><input id="ps-order" type="number" value="'+(existing?existing.sort_order||0:0)+'" placeholder="0"></div>'
-    +'<div class="form-group" style="grid-column:1/-1"><label>What\'s Included (one item per line)</label>'
-    +'<textarea id="ps-includes" rows="5" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;" placeholder="Expert repair service&#10;All major brands&#10;Estimate before work begins">'+escHtml(inc)+'</textarea></div>'
-    +'<div class="form-group" style="grid-column:1/-1"><label>Inquiry Form Fields <span style="font-size:10px;color:var(--text-muted);">(JSON array — for inquiry type)</span></label>'
-    +'<textarea id="ps-fields" rows="6" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;font-family:monospace;" placeholder=\'[{"id":"inq-brand","label":"Brand","type":"select","opts":["Canon","Other"]},{"id":"inq-model","label":"Model","type":"text","placeholder":"Enter model"}]\'>'+escHtml(flds)+'</textarea>'
-    +'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">type: "select" (opts array) or "text" (placeholder string)</div></div>'
-    +'</div>'
-    +'<div class="modal-footer"><button class="btn btn-primary" onclick="savePortalService('+(id?'\''+id+'\'':'null')+')">💾 Save Service</button><button class="btn btn-outline" onclick="closeModal(\'modal-portal-svc\')" style="width:auto;margin-left:8px;">Cancel</button>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-primary" onclick="savePortalService('+(id?'\''+id+'\'':'null')+')">💾 Save Service</button>'
+    +'<button class="btn btn-outline" onclick="closeModal(\'modal-portal-svc\')" style="width:auto;margin-left:8px;">Cancel</button>'
     +(id?'<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;padding:8px 14px;cursor:pointer;margin-left:auto;" onclick="deletePortalService(\''+id+'\')">🗑️ Delete</button>':'')
     +'</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
@@ -6276,11 +6306,13 @@ async function openPortalSvcModal(id){
 function _psTypeChange(){
   var t=document.getElementById('ps-type').value;
   document.getElementById('ps-repair-fields').style.display=t==='repair'?'block':'none';
-  document.getElementById('ps-inquiry-fields').style.display=t==='inquiry'?'block':'none';
 }
 
 async function savePortalService(existingId){
-  var id=(document.getElementById('ps-id').value||'').trim().toLowerCase().replace(/\s+/g,'-');
+  var idEl=document.getElementById('ps-id');
+  var id=(idEl?.value||'').trim();
+  if(!id){var nameForId=(document.getElementById('ps-name')?.value||'').trim();id=nameForId.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');}
+  id=id.toLowerCase().replace(/\s+/g,'-');
   var name=(document.getElementById('ps-name').value||'').trim();
   var icon=(document.getElementById('ps-icon').value||'🔧').trim();
   var priceDisp=(document.getElementById('ps-price-disp').value||'').trim();
@@ -6292,10 +6324,10 @@ async function savePortalService(existingId){
   var sortOrder=parseInt(document.getElementById('ps-order').value)||0;
   var includesRaw=(document.getElementById('ps-includes').value||'').trim();
   var includes=includesRaw?includesRaw.split('\n').map(function(x){return x.trim();}).filter(Boolean):[];
-  var fieldsRaw=(document.getElementById('ps-fields').value||'').trim();
+  var fieldsRaw=(document.getElementById('ps-fields')?.value||'[]').trim();
   var formFields=[];
-  try{formFields=JSON.parse(fieldsRaw||'[]');}catch(e){alert('Form Fields JSON is invalid: '+e.message);return;}
-  if(!id||!name||!priceDisp){alert('Service ID, Name and Price Display are required.');return;}
+  try{formFields=JSON.parse(fieldsRaw||'[]');}catch(e){formFields=[];}
+  if(!name||!priceDisp){alert('Service Name and Price Display are required.');return;}
   var data={id,name,icon,price_display:priceDisp,price_amount:priceAmt,service_type:svcType,
     repair_cat:svcType==='repair'?repairCat:null,inquiry_type:svcType==='inquiry'?(inqType||name):null,
     subtitle,includes:JSON.stringify(includes),form_fields:JSON.stringify(formFields),
