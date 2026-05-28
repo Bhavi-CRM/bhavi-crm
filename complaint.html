@@ -18,7 +18,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 
 /* Header */
 .header{background:linear-gradient(160deg,#0f2d7a 0%,#1a3fa8 60%,#2563eb 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
-.header-logo{width:56px;height:56px;border-radius:13px;margin:0 auto 10px;display:block;background:#fff;object-fit:contain;padding:4px;box-shadow:0 4px 18px rgba(0,0,0,.28);}
+.header-logo{width:56px;height:56px;border-radius:13px;margin:0 auto 10px;display:block;object-fit:cover;box-shadow:0 4px 18px rgba(0,0,0,.28);}
 .header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
 .header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
 .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
@@ -697,15 +697,15 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <!-- SIGN IN -->
     <div id="auth-signin-form">
       <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
-        <input class="inp" type="tel" id="si-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+        <input class="inp" type="tel" id="si-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" autocomplete="off">
       </div>
       <div class="inp-group">
         <label>Your 4-digit PIN <span class="req">*</span></label>
         <div class="pin-inputs">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p1" oninput="pinMove(this,'si-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p2" oninput="pinMove(this,'si-p3')" onkeydown="pinBack(event,'si-p1')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p3" oninput="pinMove(this,'si-p4')" onkeydown="pinBack(event,'si-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p4" onkeydown="pinBack(event,'si-p3')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p1" autocomplete="new-password" oninput="pinMove(this,'si-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p2" autocomplete="new-password" oninput="pinMove(this,'si-p3')" onkeydown="pinBack(event,'si-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p3" autocomplete="new-password" oninput="pinMove(this,'si-p4')" onkeydown="pinBack(event,'si-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="si-p4" autocomplete="new-password" onkeydown="pinBack(event,'si-p3')">
         </div>
       </div>
       <div class="err-msg" id="err-signin"></div>
@@ -719,7 +719,7 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <!-- SIGN UP -->
     <div id="auth-signup-form" style="display:none;">
       <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
-        <input class="inp" type="tel" id="su-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" oninput="if(this.value.length===10)checkMobileForSignup()">
+        <input class="inp" type="tel" id="su-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" autocomplete="off" oninput="if(this.value.length===10)checkMobileForSignup()">
       </div>
       <div id="su-cust-found" style="display:none;margin-bottom:12px;"></div>
       <div id="su-new-fields">
@@ -732,20 +732,20 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
         <label>Set 4-digit PIN <span class="req">*</span></label>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Choose a 4-digit PIN to secure your account.</div>
         <div class="pin-inputs">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p1" oninput="pinMove(this,'su-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p2" oninput="pinMove(this,'su-p3')" onkeydown="pinBack(event,'su-p1')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p3" oninput="pinMove(this,'su-p4')" onkeydown="pinBack(event,'su-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p4" onkeydown="pinBack(event,'su-p3')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p1" autocomplete="new-password" oninput="pinMove(this,'su-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p2" autocomplete="new-password" oninput="pinMove(this,'su-p3')" onkeydown="pinBack(event,'su-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p3" autocomplete="new-password" oninput="pinMove(this,'su-p4')" onkeydown="pinBack(event,'su-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="su-p4" autocomplete="new-password" onkeydown="pinBack(event,'su-p3')">
         </div>
       </div>
       <div class="inp-group" style="margin-top:4px;">
         <label>Confirm PIN <span class="req">*</span></label>
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Re-enter the same PIN to confirm.</div>
         <div class="pin-inputs">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p1" oninput="pinMove(this,'suc-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p2" oninput="pinMove(this,'suc-p3')" onkeydown="pinBack(event,'suc-p1')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p3" oninput="pinMove(this,'suc-p4')" onkeydown="pinBack(event,'suc-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p4" onkeydown="pinBack(event,'suc-p3')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p1" autocomplete="new-password" oninput="pinMove(this,'suc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p2" autocomplete="new-password" oninput="pinMove(this,'suc-p3')" onkeydown="pinBack(event,'suc-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p3" autocomplete="new-password" oninput="pinMove(this,'suc-p4')" onkeydown="pinBack(event,'suc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="suc-p4" autocomplete="new-password" onkeydown="pinBack(event,'suc-p3')">
         </div>
       </div>
       <div class="err-msg" id="err-signup"></div>
@@ -757,24 +757,24 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
     <div id="auth-forgot-form" style="display:none;">
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px;">🔑 Enter your mobile number and set a new PIN. Your account details remain safe.</div>
       <div class="inp-group"><label>Mobile Number <span class="req">*</span></label>
-        <input class="inp" type="tel" id="fp-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric">
+        <input class="inp" type="tel" id="fp-mob" maxlength="10" placeholder="10 digit mobile" inputmode="numeric" autocomplete="off">
       </div>
       <div class="inp-group">
         <label>New 4-digit PIN <span class="req">*</span></label>
         <div class="pin-inputs">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p1" oninput="pinMove(this,'fp-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p2" oninput="pinMove(this,'fp-p3')" onkeydown="pinBack(event,'fp-p1')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p3" oninput="pinMove(this,'fp-p4')" onkeydown="pinBack(event,'fp-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p4" onkeydown="pinBack(event,'fp-p3')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p1" autocomplete="new-password" oninput="pinMove(this,'fp-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p2" autocomplete="new-password" oninput="pinMove(this,'fp-p3')" onkeydown="pinBack(event,'fp-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p3" autocomplete="new-password" oninput="pinMove(this,'fp-p4')" onkeydown="pinBack(event,'fp-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fp-p4" autocomplete="new-password" onkeydown="pinBack(event,'fp-p3')">
         </div>
       </div>
       <div class="inp-group" style="margin-top:4px;">
         <label>Confirm New PIN <span class="req">*</span></label>
         <div class="pin-inputs">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p1" oninput="pinMove(this,'fpc-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p2" oninput="pinMove(this,'fpc-p3')" onkeydown="pinBack(event,'fpc-p1')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p3" oninput="pinMove(this,'fpc-p4')" onkeydown="pinBack(event,'fpc-p2')">
-          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p4" onkeydown="pinBack(event,'fpc-p3')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p1" autocomplete="new-password" oninput="pinMove(this,'fpc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p2" autocomplete="new-password" oninput="pinMove(this,'fpc-p3')" onkeydown="pinBack(event,'fpc-p1')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p3" autocomplete="new-password" oninput="pinMove(this,'fpc-p4')" onkeydown="pinBack(event,'fpc-p2')">
+          <input class="pin-input" type="password" maxlength="1" inputmode="numeric" id="fpc-p4" autocomplete="new-password" onkeydown="pinBack(event,'fpc-p3')">
         </div>
       </div>
       <div class="err-msg" id="err-forgot"></div>
@@ -1600,6 +1600,21 @@ function goAccountOrAuth(){
   else{goPage('pg-auth');}
 }
 
+function clearAuthForms(){
+  ['si-mob','su-mob','fp-mob','su-fname','su-lname'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  ['si-p1','si-p2','si-p3','si-p4','su-p1','su-p2','su-p3','su-p4',
+   'suc-p1','suc-p2','suc-p3','suc-p4','fp-p1','fp-p2','fp-p3','fp-p4',
+   'fpc-p1','fpc-p2','fpc-p3','fpc-p4'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  ['err-signin','err-signup','err-forgot'].forEach(function(id){
+    var el=document.getElementById(id);if(el){el.textContent='';el.style.display='none';}
+  });
+  switchAuthTab('signin');
+}
+
 function switchAuthTab(tab){
   document.getElementById('authtab-signin').classList.toggle('active',tab==='signin');
   document.getElementById('authtab-signup').classList.toggle('active',tab==='signup');
@@ -1708,6 +1723,7 @@ async function doSignUp(){
 
 function doSignOut(){
   clearSession();
+  clearAuthForms();
   goPage('pg-auth');
 }
 
@@ -1957,6 +1973,7 @@ window.addEventListener('load',function(){
     updateHomeAuthUI();
     goPage('pg-home');
   } else {
+    clearAuthForms();
     goPage('pg-auth');
   }
 });
