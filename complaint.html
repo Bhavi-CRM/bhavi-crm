@@ -19,7 +19,7 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 /* Header */
 .header{background:linear-gradient(160deg,#1e3a8a 0%,#1d4ed8 60%,#3b82f6 100%);color:#fff;padding:20px 20px 16px;text-align:center;}
 .header-logo{width:44px;height:44px;border-radius:10px;margin:0 auto 8px;display:block;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4));}
-.header-logo-auth{width:110px;height:110px;margin:0 auto 18px;display:block;object-fit:contain;}
+.header-logo-auth{width:100px;height:100px;border-radius:22px;margin:0 auto 18px;display:block;background:#fff;object-fit:contain;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,.22);}
 .header h1{font-size:16px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
 .header .tagline{font-size:10px;opacity:.75;margin-top:2px;letter-spacing:.4px;}
 .step-badge{display:inline-block;margin-top:8px;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;}
@@ -682,15 +682,13 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
 
 <!-- ========== PAGE: AUTH (Sign In / Sign Up) ========== -->
 <div class="page active fade" id="pg-auth">
-  <div style="height:6px;background:linear-gradient(90deg,#1e3a8a,#1d4ed8,#3b82f6);"></div>
-  <div style="background:#fff;text-align:center;padding:40px 24px 30px;border-bottom:1px solid #e2e8f0;">
+  <div style="background:linear-gradient(160deg,#1e3a8a 0%,#1d4ed8 65%,#3b82f6 100%);text-align:center;padding:52px 24px 44px;border-radius:0 0 36px 36px;box-shadow:0 10px 32px rgba(29,78,216,.25);">
     <img class="header-logo-auth" src="icon-192.png" alt="Bhavi Electronics" onerror="this.style.display='none'">
-    <h1 style="font-size:24px;font-weight:900;color:#1e293b;letter-spacing:-0.3px;margin-bottom:4px;">Bhavi Electronics</h1>
-    <div style="font-size:12px;color:#64748b;letter-spacing:1.8px;text-transform:uppercase;margin-bottom:18px;">&amp; Automation</div>
-    <div style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:99px;padding:6px 18px;font-size:12px;color:#1d4ed8;font-weight:700;letter-spacing:.3px;">🔐 Customer Portal — Sign in to continue</div>
+    <h1 style="font-size:23px;font-weight:900;color:#fff;letter-spacing:-0.2px;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.15);">Bhavi Electronics</h1>
+    <div style="font-size:11px;color:rgba(255,255,255,.75);letter-spacing:2px;text-transform:uppercase;">&amp; Automation</div>
   </div>
   <div class="body" style="background:#f4f6fb;padding:0;">
-    <div style="background:#fff;padding:24px 20px 8px;border-bottom:1px solid #e2e8f0;">
+    <div style="background:#fff;padding:24px 20px 8px;margin:0;border-bottom:1px solid #e2e8f0;">
     <div class="auth-tab-bar">
       <button class="auth-tab active" id="authtab-signin" onclick="switchAuthTab('signin')">Sign In</button>
       <button class="auth-tab" id="authtab-signup" onclick="switchAuthTab('signup')">New Account</button>
