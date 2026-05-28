@@ -5851,9 +5851,19 @@ async function switchMasterTab(tab,el){
       <h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📸 Add Service Photo</h3>
       <div style="display:grid;gap:10px;">
         <div class="form-group"><label>Service</label><select id="gal-svc" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">${svcOptions.map(s=>`<option value="${s}">${svcNames[s]}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Photo URL (Supabase Storage ya koi bhi public URL)</label><input type="url" id="gal-url" placeholder="https://..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>
+        <div class="form-group">
+          <label>Photo Upload</label>
+          <div style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:#fafafa;" onclick="document.getElementById('gal-file').click()">
+            <div style="font-size:28px;margin-bottom:4px;">📷</div>
+            <div style="font-size:13px;color:var(--text-muted);">Click to select photo</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">JPG, PNG, WEBP — max 5MB</div>
+          </div>
+          <input type="file" id="gal-file" accept="image/*" style="display:none;" onchange="previewGalleryFile(this)">
+          <div id="gal-preview" style="margin-top:8px;display:none;"><img id="gal-preview-img" style="max-height:120px;border-radius:8px;border:1px solid var(--border);"><button onclick="document.getElementById('gal-file').value='';document.getElementById('gal-preview').style.display='none';" style="margin-left:8px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;">✕ Remove</button></div>
+        </div>
         <div class="form-group"><label>Caption (optional)</label><input type="text" id="gal-caption" placeholder="e.g. Home automation project in Ahmedabad" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>
-        <button class="btn btn-primary" onclick="addGalleryPhoto()">➕ Add Photo</button>
+        <div id="gal-upload-status" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;"></div>
+        <button class="btn btn-primary" id="btn-add-gallery" onclick="addGalleryPhoto()">➕ Add Photo</button>
       </div>
     </div>
     <div class="card">
@@ -5976,13 +5986,44 @@ async function editModelById(btn){
 }
 async function deleteModel(id){if(!confirm('Delete?'))return;await sb('models','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('models',null);}
 async function addProblem(){const p=document.getElementById('new-prob')?.value.trim();if(!p)return;await sb('problem_types','POST',{problem:p,is_active:true});await loadMasterData();switchMasterTab('problems',null);}
+function previewGalleryFile(input){
+  var file=input.files&&input.files[0];
+  var prev=document.getElementById('gal-preview');
+  var img=document.getElementById('gal-preview-img');
+  if(!file||!prev||!img)return;
+  var reader=new FileReader();
+  reader.onload=function(e){img.src=e.target.result;prev.style.display='';};
+  reader.readAsDataURL(file);
+}
 async function addGalleryPhoto(){
   var svc=document.getElementById('gal-svc')?.value;
-  var url=(document.getElementById('gal-url')?.value||'').trim();
   var cap=(document.getElementById('gal-caption')?.value||'').trim();
-  if(!svc||!url){alert('Service and URL required');return;}
-  try{await sb('service_gallery','POST',{service_id:svc,image_url:url,caption:cap,created_at:new Date().toISOString()});
-    switchMasterTab('gallery',null);}catch(e){alert('Error: '+e.message);}
+  var fileInput=document.getElementById('gal-file');
+  var file=fileInput&&fileInput.files&&fileInput.files[0];
+  var status=document.getElementById('gal-upload-status');
+  var btn=document.getElementById('btn-add-gallery');
+  if(!svc||!file){alert('Service and photo required');return;}
+  if(file.size>5*1024*1024){alert('File too large — max 5MB');return;}
+  // Upload to Supabase Storage
+  if(btn)btn.disabled=true;
+  if(status){status.style.display='';status.style.background='#eff6ff';status.style.color='#1d4ed8';status.textContent='⏳ Uploading photo...';}
+  try{
+    var ext=file.name.split('.').pop()||'jpg';
+    var fname='svc_'+svc+'_'+Date.now()+'.'+ext;
+    var uploadResp=await fetch(SB_URL+'/storage/v1/object/service-photos/'+fname,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},
+      body:file
+    });
+    if(!uploadResp.ok){var et=await uploadResp.text();throw new Error('Upload failed: '+et);}
+    var publicUrl=SB_URL+'/storage/v1/object/public/service-photos/'+fname;
+    await sb('service_gallery','POST',{service_id:svc,image_url:publicUrl,caption:cap,created_at:new Date().toISOString()});
+    if(status){status.style.background='#f0fdf4';status.style.color='#059669';status.textContent='✅ Photo uploaded successfully!';}
+    setTimeout(function(){switchMasterTab('gallery',null);},800);
+  }catch(e){
+    if(status){status.style.display='';status.style.background='#fef2f2';status.style.color='#dc2626';status.textContent='❌ Error: '+e.message;}
+    if(btn)btn.disabled=false;
+  }
 }
 async function deleteGalleryPhoto(id){
   if(!confirm('Delete this photo?'))return;
