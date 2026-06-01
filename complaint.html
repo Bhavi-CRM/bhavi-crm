@@ -2200,7 +2200,13 @@ var CHAT_DATA={
     welcome:'👋 <b>સ્વાગત છે!</b> હું Bhavi Assistant છું.<br>કૃપા કરી આપનો પ્રશ્ન પસંદ કરો.',
     pick:'પ્રશ્ન પસંદ કરો',
     more:'બીજો પ્રશ્ન પૂછો',
+    searchPh:'Model no. અથવા Product name type કરો...',
+    searchBtn:'🔍 શોધો',
+    searching:'શોધી રહ્યા છીએ...',
+    noResult:'કોઈ model મળ્યું નહીં. બીજો શબ્દ try કરો.',
+    backBtn:'← પ્રશ્ન પર પાછા જાઓ',
     qa:[
+      {q:'🔍 Product / Model શોધો',a:'__MODEL_SEARCH__'},
       {q:'🕐 Repair કેટલા સમયમાં થાય?',
        a:'સામાન્ય રીતે <b>3–5 working days</b>માં repair થાય. Complex problems માટે વધુ સમય લાગી શકે. Ticket no. થી track કરી શકો.'},
       {q:'💰 Service charge કેટલો છે?',
@@ -2220,7 +2226,13 @@ var CHAT_DATA={
     welcome:'👋 <b>आपका स्वागत है!</b> मैं Bhavi Assistant हूँ.<br>कृपया अपना प्रश्न चुनें।',
     pick:'प्रश्न चुनें',
     more:'दूसरा प्रश्न पूछें',
+    searchPh:'Model no. या Product name type करें...',
+    searchBtn:'🔍 खोजें',
+    searching:'खोज रहे हैं...',
+    noResult:'कोई model नहीं मिला. दूसरा शब्द try करें.',
+    backBtn:'← प्रश्न पर वापस जाएं',
     qa:[
+      {q:'🔍 Product / Model खोजें',a:'__MODEL_SEARCH__'},
       {q:'🕐 Repair में कितना समय लगेगा?',
        a:'आमतौर पर <b>3–5 working days</b> में repair होती है. जटिल समस्याओं में अधिक समय लग सकता है. Ticket no. से track करें.'},
       {q:'💰 Service charge कितना है?',
@@ -2240,7 +2252,13 @@ var CHAT_DATA={
     welcome:'👋 <b>Welcome!</b> I am Bhavi Assistant.<br>Please select your question below.',
     pick:'Select a question',
     more:'Ask another question',
+    searchPh:'Type model no. or product name...',
+    searchBtn:'🔍 Search',
+    searching:'Searching...',
+    noResult:'No model found. Try a different keyword.',
+    backBtn:'← Back to questions',
     qa:[
+      {q:'🔍 Search Product / Model',a:'__MODEL_SEARCH__'},
       {q:'🕐 How long does repair take?',
        a:'Usually <b>3–5 working days</b>. Complex problems may take longer. You can track status using your ticket number.'},
       {q:'💰 What is the service charge?',
@@ -2310,6 +2328,22 @@ function chatAns(i){
   var msgs=document.getElementById('chat-msgs');
   // User question bubble
   msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  if(qa.a==='__MODEL_SEARCH__'){
+    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.7;">🔍 '+(d.searchPh)+'<br><span style="font-size:11px;color:#64748b;">Type karo ne Search dabao.</span></div>';
+    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
+    msgs.scrollTop=msgs.scrollHeight;
+    // Show search input in q-area
+    document.getElementById('chat-q-area').innerHTML=
+      '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+      +'<input id="chat-model-inp" type="text" placeholder="'+escHtml(d.searchPh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" oninput="chatModelDebounce()" onkeydown="if(event.key===\'Enter\')chatModelSearch()">'
+      +'<button onclick="chatModelSearch()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">'+d.searchBtn+'</button>'
+      +'</div>'
+      +'<div id="chat-model-results" style="max-height:200px;overflow-y:auto;"></div>'
+      +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+d.backBtn+'</button>';
+    setTimeout(function(){var el=document.getElementById('chat-model-inp');if(el)el.focus();},100);
+    return;
+  }
   var ans;
   if(qa.a==='__CONTACT__'){
     ans='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.9;">'
@@ -2324,6 +2358,69 @@ function chatAns(i){
   msgs.innerHTML+=ans;
   msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
   msgs.scrollTop=msgs.scrollHeight;
+}
+
+// ── Model Search ──────────────────────────────────────────────
+var _modelDebTimer=null;
+var _chatBrands=null;
+
+function chatModelDebounce(){
+  clearTimeout(_modelDebTimer);
+  _modelDebTimer=setTimeout(chatModelSearch,500);
+}
+
+async function chatModelSearch(){
+  var d=CHAT_DATA[_chatLang]||CHAT_DATA.en;
+  var inp=document.getElementById('chat-model-inp');
+  var res=document.getElementById('chat-model-results');
+  if(!inp||!res)return;
+  var q=inp.value.trim();
+  if(!q){res.innerHTML='';return;}
+  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">'+d.searching+'</div>';
+  try{
+    // Load brands once
+    if(!_chatBrands){
+      _chatBrands=await sbGet('brands','?select=id,name&order=name');
+    }
+    var brandMap={};
+    (_chatBrands||[]).forEach(function(b){brandMap[b.id]=b.name;});
+
+    var enc=encodeURIComponent(q);
+    var models=await sbGet('models',
+      '?or=(model_no.ilike.*'+enc+'*,model_name.ilike.*'+enc+'*)&select=id,model_no,model_name,brand_id&order=model_no&limit=15');
+
+    if(!models||!models.length){
+      res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+d.noResult+'</div>';
+      return;
+    }
+
+    res.innerHTML=models.map(function(m){
+      var brand=brandMap[m.brand_id]||'';
+      return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;transition:background .15s;" '
+        +'onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'" '
+        +'onclick="chatModelSelect(\''+escHtml(brand)+'\',\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\')"> '
+        +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11.5px;">— '+escHtml(m.model_name)+'</span>':'')+'</div>'
+        +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:2px;">📷 '+escHtml(brand)+'</div>':'')
+        +'</div>';
+    }).join('');
+  }catch(e){
+    res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+e.message+'</div>';
+  }
+}
+
+function chatModelSelect(brand,modelNo,modelName){
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(modelNo)+'</span></div>';
+  msgs.innerHTML+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:12px 14px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.8;">'
+    +'<b>✅ '+escHtml(modelNo)+'</b>'+(modelName?' — '+escHtml(modelName):'')+'<br>'
+    +(brand?'📷 <b>Brand:</b> '+escHtml(brand)+'<br>':'')
+    +'<br>🛠️ Aa model ni service Bhavi Electronics ma thay chhe.<br>'
+    +'📞 Book karva: <a href="tel:+919574004969" style="color:#059669;font-weight:700;">+91 95740 04969</a>'
+    +' &nbsp;|&nbsp; <a href="https://wa.me/919574004969?text=Service+booking+for+'+encodeURIComponent(modelNo)+'" target="_blank" style="color:#059669;font-weight:700;">WhatsApp →</a>'
+    +'</div>';
+  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  _renderChatQ();
 }
 </script>
 
