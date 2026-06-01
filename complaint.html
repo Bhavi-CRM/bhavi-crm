@@ -2419,6 +2419,17 @@ function chatAns(i){
   msgs.scrollTop=msgs.scrollHeight;
 }
 
+// ── Brochure URL auto-detect (jpg OR pdf) ─────────────────────
+async function _findBrochure(modelNo, dbUrl){
+  if(dbUrl) return dbUrl;
+  var base=SB_URL+'/storage/v1/object/public/brochures/'+encodeURIComponent(modelNo);
+  var results=await Promise.all([
+    fetch(base+'.jpg',{method:'HEAD'}).then(function(r){return r.ok?base+'.jpg':null;}).catch(function(){return null;}),
+    fetch(base+'.pdf',{method:'HEAD'}).then(function(r){return r.ok?base+'.pdf':null;}).catch(function(){return null;})
+  ]);
+  return results[0]||results[1]||null;
+}
+
 // ── Purchase Inquiry Flow ─────────────────────────────────────
 var _purchaseType='';
 var _purchModDebTimer=null;
@@ -2459,16 +2470,17 @@ async function purchModelSearch(){
     if(_purchaseType&&_purchaseType!=='all'){qs+='&printer_type=eq.'+_purchaseType;}
     var models=await sbGet('models',qs);
     if(!models||!models.length){res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+p.noResult+'</div>';return;}
-    res.innerHTML=models.map(function(m){
+    var brochures=await Promise.all(models.map(function(m){return _findBrochure(m.model_no,m.brochure_url);}));
+    res.innerHTML=models.map(function(m,i){
       var brand=brandMap[m.brand_id]||'';
-      var brochure=m.brochure_url||(SB_URL+'/storage/v1/object/public/brochures/'+encodeURIComponent(m.model_no)+'.pdf');
+      var brochure=brochures[i];
       var priceStr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):p.noPrice;
       return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
         +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11px;">'+escHtml(m.model_name)+'</span>':'')+'</div>'
         +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:1px;">📷 '+escHtml(brand)+'</div>':'')
         +'<div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;">'
         +'<span style="font-size:14px;font-weight:900;color:#059669;">'+escHtml(priceStr)+'</span>'
-        +'<a href="'+escHtml(brochure)+'" target="_blank" style="font-size:11px;background:#fefce8;color:#854d0e;border:1px solid #fcd34d;border-radius:6px;padding:3px 8px;font-weight:700;text-decoration:none;white-space:nowrap;">'+p.brochureBtn+'</a>'
+        +(brochure?'<a href="'+escHtml(brochure)+'" target="_blank" style="font-size:11px;background:#fefce8;color:#854d0e;border:1px solid #fcd34d;border-radius:6px;padding:3px 8px;font-weight:700;text-decoration:none;white-space:nowrap;">'+p.brochureBtn+'</a>':'')
         +'<button onclick="showBuyForm(\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(brand)+'\',\''+escHtml(priceStr)+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:4px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">'+p.buyBtn+'</button>'
         +'</div></div>';
     }).join('');
@@ -2543,14 +2555,16 @@ async function chatModelSearch(){
       return;
     }
 
-    res.innerHTML=models.map(function(m){
+    var brochures=await Promise.all(models.map(function(m){return _findBrochure(m.model_no,m.brochure_url);}));
+    res.innerHTML=models.map(function(m,i){
       var brand=brandMap[m.brand_id]||'';
+      var brochure=brochures[i];
       return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;transition:background .15s;" '
         +'onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'" '
-        +'onclick="chatModelSelect(\''+escHtml(brand)+'\',\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(m.brochure_url||'')+'\')"> '
+        +'onclick="chatModelSelect(\''+escHtml(brand)+'\',\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(brochure||'')+'\')">'
         +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11.5px;">— '+escHtml(m.model_name)+'</span>':'')+'</div>'
         +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:2px;">📷 '+escHtml(brand)+'</div>':'')
-        +(m.brochure_url?'<div style="margin-top:5px;"><a href="'+escHtml(m.brochure_url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;background:#f0fdf4;color:#059669;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-weight:700;text-decoration:none;">📄 Brochure →</a></div>':'')
+        +(brochure?'<div style="margin-top:5px;"><a href="'+escHtml(brochure)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;background:#f0fdf4;color:#059669;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-weight:700;text-decoration:none;">📄 Brochure →</a></div>':'')
         +'</div>';
     }).join('');
   }catch(e){
