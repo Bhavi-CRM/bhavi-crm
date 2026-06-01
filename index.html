@@ -5825,15 +5825,22 @@ async function switchMasterTab(tab,el){
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Brand</th><th>Sub-Category</th><th>Action</th></tr></thead>
     <tbody>${sc.map(s=>`<tr><td>${brands.find(b=>b.id===s.brand_id)?.name||'-'}</td><td>${s.name}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="editSubcat('${s.id}','${s.name}','${s.brand_id||''}')">✏️</button><button class="btn-icon" onclick="deleteSubcat('${s.id}')" style="color:var(--danger);">🗑️</button></td></tr>`).join('')}</tbody></table></div></div>`;
   }else if(tab==='models'){
-    const[brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&limit=300')]);
+    const[brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price&limit=300')]);
     c.innerHTML=`<div class="card" style="margin-bottom:12px;"><h3 style="font-weight:700;margin-bottom:10px;font-size:14px;">Add Model</h3>
-      <div class="master-add-row"><select id="new-model-brand" style="max-width:140px;"><option value="">Brand</option>${brands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select><input type="text" id="new-model-no" placeholder="Model No *"><input type="text" id="new-model-name" placeholder="Name (optional)"><button class="btn btn-primary btn-sm" onclick="addModel()">+ Add</button></div>
+      <div class="master-add-row">
+        <select id="new-model-brand" style="max-width:130px;"><option value="">Brand</option>${brands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select>
+        <input type="text" id="new-model-no" placeholder="Model No *" style="max-width:130px;">
+        <input type="text" id="new-model-name" placeholder="Name (optional)" style="max-width:160px;">
+        <select id="new-model-type" style="max-width:130px;"><option value="">Type</option><option value="laser">🖨️ Laser</option><option value="inkjet">💧 Inkjet</option><option value="photo">📸 Photo</option><option value="camera">📷 Camera</option><option value="other">Other</option></select>
+        <input type="number" id="new-model-price" placeholder="Sale Price ₹" style="max-width:110px;" min="0">
+        <button class="btn btn-primary btn-sm" onclick="addModel()">+ Add</button>
+      </div>
       <div class="master-add-row"><input type="file" id="model-file" accept=".xlsx,.xls,.csv" style="flex:1;"><button class="btn btn-outline btn-sm" onclick="importModels()">📥 Import</button><button class="btn btn-outline btn-sm" onclick="downloadTemplate('models')">📄 Template</button></div>
     </div>
     <div class="card">
       <div class="filter-bar" style="margin-bottom:10px;"><input type="text" id="model-search" placeholder="Search..." oninput="filterModels()" style="flex:1;"></div>
-      <div class="table-wrap"><table><thead><tr><th>Model No</th><th>Name</th><th>Brand</th><th>Action</th></tr></thead>
-      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Model No</th><th>Name</th><th>Brand</th><th>Type</th><th>Price</th><th>Action</th></tr></thead>
+      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
     </div>`;
     window._mModels=models;window._mBrands=brands;
   }else if(tab==='problems'){
@@ -5880,38 +5887,42 @@ async function switchMasterTab(tab,el){
     </div>`;
   }
 }
-function filterModels(){var q=(document.getElementById('model-search')?.value||'').toLowerCase();var ms=(window._mModels||[]).filter(function(m){return m.model_no.toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);});var b=window._mBrands||[];var tb=document.getElementById('model-tbody');if(!tb)return;var html='';ms.forEach(function(m){var bn='-';for(var bi=0;bi<b.length;bi++){if(b[bi].id===m.brand_id){bn=b[bi].name;break;}}html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});tb.innerHTML=html;}
+function filterModels(){var q=(document.getElementById('model-search')?.value||'').toLowerCase();var ms=(window._mModels||[]).filter(function(m){return m.model_no.toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);});var b=window._mBrands||[];var tb=document.getElementById('model-tbody');if(!tb)return;var html='';ms.forEach(function(m){var bn='-';for(var bi=0;bi<b.length;bi++){if(b[bi].id===m.brand_id){bn=b[bi].name;break;}}var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});tb.innerHTML=html;}
 function downloadTemplate(type){var templates={"brands":[{"Brand Name":"Canon"}],"subcats":[{"Brand":"Canon","Sub-Category":"ICP"}],"models":[{"Brand":"Canon","Sub-Category":"ICP","Model No":"MF3010","Model Name":"Canon MF3010"},{"Brand":"Canon","Sub-Category":"CSP","Model No":"G3010","Model Name":"Canon G3010"}],"problems":[{"Problem":"Paper Jam"}]};var ws=XLSX.utils.json_to_sheet(templates[type]||[]);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Data");XLSX.writeFile(wb,type+"_template.xlsx");}
 async function addBrand(){const n=document.getElementById('new-brand')?.value.trim();if(!n)return;await sb('brands','POST',{name:n});await loadMasterData();switchMasterTab('brands',null);}
 async function deleteBrand(id){if(!confirm('Delete?'))return;await sb('brands','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('brands',null);}
 async function addSubcat(){const bid=document.getElementById('new-sc-brand')?.value;const n=document.getElementById('new-sc-name')?.value.trim();if(!n||!bid){alert('Select brand and name');return;}await sb('subcategories','POST',{brand_id:bid,name:n});await loadMasterData();switchMasterTab('subcats',null);}
 async function deleteSubcat(id){if(!confirm('Delete?'))return;await sb('subcategories','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('subcats',null);}
-async function addModel(){const bid=document.getElementById('new-model-brand')?.value;const no=document.getElementById('new-model-no')?.value.trim();const nm=document.getElementById('new-model-name')?.value.trim();if(!no){alert('Enter model no');return;}await sb('models','POST',{brand_id:bid||null,model_no:no,model_name:nm||null});await loadMasterData();switchMasterTab('models',null);}
+async function addModel(){const bid=document.getElementById('new-model-brand')?.value;const no=document.getElementById('new-model-no')?.value.trim();const nm=document.getElementById('new-model-name')?.value.trim();const tp=document.getElementById('new-model-type')?.value||null;const pr=document.getElementById('new-model-price')?.value;if(!no){alert('Enter model no');return;}await sb('models','POST',{brand_id:bid||null,model_no:no,model_name:nm||null,printer_type:tp||null,sale_price:pr?Number(pr):null});await loadMasterData();switchMasterTab('models',null);}
 // Edit Model - assign/change brand and name
 let _editModelId=null;
-function editModel(id, modelNo, modelName, brandId, subcatId){
+function editModel(id, modelNo, modelName, brandId, subcatId, printerType, salePrice){
   _editModelId=id;
   const brandOpts=allBrands.map(b=>'<option value="'+b.id+'"'+(b.id===brandId?' selected':'')+'>'+b.name+'</option>').join('');
-  // Subcats for this brand
   const brandSubcats=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
   const subcatOpts=brandSubcats.map(s=>'<option value="'+s.id+'"'+(s.id===subcatId?' selected':'')+'>'+s.name+'</option>').join('');
+  const typeOpts=[['','Type'],['laser','🖨️ Laser'],['inkjet','💧 Inkjet'],['photo','📸 Photo'],['camera','📷 Camera'],['other','Other']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===printerType?' selected':'')+'>'+o[1]+'</option>';}).join('');
   const existing=document.getElementById('edit-model-modal');
   if(existing)existing.remove();
   const div=document.createElement('div');
   div.id='edit-model-modal';
   div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
-  div.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.2);">'
+  div.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">'
     +'<h3 style="font-weight:700;margin-bottom:16px;">Edit Model — '+modelNo+'</h3>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Model No</label>'
-    +'<input type="text" id="em-no" value="'+modelNo+'" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<input type="text" id="em-no" value="'+modelNo+'" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Model Name</label>'
-    +'<input type="text" id="em-name" value="'+modelName+'" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<input type="text" id="em-name" value="'+modelName+'" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Brand</label>'
     +'<select id="em-brand" onchange="updateEditModelSubcats(this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
     +'<option value="">-- No Brand --</option>'+brandOpts+'</select></div>'
-    +'<div style="margin-bottom:20px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sub-Category</label>'
+    +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sub-Category</label>'
     +'<select id="em-subcat" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
     +'<option value="">-- All / General --</option>'+subcatOpts+'</select></div>'
+    +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Printer / Product Type</label>'
+    +'<select id="em-type" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+typeOpts+'</select></div>'
+    +'<div style="margin-bottom:20px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sale Price (₹)</label>'
+    +'<input type="number" id="em-price" value="'+(salePrice||'')+'" min="0" placeholder="e.g. 12500" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
     +'<button onclick="closeEditModelModal()" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Cancel</button>'
     +'<button onclick="saveEditModel()" style="padding:8px 16px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">💾 Save</button>'
@@ -5928,9 +5939,11 @@ async function saveEditModel(){
   const name=document.getElementById('em-name')?.value.trim();
   const brand=document.getElementById('em-brand')?.value;
   const subcat=document.getElementById('em-subcat')?.value;
+  const type=document.getElementById('em-type')?.value||null;
+  const price=document.getElementById('em-price')?.value;
   if(!no){alert('Enter model no');return;}
   try{
-    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null},`?id=eq.${_editModelId}`);
+    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null,printer_type:type||null,sale_price:price?Number(price):null},`?id=eq.${_editModelId}`);
     document.getElementById('edit-model-modal')?.remove();
     await loadMasterData();switchMasterTab('models',null);
   }catch(e){alert('Error: '+e.message);}
@@ -5982,7 +5995,7 @@ async function editModelById(btn){
     var res=await sb('models','GET',null,'?id=eq.'+id);
     if(!res.length)return;
     var m=res[0];
-    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'');
+    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'',m.printer_type||'',m.sale_price||'');
   }catch(e){alert('Error: '+e.message);}
 }
 async function deleteModel(id){if(!confirm('Delete?'))return;await sb('models','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('models',null);}
