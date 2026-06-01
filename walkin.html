@@ -380,6 +380,14 @@ var CATS=[
     label:{en:'Musical Instruments', gu:'સ્સ્ સ્ સ્ Musical Instruments', hi:'संगीत वाद्य'},
     sub:{en:'All brands', gu:'All brands', hi:'All brands'},
     hasBrand:false, wc:'ICP'},
+  {id:'accessories', icon:'🎒',
+    label:{en:'Accessories', gu:'Accessories (ICP)', hi:'Accessories (ICP)'},
+    sub:{en:'Bags, Straps, Filters, Tripods & more', gu:'Bags, Straps, Filters, Tripods & more', hi:'Bags, Straps, Filters, Tripods & more'},
+    hasBrand:false, wc:'ICP', purchase:true},
+  {id:'ink', icon:'🖨️',
+    label:{en:'Ink, Cartridge & Parts', gu:'Ink, Cartridge & Parts (CSP)', hi:'Ink, Cartridge & Parts (CSP)'},
+    sub:{en:'Ink tanks, cartridges, printer parts', gu:'Ink tanks, cartridges, printer parts', hi:'Ink tanks, cartridges, printer parts'},
+    hasBrand:false, wc:'CSP', purchase:true},
 ];
 
 var BRANDS={
@@ -624,6 +632,17 @@ function selectCategory(catId){
   state.hasBrand=cat.hasBrand;
   state.directWc=cat.wc||'';
   state.brandName='';state.brandWc='';state.brandEmoji='';
+
+  // Direct purchase categories — skip brand/purpose/product, go straight to token
+  if(cat.purchase){
+    state.purposeId='purchase';
+    state.purposeLabel='Direct Purchase';
+    state.purposeType='Purchase';
+    state.warranty='';state.model='';state.serial='';state.problem='';state.problemDetail='';
+    submitEntry();
+    return;
+  }
+
   // Load problem options for this category
   loadProblemOptions(catId);
   // Load models filtered by category

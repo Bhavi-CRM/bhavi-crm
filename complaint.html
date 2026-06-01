@@ -2159,6 +2159,89 @@ window.addEventListener('load',function(){
     goPage('pg-auth');
   }
 });
+
+// ============================================================
+// LABEL PRINT  (1.5" × 3" — fits standard address label)
+// ============================================================
+function printLabel(){
+  var custName=state.isNew?(state.firstName+' '+state.lastName):((state.existingCust&&state.existingCust.cname)||'Customer');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label '+escHtml(state.ticketId)+'</title>'
+    +'<style>'
+    +'@page{size:3in 1.5in;margin:0;}'
+    +'*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Arial,sans-serif;width:3in;height:1.5in;overflow:hidden;padding:5px 7px;background:#fff;}'
+    +'.hdr{font-size:7px;font-weight:900;color:#1a3fa8;text-transform:uppercase;letter-spacing:.5px;border-bottom:1.5px solid #1a3fa8;padding-bottom:2px;margin-bottom:3px;}'
+    +'.jno{font-size:14px;font-weight:900;color:#dc2626;letter-spacing:.5px;margin-bottom:3px;}'
+    +'.row{display:flex;align-items:baseline;gap:3px;margin-bottom:2px;line-height:1.2;}'
+    +'.lbl{font-size:7px;font-weight:700;color:#64748b;min-width:42px;text-transform:uppercase;}'
+    +'.val{font-size:8.5px;font-weight:700;color:#1e293b;}'
+    +'</style></head><body>'
+    +'<div class="hdr">Bhavi Electronics &amp; Automation</div>'
+    +'<div class="jno">'+escHtml(state.ticketId)+'</div>'
+    +'<div class="row"><span class="lbl">Name</span><span class="val">'+escHtml(custName)+'</span></div>'
+    +'<div class="row"><span class="lbl">Mobile</span><span class="val">'+escHtml(state.mobile)+'</span></div>'
+    +'<div class="row"><span class="lbl">Model</span><span class="val">'+escHtml(state.modelNo||'—')+'</span></div>'
+    +'<div class="row"><span class="lbl">Serial</span><span class="val">'+escHtml(state.serialNo||'—')+'</span></div>'
+    +'</body></html>';
+  var win=window.open('','_blank','width=320,height=200');
+  win.document.open();win.document.write(html);win.document.close();
+  win.onload=function(){win.print();};
+}
+
+// ============================================================
+// CUSTOMER CHAT WIDGET
+// ============================================================
+var CHAT_QA=[
+  {q:'🕐 Repair ketla time ma thay?',
+   a:'Aamaanye <b>3–5 working days</b> ma repair thay chhe. Complex problems ma varo lagay shakay. Ticket no. thi track kari shako.'},
+  {q:'💰 Service charge ketlo chhe?',
+   a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts/spare charges extra as per estimate.'},
+  {q:'📦 Maru complaint kevi rite track karu?',
+   a:'Home screen par <b>"Track My Order"</b> option chhe. Tyaa thamaro ticket number enter karo — live status malse.'},
+  {q:'🛡️ Repair par warranty male chhe?',
+   a:'Haa! Repaired parts par <b>90 days ni warranty</b> apavama aave chhe.'},
+  {q:'📷 Kon sa products service thay?',
+   a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
+  {q:'💳 Payment kevi rite thay?',
+   a:'Cash ya UPI dono accept chhe.<br><b>Carry-in:</b> Office par payment.<br><b>Onsite:</b> Engineer ne door par payment.'},
+  {q:'📞 Contact / Vahu Mahiti',a:'__CONTACT__'},
+];
+
+function openChat(){
+  document.getElementById('chat-modal').style.display='';
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:11px 13px;font-size:13px;color:#1e40af;line-height:1.6;">'
+    +'👋 <b>Namaste!</b> Hu Bhavi Assistant chu.<br>Tame shu janva mango chho? Niche thi prasna pasand karo.</div>';
+  renderChatQ();
+}
+function closeChat(){document.getElementById('chat-modal').style.display='none';}
+function renderChatQ(){
+  document.getElementById('chat-q-area').innerHTML=
+    '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;">Prasna pasand karo</div>'
+    +CHAT_QA.map(function(qa,i){
+      return '<button onclick="chatAns('+i+')" style="display:block;width:100%;text-align:left;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'">'
+        +qa.q+'</button>';
+    }).join('');
+}
+function chatAns(i){
+  var qa=CHAT_QA[i];
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML+='<div style="text-align:right;margin-top:6px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
+  var ans;
+  if(qa.a==='__CONTACT__'){
+    ans='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px;font-size:12.5px;color:#166534;max-width:88%;margin-top:6px;line-height:1.9;">'
+      +'<b>📞 Bhavi Electronics &amp; Automation</b><br>'
+      +'📱 Call: <a href="tel:+919574004969" style="color:#059669;font-weight:700;">+91 95740 04969</a><br>'
+      +'💬 WhatsApp: <a href="https://wa.me/919574004969?text=Hello%20Bhavi%20Electronics%2C%20I%20need%20help" target="_blank" style="color:#059669;font-weight:700;">Chat on WhatsApp</a><br>'
+      +'🕐 Mon–Sat: 10 AM – 7 PM<br>'
+      +'📍 Surat, Gujarat</div>';
+  } else {
+    ans='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:12.5px;color:#1e293b;max-width:88%;margin-top:6px;line-height:1.7;">'+qa.a+'</div>';
+  }
+  msgs.innerHTML+=ans;
+  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:2px;padding-left:2px;">Bhavi Assistant • just now</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+}
 </script>
 </body>
 </html>

@@ -432,6 +432,7 @@ tr:hover td{background:#f8fafc;}
       <div><h2 id="modal-ticket-title">Ticket</h2><div id="modal-ticket-sub" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div></div>
       <div style="display:flex;gap:6px;">
         <button class="btn btn-outline btn-sm" onclick="printJobSheet()">🖨️ Print</button>
+        <button class="btn btn-outline btn-sm" onclick="printLabel()" style="border-color:#7c3aed;color:#7c3aed;">🏷️ Label</button>
         <button class="close-btn" onclick="closeModal('modal-ticket')">✕</button>
       </div>
     </div>
@@ -6492,8 +6493,7 @@ async function printJobSheet(){
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');const isOOC=t.warranty_coverage==='Out of Coverage';
   const logoHtml=logoData?`<img src="${logoData}" style="max-height:50px;max-width:140px;object-fit:contain;">`:'';
   const win=window.open('','_blank','width=820,height=1000');
-  win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>
-    *{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:14px;}
+  win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:14px;}
     .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:8px;}
     .co-name{font-size:15px;font-weight:900;}.co-info{font-size:9px;color:#333;margin-top:2px;line-height:1.5;}
     .js-right{text-align:right;}.js-title{font-size:13px;font-weight:700;}
@@ -6600,6 +6600,34 @@ async function printJobSheet(){
       </div>
     </div>
     <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
+  </body></html>`);win.document.close();
+}
+
+// ─── LABEL PRINT (1.5" × 3" — physical label printer) ────────────────────────
+async function printLabel(){
+  const id=viewingTicketId;if(!id)return;
+  let t;try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
+  if(!t)return;
+  const jsNo=t.job_sheet||t.id||'';
+  const win=window.open('','_blank','width=340,height=220');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label-${jsNo}</title><style>
+    @page{size:3in 1.5in;margin:0;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;width:3in;height:1.5in;overflow:hidden;padding:5px 7px;background:#fff;}
+    .hdr{font-size:7px;font-weight:900;color:#1a3fa8;text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid #1a3fa8;padding-bottom:2px;margin-bottom:3px;}
+    .jno{font-size:15px;font-weight:900;color:#dc2626;letter-spacing:.5px;margin-bottom:4px;}
+    .row{display:flex;align-items:baseline;gap:4px;margin-bottom:2px;line-height:1.25;}
+    .lbl{font-size:7.5px;font-weight:700;color:#64748b;min-width:44px;text-transform:uppercase;}
+    .val{font-size:9px;font-weight:700;color:#1e293b;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+  </style></head><body>
+    <div class="hdr">Bhavi Electronics &amp; Automation</div>
+    <div class="jno">${jsNo}</div>
+    <div class="row"><span class="lbl">Customer</span><span class="val">${t.cname||'—'}</span></div>
+    <div class="row"><span class="lbl">Mobile</span><span class="val">${t.mobile||'—'}</span></div>
+    <div class="row"><span class="lbl">Model</span><span class="val">${t.model||'—'}</span></div>
+    <div class="row"><span class="lbl">Serial</span><span class="val">${t.serial||'—'}</span></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script>
   </body></html>`);win.document.close();
 }
 
