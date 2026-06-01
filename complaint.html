@@ -2191,57 +2191,170 @@ function printLabel(){
 // ============================================================
 // CUSTOMER CHAT WIDGET
 // ============================================================
-var CHAT_QA=[
-  {q:'🕐 Repair ketla time ma thay?',
-   a:'Aamaanye <b>3–5 working days</b> ma repair thay chhe. Complex problems ma varo lagay shakay. Ticket no. thi track kari shako.'},
-  {q:'💰 Service charge ketlo chhe?',
-   a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts/spare charges extra as per estimate.'},
-  {q:'📦 Maru complaint kevi rite track karu?',
-   a:'Home screen par <b>"Track My Order"</b> option chhe. Tyaa thamaro ticket number enter karo — live status malse.'},
-  {q:'🛡️ Repair par warranty male chhe?',
-   a:'Haa! Repaired parts par <b>90 days ni warranty</b> apavama aave chhe.'},
-  {q:'📷 Kon sa products service thay?',
-   a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
-  {q:'💳 Payment kevi rite thay?',
-   a:'Cash ya UPI dono accept chhe.<br><b>Carry-in:</b> Office par payment.<br><b>Onsite:</b> Engineer ne door par payment.'},
-  {q:'📞 Contact / Vahu Mahiti',a:'__CONTACT__'},
-];
+// CUSTOMER CHAT WIDGET — Multilingual (gu / hi / en)
+// ============================================================
+var _chatLang='';
+
+var CHAT_DATA={
+  gu:{
+    welcome:'👋 <b>સ્વાગત છે!</b> હું Bhavi Assistant છું.<br>કૃપા કરી આપનો પ્રશ્ન પસંદ કરો.',
+    pick:'પ્રશ્ન પસંદ કરો',
+    more:'બીજો પ્રશ્ન પૂછો',
+    qa:[
+      {q:'🕐 Repair કેટલા સમયમાં થાય?',
+       a:'સામાન્ય રીતે <b>3–5 working days</b>માં repair થાય. Complex problems માટે વધુ સમય લાગી શકે. Ticket no. થી track કરી શકો.'},
+      {q:'💰 Service charge કેટલો છે?',
+       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate પ્રમાણે અલગ.'},
+      {q:'📦 મારી complaint track કેવી રીતે કરું?',
+       a:'Home screen પર <b>"Track My Order"</b> option છે. ત્યાં ticket number enter કરો — live status મળશે.'},
+      {q:'🛡️ Repair પર warranty મળે છે?',
+       a:'હા! Repaired parts પર <b>90 days ની warranty</b> આપવામાં આવે છે.'},
+      {q:'📷 કયા products service થાય?',
+       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
+      {q:'💳 Payment કેવી રીતે થાય?',
+       a:'Cash અને UPI બંને accept થાય.<br><b>Carry-in:</b> Office પર payment.<br><b>Onsite:</b> Engineer ને ઘરે payment.'},
+      {q:'📞 Contact / વધુ માહિતી',a:'__CONTACT__'},
+    ]
+  },
+  hi:{
+    welcome:'👋 <b>आपका स्वागत है!</b> मैं Bhavi Assistant हूँ.<br>कृपया अपना प्रश्न चुनें।',
+    pick:'प्रश्न चुनें',
+    more:'दूसरा प्रश्न पूछें',
+    qa:[
+      {q:'🕐 Repair में कितना समय लगेगा?',
+       a:'आमतौर पर <b>3–5 working days</b> में repair होती है. जटिल समस्याओं में अधिक समय लग सकता है. Ticket no. से track करें.'},
+      {q:'💰 Service charge कितना है?',
+       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate के अनुसार अलग.'},
+      {q:'📦 मेरी complaint track कैसे करूँ?',
+       a:'Home screen पर <b>"Track My Order"</b> option है. वहाँ ticket number enter करें — live status मिलेगा.'},
+      {q:'🛡️ Repair पर warranty मिलती है?',
+       a:'हाँ! Repaired parts पर <b>90 days की warranty</b> दी जाती है.'},
+      {q:'📷 कौन से products service होते हैं?',
+       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
+      {q:'💳 Payment कैसे होती है?',
+       a:'Cash और UPI दोनों accept होते हैं.<br><b>Carry-in:</b> Office पर payment.<br><b>Onsite:</b> Engineer को घर पर payment.'},
+      {q:'📞 Contact / अधिक जानकारी',a:'__CONTACT__'},
+    ]
+  },
+  en:{
+    welcome:'👋 <b>Welcome!</b> I am Bhavi Assistant.<br>Please select your question below.',
+    pick:'Select a question',
+    more:'Ask another question',
+    qa:[
+      {q:'🕐 How long does repair take?',
+       a:'Usually <b>3–5 working days</b>. Complex problems may take longer. You can track status using your ticket number.'},
+      {q:'💰 What is the service charge?',
+       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges extra as per estimate.'},
+      {q:'📦 How do I track my complaint?',
+       a:'Use <b>"Track My Order"</b> on the home screen. Enter your ticket number to see live status.'},
+      {q:'🛡️ Is there warranty on repairs?',
+       a:'Yes! A <b>90-day warranty</b> is provided on all repaired parts.'},
+      {q:'📷 Which products do you service?',
+       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
+      {q:'💳 How do I pay?',
+       a:'Cash and UPI both accepted.<br><b>Carry-in:</b> Pay at office.<br><b>Onsite:</b> Pay engineer at your door.'},
+      {q:'📞 Contact / More Info',a:'__CONTACT__'},
+    ]
+  }
+};
 
 function openChat(){
+  _chatLang='';
   document.getElementById('chat-modal').style.display='';
-  var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:11px 13px;font-size:13px;color:#1e40af;line-height:1.6;">'
-    +'👋 <b>Namaste!</b> Hu Bhavi Assistant chu.<br>Tame shu janva mango chho? Niche thi prasna pasand karo.</div>';
-  renderChatQ();
-}
-function closeChat(){document.getElementById('chat-modal').style.display='none';}
-function renderChatQ(){
+  document.getElementById('chat-msgs').innerHTML='';
+  // Step 1: Language selection
   document.getElementById('chat-q-area').innerHTML=
-    '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px;">Prasna pasand karo</div>'
-    +CHAT_QA.map(function(qa,i){
-      return '<button onclick="chatAns('+i+')" style="display:block;width:100%;text-align:left;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'">'
+    '<div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:10px;text-align:center;">🌐 ભાષા / भाषा / Language</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+    +_langBtn('gu','🇮🇳','ગુજરાતી')
+    +_langBtn('hi','🇮🇳','हिंदी')
+    +_langBtn('en','🇬🇧','English')
+    +'</div>';
+}
+
+function _langBtn(code,flag,label){
+  return '<button onclick="selectChatLang(\''+code+'\')" style="background:#f1f5f9;border:2px solid #e2e8f0;border-radius:12px;padding:14px 8px;font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;text-align:center;transition:all .15s;" onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#93c5fd\'" onmouseout="this.style.background=\'#f1f5f9\';this.style.borderColor=\'#e2e8f0\'">'
+    +'<div style="font-size:22px;margin-bottom:4px;">'+flag+'</div>'
+    +label+'</button>';
+}
+
+function selectChatLang(lang){
+  _chatLang=lang;
+  var d=CHAT_DATA[lang];
+  var msgs=document.getElementById('chat-msgs');
+  // User "selected language" bubble
+  var lLabels={gu:'ગુજરાતી',hi:'हिंदी',en:'English'};
+  msgs.innerHTML='<div style="text-align:right;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 14px;font-size:13px;font-weight:600;">🌐 '+lLabels[lang]+'</span></div>';
+  // Bot welcome message
+  msgs.innerHTML+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px 14px 14px 4px;padding:12px 14px;font-size:13px;color:#1e40af;line-height:1.65;max-width:90%;margin-top:4px;">'+d.welcome+'</div>';
+  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;padding-left:2px;">Bhavi Assistant • just now</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  _renderChatQ();
+}
+
+function _renderChatQ(){
+  var d=CHAT_DATA[_chatLang];
+  document.getElementById('chat-q-area').innerHTML=
+    '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">'+d.pick+'</div>'
+    +d.qa.map(function(qa,i){
+      return '<button onclick="chatAns('+i+')" style="display:block;width:100%;text-align:left;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:600;color:#1e293b;margin-bottom:6px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'">'
         +qa.q+'</button>';
     }).join('');
 }
+
+function closeChat(){document.getElementById('chat-modal').style.display='none';}
+
 function chatAns(i){
-  var qa=CHAT_QA[i];
+  var d=CHAT_DATA[_chatLang];if(!d)return;
+  var qa=d.qa[i];
   var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML+='<div style="text-align:right;margin-top:6px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
+  // User question bubble
+  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
   var ans;
   if(qa.a==='__CONTACT__'){
-    ans='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px;font-size:12.5px;color:#166534;max-width:88%;margin-top:6px;line-height:1.9;">'
+    ans='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.9;">'
       +'<b>📞 Bhavi Electronics &amp; Automation</b><br>'
       +'📱 Call: <a href="tel:+919574004969" style="color:#059669;font-weight:700;">+91 95740 04969</a><br>'
-      +'💬 WhatsApp: <a href="https://wa.me/919574004969?text=Hello%20Bhavi%20Electronics%2C%20I%20need%20help" target="_blank" style="color:#059669;font-weight:700;">Chat on WhatsApp</a><br>'
+      +'💬 WhatsApp: <a href="https://wa.me/919574004969?text=Hello%20Bhavi%20Electronics%2C%20I%20need%20help" target="_blank" style="color:#059669;font-weight:700;">Chat on WhatsApp →</a><br>'
       +'🕐 Mon–Sat: 10 AM – 7 PM<br>'
       +'📍 Surat, Gujarat</div>';
   } else {
-    ans='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:12.5px;color:#1e293b;max-width:88%;margin-top:6px;line-height:1.7;">'+qa.a+'</div>';
+    ans='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.75;box-shadow:0 1px 4px rgba(0,0,0,.05);">'+qa.a+'</div>';
   }
   msgs.innerHTML+=ans;
-  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:2px;padding-left:2px;">Bhavi Assistant • just now</div>';
+  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
   msgs.scrollTop=msgs.scrollHeight;
 }
 </script>
+
+<!-- ====== FLOATING CHAT BUTTON ====== -->
+<button id="chat-fab" onclick="openChat()" style="position:fixed;bottom:76px;right:16px;z-index:8000;background:linear-gradient(135deg,#1d4ed8,#1a3fa8);color:#fff;border:none;border-radius:50px;padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 18px rgba(29,78,216,.45);display:flex;align-items:center;gap:7px;letter-spacing:.2px;">
+  <span style="font-size:18px;">💬</span> Help / Chat
+</button>
+
+<!-- ====== CHAT MODAL ====== -->
+<div id="chat-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);" onclick="if(event.target===this)closeChat()">
+  <div style="position:absolute;bottom:0;left:0;right:0;max-height:88vh;background:#fff;border-radius:22px 22px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.18);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1d4ed8,#1a3fa8);color:#fff;padding:16px 20px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;">🤖</div>
+        <div>
+          <div style="font-size:15px;font-weight:800;letter-spacing:.1px;">Bhavi Assistant</div>
+          <div style="font-size:11px;opacity:.8;margin-top:1px;">● Online — Instant Replies</div>
+        </div>
+      </div>
+      <button onclick="closeChat()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+    </div>
+
+    <!-- Messages -->
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f8fafc;"></div>
+
+    <!-- Quick Questions -->
+    <div id="chat-q-area" style="padding:12px 14px 16px;background:#fff;border-top:1px solid #e2e8f0;flex-shrink:0;max-height:52vh;overflow-y:auto;"></div>
+
+  </div>
+</div>
 </body>
 </html>
