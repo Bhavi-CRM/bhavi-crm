@@ -2205,7 +2205,22 @@ var CHAT_DATA={
     searching:'શોધી રહ્યા છીએ...',
     noResult:'કોઈ model મળ્યું નહીં. બીજો શબ્દ try કરો.',
     backBtn:'← પ્રશ્ન પર પાછા જાઓ',
+    purch:{
+      typePick:'📦 કઈ category ની printer / product જોઈએ?',
+      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'📋 બધા Models',v:'all'}],
+      searchPh:'Model no. type કરો... (e.g. G3010)',
+      noResult:'Model મળ્યું નહીં. બીજો keyword try કરો.',
+      noPrice:'ભાવ inquiry ઉપર',
+      brochureBtn:'📄 Brochure',
+      buyBtn:'🛒 ખરીદવા માંગો?',
+      namePh:'Full Name',
+      mobilePh:'Mobile Number (10 digits)',
+      submitBtn:'✅ Inquiry મોકલો',
+      sent:'🎉 Inquiry નોંધાઈ ગઈ! ટૂંક સમયમાં call / WhatsApp આવશે.',
+      backBtn:'← પ્રશ્ન પર પાછા જાઓ'
+    },
     qa:[
+      {q:'🛍️ Product ખરીદવી / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Product / Model શોધો',a:'__MODEL_SEARCH__'},
       {q:'🕐 Repair કેટલા સમયમાં થાય?',
        a:'સામાન્ય રીતે <b>3–5 working days</b>માં repair થાય. Complex problems માટે વધુ સમય લાગી શકે. Ticket no. થી track કરી શકો.'},
@@ -2231,7 +2246,22 @@ var CHAT_DATA={
     searching:'खोज रहे हैं...',
     noResult:'कोई model नहीं मिला. दूसरा शब्द try करें.',
     backBtn:'← प्रश्न पर वापस जाएं',
+    purch:{
+      typePick:'📦 किस category का printer / product चाहिए?',
+      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'📋 सभी Models',v:'all'}],
+      searchPh:'Model no. type करें... (e.g. G3010)',
+      noResult:'Model नहीं मिला. दूसरा keyword try करें.',
+      noPrice:'Price on inquiry',
+      brochureBtn:'📄 Brochure',
+      buyBtn:'🛒 खरीदना चाहते हैं?',
+      namePh:'Full Name',
+      mobilePh:'Mobile Number (10 digits)',
+      submitBtn:'✅ Inquiry भेजें',
+      sent:'🎉 Inquiry मिल गई! जल्द call / WhatsApp आएगा।',
+      backBtn:'← प्रश्न पर वापस जाएं'
+    },
     qa:[
+      {q:'🛍️ Product खरीदनी है / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Product / Model खोजें',a:'__MODEL_SEARCH__'},
       {q:'🕐 Repair में कितना समय लगेगा?',
        a:'आमतौर पर <b>3–5 working days</b> में repair होती है. जटिल समस्याओं में अधिक समय लग सकता है. Ticket no. से track करें.'},
@@ -2257,7 +2287,22 @@ var CHAT_DATA={
     searching:'Searching...',
     noResult:'No model found. Try a different keyword.',
     backBtn:'← Back to questions',
+    purch:{
+      typePick:'📦 Which category of printer / product do you need?',
+      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'📋 All Models',v:'all'}],
+      searchPh:'Type model no... (e.g. G3010)',
+      noResult:'No model found. Try a different keyword.',
+      noPrice:'Price on request',
+      brochureBtn:'📄 Brochure',
+      buyBtn:'🛒 Want to Buy?',
+      namePh:'Full Name',
+      mobilePh:'Mobile Number (10 digits)',
+      submitBtn:'✅ Send Inquiry',
+      sent:'🎉 Inquiry received! We will call / WhatsApp you shortly.',
+      backBtn:'← Back to questions'
+    },
     qa:[
+      {q:'🛍️ Buy a Product / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Search Product / Model',a:'__MODEL_SEARCH__'},
       {q:'🕐 How long does repair take?',
        a:'Usually <b>3–5 working days</b>. Complex problems may take longer. You can track status using your ticket number.'},
@@ -2329,6 +2374,20 @@ function chatAns(i){
   // User question bubble
   msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
   msgs.scrollTop=msgs.scrollHeight;
+  if(qa.a==='__PURCHASE_INQUIRY__'){
+    var p=d.purch;
+    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;">'+p.typePick+'</div>';
+    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
+    msgs.scrollTop=msgs.scrollHeight;
+    document.getElementById('chat-q-area').innerHTML=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
+      +p.typeOpts.map(function(opt){
+        return '<button onclick="selectPurchaseType(\''+opt.v+'\',\''+escHtml(opt.l)+'\')" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 6px;font-size:11.5px;font-weight:700;color:#1e293b;cursor:pointer;transition:all .15s;text-align:center;" onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#93c5fd\'" onmouseout="this.style.background=\'#f8fafc\';this.style.borderColor=\'#e2e8f0\'">'+opt.l+'</button>';
+      }).join('')
+      +'</div>'
+      +'<button onclick="_renderChatQ()" style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
+    return;
+  }
   if(qa.a==='__MODEL_SEARCH__'){
     msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.7;">🔍 '+(d.searchPh)+'<br><span style="font-size:11px;color:#64748b;">Type karo ne Search dabao.</span></div>';
     msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
@@ -2358,6 +2417,96 @@ function chatAns(i){
   msgs.innerHTML+=ans;
   msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
   msgs.scrollTop=msgs.scrollHeight;
+}
+
+// ── Purchase Inquiry Flow ─────────────────────────────────────
+var _purchaseType='';
+var _purchModDebTimer=null;
+
+function selectPurchaseType(type,typeLabel){
+  _purchaseType=type;
+  var d=CHAT_DATA[_chatLang];var p=d.purch;
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(typeLabel)+'</span></div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  document.getElementById('chat-q-area').innerHTML=
+    '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+    +'<input id="purch-model-inp" type="text" placeholder="'+escHtml(p.searchPh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" oninput="purchModelDebounce()" onkeydown="if(event.key===\'Enter\')purchModelSearch()">'
+    +'<button onclick="purchModelSearch()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;">🔍</button>'
+    +'</div>'
+    +'<div id="purch-model-results" style="max-height:230px;overflow-y:auto;"></div>'
+    +'<button onclick="_renderChatQ()" style="margin-top:6px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
+  setTimeout(function(){var el=document.getElementById('purch-model-inp');if(el)el.focus();},100);
+}
+
+function purchModelDebounce(){
+  clearTimeout(_purchModDebTimer);
+  _purchModDebTimer=setTimeout(purchModelSearch,500);
+}
+
+async function purchModelSearch(){
+  var d=CHAT_DATA[_chatLang];var p=d.purch;
+  var inp=document.getElementById('purch-model-inp');
+  var res=document.getElementById('purch-model-results');
+  if(!inp||!res)return;
+  var q=inp.value.trim();if(!q){res.innerHTML='';return;}
+  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">⏳ Searching...</div>';
+  try{
+    if(!_chatBrands){_chatBrands=await sbGet('brands','?select=id,name&order=name');}
+    var brandMap={};(_chatBrands||[]).forEach(function(b){brandMap[b.id]=b.name;});
+    var enc=encodeURIComponent(q);
+    var qs='?or=(model_no.ilike.*'+enc+'*,model_name.ilike.*'+enc+'*)&select=id,model_no,model_name,brand_id,sale_price,brochure_url,printer_type&order=model_no&limit=20';
+    if(_purchaseType&&_purchaseType!=='all'){qs+='&printer_type=eq.'+_purchaseType;}
+    var models=await sbGet('models',qs);
+    if(!models||!models.length){res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+p.noResult+'</div>';return;}
+    res.innerHTML=models.map(function(m){
+      var brand=brandMap[m.brand_id]||'';
+      var brochure=m.brochure_url||(SB_URL+'/storage/v1/object/public/brochures/'+encodeURIComponent(m.model_no)+'.pdf');
+      var priceStr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):p.noPrice;
+      return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
+        +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11px;">'+escHtml(m.model_name)+'</span>':'')+'</div>'
+        +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:1px;">📷 '+escHtml(brand)+'</div>':'')
+        +'<div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;">'
+        +'<span style="font-size:14px;font-weight:900;color:#059669;">'+escHtml(priceStr)+'</span>'
+        +'<a href="'+escHtml(brochure)+'" target="_blank" style="font-size:11px;background:#fefce8;color:#854d0e;border:1px solid #fcd34d;border-radius:6px;padding:3px 8px;font-weight:700;text-decoration:none;white-space:nowrap;">'+p.brochureBtn+'</a>'
+        +'<button onclick="showBuyForm(\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(brand)+'\',\''+escHtml(priceStr)+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:4px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">'+p.buyBtn+'</button>'
+        +'</div></div>';
+    }).join('');
+  }catch(e){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+e.message+'</div>';}
+}
+
+function showBuyForm(modelNo,modelName,brand,priceStr){
+  var d=CHAT_DATA[_chatLang];var p=d.purch;
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+p.buyBtn+' — '+escHtml(modelNo)+'</span></div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  document.getElementById('chat-q-area').innerHTML=
+    '<div style="background:#fff;border:2px solid #1d4ed8;border-radius:12px;padding:14px;">'
+    +'<div style="font-size:12.5px;font-weight:700;color:#1d4ed8;margin-bottom:10px;">🛒 '+escHtml(modelNo)+' <span style="color:#059669;font-size:13px;">'+escHtml(priceStr)+'</span></div>'
+    +'<input id="purch-name" type="text" placeholder="'+escHtml(p.namePh)+'" style="display:block;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;">'
+    +'<input id="purch-mobile" type="tel" placeholder="'+escHtml(p.mobilePh)+'" maxlength="10" style="display:block;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box;">'
+    +'<button onclick="submitPurchaseInquiry(\''+escHtml(modelNo)+'\',\''+escHtml(modelName)+'\',\''+escHtml(brand)+'\',\''+escHtml(priceStr)+'\')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:11px;width:100%;font-size:13px;font-weight:700;cursor:pointer;">'+p.submitBtn+'</button>'
+    +'</div>'
+    +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
+  setTimeout(function(){var el=document.getElementById('purch-name');if(el)el.focus();},100);
+}
+
+async function submitPurchaseInquiry(modelNo,modelName,brand,priceStr){
+  var d=CHAT_DATA[_chatLang];var p=d.purch;
+  var name=((document.getElementById('purch-name')||{}).value||'').trim();
+  var mobile=((document.getElementById('purch-mobile')||{}).value||'').trim();
+  if(!name){var ne=document.getElementById('purch-name');if(ne)ne.style.borderColor='#dc2626';return;}
+  if(!mobile){var me=document.getElementById('purch-mobile');if(me)me.style.borderColor='#dc2626';return;}
+  var desc='Purchase Inquiry: '+modelNo+(modelName?' ('+modelName+')':'')+(brand?' | Brand: '+brand:'')+(priceStr?' | Price: '+priceStr:'')+' | Via Portal Chat';
+  try{
+    await sbPostMin('auto_inquiries',{customer_name:name,mobile:mobile,address:'',inquiry_type:'Purchase Inquiry',description:desc,status:'Open',created_by:'Customer Portal Chat',updated_at:new Date().toISOString()});
+  }catch(e){}
+  var msgs=document.getElementById('chat-msgs');
+  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(name)+' | '+escHtml(mobile)+'</span></div>';
+  msgs.innerHTML+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px 14px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.9;">'+p.sent+'</div>';
+  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
+  msgs.scrollTop=msgs.scrollHeight;
+  _renderChatQ();
 }
 
 // ── Model Search ──────────────────────────────────────────────
