@@ -2253,6 +2253,7 @@ function onCityChange(){
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 var _pinTimer=null;
+var _pincodeCache={};
 function filterPinList(val){
   var pinEl=document.getElementById('call-pin');
   var drop=document.getElementById('call-pin-drop');
@@ -2271,20 +2272,21 @@ function filterPinList(val){
       else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
       var rows=await sb('pincodes','GET',null,qs);
       if(rows&&rows.length){
+        rows.forEach(function(r){_pincodeCache[r.pincode]=r.area;});
         drop.innerHTML=rows.map(function(r){
           var safePin=r.pincode;
           var safeArea=(r.area||'').replace(/'/g,'&#39;');
-          var displayText=r.pincode+(r.area?'-'+r.area:'');
+          var displayText=r.pincode+(r.area?' - '+r.area:'');
           return'<div onmousedown="callPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-size:13px;font-weight:600;color:var(--primary)">'+displayText+'</span>'+(r.district?'<span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+escHtml(r.district)+'</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
       }
     }catch(e){}
-    // Fallback: static INDIA_ADDR
+    // Fallback: static INDIA_ADDR + cached pincode data
     var pins=pinEl._allPins||[];
     var filtered=pins.filter(function(p){return p.startsWith(q);}).slice(0,60);
     if(!filtered.length){drop.style.display='none';return;}
-    drop.innerHTML=filtered.map(function(p){return'<div onmousedown="callPinSelect(\''+p+'\',\'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';}).join('');
+    drop.innerHTML=filtered.map(function(p){var area=_pincodeCache[p]||'';var displayText=p+(area?' - '+area:'');return'<div onmousedown="callPinSelect(\''+p+'\',\''+area.replace(/'/g,'&#39;')+\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+displayText+'</div>';}).join('');
     drop.style.display='block';
   },200);
 }
@@ -2343,12 +2345,15 @@ function filterPinList(val){
   var filtered=q?pins.filter(function(p){return p.startsWith(q);}):pins;
   if(!filtered.length){drop.style.display='none';return;}
   drop.innerHTML=filtered.slice(0,60).map(function(p){
-    return'<div onmousedown="callPinSelect(\''+p+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';
+    var area=_pincodeCache[p]||'';
+    var displayText=p+(area?' - '+area:'');
+    return'<div onmousedown="callPinSelect(\''+p+'\',\''+area.replace(/'/g,'&#39;')+'\',true)" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+displayText+'</div>';
   }).join('');
   drop.style.display='block';
 }
-function callPinSelect(pin){
+function callPinSelect(pin,area){
   var el=document.getElementById('call-pin');if(el)el.value=pin;
+  var areaEl=document.getElementById('call-area');if(areaEl&&area)areaEl.value=area;
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 
