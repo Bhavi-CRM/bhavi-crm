@@ -2282,11 +2282,11 @@ function filterPinList(val){
         drop.style.display='block'; return;
       }
     }catch(e){}
-    // Fallback: static INDIA_ADDR + cached pincode data
+    // Fallback: static INDIA_ADDR
     var pins=pinEl._allPins||[];
     var filtered=pins.filter(function(p){return p.startsWith(q);}).slice(0,60);
     if(!filtered.length){drop.style.display='none';return;}
-    drop.innerHTML=filtered.map(function(p){var area=_pincodeCache[p]||'';var displayText=p+(area?' - '+area:'');return'<div onmousedown="callPinSelect(\''+p+'\',\''+area.replace(/'/g,'&#39;')+\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+displayText+'</div>';}).join('');
+    drop.innerHTML=filtered.map(function(p){return'<div onmousedown="callPinSelect(\''+p+'\',\'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';}).join('');
     drop.style.display='block';
   },200);
 }
