@@ -4712,10 +4712,37 @@ function renderInvStockTab(){
   </div>`;
 }
 
+window._invPurchaseData=null;
 function renderInvPurchaseTab(purchases){
+  window._invPurchaseData=purchases||[];
+  invPurchaseRender();
+}
+function invPurchaseRender(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
-  const rows=(purchases||[]).map(p=>`<tr>
+  const all=window._invPurchaseData||[];
+  const q=(document.getElementById('inv-pur-search')?.value||'').toLowerCase();
+  const fromD=document.getElementById('inv-pur-from')?.value||'';
+  const toD=document.getElementById('inv-pur-to')?.value||'';
+
+  const filtered=all.filter(p=>{
+    if(fromD && (p.purchase_date||'')< fromD)return false;
+    if(toD && (p.purchase_date||'')>toD)return false;
+    if(q){
+      const txt=((p.part_code||'')+' '+(p.part_name||'')+' '+(p.supplier||'')+' '+(p.invoice_no||'')).toLowerCase();
+      if(!txt.includes(q))return false;
+    }
+    return true;
+  });
+
+  const totalQty=filtered.reduce((s,p)=>s+(p.qty||0),0);
+  const totalVal=filtered.reduce((s,p)=>s+(p.qty||0)*(p.unit_cost||0),0);
+
+  const savedQ=document.getElementById('inv-pur-search')?.value||'';
+  const savedFrom=document.getElementById('inv-pur-from')?.value||'';
+  const savedTo=document.getElementById('inv-pur-to')?.value||'';
+
+  const rows=filtered.map(p=>`<tr>
     <td>${p.purchase_date||'-'}</td>
     <td><b>${p.part_code||'-'}</b></td>
     <td>${p.part_name||'-'}</td>
@@ -4726,9 +4753,23 @@ function renderInvPurchaseTab(purchases){
     <td>${p.invoice_no||'-'}</td>
     <td>${p.added_by||'-'}</td>
   </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
+
   c.innerHTML=`<div class="card">
-    <div class="section-header"><h2>Purchase History</h2>
+    <div class="section-header" style="flex-wrap:wrap;gap:8px;">
+      <h2>Purchase History</h2>
       <button class="btn btn-primary btn-sm" onclick="openPurchaseEntry()">+ New Purchase</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input id="inv-pur-search" type="text" placeholder="🔍 Part code, name, supplier, invoice..." value="${escHtml(savedQ)}"
+        oninput="invPurchaseRender()"
+        style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <input id="inv-pur-from" type="date" value="${savedFrom}" onchange="invPurchaseRender()" title="From date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <input id="inv-pur-to" type="date" value="${savedTo}" onchange="invPurchaseRender()" title="To date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <button onclick="document.getElementById('inv-pur-search').value='';document.getElementById('inv-pur-from').value='';document.getElementById('inv-pur-to').value='';invPurchaseRender();"
+        style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Clear</button>
+      <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records | Qty: ${totalQty} | Total: ₹${Math.round(totalVal).toLocaleString('en-IN')}</span>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Supplier</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Invoice No</th><th>By</th></tr></thead>
@@ -4737,10 +4778,40 @@ function renderInvPurchaseTab(purchases){
   </div>`;
 }
 
+window._invSalesData=null;
 function renderInvSalesTab(salesLogs){
+  window._invSalesData=salesLogs||[];
+  invSalesRender();
+}
+function invSalesRender(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
-  const rows=(salesLogs||[]).map(s=>{
+  const all=window._invSalesData||[];
+  const q=(document.getElementById('inv-sal-search')?.value||'').toLowerCase();
+  const typeF=document.getElementById('inv-sal-type')?.value||'';
+  const fromD=document.getElementById('inv-sal-from')?.value||'';
+  const toD=document.getElementById('inv-sal-to')?.value||'';
+
+  const filtered=all.filter(s=>{
+    if(typeF && s.sale_type!==typeF)return false;
+    if(fromD && (s.sale_date||'')<fromD)return false;
+    if(toD && (s.sale_date||'')>toD)return false;
+    if(q){
+      const txt=((s.part_code||'')+' '+(s.part_name||'')+' '+(s.customer_name||'')+' '+(s.reference||'')).toLowerCase();
+      if(!txt.includes(q))return false;
+    }
+    return true;
+  });
+
+  const totalQty=filtered.reduce((s,r)=>s+(r.qty||0),0);
+  const totalVal=filtered.reduce((s,r)=>s+(r.qty||0)*(r.unit_price||0),0);
+
+  const savedQ=document.getElementById('inv-sal-search')?.value||'';
+  const savedType=document.getElementById('inv-sal-type')?.value||'';
+  const savedFrom=document.getElementById('inv-sal-from')?.value||'';
+  const savedTo=document.getElementById('inv-sal-to')?.value||'';
+
+  const rows=filtered.map(s=>{
     const typeLabel=s.sale_type==='call'?`Call: ${s.reference||''}`:(s.sale_type==='dealer'?`Dealer: ${s.customer_name||''}`:`Customer: ${s.customer_name||''}`);
     return `<tr>
       <td>${s.sale_date||'-'}</td>
@@ -4754,9 +4825,29 @@ function renderInvSalesTab(salesLogs){
       <td>${s.added_by||'-'}</td>
     </tr>`;
   }).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
+
   c.innerHTML=`<div class="card">
-    <div class="section-header"><h2>Sales History</h2>
+    <div class="section-header" style="flex-wrap:wrap;gap:8px;">
+      <h2>Sales History</h2>
       <button class="btn btn-primary btn-sm" onclick="openManualSale()">+ Manual Sale</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input id="inv-sal-search" type="text" placeholder="🔍 Part code, name, customer, reference..." value="${escHtml(savedQ)}"
+        oninput="invSalesRender()"
+        style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <select id="inv-sal-type" onchange="invSalesRender()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+        <option value="">All Types</option>
+        <option value="call" ${savedType==='call'?'selected':''}>Call</option>
+        <option value="dealer" ${savedType==='dealer'?'selected':''}>Dealer</option>
+        <option value="customer" ${savedType==='customer'?'selected':''}>Customer</option>
+      </select>
+      <input id="inv-sal-from" type="date" value="${savedFrom}" onchange="invSalesRender()" title="From date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <input id="inv-sal-to" type="date" value="${savedTo}" onchange="invSalesRender()" title="To date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <button onclick="document.getElementById('inv-sal-search').value='';document.getElementById('inv-sal-type').value='';document.getElementById('inv-sal-from').value='';document.getElementById('inv-sal-to').value='';invSalesRender();"
+        style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Clear</button>
+      <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records | Qty: ${totalQty} | Total: ₹${Math.round(totalVal).toLocaleString('en-IN')}</span>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th></tr></thead>
@@ -6242,29 +6333,89 @@ function showPartEngBreakdown(partId){
   },0);
 }
 
+window._epLogData=null;
 async function renderEPLog(){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
   try{
-    const movs=await sb('eng_movements','GET',null,'?order=created_at.desc&limit=300');
-    const typeLabel={
-      ISSUE:'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📤 Issued</span>',
-      USE:'<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔧 Used</span>',
-      WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
-      ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
-    };
-    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`<b style="color:var(--primary)">${p.part_code}</b> — ${p.item_name}`:p.item_name):'—';};
-    const rows=movs.map(m=>`<tr>
-      <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
-      <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
-      <td style="padding:8px 12px;font-size:12px;font-weight:600;">${getPartName(m.part_id)}</td>
-      <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;">${m.qty}</td>
-      <td style="padding:8px 12px;font-size:12px;">${m.from_owner||'—'}</td>
-      <td style="padding:8px 12px;font-size:12px;">${m.to_owner||'—'}</td>
-      <td style="padding:8px 12px;font-size:12px;color:#1d4ed8;">${m.job_sheet||'—'}</td>
-      <td style="padding:8px 12px;font-size:11px;">${m.warranty?'<span style="color:#059669;font-weight:700;">Warranty</span>':m.notes||'—'}</td>
-    </tr>`).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted);">No movements yet</td></tr>';
-    el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
+    const movs=await sb('eng_movements','GET',null,'?order=created_at.desc&limit=1000');
+    window._epLogData=movs||[];
+    epLogRender();
+  }catch(e){el.innerHTML=`<div class="card"><p>Error: ${e.message}</p></div>`;}
+}
+
+function epLogRender(){
+  const el=document.getElementById('ep-content');
+  if(!el)return;
+  const movs=window._epLogData||[];
+  const q=(document.getElementById('ep-log-search')?.value||'').toLowerCase();
+  const typeF=document.getElementById('ep-log-type')?.value||'';
+  const fromD=document.getElementById('ep-log-from')?.value||'';
+  const toD=document.getElementById('ep-log-to')?.value||'';
+
+  const typeLabel={
+    ISSUE:'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📤 Issued</span>',
+    USE:'<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔧 Used</span>',
+    WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
+    ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
+    ADJUST:'<span style="background:#fff7ed;color:#c2410c;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">⚙️ Adjusted</span>',
+  };
+  const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`${p.part_code} — ${p.item_name}`:p.item_name):'—';};
+  const getPartHtml=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`<b style="color:var(--primary)">${p.part_code}</b> — ${p.item_name}`:p.item_name):'—';};
+
+  const filtered=movs.filter(m=>{
+    if(typeF && m.type!==typeF)return false;
+    if(fromD && m.created_at.slice(0,10)<fromD)return false;
+    if(toD && m.created_at.slice(0,10)>toD)return false;
+    if(q){
+      const pname=getPartName(m.part_id).toLowerCase();
+      const from=(m.from_owner||'').toLowerCase();
+      const to=(m.to_owner||'').toLowerCase();
+      const job=(m.job_sheet||'').toLowerCase();
+      const notes=(m.notes||'').toLowerCase();
+      if(!pname.includes(q)&&!from.includes(q)&&!to.includes(q)&&!job.includes(q)&&!notes.includes(q))return false;
+    }
+    return true;
+  });
+
+  const rows=filtered.map(m=>`<tr>
+    <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+    <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
+    <td style="padding:8px 12px;font-size:12px;font-weight:600;">${getPartHtml(m.part_id)}</td>
+    <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;">${m.qty}</td>
+    <td style="padding:8px 12px;font-size:12px;">${m.from_owner||'—'}</td>
+    <td style="padding:8px 12px;font-size:12px;">${m.to_owner||'—'}</td>
+    <td style="padding:8px 12px;font-size:12px;color:#1d4ed8;">${m.job_sheet||'—'}</td>
+    <td style="padding:8px 12px;font-size:11px;">${m.warranty?'<span style="color:#059669;font-weight:700;">Warranty</span>':m.notes||'—'}</td>
+  </tr>`).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted);">No movements found</td></tr>';
+
+  const savedQ=document.getElementById('ep-log-search')?.value||'';
+  const savedType=document.getElementById('ep-log-type')?.value||'';
+  const savedFrom=document.getElementById('ep-log-from')?.value||'';
+  const savedTo=document.getElementById('ep-log-to')?.value||'';
+
+  el.innerHTML=`
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+      <input id="ep-log-search" type="text" placeholder="🔍 Search part, engineer, jobsheet..." value="${escHtml(savedQ)}"
+        oninput="epLogRender()"
+        style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <select id="ep-log-type" onchange="epLogRender()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+        <option value="">All Types</option>
+        <option value="ISSUE" ${savedType==='ISSUE'?'selected':''}>📤 Issued</option>
+        <option value="ENG_RETURN" ${savedType==='ENG_RETURN'?'selected':''}>↩️ Returned</option>
+        <option value="USE" ${savedType==='USE'?'selected':''}>🔧 Used</option>
+        <option value="WARRANTY_RETURN" ${savedType==='WARRANTY_RETURN'?'selected':''}>🔄 Warranty</option>
+        <option value="ADJUST" ${savedType==='ADJUST'?'selected':''}>⚙️ Adjusted</option>
+      </select>
+      <input id="ep-log-from" type="date" value="${savedFrom}" onchange="epLogRender()" title="From date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <input id="ep-log-to" type="date" value="${savedTo}" onchange="epLogRender()" title="To date"
+        style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <button onclick="document.getElementById('ep-log-search').value='';document.getElementById('ep-log-type').value='';document.getElementById('ep-log-from').value='';document.getElementById('ep-log-to').value='';epLogRender();"
+        style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Clear</button>
+      <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records</span>
+    </div>
+    <div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:700px;border-collapse:collapse;width:100%;">
         <thead><tr style="background:#f8fafc;">
           <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Date/Time</th>
@@ -6277,8 +6428,8 @@ async function renderEPLog(){
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
         </tr></thead>
         <tbody>${rows}</tbody>
-      </table></div>`;
-  }catch(e){el.innerHTML=`<div class="card"><p>Error: ${e.message}</p></div>`;}
+      </table>
+    </div>`;
 }
 
 // ── Modal openers ─────────────────────────────────────────────
@@ -16423,7 +16574,7 @@ async function renderPendingList(){
   pc.innerHTML='<div style="padding:20px;max-width:1200px;margin:0 auto;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
 
   try{
-    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,ticket_no,customer_name,wc_type,brand,status,created_at,assigned_name&order=created_at.desc&limit=2000');
+    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,cname,wc_type,brand_name,status,created_at,assigned_name&order=created_at.desc&limit=2000');
 
     // Get current date and time
     var now=new Date();
@@ -16437,7 +16588,7 @@ async function renderPendingList(){
     // Filter tickets
     var filtered=(tickets||[]).filter(function(t){
       if(wcFilter && t.wc_type!==wcFilter)return false;
-      if(brandFilter && (t.brand||'').indexOf(brandFilter)<0)return false;
+      if(brandFilter && (t.brand_name||'').indexOf(brandFilter)<0)return false;
       return true;
     });
 
@@ -16470,7 +16621,7 @@ async function renderPendingList(){
       +'<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;">'
       +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
       +'<thead><tr style="background:#f9fafb;border-bottom:1px solid #e2e8f0;">'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Ticket No</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Ticket ID</th>'
       +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Customer</th>'
       +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">WC Type</th>'
       +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Brand</th>'
@@ -16485,10 +16636,10 @@ async function renderPendingList(){
       filtered.forEach(function(t){
         var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
         html+='<tr style="border-bottom:1px solid #e2e8f0;hover:background:#f9fafb;">'
-          +'<td style="padding:12px;color:#1f2937;"><strong>'+escHtml(t.ticket_no||'—')+'</strong></td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.customer_name||'—')+'</td>'
+          +'<td style="padding:12px;color:#1f2937;"><strong>'+escHtml(t.id||'—')+'</strong></td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.cname||'—')+'</td>'
           +'<td style="padding:12px;color:#475569;">'+escHtml(t.wc_type||'—')+'</td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.brand||'—')+'</td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.brand_name||'—')+'</td>'
           +'<td style="padding:12px;"><span style="background:#fef08a;color:#713f12;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;">'+escHtml(t.status||'—')+'</span></td>'
           +'<td style="padding:12px;color:#6b7280;font-size:12px;">'+createdDate+'</td>'
           +'<td style="padding:12px;color:#475569;">'+escHtml(t.assigned_name||'—')+'</td>'
@@ -16509,23 +16660,23 @@ async function renderPendingList(){
 
 async function exportPendingListExcel(){
   try{
-    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,ticket_no,customer_name,wc_type,brand,status,created_at,assigned_name&order=created_at.desc&limit=2000');
+    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,cname,wc_type,brand_name,status,created_at,assigned_name&order=created_at.desc&limit=2000');
 
     var wcFilter=window._pendingWCFilter||'CSP';
     var brandFilter=window._pendingBrandFilter||'';
 
     var filtered=(tickets||[]).filter(function(t){
       if(wcFilter && t.wc_type!==wcFilter)return false;
-      if(brandFilter && (t.brand||'').indexOf(brandFilter)<0)return false;
+      if(brandFilter && (t.brand_name||'').indexOf(brandFilter)<0)return false;
       return true;
     });
 
     var data=filtered.map(function(t){
       return{
-        'Ticket No':t.ticket_no||'',
-        'Customer':t.customer_name||'',
+        'Ticket ID':t.id||'',
+        'Customer':t.cname||'',
         'WC Type':t.wc_type||'',
-        'Brand':t.brand||'',
+        'Brand':t.brand_name||'',
         'Status':t.status||'',
         'Created Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
         'Assigned To':t.assigned_name||''
