@@ -138,6 +138,9 @@ tr:hover td{background:#f8fafc;}
 .ac-list.open{display:block;}
 .ac-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
 .ac-item:hover{background:var(--primary-light);}
+.ep-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;z-index:400;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12);display:none;}
+.ep-drop-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;}
+.ep-drop-item:hover{background:#eff6ff;}
 /* REPORT */
 .report-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .report-kpi-card{background:var(--card);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow);}
@@ -5948,6 +5951,31 @@ async function renderEPLog(){
 function epPartOpts(){
   return (allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||'')).map(i=>`<option value="${i.id}">${i.part_code?i.part_code+' — ':''}${i.item_name}</option>`).join('');
 }
+function epFilterParts(prefix){
+  const q=(document.getElementById(prefix+'-part-q')?.value||'').toLowerCase();
+  const drop=document.getElementById(prefix+'-part-drop');
+  if(!drop)return;
+  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
+  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
+  const items=filtered.slice(0,60);
+  drop.innerHTML=items.length
+    ?items.map(i=>{const stk=i.qty_in_stock||0;const sc=stk>0?'#059669':'#dc2626';return`<div class="ep-drop-item" onmousedown="epSelectPart('${prefix}','${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><span><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span style="color:#1e293b">${i.item_name}</span></span><span style="font-size:11px;font-weight:700;color:${sc};white-space:nowrap;margin-left:8px;">Stk: ${stk}</span></div>`;}).join('')
+    :'<div style="padding:10px 12px;font-size:13px;color:#64748b;">No results</div>';
+  drop.style.display='block';
+}
+function epSelectPart(prefix,partId,label){
+  const inp=document.getElementById(prefix+'-part');if(inp)inp.value=partId;
+  const qEl=document.getElementById(prefix+'-part-q');if(qEl)qEl.value=label;
+  epHideDrop(prefix);
+}
+function epHideDrop(prefix){
+  const drop=document.getElementById(prefix+'-part-drop');if(drop)drop.style.display='none';
+}
+function epClearPartSearch(prefix){
+  const inp=document.getElementById(prefix+'-part');if(inp)inp.value='';
+  const qEl=document.getElementById(prefix+'-part-q');if(qEl)qEl.value='';
+  epHideDrop(prefix);
+}
 function epEngOpts(){
   const fromStock=[...new Set(allEngStock.map(s=>s.owner))];
   const fromUsers=(allEngineers||[]).map(e=>e.name);
@@ -5957,7 +5985,7 @@ function epEngOpts(){
 
 function openEngIssue(){
   if(!allInventory.length){alert('No inventory items found.');return;}
-  document.getElementById('ei-part').innerHTML=epPartOpts();
+  epClearPartSearch('ei');
   document.getElementById('ei-engineer').innerHTML=epEngOpts();
   document.getElementById('ei-qty').value=1;
   document.getElementById('ei-notes').value='';
@@ -5980,7 +6008,7 @@ async function saveEngIssue(){
 
 function openEngUse(){
   document.getElementById('eu-engineer').innerHTML=epEngOpts();
-  document.getElementById('eu-part').innerHTML=epPartOpts();
+  epClearPartSearch('eu');
   document.getElementById('eu-qty').value=1;
   document.getElementById('eu-jobsheet').value='';
   document.getElementById('eu-warranty').checked=false;
@@ -6004,7 +6032,7 @@ async function saveEngUse(){
 }
 
 function openEngWarranty(){
-  document.getElementById('ew-part').innerHTML=epPartOpts();
+  epClearPartSearch('ew');
   document.getElementById('ew-qty').value=1;
   document.getElementById('ew-jobsheet').value='';
   document.getElementById('ew-notes').value='';
@@ -6026,7 +6054,7 @@ async function saveEngWarranty(){
 
 function openEngReturn(){
   document.getElementById('er-engineer').innerHTML=epEngOpts();
-  document.getElementById('er-part').innerHTML=epPartOpts();
+  epClearPartSearch('er');
   document.getElementById('er-qty').value=1;
   document.getElementById('er-notes').value='';
   showModal('modal-eng-return');
@@ -15135,7 +15163,13 @@ function clearAILog(){
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
     <div class="modal-header"><h2>📤 Issue Parts to Engineer</h2><button class="close-btn" onclick="closeModal('modal-eng-issue')">✕</button></div>
     <div class="modal-body">
-      <div class="form-group"><label>Part</label><select id="ei-part" class="form-control"></select></div>
+      <div class="form-group"><label>Part</label>
+        <div style="position:relative;">
+          <input type="text" id="ei-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('ei')" onfocus="epFilterParts('ei')" onblur="setTimeout(()=>epHideDrop('ei'),200)" autocomplete="off">
+          <div id="ei-part-drop" class="ep-drop"></div>
+          <input type="hidden" id="ei-part">
+        </div>
+      </div>
       <div class="form-group"><label>Engineer</label><select id="ei-engineer" class="form-control"></select></div>
       <div class="form-group"><label>Quantity</label><input type="number" id="ei-qty" class="form-control" min="1" value="1" placeholder="Qty"></div>
       <div class="form-group"><label>Notes (optional)</label><input type="text" id="ei-notes" class="form-control" placeholder="e.g. Morning issue"></div>
@@ -15152,7 +15186,13 @@ function clearAILog(){
     <div class="modal-header"><h2>🔧 Record Part Usage</h2><button class="close-btn" onclick="closeModal('modal-eng-use')">✕</button></div>
     <div class="modal-body">
       <div class="form-group"><label>Engineer</label><select id="eu-engineer" class="form-control"></select></div>
-      <div class="form-group"><label>Part Used</label><select id="eu-part" class="form-control"></select></div>
+      <div class="form-group"><label>Part Used</label>
+        <div style="position:relative;">
+          <input type="text" id="eu-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('eu')" onfocus="epFilterParts('eu')" onblur="setTimeout(()=>epHideDrop('eu'),200)" autocomplete="off">
+          <div id="eu-part-drop" class="ep-drop"></div>
+          <input type="hidden" id="eu-part">
+        </div>
+      </div>
       <div class="form-group"><label>Quantity</label><input type="number" id="eu-qty" class="form-control" min="1" value="1"></div>
       <div class="form-group"><label>Jobsheet No (linked ticket)</label><input type="text" id="eu-jobsheet" class="form-control" placeholder="e.g. BH-2025-001"></div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px;">
@@ -15173,7 +15213,13 @@ function clearAILog(){
     <div class="modal-header" style="background:#f0fdf4;"><h2>🔄 Warranty Part Received</h2><button class="close-btn" onclick="closeModal('modal-eng-warranty')">✕</button></div>
     <div class="modal-body">
       <p style="font-size:12px;color:#059669;background:#f0fdf4;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Part received back from company — will be added to Office stock.</p>
-      <div class="form-group"><label>Part</label><select id="ew-part" class="form-control"></select></div>
+      <div class="form-group"><label>Part</label>
+        <div style="position:relative;">
+          <input type="text" id="ew-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('ew')" onfocus="epFilterParts('ew')" onblur="setTimeout(()=>epHideDrop('ew'),200)" autocomplete="off">
+          <div id="ew-part-drop" class="ep-drop"></div>
+          <input type="hidden" id="ew-part">
+        </div>
+      </div>
       <div class="form-group"><label>Quantity Received</label><input type="number" id="ew-qty" class="form-control" min="1" value="1"></div>
       <div class="form-group"><label>Original Jobsheet (reference)</label><input type="text" id="ew-jobsheet" class="form-control" placeholder="e.g. BH-2025-001"></div>
       <div class="form-group"><label>Notes</label><input type="text" id="ew-notes" class="form-control" placeholder="Optional"></div>
@@ -15191,7 +15237,13 @@ function clearAILog(){
     <div class="modal-body">
       <p style="font-size:12px;color:#64748b;background:#f8fafc;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Engineer returns unused parts to office — subtracted from engineer, added to Office stock.</p>
       <div class="form-group"><label>Engineer</label><select id="er-engineer" class="form-control"></select></div>
-      <div class="form-group"><label>Part</label><select id="er-part" class="form-control"></select></div>
+      <div class="form-group"><label>Part</label>
+        <div style="position:relative;">
+          <input type="text" id="er-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('er')" onfocus="epFilterParts('er')" onblur="setTimeout(()=>epHideDrop('er'),200)" autocomplete="off">
+          <div id="er-part-drop" class="ep-drop"></div>
+          <input type="hidden" id="er-part">
+        </div>
+      </div>
       <div class="form-group"><label>Quantity Returned</label><input type="number" id="er-qty" class="form-control" min="1" value="1"></div>
       <div class="form-group"><label>Notes</label><input type="text" id="er-notes" class="form-control" placeholder="Optional"></div>
     </div>
