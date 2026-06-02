@@ -170,6 +170,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <input class="inp" type="text" id="inp-name" autocomplete="name">
       </div>
       <div class="inp-group">
+        <label id="lbl-address-field">Address</label>
+        <input class="inp" type="text" id="inp-address" autocomplete="street-address">
+      </div>
+      <div class="inp-group">
+        <label id="lbl-area-field">Area / Society</label>
+        <input class="inp" type="text" id="inp-area" autocomplete="address-line2">
+      </div>
+      <div class="inp-group">
         <label id="lbl-state-field">State</label>
         <select class="inp" id="wi-state" onchange="wiOnStateChange()">
           <option value="">— State —</option>
@@ -189,14 +197,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <div id="wi-pin-drop" style="display:none;position:absolute;z-index:600;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1.5px solid #1a56db;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
           </div>
         </div>
-      </div>
-      <div class="inp-group">
-        <label id="lbl-area-field">Area / Society</label>
-        <input class="inp" type="text" id="inp-area" autocomplete="address-line2">
-      </div>
-      <div class="inp-group">
-        <label id="lbl-address-field">Address</label>
-        <input class="inp" type="text" id="inp-address" autocomplete="street-address">
       </div>
     </div>
     <button class="btn-primary" onclick="submitCustomer()" style="margin-top:18px;"><span id="lbl-confirm">Confirm &amp; Continue →</span></button>
@@ -1044,17 +1044,18 @@ function wiFilterPin(val){
   _wiPinTimer=setTimeout(async function(){
     try{
       var state=window._wiPinState||'';
-      var district=window._wiPinDistrict||'';
-      var qs='?select=pincode,area,district&limit=50&order=pincode';
-      if(state) qs+='&state=eq.'+encodeURIComponent(state);
-      if(district) qs+='&district=eq.'+encodeURIComponent(district);
-      if(/^\d+$/.test(q)) qs+='&pincode=like.'+q+'*';
+      var isNum=/^\d+$/.test(q);
+      var qs='?select=pincode,area,district&limit=60&order=pincode';
+      // For area text search use state filter; for pincode digits don't restrict by district (names may differ from DB)
+      if(!isNum&&state) qs+='&state=eq.'+encodeURIComponent(state);
+      if(isNum) qs+='&pincode=like.'+q+'*';
       else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
       var r=await fetch(SB_URL+'/rest/v1/pincodes'+qs,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
       var rows=r.ok?await r.json():[];
       if(rows&&rows.length){
         drop.innerHTML=rows.map(function(r){
-          return'<div onmousedown="wiSelectPin(\''+r.pincode+'\',\''+r.area+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b>'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:8px;">'+r.area+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">'+r.district+'</span>':'')+'</div>';
+          var safeArea=(r.area||'').replace(/'/g,'&#39;');
+          return'<div onmousedown="wiSelectPin(\''+r.pincode+'\',\''+safeArea+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b>'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:8px;">'+r.area+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">('+r.district+')</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
       }

@@ -378,6 +378,8 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Name <span class="req">*</span></label><input type="text" id="call-cname"></div>
         <div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="call-mobile" oninput="debounceCallMobile(this.value)" maxlength="10" inputmode="numeric"><div id="call-cust-hint" style="font-size:11px;margin-top:4px;display:none;"></div></div>
         <div class="form-group"><label>Alternate</label><input type="tel" id="call-alt"></div>
+        <div class="form-group form-full"><label>Address <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street..."></div>
+        <div class="form-group"><label>Area</label><input type="text" id="call-area" placeholder="Society / Landmark"></div>
         <div class="form-group">
           <label>State <span class="req">*</span></label>
           <select id="call-state" onchange="onStateChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
@@ -400,8 +402,6 @@ tr:hover td{background:#f8fafc;}
             <div id="call-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
           </div>
         </div>
-        <div class="form-group"><label>Area</label><input type="text" id="call-area" placeholder="Society / Landmark"></div>
-        <div class="form-group form-full"><label>Address <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street..."></div>
       </div>
       <hr class="divider">
       <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">🔧 Problem</h3>
@@ -2262,16 +2262,18 @@ function filterPinList(val){
   _pinTimer=setTimeout(async function(){
     try{
       var state=pinEl._pinState||'';
-      var district=pinEl._pinDistrict||'';
-      var qs='?select=pincode,area,district&limit=50&order=pincode';
-      if(state) qs+='&state=eq.'+encodeURIComponent(state);
-      if(district) qs+='&district=eq.'+encodeURIComponent(district);
-      if(/^\d+$/.test(q)) qs+='&pincode=like.'+q+'*';
+      var isNum=/^\d+$/.test(q);
+      var qs='?select=pincode,area,district&limit=60&order=pincode';
+      // For area text search use state filter; for pincode digits search all (district names may differ from DB)
+      if(!isNum&&state) qs+='&state=eq.'+encodeURIComponent(state);
+      if(isNum) qs+='&pincode=like.'+q+'*';
       else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
       var rows=await sb('pincodes','GET',null,qs);
       if(rows&&rows.length){
         drop.innerHTML=rows.map(function(r){
-          return'<div onmousedown="callPinSelect(\''+r.pincode+'\',\''+escHtml(r.area||'')+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b style="font-size:13px;color:var(--primary)">'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:6px;">'+escHtml(r.area)+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">'+escHtml(r.district)+'</span>':'')+'</div>';
+          var safePin=r.pincode;
+          var safeArea=(r.area||'').replace(/'/g,'&#39;');
+          return'<div onmousedown="callPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b style="font-size:13px;color:var(--primary)">'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:6px;">'+escHtml(r.area)+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">('+escHtml(r.district)+')</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
       }
@@ -5870,41 +5872,51 @@ async function renderReportTasks(c){
 let allEngStock=[];
 
 async function renderEngParts(tab){
-  tab=tab||'overview';
   const c=document.getElementById('page-content');
   c.innerHTML='<div class="loading">Loading...</div>';
+  const role=currentUser.role||'';
+  const isEng=role==='engineer';
+  const isWC=(role==='admin'&&(currentUser.role_type||'')==='work_controller')||role==='work_controller';
+  const isAdmin=!isEng&&!isWC;
+  if(!tab) tab=isEng?'my-requests':(isWC?'pending':'overview');
   try{
-    allEngStock=await sb('eng_stock','GET',null,'?order=owner');
-    if(!allEngineers||!allEngineers.length) await loadMasterData();
     if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
-
+    if(!allEngineers||!allEngineers.length) await loadMasterData();
+    if(isEng){await renderEngSelfService(tab);return;}
+    allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     const engineers=[...new Set(allEngStock.map(s=>s.owner))].sort();
-    const totalEngVal=allEngStock.reduce((a,s)=>{
-      const p=allInventory.find(x=>x.id===s.part_id);
-      return a+(s.qty||0)*(p?.unit_price||0);
-    },0);
+    const totalEngVal=allEngStock.reduce((a,s)=>{const p=allInventory.find(x=>x.id===s.part_id);return a+(s.qty||0)*(p?.unit_price||0);},0);
     const totalInvVal=allInventory.reduce((a,i)=>a+(i.qty_in_stock||0)*(i.unit_price||0),0);
-
     const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">${label}</button>`;
-
-    c.innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
-        <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Inventory Items</div><div class="kpi-value" style="font-size:22px;">${allInventory.length}</div></div>
-        <div class="kpi-card" style="padding:12px;border-color:#0891b2;"><div class="kpi-label">Engineers with Stock</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${engineers.length}</div></div>
-        <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Office Stock Value</div><div class="kpi-value" style="font-size:15px;color:var(--success);">₹${totalInvVal.toFixed(0)}</div></div>
-        <div class="kpi-card" style="padding:12px;border-color:#f59e0b;"><div class="kpi-label">Field Stock Value</div><div class="kpi-value" style="font-size:15px;color:#f59e0b;">₹${totalEngVal.toFixed(0)}</div></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="openEngIssue()">📤 Issue to Engineer</button>
-        <button class="btn" style="background:#d97706;color:#fff;" onclick="openEngUse()">🔧 Record Usage</button>
-        <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
-        <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
-      </div>
-      <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('log','📋 Movement Log')}</div>
-      <div id="ep-content"></div>`;
-
-    if(tab==='overview') renderEPOverview(engineers);
-    else await renderEPLog();
+    if(isAdmin){
+      c.innerHTML=`
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+          <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Inventory Items</div><div class="kpi-value" style="font-size:22px;">${allInventory.length}</div></div>
+          <div class="kpi-card" style="padding:12px;border-color:#0891b2;"><div class="kpi-label">Engineers with Stock</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${engineers.length}</div></div>
+          <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Office Stock Value</div><div class="kpi-value" style="font-size:15px;color:var(--success);">₹${totalInvVal.toFixed(0)}</div></div>
+          <div class="kpi-card" style="padding:12px;border-color:#f59e0b;"><div class="kpi-label">Field Stock Value</div><div class="kpi-value" style="font-size:15px;color:#f59e0b;">₹${totalEngVal.toFixed(0)}</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="openEngIssue()">📤 Issue to Engineer</button>
+          <button class="btn" style="background:#d97706;color:#fff;" onclick="openEngUse()">🔧 Record Usage</button>
+          <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
+          <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
+        </div>
+        <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('log','📋 Movement Log')}</div>
+        <div id="ep-content"></div>`;
+      if(tab==='overview') renderEPOverview(engineers);
+      else if(tab==='pending') await renderEPPending(null);
+      else await renderEPLog();
+    }else{
+      // WC: only approve Returns
+      c.innerHTML=`
+        <div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
+          ℹ️ Tame faqt Engineer Return Requests approve kari sako chho. Stock details faqt Admin ne dikhe chhe.
+        </div>
+        <div class="tabs">${tabHtml('pending','⏳ Pending Returns')}</div>
+        <div id="ep-content"></div>`;
+      await renderEPPending('RETURN');
+    }
   }catch(e){
     document.getElementById('page-content').innerHTML=`<div class="card"><p style="color:red;font-weight:600;">Setup required — Run this SQL in Supabase SQL Editor:</p>
       <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow:auto;">CREATE TABLE eng_stock (
@@ -5924,7 +5936,19 @@ CREATE TABLE eng_movements (
   from_owner TEXT, to_owner TEXT,
   job_sheet TEXT, warranty BOOLEAN DEFAULT false,
   notes TEXT, created_by TEXT
-);</pre></div>`;
+);
+CREATE TABLE eng_part_requests (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  type TEXT NOT NULL,
+  status TEXT DEFAULT 'PENDING',
+  engineer_id TEXT, engineer_name TEXT,
+  parts JSONB,
+  notes TEXT,
+  approved_by TEXT, approved_at TIMESTAMPTZ
+);
+ALTER TABLE eng_part_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "epr_anon_all" ON eng_part_requests FOR ALL TO anon USING (true) WITH CHECK (true);</pre></div>`;
   }
 }
 
@@ -6185,6 +6209,241 @@ async function saveEngAdj(){
     else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
     await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(newQty-curQty),from_owner:newQty>curQty?'MANUAL':owner,to_owner:newQty>curQty?owner:'MANUAL',notes:`Manual adjust: ${curQty}→${newQty}`,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-adj');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
+// ── Engineer self-service view ─────────────────────────────
+async function renderEngSelfService(tab){
+  const c=document.getElementById('page-content');
+  const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">${label}</button>`;
+  c.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="openEngReqReceive()">📥 Parts Request (Receive)</button>
+      <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReqReturn()">↩️ Return Parts to Store</button>
+    </div>
+    <div class="tabs">${tabHtml('my-requests','📋 My Requests')}</div>
+    <div id="ep-content"></div>`;
+  await renderEPMyRequests();
+}
+async function renderEPMyRequests(){
+  const el=document.getElementById('ep-content');
+  el.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    const engId=currentUser.eng_id||currentUser.user_id;
+    const reqs=await sb('eng_part_requests','GET',null,'?engineer_id=eq.'+encodeURIComponent(engId)+'&order=created_at.desc&limit=100');
+    const stLabel={PENDING:'<span style="background:#fefce8;color:#d97706;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">⏳ Pending</span>',APPROVED:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">✅ Approved</span>',REJECTED:'<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">❌ Rejected</span>'};
+    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?p.part_code+' — '+p.item_name:p.item_name):'Unknown';};
+    const rows=(reqs||[]).map(r=>{
+      const partsList=(r.parts||[]).map(p=>`${getPartName(p.part_id)} × ${p.qty}`).join('<br>');
+      return`<tr>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+        <td style="padding:8px 12px;">${r.type==='RECEIVE'?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📥 Receive</span>':'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Return</span>'}</td>
+        <td style="padding:8px 12px;font-size:12px;">${partsList||'—'}</td>
+        <td style="padding:8px 12px;font-size:12px;color:#475569;">${r.notes||'—'}</td>
+        <td style="padding:8px 12px;">${stLabel[r.status]||r.status}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;">${r.approved_by||'—'}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">No requests yet. "Parts Request" button thi navo request submit karo.</td></tr>';
+    el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
+      <table style="min-width:600px;border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Date</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Type</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Parts</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Approved By</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: "eng_part_requests" table Supabase ma create karo (Admin ne SQL aapshe).</p></div>`;}
+}
+
+async function renderEPPending(typeFilter){
+  const el=document.getElementById('ep-content');
+  el.innerHTML='<div class="loading">Loading...</div>';
+  const isWC=(currentUser.role==='admin'&&(currentUser.role_type||'')==='work_controller')||currentUser.role==='work_controller';
+  try{
+    let qs='?status=eq.PENDING&order=created_at.asc';
+    if(typeFilter) qs+='&type=eq.'+typeFilter;
+    const reqs=await sb('eng_part_requests','GET',null,qs);
+    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?'<b style="color:var(--primary)">'+p.part_code+'</b> — '+p.item_name:p.item_name):'Unknown';};
+    const rows=(reqs||[]).map(r=>{
+      const partsList=(r.parts||[]).map(p=>`${getPartName(p.part_id)} × <b>${p.qty}</b>`).join('<br>');
+      const canApprove=!isWC||r.type==='RETURN';
+      return`<tr>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+        <td style="padding:8px 12px;">${r.type==='RECEIVE'?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📥 Receive</span>':'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Return</span>'}</td>
+        <td style="padding:8px 12px;font-size:12px;font-weight:600;">${r.engineer_name||r.engineer_id||'—'}</td>
+        <td style="padding:8px 12px;font-size:12px;">${partsList||'—'}</td>
+        <td style="padding:8px 12px;font-size:12px;color:#475569;">${r.notes||'—'}</td>
+        <td style="padding:8px 12px;white-space:nowrap;">
+          ${canApprove?`<button class="btn btn-sm" style="background:#059669;color:#fff;margin-right:4px;" onclick="approveEngReq('${r.id}',${JSON.stringify(JSON.stringify(r))})">✅ Approve</button>`:''}
+          ${!isWC?`<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;" onclick="rejectEngReq('${r.id}')">❌ Reject</button>`:''}
+        </td>
+      </tr>`;
+    }).join('')||`<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">✅ Koi pending request nathi.</td></tr>`;
+    el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
+      <table style="min-width:650px;border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Date</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Type</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Engineer</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Parts</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Action</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: "eng_part_requests" table Supabase ma create karo — SQL admin ne dikhe chhe.</p></div>`;}
+}
+
+// ── Engineer request — Receive parts ──────────────────────
+var _eprRowCount=0;
+function openEngReqReceive(){
+  if(!allInventory.length){alert('Inventory load nathi thayu. Fari try karo.');return;}
+  _eprRowCount=0;
+  document.getElementById('epr-parts-container').innerHTML='';
+  eprAddRow();
+  document.getElementById('epr-notes').value='';
+  showModal('modal-eng-req-receive');
+}
+function eprAddRow(){
+  const idx=_eprRowCount++;
+  const cont=document.getElementById('epr-parts-container');
+  const div=document.createElement('div');
+  div.id='epr-row-'+idx;
+  div.style.cssText='display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;';
+  div.innerHTML=`<div style="flex:1;position:relative;">
+    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code / name..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},200)" autocomplete="off">
+    <div id="epr-drop-${idx}" class="ep-drop"></div>
+    <input type="hidden" id="epr-pid-${idx}">
+  </div>
+  <div style="width:72px;"><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;flex-shrink:0;margin-bottom:0;" onclick="document.getElementById('epr-row-${idx}').remove()">✕</button>`;
+  cont.appendChild(div);
+}
+function eprFilterParts(idx){
+  const q=(document.getElementById('epr-q-'+idx)?.value||'').toLowerCase();
+  const drop=document.getElementById('epr-drop-'+idx);if(!drop)return;
+  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
+  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
+  drop.innerHTML=filtered.slice(0,40).map(i=>{const stk=i.qty_in_stock||0;const sc=stk>0?'#059669':'#dc2626';return`<div class="ep-drop-item" onmousedown="eprSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><span><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span>${i.item_name}</span></span><span style="font-size:11px;font-weight:700;color:${sc};margin-left:8px;">Stk:${stk}</span></div>`;}).join('')||'<div style="padding:10px 12px;color:#64748b;">No results</div>';
+  drop.style.display='block';
+}
+function eprSelectPart(idx,partId,label){
+  const pidEl=document.getElementById('epr-pid-'+idx);if(pidEl)pidEl.value=partId;
+  const qEl=document.getElementById('epr-q-'+idx);if(qEl)qEl.value=label;
+  const drop=document.getElementById('epr-drop-'+idx);if(drop)drop.style.display='none';
+}
+async function saveEngReqReceive(){
+  const cont=document.getElementById('epr-parts-container');
+  const parts=[];
+  cont.querySelectorAll('[id^="epr-row-"]').forEach(row=>{
+    const idx=row.id.replace('epr-row-','');
+    const partId=document.getElementById('epr-pid-'+idx)?.value;
+    const label=document.getElementById('epr-q-'+idx)?.value||'';
+    const qty=parseInt(document.getElementById('epr-qty-'+idx)?.value)||0;
+    if(partId&&qty>0) parts.push({part_id:partId,label,qty});
+  });
+  if(!parts.length){alert('Ochhamaa ek part select karo.');return;}
+  const notes=document.getElementById('epr-notes').value.trim();
+  try{
+    await sb('eng_part_requests','POST',{type:'RECEIVE',status:'PENDING',engineer_id:currentUser.eng_id||currentUser.user_id,engineer_name:currentUser.name,parts,notes});
+    closeModal('modal-eng-req-receive');
+    alert('✅ Request submit thayu! Admin approve karshe pacchi stock malshe.');
+    renderEngParts('my-requests');
+  }catch(e){alert('Error: '+e.message+'\n\nNote: eng_part_requests table Supabase ma create kari nakhvo.');}
+}
+
+// ── Engineer request — Return parts ───────────────────────
+var _errRowCount=0;
+function openEngReqReturn(){
+  if(!allInventory.length){alert('Inventory load nathi thayu. Fari try karo.');return;}
+  _errRowCount=0;
+  document.getElementById('err-parts-container').innerHTML='';
+  errAddRow();
+  document.getElementById('err-notes').value='';
+  showModal('modal-eng-req-return');
+}
+function errAddRow(){
+  const idx=_errRowCount++;
+  const cont=document.getElementById('err-parts-container');
+  const div=document.createElement('div');
+  div.id='err-row-'+idx;
+  div.style.cssText='display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;';
+  div.innerHTML=`<div style="flex:1;position:relative;">
+    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code / name..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},200)" autocomplete="off">
+    <div id="err-drop-${idx}" class="ep-drop"></div>
+    <input type="hidden" id="err-pid-${idx}">
+  </div>
+  <div style="width:72px;"><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;flex-shrink:0;margin-bottom:0;" onclick="document.getElementById('err-row-${idx}').remove()">✕</button>`;
+  cont.appendChild(div);
+}
+function errFilterParts(idx){
+  const q=(document.getElementById('err-q-'+idx)?.value||'').toLowerCase();
+  const drop=document.getElementById('err-drop-'+idx);if(!drop)return;
+  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
+  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
+  drop.innerHTML=filtered.slice(0,40).map(i=>`<div class="ep-drop-item" onmousedown="errSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span>${i.item_name}</span></div>`).join('')||'<div style="padding:10px 12px;color:#64748b;">No results</div>';
+  drop.style.display='block';
+}
+function errSelectPart(idx,partId,label){
+  const pidEl=document.getElementById('err-pid-'+idx);if(pidEl)pidEl.value=partId;
+  const qEl=document.getElementById('err-q-'+idx);if(qEl)qEl.value=label;
+  const drop=document.getElementById('err-drop-'+idx);if(drop)drop.style.display='none';
+}
+async function saveEngReqReturn(){
+  const cont=document.getElementById('err-parts-container');
+  const parts=[];
+  cont.querySelectorAll('[id^="err-row-"]').forEach(row=>{
+    const idx=row.id.replace('err-row-','');
+    const partId=document.getElementById('err-pid-'+idx)?.value;
+    const label=document.getElementById('err-q-'+idx)?.value||'';
+    const qty=parseInt(document.getElementById('err-qty-'+idx)?.value)||0;
+    if(partId&&qty>0) parts.push({part_id:partId,label,qty});
+  });
+  if(!parts.length){alert('Ochhamaa ek part select karo.');return;}
+  const notes=document.getElementById('err-notes').value.trim();
+  try{
+    await sb('eng_part_requests','POST',{type:'RETURN',status:'PENDING',engineer_id:currentUser.eng_id||currentUser.user_id,engineer_name:currentUser.name,parts,notes});
+    closeModal('modal-eng-req-return');
+    alert('✅ Return request submit thayu! Admin/WC approve karshe.');
+    renderEngParts('my-requests');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── Approve / Reject requests (Admin + WC for RETURN) ─────
+async function approveEngReq(reqId,reqJson){
+  const req=JSON.parse(reqJson);
+  const parts=req.parts||[];
+  if(!parts.length){alert('Request ma koi part nathi.');return;}
+  if(!confirm(`Approve karvu chhe?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
+  try{
+    if(!allEngStock) allEngStock=await sb('eng_stock','GET',null,'?order=owner');
+    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
+    for(const p of parts){
+      if(req.type==='RECEIVE'){
+        await invQtyAdjust(p.part_id,-p.qty);
+        await engStockAdjust(req.engineer_name,p.part_id,p.qty);
+        await sb('eng_movements','POST',{type:'ISSUE',part_id:p.part_id,qty:p.qty,from_owner:'MAIN',to_owner:req.engineer_name,notes:'Via request '+reqId,created_by:currentUser?.name||'Admin'});
+      }else{
+        await engStockAdjust(req.engineer_name,p.part_id,-p.qty);
+        await invQtyAdjust(p.part_id,p.qty);
+        await sb('eng_movements','POST',{type:'ENG_RETURN',part_id:p.part_id,qty:p.qty,from_owner:req.engineer_name,to_owner:'MAIN',notes:'Via request '+reqId,created_by:currentUser?.name||'Admin'});
+      }
+    }
+    await sb('eng_part_requests','PATCH',{status:'APPROVED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
+    alert('✅ Approved! Stock update thayu.');
+    const isWC=(currentUser.role==='admin'&&(currentUser.role_type||'')==='work_controller')||currentUser.role==='work_controller';
+    renderEngParts('pending');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function rejectEngReq(reqId){
+  if(!confirm('Reject karvu chhe aa request?'))return;
+  try{
+    await sb('eng_part_requests','PATCH',{status:'REJECTED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
+    renderEngParts('pending');
   }catch(e){alert('Error: '+e.message);}
 }
 // ════════════════════════════════════════════════════════════
@@ -7062,7 +7321,7 @@ async function printJobSheet(){
       <tbody>
         ${sp.length?sp.filter(s=>!s.requested).map(s=>`<tr><td>${s.code||'-'}</td><td>${s.name}</td><td style="text-align:center;">${s.qty}</td><td style="text-align:right;">₹${s.price||0}</td><td style="text-align:right;">₹${((s.qty||0)*(s.price||0)).toFixed(2)}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#999;padding:6px;">No spares used</td></tr>'}
         ${isOOC||!isW?`<tr style="background:#f5f5f5;font-weight:700;"><td colspan="4" style="text-align:right;">Parts</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
-        <tr><td colspan="4" style="text-align:right;">Labor</td><td style="text-align:right;">₹${t.labor||0}</td></tr>
+        <tr><td colspan="4" style="text-align:right;">Service Charges</td><td style="text-align:right;">₹${t.labor||t.service_charges||0}</td></tr>
         <tr><td colspan="4" style="text-align:right;">Other</td><td style="text-align:right;">₹${t.other_charge||0}</td></tr>
         <tr style="background:#e8e8e8;font-weight:700;font-size:12px;"><td colspan="4" style="text-align:right;">Grand Total</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>`:''}
       </tbody></table>
@@ -7073,6 +7332,21 @@ async function printJobSheet(){
       </div>
       <div class="field"><label>Remarks</label><div class="val" style="min-height:16px;">${t.eng_remarks||t.remarks||''}</div></div>
     </div></div>
+    ${(()=>{
+      const wct=(t.wc_type||'').toUpperCase();
+      if(wct==='ICP'){
+        return `<div style="margin-top:10px;border:1px solid #e5e7eb;border-radius:4px;padding:8px 10px;font-size:9px;color:#374151;line-height:1.6;">
+          <strong style="font-size:9px;">&#9432; Important Note (ICP):</strong><br>
+          Atyare tamane khali service charges j inform karyo chhe, biju kai hase ae engineer check kari ne kese, part estimate extra rehse, repairing warranty 7 days testing warranty on same problem and same replaced parts, if estimate rejected thase to <strong>Rs. 295</strong> inspection charges is <strong>compulsory</strong> payable.
+        </div>`;
+      } else if(wct==='CSP'){
+        return `<div style="margin-top:10px;border:1px solid #e5e7eb;border-radius:4px;padding:8px 10px;font-size:9px;color:#374151;line-height:1.6;">
+          <strong style="font-size:9px;">&#9432; Important Note (CSP):</strong><br>
+          Atyare tamane khali service charges j inform karyo chhe, biju kai hase ae engineer check kari ne kese, part estimate extra rehse, repairing warranty 7 days testing warranty on same problem and same replaced parts. If estimate rejected thase to <strong>Rs. 413</strong> inspection charges payable (non-compulsory if repair print thay). If higher estimate rejected, <strong>Rs. 413</strong> payable.
+        </div>`;
+      }
+      return '';
+    })()}
     <div class="sig-row-4">
       <div class="sig-box">
         <div style="font-weight:700;font-size:9px;margin-bottom:3px;">RECEPTIONIST</div>
@@ -7111,14 +7385,15 @@ async function printLabel(){
   const win=window.open('','_blank','width=340,height=220');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label-${jsNo}</title><style>
     @page{size:3in 1.5in;margin:0;}
+    @media print{@page{size:3in 1.5in;margin:0;}html,body{width:3in!important;height:1.5in!important;overflow:hidden!important;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
     *{box-sizing:border-box;margin:0;padding:0;}
+    html{width:3in;height:1.5in;}
     body{font-family:Arial,sans-serif;width:3in;height:1.5in;overflow:hidden;padding:5px 7px;background:#fff;}
     .hdr{font-size:7px;font-weight:900;color:#1a3fa8;text-transform:uppercase;letter-spacing:.4px;border-bottom:1.5px solid #1a3fa8;padding-bottom:2px;margin-bottom:3px;}
     .jno{font-size:15px;font-weight:900;color:#dc2626;letter-spacing:.5px;margin-bottom:4px;}
     .row{display:flex;align-items:baseline;gap:4px;margin-bottom:2px;line-height:1.25;}
     .lbl{font-size:7.5px;font-weight:700;color:#64748b;min-width:44px;text-transform:uppercase;}
     .val{font-size:9px;font-weight:700;color:#1e293b;}
-    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
   </style></head><body>
     <div class="hdr">Bhavi Electronics &amp; Automation</div>
     <div class="jno">${jsNo}</div>
@@ -15407,6 +15682,38 @@ function clearAILog(){
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-eng-return')">Cancel</button>
       <button class="btn" style="background:#7c3aed;color:#fff;" onclick="saveEngReturn()">Confirm Return</button>
+    </div>
+  </div>
+</div>
+<!-- Engineer self-service: Request Receive -->
+<div class="modal-overlay hidden" id="modal-eng-req-receive" onclick="if(event.target===this)closeModal('modal-eng-req-receive')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-header" style="background:#eff6ff;"><h2>📥 Parts Request (Receive)</h2><button class="close-btn" onclick="closeModal('modal-eng-req-receive')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#1d4ed8;background:#eff6ff;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Tame request submit karo — Admin approve karshe pacchi parts tmare stock ma add thashhe.</p>
+      <div id="epr-parts-container"></div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="eprAddRow()" style="margin-bottom:12px;">+ Part Add Karo</button>
+      <div class="form-group"><label>Notes (optional)</label><input type="text" id="epr-notes" class="form-control" placeholder="Koi note hoy to lakho..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-req-receive')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEngReqReceive()">Submit Request</button>
+    </div>
+  </div>
+</div>
+<!-- Engineer self-service: Request Return -->
+<div class="modal-overlay hidden" id="modal-eng-req-return" onclick="if(event.target===this)closeModal('modal-eng-req-return')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-header" style="background:#fdf4ff;"><h2>↩️ Return Parts to Store</h2><button class="close-btn" onclick="closeModal('modal-eng-req-return')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#7c3aed;background:#fdf4ff;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Unused parts store ma pachha maoklo — Admin/WC approve karshe pacchi stock adjust thashhe.</p>
+      <div id="err-parts-container"></div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="errAddRow()" style="margin-bottom:12px;">+ Part Add Karo</button>
+      <div class="form-group"><label>Notes (optional)</label><input type="text" id="err-notes" class="form-control" placeholder="Reason / note..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-req-return')">Cancel</button>
+      <button class="btn" style="background:#7c3aed;color:#fff;" onclick="saveEngReqReturn()">Submit Return Request</button>
     </div>
   </div>
 </div>
