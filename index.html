@@ -2238,8 +2238,7 @@ function onStateChange(){
   if(!cityEl||!pinEl)return;
   const cities=getCities(state).sort();
   cityEl.innerHTML='<option value="">-- Select District --</option>'+cities.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
-  pinEl.value='';
-  if(pinEl)pinEl._allPins=[];
+  pinEl.value=''; pinEl._allPins=[];
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 function onCityChange(){
@@ -2247,9 +2246,26 @@ function onCityChange(){
   const city=document.getElementById('call-city')?.value||'';
   const pinEl=document.getElementById('call-pin');
   if(!pinEl)return;
-  const pins=getPins(state,city);
-  pinEl._allPins=pins;
+  pinEl._allPins=getPins(state,city);
   pinEl.value='';
+  var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
+}
+function filterPinList(val){
+  var pinEl=document.getElementById('call-pin');
+  var drop=document.getElementById('call-pin-drop');
+  if(!pinEl||!drop)return;
+  var pins=pinEl._allPins||[];
+  if(!pins.length){drop.style.display='none';return;}
+  var q=(val||'').trim();
+  var filtered=q?pins.filter(function(p){return p.startsWith(q);}):pins;
+  if(!filtered.length){drop.style.display='none';return;}
+  drop.innerHTML=filtered.slice(0,60).map(function(p){
+    return'<div onmousedown="callPinSelect(\''+p+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';
+  }).join('');
+  drop.style.display='block';
+}
+function callPinSelect(pin){
+  var el=document.getElementById('call-pin');if(el)el.value=pin;
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 function setAddressDropdowns(state,city,pin){
