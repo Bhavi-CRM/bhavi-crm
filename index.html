@@ -283,6 +283,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('reorder')" id="nav-reorder"><span class="icon">📦</span><span>Reorder</span></div>
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
+    <div class="nav-item hidden" onclick="navigate('pending-list')" id="nav-pending-list"><span class="icon">📋</span><span>Pending List</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -2409,7 +2410,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-followup','nav-profit','nav-reorder','nav-weekly'].forEach(function(id){
+   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-followup','nav-profit','nav-reorder','nav-weekly','nav-pending-list'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2537,7 +2538,7 @@ function setupNav(){
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
-      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);
+      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2597,7 +2598,7 @@ async function navigate(page){
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
   const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList}[page];
   if(renderFn)await renderFn();
 }
 
@@ -16414,6 +16415,133 @@ async function uploadSalesExcel(input){
     }catch(ex){alert('Error: '+ex.message);}
   };
   reader.readAsBinaryString(file);input.value='';
+}
+
+// ===== PENDING LIST REPORT =====
+async function renderPendingList(){
+  var pc=document.getElementById('page-content');if(!pc)return;
+  pc.innerHTML='<div style="padding:20px;max-width:1200px;margin:0 auto;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
+
+  try{
+    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,ticket_no,customer_name,wc_type,brand,status,created_at,assigned_name&order=created_at.desc&limit=2000');
+
+    // Get current date and time
+    var now=new Date();
+    var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+
+    // Default filters
+    var wcFilter=window._pendingWCFilter||'CSP';
+    var brandFilter=window._pendingBrandFilter||'';
+
+    // Filter tickets
+    var filtered=(tickets||[]).filter(function(t){
+      if(wcFilter && t.wc_type!==wcFilter)return false;
+      if(brandFilter && (t.brand||'').indexOf(brandFilter)<0)return false;
+      return true;
+    });
+
+    var html='<div style="padding:20px;max-width:1200px;margin:0 auto;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">'
+      +'<div><h2 style="margin:0;font-size:20px;">📋 Pending Calls List</h2>'
+      +'<div style="font-size:13px;color:#6b7280;margin-top:4px;">As of '+dateStr+', '+timeStr+'</div></div>'
+      +'<button onclick="exportPendingListExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;">📥 Export Excel</button>'
+      +'</div>'
+
+      +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">'
+      +'<label style="font-size:13px;font-weight:600;">WC Type:</label>'
+      +'<select id="pending-wc-filter" onchange="window._pendingWCFilter=this.value;renderPendingList();" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+      +'<option value="">All</option>'
+      +'<option value="ICP"'+(wcFilter==='ICP'?' selected':'')+'>ICP</option>'
+      +'<option value="CSP"'+(wcFilter==='CSP'?' selected':'')+'>CSP</option>'
+      +'</select>'
+      +'<label style="font-size:13px;font-weight:600;margin-left:10px;">Brand:</label>'
+      +'<select id="pending-brand-filter" onchange="window._pendingBrandFilter=this.value;renderPendingList();" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+      +'<option value="">All</option>'
+      +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
+      +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
+      +'</select>'
+      +'</div>'
+
+      +'<div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;">'
+      +'<strong style="color:#1f2937;">Total Pending Calls:</strong> '+filtered.length
+      +'</div>'
+
+      +'<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:#f9fafb;border-bottom:1px solid #e2e8f0;">'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Ticket No</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Customer</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">WC Type</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Brand</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Status</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Created</th>'
+      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Assigned To</th>'
+      +'</tr></thead><tbody>';
+
+    if(!filtered.length){
+      html+='<tr><td colspan="7" style="padding:20px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
+    }else{
+      filtered.forEach(function(t){
+        var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
+        html+='<tr style="border-bottom:1px solid #e2e8f0;hover:background:#f9fafb;">'
+          +'<td style="padding:12px;color:#1f2937;"><strong>'+escHtml(t.ticket_no||'—')+'</strong></td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.customer_name||'—')+'</td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.wc_type||'—')+'</td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.brand||'—')+'</td>'
+          +'<td style="padding:12px;"><span style="background:#fef08a;color:#713f12;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;">'+escHtml(t.status||'—')+'</span></td>'
+          +'<td style="padding:12px;color:#6b7280;font-size:12px;">'+createdDate+'</td>'
+          +'<td style="padding:12px;color:#475569;">'+escHtml(t.assigned_name||'—')+'</td>'
+          +'</tr>';
+      });
+    }
+
+    html+='</tbody></table></div></div>';
+    pc.innerHTML=html;
+
+    // Ensure filters are set
+    if(document.getElementById('pending-wc-filter'))document.getElementById('pending-wc-filter').value=wcFilter;
+    if(document.getElementById('pending-brand-filter'))document.getElementById('pending-brand-filter').value=brandFilter;
+  }catch(e){
+    pc.innerHTML='<div style="padding:40px;text-align:center;color:#ef4444;">Error loading pending calls: '+escHtml(e.message)+'</div>';
+  }
+}
+
+async function exportPendingListExcel(){
+  try{
+    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,ticket_no,customer_name,wc_type,brand,status,created_at,assigned_name&order=created_at.desc&limit=2000');
+
+    var wcFilter=window._pendingWCFilter||'CSP';
+    var brandFilter=window._pendingBrandFilter||'';
+
+    var filtered=(tickets||[]).filter(function(t){
+      if(wcFilter && t.wc_type!==wcFilter)return false;
+      if(brandFilter && (t.brand||'').indexOf(brandFilter)<0)return false;
+      return true;
+    });
+
+    var data=filtered.map(function(t){
+      return{
+        'Ticket No':t.ticket_no||'',
+        'Customer':t.customer_name||'',
+        'WC Type':t.wc_type||'',
+        'Brand':t.brand||'',
+        'Status':t.status||'',
+        'Created Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
+        'Assigned To':t.assigned_name||''
+      };
+    });
+
+    if(!data.length){alert('No data to export');return;}
+
+    var now=new Date();
+    var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+    var ws=XLSX.utils.json_to_sheet(data);
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Pending Calls');
+    XLSX.writeFile(wb,'Pending_Calls_'+dateStr+'.xlsx');
+  }catch(e){alert('Export failed: '+e.message);}
 }
 
 async function renderSales(){
