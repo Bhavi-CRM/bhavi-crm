@@ -2246,26 +2246,47 @@ function onCityChange(){
   const city=document.getElementById('call-city')?.value||'';
   const pinEl=document.getElementById('call-pin');
   if(!pinEl)return;
-  pinEl._allPins=getPins(state,city);
+  pinEl._allPins=getPins(state,city); // static fallback
+  pinEl._pinState=state; pinEl._pinDistrict=city;
   pinEl.value='';
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
+var _pinTimer=null;
 function filterPinList(val){
   var pinEl=document.getElementById('call-pin');
   var drop=document.getElementById('call-pin-drop');
   if(!pinEl||!drop)return;
-  var pins=pinEl._allPins||[];
-  if(!pins.length){drop.style.display='none';return;}
   var q=(val||'').trim();
-  var filtered=q?pins.filter(function(p){return p.startsWith(q);}):pins;
-  if(!filtered.length){drop.style.display='none';return;}
-  drop.innerHTML=filtered.slice(0,60).map(function(p){
-    return'<div onmousedown="callPinSelect(\''+p+'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';
-  }).join('');
-  drop.style.display='block';
+  if(!q){drop.style.display='none';return;}
+  clearTimeout(_pinTimer);
+  _pinTimer=setTimeout(async function(){
+    try{
+      var state=pinEl._pinState||'';
+      var district=pinEl._pinDistrict||'';
+      var qs='?select=pincode,area,district&limit=50&order=pincode';
+      if(state) qs+='&state=eq.'+encodeURIComponent(state);
+      if(district) qs+='&district=eq.'+encodeURIComponent(district);
+      if(/^\d+$/.test(q)) qs+='&pincode=like.'+q+'*';
+      else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
+      var rows=await sb('pincodes','GET',null,qs);
+      if(rows&&rows.length){
+        drop.innerHTML=rows.map(function(r){
+          return'<div onmousedown="callPinSelect(\''+r.pincode+'\',\''+escHtml(r.area||'')+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b style="font-size:13px;color:var(--primary)">'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:6px;">'+escHtml(r.area)+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">'+escHtml(r.district)+'</span>':'')+'</div>';
+        }).join('');
+        drop.style.display='block'; return;
+      }
+    }catch(e){}
+    // Fallback: static INDIA_ADDR
+    var pins=pinEl._allPins||[];
+    var filtered=pins.filter(function(p){return p.startsWith(q);}).slice(0,60);
+    if(!filtered.length){drop.style.display='none';return;}
+    drop.innerHTML=filtered.map(function(p){return'<div onmousedown="callPinSelect(\''+p+'\',\'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';}).join('');
+    drop.style.display='block';
+  },200);
 }
-function callPinSelect(pin){
+function callPinSelect(pin,area){
   var el=document.getElementById('call-pin');if(el)el.value=pin;
+  var areaEl=document.getElementById('call-area');if(areaEl&&area&&!areaEl.value)areaEl.value=area;
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 function setAddressDropdowns(state,city,pin){
@@ -6175,6 +6196,7 @@ async function renderMaster(){
       <button class="tab" onclick="switchMasterTab('subcats',this)">Sub-Categories</button>
       <button class="tab" onclick="switchMasterTab('models',this)">Models</button>
       <button class="tab" onclick="switchMasterTab('problems',this)">Problem Types</button>
+      <button class="tab" onclick="switchMasterTab('pincodes',this)">📍 Pincodes</button>
       <button class="tab" onclick="switchMasterTab('gallery',this)">📸 Service Gallery</button>
     </div>
     <div id="master-content"></div>`;
@@ -6227,6 +6249,33 @@ async function switchMasterTab(tab,el){
     </div>
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Problem Type</th><th>Action</th></tr></thead>
     <tbody id="prob-tbody">${problems.map(p=>`<tr><td>${p.problem}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="editProblemById(\`${p.id}\`)">✏️</button><button class="btn-icon" onclick="deleteProblem(\`${p.id}\`)" style="color:var(--danger);">🗑️</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  }else if(tab==='pincodes'){
+    let cnt=0;
+    try{const r=await sb('pincodes','GET',null,'?select=pincode&limit=1&offset=0');
+      // get actual count
+      const cr=await fetch(SB_URL+'/rest/v1/pincodes?select=pincode',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=exact','Range':'0-0'}});
+      cnt=parseInt(cr.headers.get('content-range')?.split('/')[1]||'0');}catch(e){}
+    c.innerHTML=`
+    <div class="card" style="margin-bottom:12px;">
+      <h3 style="font-weight:700;font-size:14px;margin-bottom:8px;">📍 Pincode Data</h3>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:#f8fafc;padding:10px 12px;border-radius:8px;">
+        <b>Format:</b> File ma 4 columns hava joie: <code>pincode</code>, <code>area</code>, <code>district</code>, <code>state</code><br>
+        Accepted: <b>.csv</b> or <b>.xlsx / .xls</b> &nbsp;|&nbsp; Current records: <b id="pin-db-count">${cnt.toLocaleString('en-IN')}</b>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn btn-outline btn-sm" onclick="downloadPincodeTemplate()">📄 Template Download</button>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:600;">File Select karo</label>
+        <input type="file" id="pin-import-file" accept=".csv,.xlsx,.xls" style="display:block;margin-top:6px;" onchange="previewPincodeFile(this)">
+      </div>
+      <div id="pin-import-preview" style="display:none;margin-bottom:12px;font-size:13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="importPincodes(false)">📥 Add / Update Records</button>
+        <button class="btn" style="background:#dc2626;color:#fff;" onclick="importPincodes(true)">🗑️ Clear All &amp; Reimport</button>
+      </div>
+      <div id="pin-import-status" style="margin-top:12px;font-size:13px;"></div>
+    </div>`;
   }else if(tab==='gallery'){
     const svcOptions=['camera-repair','home-automation','cctv-install','printer-amc','printer-repair','scanner-repair'];
     const svcNames={'camera-repair':'Camera Repair','home-automation':'Home Automation','cctv-install':'CCTV Install','printer-amc':'Printer AMC','printer-repair':'Printer Repair','scanner-repair':'Scanner Service'};
@@ -6265,6 +6314,67 @@ async function switchMasterTab(tab,el){
 }
 function filterModels(){var q=(document.getElementById('model-search')?.value||'').toLowerCase();var ms=(window._mModels||[]).filter(function(m){return m.model_no.toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);});var b=window._mBrands||[];var tb=document.getElementById('model-tbody');if(!tb)return;var html='';ms.forEach(function(m){var bn='-';for(var bi=0;bi<b.length;bi++){if(b[bi].id===m.brand_id){bn=b[bi].name;break;}}var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});tb.innerHTML=html;}
 function downloadTemplate(type){var templates={"brands":[{"Brand Name":"Canon"}],"subcats":[{"Brand":"Canon","Sub-Category":"ICP"}],"models":[{"Brand":"Canon","Sub-Category":"ICP","Model No":"MF3010","Model Name":"Canon MF3010"},{"Brand":"Canon","Sub-Category":"CSP","Model No":"G3010","Model Name":"Canon G3010"}],"problems":[{"Problem":"Paper Jam"}]};var ws=XLSX.utils.json_to_sheet(templates[type]||[]);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Data");XLSX.writeFile(wb,type+"_template.xlsx");}
+function downloadPincodeTemplate(){
+  var data=[{pincode:'395001',area:'Surat City',district:'Surat',state:'Gujarat'},{pincode:'395002',area:'Athwa',district:'Surat',state:'Gujarat'},{pincode:'380001',area:'Ahmedabad City',district:'Ahmadabad',state:'Gujarat'}];
+  var ws=XLSX.utils.json_to_sheet(data);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pincodes');XLSX.writeFile(wb,'pincode_template.xlsx');
+}
+window._pinImportRows=[];
+function previewPincodeFile(input){
+  var preview=document.getElementById('pin-import-preview');
+  var file=input.files[0];if(!file){preview.style.display='none';return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var rows=[];
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var json=XLSX.utils.sheet_to_json(ws,{raw:false,defval:''});
+      // Normalise headers (case-insensitive, trim)
+      rows=json.map(function(r){
+        var keys=Object.keys(r);
+        var get=function(n){var k=keys.find(function(k){return k.trim().toLowerCase()===n;});return k?String(r[k]).trim():'';};
+        return{pincode:get('pincode'),area:get('area'),district:get('district'),state:get('state')};
+      }).filter(function(r){return r.pincode&&/^\d{6}$/.test(r.pincode);});
+    }catch(ex){preview.innerHTML='<b style="color:var(--danger)">File parse error: '+ex.message+'</b>';preview.style.display='';return;}
+    window._pinImportRows=rows;
+    var states={};rows.forEach(function(r){states[r.state]=(states[r.state]||0)+1;});
+    var stateSummary=Object.keys(states).map(function(s){return s+': '+states[s].toLocaleString('en-IN');}).join(' | ');
+    preview.innerHTML='✅ <b>'+rows.length.toLocaleString('en-IN')+' valid rows</b> found &nbsp;·&nbsp; '+stateSummary;
+    preview.style.display='';
+  };
+  reader.readAsBinaryString(file);
+}
+async function importPincodes(clearFirst){
+  var rows=window._pinImportRows||[];
+  if(!rows.length){alert('Pehla file select karo.');return;}
+  var status=document.getElementById('pin-import-status');
+  if(clearFirst&&!confirm('Supabase mathi BADHA pincodes delete thashe ane new file import thashe. Sure?'))return;
+  status.innerHTML='<span style="color:#d97706;">⏳ Starting...</span>';
+  try{
+    if(clearFirst){
+      status.innerHTML='<span style="color:#d97706;">🗑️ Clearing existing records...</span>';
+      await fetch(SB_URL+'/rest/v1/pincodes?pincode=gte.100000',{method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    }
+    var BATCH=500;var total=rows.length;var done=0;
+    for(var i=0;i<rows.length;i+=BATCH){
+      var batch=rows.slice(i,i+BATCH);
+      await fetch(SB_URL+'/rest/v1/pincodes',{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},
+        body:JSON.stringify(batch)
+      });
+      done+=batch.length;
+      status.innerHTML='<span style="color:#1d4ed8;">📥 Importing... '+done.toLocaleString('en-IN')+' / '+total.toLocaleString('en-IN')+'</span>';
+    }
+    status.innerHTML='<span style="color:#059669;">✅ Import complete! '+done.toLocaleString('en-IN')+' records added/updated.</span>';
+    // Refresh count
+    var cr=await fetch(SB_URL+'/rest/v1/pincodes?select=pincode',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'count=exact','Range':'0-0'}});
+    var cnt=parseInt(cr.headers.get('content-range')?.split('/')[1]||'0');
+    var el=document.getElementById('pin-db-count');if(el)el.textContent=cnt.toLocaleString('en-IN');
+    window._pinImportRows=[];document.getElementById('pin-import-file').value='';
+    document.getElementById('pin-import-preview').style.display='none';
+  }catch(e){status.innerHTML='<span style="color:var(--danger)">❌ Error: '+e.message+'</span>';}
+}
 async function addBrand(){const n=document.getElementById('new-brand')?.value.trim();if(!n)return;await sb('brands','POST',{name:n});await loadMasterData();switchMasterTab('brands',null);}
 async function deleteBrand(id){if(!confirm('Delete?'))return;await sb('brands','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('brands',null);}
 async function addSubcat(){const bid=document.getElementById('new-sc-brand')?.value;const n=document.getElementById('new-sc-name')?.value.trim();if(!n||!bid){alert('Select brand and name');return;}await sb('subcategories','POST',{brand_id:bid,name:n});await loadMasterData();switchMasterTab('subcats',null);}

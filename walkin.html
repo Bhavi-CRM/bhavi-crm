@@ -1030,23 +1030,46 @@ function wiOnStateChange(){
 }
 function wiOnCityChange(){
   var s=document.getElementById('wi-state').value,c=document.getElementById('wi-city').value;
-  window._wiCurrentPins=wiGetPins(s,c);
+  window._wiCurrentPins=wiGetPins(s,c); // static fallback
+  window._wiPinState=s; window._wiPinDistrict=c;
   document.getElementById('wi-pin').value='';
   var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
 }
+var _wiPinTimer=null;
 function wiFilterPin(val){
   var drop=document.getElementById('wi-pin-drop');
-  var pins=window._wiCurrentPins||[];
-  if(!pins.length){if(drop)drop.style.display='none';return;}
-  var filtered=val?pins.filter(function(p){return p.startsWith(val);}):pins;
-  if(!filtered.length){if(drop)drop.style.display='none';return;}
-  drop.innerHTML=filtered.slice(0,50).map(function(p){
-    return'<div onmousedown="wiSelectPin(\''+p+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';
-  }).join('');
-  drop.style.display='block';
+  var q=(val||'').trim();
+  if(!q){if(drop)drop.style.display='none';return;}
+  clearTimeout(_wiPinTimer);
+  _wiPinTimer=setTimeout(async function(){
+    try{
+      var state=window._wiPinState||'';
+      var district=window._wiPinDistrict||'';
+      var qs='?select=pincode,area,district&limit=50&order=pincode';
+      if(state) qs+='&state=eq.'+encodeURIComponent(state);
+      if(district) qs+='&district=eq.'+encodeURIComponent(district);
+      if(/^\d+$/.test(q)) qs+='&pincode=like.'+q+'*';
+      else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
+      var r=await fetch(SB_URL+'/rest/v1/pincodes'+qs,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      var rows=r.ok?await r.json():[];
+      if(rows&&rows.length){
+        drop.innerHTML=rows.map(function(r){
+          return'<div onmousedown="wiSelectPin(\''+r.pincode+'\',\''+r.area+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b>'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:8px;">'+r.area+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">'+r.district+'</span>':'')+'</div>';
+        }).join('');
+        drop.style.display='block'; return;
+      }
+    }catch(e){}
+    // Fallback: static list
+    var pins=window._wiCurrentPins||[];
+    var filtered=pins.filter(function(p){return p.startsWith(q);}).slice(0,50);
+    if(!filtered.length){drop.style.display='none';return;}
+    drop.innerHTML=filtered.map(function(p){return'<div onmousedown="wiSelectPin(\''+p+'\',\'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';}).join('');
+    drop.style.display='block';
+  },200);
 }
-function wiSelectPin(pin){
+function wiSelectPin(pin,area){
   document.getElementById('wi-pin').value=pin;
+  var areaEl=document.getElementById('inp-area');if(areaEl&&area&&!areaEl.value)areaEl.value=area;
   var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
 }
 
