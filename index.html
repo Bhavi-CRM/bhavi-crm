@@ -5904,9 +5904,10 @@ async function renderEngParts(tab){
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
         </div>
-        <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('log','📋 Movement Log')}</div>
+        <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('log','📋 Movement Log')}</div>
         <div id="ep-content"></div>`;
       if(tab==='overview') renderEPOverview(engineers);
+      else if(tab==='analysis') renderEPAnalysis(engineers);
       else if(tab==='pending') await renderEPPending(null);
       else await renderEPLog();
     }else{
@@ -5963,6 +5964,121 @@ function epQtyCell(qty,owner,partId){
   const col=qty<=0?'#dc2626':qty<=2?'#d97706':'#059669';
   const click=owner?`onclick="openEngAdj('${owner}','${partId}','${qty}')" style="cursor:pointer;" title="Click to adjust"`:'';
   return `<td ${click} style="text-align:center;padding:8px 6px;background:${bg};color:${col};font-weight:700;font-size:13px;border-top:1px solid #f1f5f9;">${qty}</td>`;
+}
+
+function renderEPAnalysis(engineers){
+  const el=document.getElementById('ep-content');
+  const filterHtml=`
+    <div class="card" style="padding:12px;margin-bottom:12px;background:#f0f9ff;border:1px solid #0891b2;">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <label style="font-size:11px;font-weight:700;color:#0891b2;text-transform:uppercase;display:block;margin-bottom:6px;">🔍 Filter by Part</label>
+          <select id="ep-part-filter" onchange="epaFilterChange()" style="border:1px solid #0891b2;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#fff;">
+            <option value="">-- Select Part (or see all engineers) --</option>
+            ${allInventory.sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||'')).map(p=>`<option value="${p.id}">${p.part_code} — ${p.item_name}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('ep-part-filter').value='';epaFilterChange();">Clear Filter</button>
+      </div>
+    </div>
+  `;
+
+  const filterPartId=document.getElementById('ep-part-filter')?.value||'';
+
+  if(filterPartId){
+    // Part-wise distribution
+    const part=allInventory.find(p=>p.id===filterPartId);
+    const officeQty=part?.qty_in_stock||0;
+    const engDistribution=engineers.map(eng=>{
+      const stock=allEngStock.find(s=>s.owner===eng&&s.part_id===filterPartId);
+      return{eng,qty:stock?.qty||0};
+    }).filter(d=>d.qty>0).sort((a,b)=>b.qty-a.qty);
+
+    const totalDistributed=engDistribution.reduce((a,d)=>a+d.qty,0);
+    const partHtml=`
+      <div class="card" style="margin-bottom:12px;">
+        <div style="padding:12px;border-bottom:2px solid #0891b2;">
+          <h3 style="font-size:14px;font-weight:700;color:#1e293b;margin:0;">${part?.part_code} — ${part?.item_name}</h3>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;">
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border-left:3px solid #059669;">
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;">Office Stock</div>
+              <div style="font-size:18px;font-weight:700;color:#059669;margin-top:4px;">${officeQty}</div>
+            </div>
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border-left:3px solid #0891b2;">
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;">With Engineers</div>
+              <div style="font-size:18px;font-weight:700;color:#0891b2;margin-top:4px;">${totalDistributed}</div>
+            </div>
+            <div style="background:#f8fafc;padding:10px;border-radius:6px;border-left:3px solid #7c3aed;">
+              <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;">Total Stock</div>
+              <div style="font-size:18px;font-weight:700;color:#7c3aed;margin-top:4px;">${officeQty+totalDistributed}</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:12px;">
+          ${engDistribution.length?`
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Engineer</th>
+                <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Qty</th>
+                <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Percentage</th>
+              </tr></thead>
+              <tbody>
+                ${engDistribution.map(d=>{const pct=((d.qty/totalDistributed)*100).toFixed(0);return`<tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:8px;font-weight:600;">${d.eng}</td>
+                  <td style="padding:8px;text-align:center;font-weight:700;">${d.qty}</td>
+                  <td style="padding:8px;text-align:right;"><div style="background:#eff6ff;color:#0891b2;padding:4px 8px;border-radius:4px;display:inline-block;font-weight:600;font-size:11px;">${pct}%</div></td>
+                </tr>`;}).join('')}
+              </tbody>
+            </table>
+          `:`<div style="color:#94a3b8;text-align:center;padding:12px;">No engineers have this part in stock</div>`}
+        </div>
+      </div>
+    `;
+    el.innerHTML=filterHtml+partHtml;
+  }else{
+    // Engineer-wise overview
+    const engData=engineers.map(eng=>{
+      const parts=allEngStock.filter(s=>s.owner===eng);
+      const totalQty=parts.reduce((a,p)=>a+(p.qty||0),0);
+      const totalVal=parts.reduce((a,s)=>{const p=allInventory.find(x=>x.id===s.part_id);return a+(s.qty||0)*(p?.unit_price||0);},0);
+      return{eng,parts,totalQty,totalVal};
+    }).sort((a,b)=>b.totalVal-a.totalVal);
+
+    const html=engData.map(d=>`
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:2px solid #e2e8f0;">
+          <div>
+            <h3 style="font-size:14px;font-weight:700;color:#1e293b;margin:0;">${d.eng}</h3>
+            <span style="font-size:11px;color:#64748b;">Total Stock: <b>${d.totalQty}</b> items | Value: <b style="color:#059669;">₹${d.totalVal.toFixed(0)}</b></span>
+          </div>
+        </div>
+        ${d.parts.length?`<table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Part Code</th>
+            <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Item Name</th>
+            <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Qty</th>
+            <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Unit Price</th>
+            <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Value</th>
+          </tr></thead>
+          <tbody>
+            ${d.parts.map(s=>{const p=allInventory.find(x=>x.id===s.part_id);const val=(s.qty||0)*(p?.unit_price||0);return`<tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:8px;font-weight:600;color:var(--primary);">${p?.part_code||'—'}</td>
+              <td style="padding:8px;">${p?.item_name||'Unknown'}</td>
+              <td style="padding:8px;text-align:center;font-weight:700;">${s.qty||0}</td>
+              <td style="padding:8px;text-align:right;">₹${p?.unit_price||0}</td>
+              <td style="padding:8px;text-align:right;font-weight:600;color:#059669;">₹${val.toFixed(0)}</td>
+            </tr>`;}).join('')}
+          </tbody>
+        </table>`:'<div style="padding:12px;color:#94a3b8;text-align:center;">No stock</div>'}
+      </div>
+    `).join('');
+
+    el.innerHTML=filterHtml+html||filterHtml+'<div class="card"><p style="color:#94a3b8;">No engineer stock data available.</p></div>';
+  }
+}
+
+function epaFilterChange(){
+  renderEngParts('analysis');
 }
 
 function renderEPOverview(engineers){
@@ -6273,15 +6389,15 @@ async function renderEPPending(typeFilter){
     const rows=(reqs||[]).map(r=>{
       const partsList=(r.parts||[]).map(p=>`${getPartName(p.part_id)} × <b>${p.qty}</b>`).join('<br>');
       const canApprove=!isWC||r.type==='RETURN';
-      return`<tr>
+      return`<tr data-req-id="${r.id}" data-req-data='${JSON.stringify(r).replace(/'/g,'&apos;')}'>
         <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
         <td style="padding:8px 12px;">${r.type==='RECEIVE'?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📥 Receive</span>':'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Return</span>'}</td>
         <td style="padding:8px 12px;font-size:12px;font-weight:600;">${r.engineer_name||r.engineer_id||'—'}</td>
         <td style="padding:8px 12px;font-size:12px;">${partsList||'—'}</td>
         <td style="padding:8px 12px;font-size:12px;color:#475569;">${r.notes||'—'}</td>
         <td style="padding:8px 12px;white-space:nowrap;">
-          ${canApprove?`<button class="btn btn-sm" style="background:#059669;color:#fff;margin-right:4px;" onclick="approveEngReq('${r.id}',${JSON.stringify(JSON.stringify(r))})">✅ Approve</button>`:''}
-          ${!isWC?`<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;" onclick="rejectEngReq('${r.id}')">❌ Reject</button>`:''}
+          ${canApprove?`<button class="btn btn-sm epr-approve-btn" style="background:#059669;color:#fff;margin-right:4px;">✅ Approve</button>`:''}
+          ${!isWC?`<button class="btn btn-sm epr-reject-btn" style="background:#fef2f2;color:#dc2626;">❌ Reject</button>`:''}
         </td>
       </tr>`;
     }).join('')||`<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">✅ Koi pending request nathi.</td></tr>`;
@@ -6297,6 +6413,8 @@ async function renderEPPending(typeFilter){
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
+    document.querySelectorAll('.epr-approve-btn').forEach(btn=>btn.addEventListener('click',function(){const row=this.closest('tr');const reqId=row.dataset.reqId;const reqData=JSON.parse(row.dataset.reqData);approveEngReq(reqId,reqData);}));
+    document.querySelectorAll('.epr-reject-btn').forEach(btn=>btn.addEventListener('click',function(){const row=this.closest('tr');const reqId=row.dataset.reqId;rejectEngReq(reqId);}));
   }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: "eng_part_requests" table Supabase ma create karo — SQL admin ne dikhe chhe.</p></div>`;}
 }
 
@@ -6315,14 +6433,14 @@ function eprAddRow(){
   const cont=document.getElementById('epr-parts-container');
   const div=document.createElement('div');
   div.id='epr-row-'+idx;
-  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:10px;align-items:flex-start;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-  div.innerHTML=`<div style="position:relative;display:flex;flex-direction:column;gap:4px;">
-    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1.5px solid #e2e8f0;padding:10px 12px;">
+  div.style.cssText='display:grid;grid-template-columns:1fr 70px 40px;gap:10px;align-items:center;margin-bottom:10px;padding:12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;';
+  div.innerHTML=`<div style="position:relative;min-width:0;">
+    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Type part code..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1px solid #cbd5e1;padding:9px 11px;width:100%;">
     <div id="epr-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="epr-pid-${idx}">
   </div>
-  <div><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;border:1.5px solid #e2e8f0;padding:10px 8px;"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:10px 8px;margin-top:24px;border:none;" onclick="document.getElementById('epr-row-${idx}').remove(); return false;">✕</button>`;
+  <input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" style="text-align:center;border:1px solid #cbd5e1;padding:9px 6px;font-size:13px;">
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:none;padding:8px 10px;width:100%;height:38px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('epr-row-${idx}').remove(); return false;">✕</button>`;
   cont.appendChild(div);
 }
 function eprFilterParts(idx){
@@ -6378,14 +6496,14 @@ function errAddRow(){
   const cont=document.getElementById('err-parts-container');
   const div=document.createElement('div');
   div.id='err-row-'+idx;
-  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:10px;align-items:flex-start;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-  div.innerHTML=`<div style="position:relative;display:flex;flex-direction:column;gap:4px;">
-    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1.5px solid #e2e8f0;padding:10px 12px;">
+  div.style.cssText='display:grid;grid-template-columns:1fr 70px 40px;gap:10px;align-items:center;margin-bottom:10px;padding:12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;';
+  div.innerHTML=`<div style="position:relative;min-width:0;">
+    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Type part code..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1px solid #cbd5e1;padding:9px 11px;width:100%;">
     <div id="err-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="err-pid-${idx}">
   </div>
-  <div><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;border:1.5px solid #e2e8f0;padding:10px 8px;"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:10px 8px;margin-top:24px;border:none;" onclick="document.getElementById('err-row-${idx}').remove(); return false;">✕</button>`;
+  <input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" style="text-align:center;border:1px solid #cbd5e1;padding:9px 6px;font-size:13px;">
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:none;padding:8px 10px;width:100%;height:38px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('err-row-${idx}').remove(); return false;">✕</button>`;
   cont.appendChild(div);
 }
 function errFilterParts(idx){
@@ -6427,8 +6545,7 @@ async function saveEngReqReturn(){
 }
 
 // ── Approve / Reject requests (Admin + WC for RETURN) ─────
-async function approveEngReq(reqId,reqJson){
-  const req=JSON.parse(reqJson);
+async function approveEngReq(reqId,req){
   const parts=req.parts||[];
   if(!parts.length){alert('Request ma koi part nathi.');return;}
   if(!confirm(`Approve karvu chhe?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
@@ -6440,7 +6557,7 @@ async function approveEngReq(reqId,reqJson){
         await invQtyAdjust(p.part_id,-p.qty);
         await engStockAdjust(req.engineer_name,p.part_id,p.qty);
         await sb('eng_movements','POST',{type:'ISSUE',part_id:p.part_id,qty:p.qty,from_owner:'MAIN',to_owner:req.engineer_name,notes:'Via request '+reqId,created_by:currentUser?.name||'Admin'});
-      }else{
+      }else if(req.type==='RETURN'){
         await engStockAdjust(req.engineer_name,p.part_id,-p.qty);
         await invQtyAdjust(p.part_id,p.qty);
         await sb('eng_movements','POST',{type:'ENG_RETURN',part_id:p.part_id,qty:p.qty,from_owner:req.engineer_name,to_owner:'MAIN',notes:'Via request '+reqId,created_by:currentUser?.name||'Admin'});
@@ -6448,9 +6565,8 @@ async function approveEngReq(reqId,reqJson){
     }
     await sb('eng_part_requests','PATCH',{status:'APPROVED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
     alert('✅ Approved! Stock update thayu.');
-    const isWC=(currentUser.role==='admin'&&(currentUser.role_type||'')==='work_controller')||currentUser.role==='work_controller';
     renderEngParts('pending');
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){alert('Error: '+e.message);console.error(e);}
 }
 async function rejectEngReq(reqId){
   if(!confirm('Reject karvu chhe aa request?'))return;
