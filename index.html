@@ -262,6 +262,7 @@ tr:hover td{background:#f8fafc;}
   <div class="nav-section" id="nav-admin-section">
     <div class="nav-section-title">Management</div>
     <div class="nav-item" onclick="navigate('inventory')" id="nav-inventory"><span class="icon">🗃️</span><span>Inventory</span></div>
+    <div class="nav-item" onclick="navigate('eng-parts')" id="nav-eng-parts"><span class="icon">🧰</span><span>Eng. Parts</span></div>
     <div class="nav-item" onclick="navigate('tasks')" id="nav-tasks"><span class="icon">✅</span><span>Tasks</span></div>
     <div class="nav-item" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
     <div class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
@@ -2514,9 +2515,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales}[page];
   if(renderFn)await renderFn();
 }
 
@@ -5792,6 +5793,343 @@ async function renderReportTasks(c){
   }catch(e){c.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 
+// ════════════════════════════════════════════════════════════
+// ENGINEER PARTS TRACKING
+// ════════════════════════════════════════════════════════════
+let allEngParts=[], allEngStock=[], editingEngPartId=null;
+
+async function renderEngParts(tab){
+  tab=tab||'overview';
+  const c=document.getElementById('page-content');
+  c.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    [allEngParts, allEngStock]=await Promise.all([
+      sb('eng_parts','GET',null,'?order=name'),
+      sb('eng_stock','GET',null,'?order=owner'),
+    ]);
+    if(!allEngineers||!allEngineers.length) await loadMasterData();
+
+    const engineers=[...new Set(allEngStock.map(s=>s.owner).filter(o=>o!=='MAIN'))].sort();
+    const mainStock=allEngStock.filter(s=>s.owner==='MAIN');
+    const totalMainVal=mainStock.reduce((a,s)=>{
+      const p=allEngParts.find(x=>x.id===s.part_id);
+      return a+(s.qty||0)*(p?.unit_price||0);
+    },0);
+    const totalEngVal=allEngStock.filter(s=>s.owner!=='MAIN').reduce((a,s)=>{
+      const p=allEngParts.find(x=>x.id===s.part_id);
+      return a+(s.qty||0)*(p?.unit_price||0);
+    },0);
+
+    const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">${label}</button>`;
+
+    c.innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+        <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Part Types</div><div class="kpi-value" style="font-size:22px;">${allEngParts.length}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:#0891b2;"><div class="kpi-label">Engineers</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${engineers.length}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Office Stock Value</div><div class="kpi-value" style="font-size:15px;color:var(--success);">₹${totalMainVal.toFixed(0)}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:#f59e0b;"><div class="kpi-label">Field Stock Value</div><div class="kpi-value" style="font-size:15px;color:#f59e0b;">₹${totalEngVal.toFixed(0)}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="openEngIssue()">📤 Issue to Engineer</button>
+        <button class="btn" style="background:#d97706;color:#fff;" onclick="openEngUse()">🔧 Record Usage</button>
+        <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
+        <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
+      </div>
+      <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('log','📋 Movement Log')}${tabHtml('parts','🔩 Parts Master')}</div>
+      <div id="ep-content"></div>`;
+
+    if(tab==='overview') renderEPOverview(engineers);
+    else if(tab==='log') await renderEPLog();
+    else renderEPParts();
+  }catch(e){
+    document.getElementById('page-content').innerHTML=`<div class="card"><p style="color:red;font-weight:600;">Setup required</p>
+      <p style="font-size:13px;">Run this SQL in Supabase SQL Editor first:</p>
+      <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow:auto;">CREATE TABLE eng_parts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  part_no TEXT, name TEXT NOT NULL, category TEXT,
+  unit_price DECIMAL(10,2) DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE eng_stock (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  owner TEXT NOT NULL,
+  part_id uuid REFERENCES eng_parts(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(owner, part_id)
+);
+CREATE TABLE eng_movements (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  type TEXT NOT NULL,
+  part_id uuid REFERENCES eng_parts(id),
+  qty INTEGER NOT NULL,
+  from_owner TEXT, to_owner TEXT,
+  job_sheet TEXT, warranty BOOLEAN DEFAULT false,
+  notes TEXT, created_by TEXT
+);</pre></div>`;
+  }
+}
+
+function epGetQty(owner,partId){
+  const s=allEngStock.find(x=>x.owner===owner&&x.part_id===partId);
+  return s?s.qty:0;
+}
+function epQtyCell(qty){
+  const bg=qty<=0?'#fef2f2':qty<=2?'#fefce8':'#f0fdf4';
+  const col=qty<=0?'#dc2626':qty<=2?'#d97706':'#059669';
+  return `<td style="text-align:center;padding:8px 6px;background:${bg};color:${col};font-weight:700;font-size:13px;border-top:1px solid #f1f5f9;">${qty}</td>`;
+}
+
+function renderEPOverview(engineers){
+  const el=document.getElementById('ep-content');
+  if(!allEngParts.length){el.innerHTML='<div class="card"><p style="color:var(--text-muted);">No parts yet. Go to Parts Master tab → Add Part.</p></div>';return;}
+  const engCols=engineers.map(e=>`<th style="padding:8px 10px;font-size:11px;text-align:center;background:#f0f9ff;color:#0891b2;white-space:nowrap;">👷 ${e}</th>`).join('');
+  const rows=allEngParts.map(p=>{
+    const mainQty=epGetQty('MAIN',p.id);
+    const engCells=engineers.map(e=>epQtyCell(epGetQty(e,p.id))).join('');
+    const total=mainQty+engineers.reduce((a,e)=>a+epGetQty(e,p.id),0);
+    return `<tr>
+      <td style="padding:8px 12px;font-weight:600;font-size:13px;border-top:1px solid #f1f5f9;">${p.name}</td>
+      <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.part_no||'—'}</td>
+      <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.category||'—'}</td>
+      ${epQtyCell(mainQty)}
+      ${engCells}
+      <td style="text-align:center;padding:8px;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-top:1px solid #f1f5f9;">${total}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`
+    <div class="card" style="padding:0;overflow:auto;">
+      <table style="min-width:500px;border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Name</th>
+          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part No</th>
+          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Category</th>
+          <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0fdf4;color:#059669;font-weight:700;text-transform:uppercase;">🏢 Office</th>
+          ${engCols}
+          <th style="padding:10px 8px;font-size:11px;text-align:center;background:#eff6ff;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Total</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">🟢 Good &nbsp;|&nbsp; 🟡 Low (≤2) &nbsp;|&nbsp; 🔴 Out of stock</p>`;
+}
+
+async function renderEPLog(){
+  const el=document.getElementById('ep-content');
+  el.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    const movs=await sb('eng_movements','GET',null,'?order=created_at.desc&limit=300&select=*,eng_parts(name)');
+    const typeLabel={
+      ISSUE:'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📤 Issued</span>',
+      USE:'<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔧 Used</span>',
+      WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
+      ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
+      ADJUST:'<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">⚙️ Adjusted</span>',
+    };
+    const rows=movs.map(m=>`<tr>
+      <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+      <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
+      <td style="padding:8px 12px;font-size:12px;font-weight:600;">${m.eng_parts?.name||'—'}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;">${m.qty}</td>
+      <td style="padding:8px 12px;font-size:12px;">${m.from_owner||'—'}</td>
+      <td style="padding:8px 12px;font-size:12px;">${m.to_owner||'—'}</td>
+      <td style="padding:8px 12px;font-size:12px;color:#1d4ed8;">${m.job_sheet||'—'}</td>
+      <td style="padding:8px 12px;font-size:11px;">${m.warranty?'<span style="color:#059669;font-weight:700;">Warranty</span>':m.notes||'—'}</td>
+    </tr>`).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted);">No movements yet</td></tr>';
+    el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
+      <table style="min-width:700px;border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Date/Time</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Type</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Qty</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">From</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">To</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Jobsheet</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }catch(e){el.innerHTML=`<div class="card"><p>Error: ${e.message}</p></div>`;}
+}
+
+function renderEPParts(){
+  const el=document.getElementById('ep-content');
+  const rows=allEngParts.map(p=>`<tr>
+    <td style="padding:9px 12px;font-size:12px;color:#64748b;">${p.part_no||'—'}</td>
+    <td style="padding:9px 12px;font-weight:600;">${p.name}</td>
+    <td style="padding:9px 12px;font-size:12px;color:#64748b;">${p.category||'—'}</td>
+    <td style="padding:9px 12px;text-align:right;font-weight:600;">₹${(p.unit_price||0).toFixed(2)}</td>
+    <td style="padding:9px 12px;text-align:center;">
+      <button class="btn btn-sm" onclick="editEngPart('${p.id}')">Edit</button>
+      <button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteEngPart('${p.id}')">Del</button>
+    </td>
+  </tr>`).join('')||'<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted);">No parts yet. Click + Add Part.</td></tr>';
+  el.innerHTML=`
+    <div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;">${allEngParts.length} Parts</span>
+      <button class="btn btn-primary" onclick="openAddEngPart()">+ Add Part</button>
+    </div>
+    <div class="card" style="padding:0;overflow:auto;">
+      <table style="border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part No</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Name</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Category</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Unit Price</th>
+          <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;color:#64748b;"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Modal openers (populate dropdowns) ───────────────────────
+function epPartOpts(){return allEngParts.map(p=>`<option value="${p.id}">${p.name}${p.part_no?' ('+p.part_no+')':''}</option>`).join('');}
+function epEngOpts(){
+  const fromStock=[...new Set(allEngStock.map(s=>s.owner).filter(o=>o!=='MAIN'))];
+  const fromUsers=(allEngineers||[]).map(e=>e.name);
+  const all=[...new Set([...fromStock,...fromUsers])].sort();
+  return all.map(n=>`<option value="${n}">${n}</option>`).join('')||'<option disabled>No engineers found</option>';
+}
+
+function openEngIssue(){
+  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
+  document.getElementById('ei-part').innerHTML=epPartOpts();
+  document.getElementById('ei-engineer').innerHTML=epEngOpts();
+  document.getElementById('ei-qty').value=1;
+  document.getElementById('ei-notes').value='';
+  showModal('modal-eng-issue');
+}
+async function saveEngIssue(){
+  const partId=document.getElementById('ei-part').value;
+  const engineer=document.getElementById('ei-engineer').value;
+  const qty=parseInt(document.getElementById('ei-qty').value)||0;
+  const notes=document.getElementById('ei-notes').value.trim();
+  if(!partId||!engineer||qty<=0){alert('Fill all fields with valid qty.');return;}
+  try{
+    await engStockAdjust('MAIN',partId,-qty);
+    await engStockAdjust(engineer,partId,qty);
+    await sb('eng_movements','POST',{type:'ISSUE',part_id:partId,qty,from_owner:'MAIN',to_owner:engineer,notes,created_by:currentUser?.name||'Admin'});
+    closeModal('modal-eng-issue');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function openEngUse(){
+  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
+  document.getElementById('eu-engineer').innerHTML=epEngOpts();
+  document.getElementById('eu-part').innerHTML=epPartOpts();
+  document.getElementById('eu-qty').value=1;
+  document.getElementById('eu-jobsheet').value='';
+  document.getElementById('eu-warranty').checked=false;
+  document.getElementById('eu-notes').value='';
+  showModal('modal-eng-use');
+}
+async function saveEngUse(){
+  const partId=document.getElementById('eu-part').value;
+  const engineer=document.getElementById('eu-engineer').value;
+  const qty=parseInt(document.getElementById('eu-qty').value)||0;
+  const jobSheet=document.getElementById('eu-jobsheet').value.trim();
+  const warranty=document.getElementById('eu-warranty').checked;
+  const notes=document.getElementById('eu-notes').value.trim();
+  if(!partId||!engineer||qty<=0){alert('Fill engineer, part and qty.');return;}
+  try{
+    await engStockAdjust(engineer,partId,-qty);
+    await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jobSheet,warranty,notes,created_by:currentUser?.name||'Admin'});
+    closeModal('modal-eng-use');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function openEngWarranty(){
+  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
+  document.getElementById('ew-part').innerHTML=epPartOpts();
+  document.getElementById('ew-qty').value=1;
+  document.getElementById('ew-jobsheet').value='';
+  document.getElementById('ew-notes').value='';
+  showModal('modal-eng-warranty');
+}
+async function saveEngWarranty(){
+  const partId=document.getElementById('ew-part').value;
+  const qty=parseInt(document.getElementById('ew-qty').value)||0;
+  const jobSheet=document.getElementById('ew-jobsheet').value.trim();
+  const notes=document.getElementById('ew-notes').value.trim();
+  if(!partId||qty<=0){alert('Select part and enter qty.');return;}
+  try{
+    await engStockAdjust('MAIN',partId,qty);
+    await sb('eng_movements','POST',{type:'WARRANTY_RETURN',part_id:partId,qty,from_owner:'COMPANY',to_owner:'MAIN',job_sheet:jobSheet,warranty:true,notes,created_by:currentUser?.name||'Admin'});
+    closeModal('modal-eng-warranty');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function openEngReturn(){
+  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
+  document.getElementById('er-engineer').innerHTML=epEngOpts();
+  document.getElementById('er-part').innerHTML=epPartOpts();
+  document.getElementById('er-qty').value=1;
+  document.getElementById('er-notes').value='';
+  showModal('modal-eng-return');
+}
+async function saveEngReturn(){
+  const partId=document.getElementById('er-part').value;
+  const engineer=document.getElementById('er-engineer').value;
+  const qty=parseInt(document.getElementById('er-qty').value)||0;
+  const notes=document.getElementById('er-notes').value.trim();
+  if(!partId||!engineer||qty<=0){alert('Fill all fields.');return;}
+  try{
+    await engStockAdjust(engineer,partId,-qty);
+    await engStockAdjust('MAIN',partId,qty);
+    await sb('eng_movements','POST',{type:'ENG_RETURN',part_id:partId,qty,from_owner:engineer,to_owner:'MAIN',notes,created_by:currentUser?.name||'Admin'});
+    closeModal('modal-eng-return');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function engStockAdjust(owner,partId,delta){
+  const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
+  const newQty=(existing?.qty||0)+delta;
+  const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
+  if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
+  else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty<0?0:newQty});
+}
+
+function openAddEngPart(){
+  editingEngPartId=null;
+  document.getElementById('modal-eng-part-title').textContent='Add Part';
+  ['ep-part-no','ep-part-name','ep-part-price'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ep-part-cat').value='';
+  showModal('modal-eng-part');
+}
+function editEngPart(id){
+  const p=allEngParts.find(x=>x.id===id);if(!p)return;
+  editingEngPartId=id;
+  document.getElementById('modal-eng-part-title').textContent='Edit Part';
+  document.getElementById('ep-part-no').value=p.part_no||'';
+  document.getElementById('ep-part-name').value=p.name||'';
+  document.getElementById('ep-part-cat').value=p.category||'';
+  document.getElementById('ep-part-price').value=p.unit_price||'';
+  showModal('modal-eng-part');
+}
+async function saveEngPart(){
+  const data={
+    part_no:document.getElementById('ep-part-no').value.trim()||null,
+    name:document.getElementById('ep-part-name').value.trim(),
+    category:document.getElementById('ep-part-cat').value||null,
+    unit_price:parseFloat(document.getElementById('ep-part-price').value)||0,
+  };
+  if(!data.name){alert('Enter part name.');return;}
+  try{
+    if(editingEngPartId) await sb('eng_parts','PATCH',data,`?id=eq.${editingEngPartId}`);
+    else await sb('eng_parts','POST',data);
+    closeModal('modal-eng-part');renderEngParts('parts');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteEngPart(id){
+  if(!confirm('Delete this part? Stock entries for it will also be removed.'))return;
+  try{await sb('eng_parts','DELETE',null,`?id=eq.${id}`);renderEngParts('parts');}
+  catch(e){alert('Error: '+e.message);}
+}
+// ════════════════════════════════════════════════════════════
+
 async function renderMaster(){
   document.getElementById('page-content').innerHTML=`
     <div class="tabs">
@@ -5831,7 +6169,7 @@ async function switchMasterTab(tab,el){
         <select id="new-model-brand" style="max-width:130px;"><option value="">Brand</option>${brands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select>
         <input type="text" id="new-model-no" placeholder="Model No *" style="max-width:130px;">
         <input type="text" id="new-model-name" placeholder="Name (optional)" style="max-width:160px;">
-        <select id="new-model-type" style="max-width:130px;"><option value="">Type</option><option value="laser">🖨️ Laser</option><option value="inkjet">💧 Inkjet</option><option value="photo">📸 Photo</option><option value="camera">📷 Camera</option><option value="other">Other</option></select>
+        <select id="new-model-type" style="max-width:130px;"><option value="">Type</option><option value="laser">🖨️ Laser</option><option value="inkjet">💧 Inkjet</option><option value="photo">📸 Photo</option><option value="scanner">🖷 Scanner</option><option value="camera">📷 Camera</option><option value="other">Other</option></select>
         <input type="number" id="new-model-price" placeholder="Sale Price ₹" style="max-width:110px;" min="0">
         <button class="btn btn-primary btn-sm" onclick="addModel()">+ Add</button>
       </div>
@@ -5901,7 +6239,7 @@ function editModel(id, modelNo, modelName, brandId, subcatId, printerType, saleP
   const brandOpts=allBrands.map(b=>'<option value="'+b.id+'"'+(b.id===brandId?' selected':'')+'>'+b.name+'</option>').join('');
   const brandSubcats=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
   const subcatOpts=brandSubcats.map(s=>'<option value="'+s.id+'"'+(s.id===subcatId?' selected':'')+'>'+s.name+'</option>').join('');
-  const typeOpts=[['','Type'],['laser','🖨️ Laser'],['inkjet','💧 Inkjet'],['photo','📸 Photo'],['camera','📷 Camera'],['other','Other']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===printerType?' selected':'')+'>'+o[1]+'</option>';}).join('');
+  const typeOpts=[['','Type'],['laser','🖨️ Laser'],['inkjet','💧 Inkjet'],['photo','📸 Photo'],['scanner','🖷 Scanner'],['camera','📷 Camera'],['other','Other']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===printerType?' selected':'')+'>'+o[1]+'</option>';}).join('');
   const existing=document.getElementById('edit-model-modal');
   if(existing)existing.remove();
   const div=document.createElement('div');
@@ -14797,6 +15135,107 @@ function clearAILog(){
 </div>
 
 <!-- GENERAL PURPOSE MODAL -->
+<!-- ── ENG PARTS MODALS ──────────────────────────────────────── -->
+<!-- Issue to engineer -->
+<div class="modal-overlay hidden" id="modal-eng-issue" onclick="if(event.target===this)closeModal('modal-eng-issue')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header"><h2>📤 Issue Parts to Engineer</h2><button class="close-btn" onclick="closeModal('modal-eng-issue')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Part</label><select id="ei-part" class="form-control"></select></div>
+      <div class="form-group"><label>Engineer</label><select id="ei-engineer" class="form-control"></select></div>
+      <div class="form-group"><label>Quantity</label><input type="number" id="ei-qty" class="form-control" min="1" value="1" placeholder="Qty"></div>
+      <div class="form-group"><label>Notes (optional)</label><input type="text" id="ei-notes" class="form-control" placeholder="e.g. Morning issue"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-issue')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEngIssue()">Issue Parts</button>
+    </div>
+  </div>
+</div>
+<!-- Use on call -->
+<div class="modal-overlay hidden" id="modal-eng-use" onclick="if(event.target===this)closeModal('modal-eng-use')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header"><h2>🔧 Record Part Usage</h2><button class="close-btn" onclick="closeModal('modal-eng-use')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Engineer</label><select id="eu-engineer" class="form-control"></select></div>
+      <div class="form-group"><label>Part Used</label><select id="eu-part" class="form-control"></select></div>
+      <div class="form-group"><label>Quantity</label><input type="number" id="eu-qty" class="form-control" min="1" value="1"></div>
+      <div class="form-group"><label>Jobsheet No (linked ticket)</label><input type="text" id="eu-jobsheet" class="form-control" placeholder="e.g. BH-2025-001"></div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="eu-warranty" style="width:16px;height:16px;">
+        <label for="eu-warranty" style="margin:0;font-weight:600;">Under Warranty (part will come back from company)</label>
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="eu-notes" class="form-control" placeholder="Optional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-use')">Cancel</button>
+      <button class="btn" style="background:#d97706;color:#fff;" onclick="saveEngUse()">Record Usage</button>
+    </div>
+  </div>
+</div>
+<!-- Warranty return -->
+<div class="modal-overlay hidden" id="modal-eng-warranty" onclick="if(event.target===this)closeModal('modal-eng-warranty')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header" style="background:#f0fdf4;"><h2>🔄 Warranty Part Received</h2><button class="close-btn" onclick="closeModal('modal-eng-warranty')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#059669;background:#f0fdf4;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Part received back from company — will be added to Office stock.</p>
+      <div class="form-group"><label>Part</label><select id="ew-part" class="form-control"></select></div>
+      <div class="form-group"><label>Quantity Received</label><input type="number" id="ew-qty" class="form-control" min="1" value="1"></div>
+      <div class="form-group"><label>Original Jobsheet (reference)</label><input type="text" id="ew-jobsheet" class="form-control" placeholder="e.g. BH-2025-001"></div>
+      <div class="form-group"><label>Notes</label><input type="text" id="ew-notes" class="form-control" placeholder="Optional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-warranty')">Cancel</button>
+      <button class="btn" style="background:#059669;color:#fff;" onclick="saveEngWarranty()">Add to Stock</button>
+    </div>
+  </div>
+</div>
+<!-- Engineer returns unused parts -->
+<div class="modal-overlay hidden" id="modal-eng-return" onclick="if(event.target===this)closeModal('modal-eng-return')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header"><h2>↩️ Engineer Returns Parts</h2><button class="close-btn" onclick="closeModal('modal-eng-return')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#64748b;background:#f8fafc;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Engineer returns unused parts to office — subtracted from engineer, added to Office stock.</p>
+      <div class="form-group"><label>Engineer</label><select id="er-engineer" class="form-control"></select></div>
+      <div class="form-group"><label>Part</label><select id="er-part" class="form-control"></select></div>
+      <div class="form-group"><label>Quantity Returned</label><input type="number" id="er-qty" class="form-control" min="1" value="1"></div>
+      <div class="form-group"><label>Notes</label><input type="text" id="er-notes" class="form-control" placeholder="Optional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-return')">Cancel</button>
+      <button class="btn" style="background:#7c3aed;color:#fff;" onclick="saveEngReturn()">Confirm Return</button>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit part -->
+<div class="modal-overlay hidden" id="modal-eng-part" onclick="if(event.target===this)closeModal('modal-eng-part')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:380px;">
+    <div class="modal-header"><h2 id="modal-eng-part-title">Add Part</h2><button class="close-btn" onclick="closeModal('modal-eng-part')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Part No (optional)</label><input type="text" id="ep-part-no" class="form-control" placeholder="e.g. INK-001"></div>
+      <div class="form-group"><label>Part Name *</label><input type="text" id="ep-part-name" class="form-control" placeholder="e.g. HP 678 Black Ink"></div>
+      <div class="form-group"><label>Category</label>
+        <select id="ep-part-cat" class="form-control">
+          <option value="">-- Select --</option>
+          <option value="Ink Cartridge">Ink Cartridge</option>
+          <option value="Toner Cartridge">Toner Cartridge</option>
+          <option value="Print Head">Print Head</option>
+          <option value="Drum Unit">Drum Unit</option>
+          <option value="Paper Roll">Paper Roll</option>
+          <option value="Maintenance Kit">Maintenance Kit</option>
+          <option value="Cable / Accessory">Cable / Accessory</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Unit Price (₹)</label><input type="number" id="ep-part-price" class="form-control" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-part')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEngPart()">Save Part</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="modal-general" onclick="if(event.target===this)closeModal('modal-general')">
   <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:600px;max-height:90vh;overflow-y:auto;">
     <div class="modal-header"><h2 id="modal-general-title">Details</h2><button class="close-btn" onclick="closeModal('modal-general')">✕</button></div>
