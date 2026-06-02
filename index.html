@@ -2273,7 +2273,8 @@ function filterPinList(val){
         drop.innerHTML=rows.map(function(r){
           var safePin=r.pincode;
           var safeArea=(r.area||'').replace(/'/g,'&#39;');
-          return'<div onmousedown="callPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><b style="font-size:13px;color:var(--primary)">'+r.pincode+'</b>'+(r.area?'<span style="font-size:12px;color:#475569;margin-left:6px;">'+escHtml(r.area)+'</span>':'')+(r.district?'<span style="font-size:11px;color:#94a3b8;margin-left:6px;">('+escHtml(r.district)+')</span>':'')+'</div>';
+          var displayText=r.pincode+(r.area?'-'+r.area:'');
+          return'<div onmousedown="callPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-size:13px;font-weight:600;color:var(--primary)">'+displayText+'</span>'+(r.district?'<span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+escHtml(r.district)+'</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
       }
@@ -6312,22 +6313,26 @@ function eprAddRow(){
   const cont=document.getElementById('epr-parts-container');
   const div=document.createElement('div');
   div.id='epr-row-'+idx;
-  div.style.cssText='display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;';
-  div.innerHTML=`<div style="flex:1;position:relative;">
-    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code / name..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},200)" autocomplete="off">
+  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:flex-start;margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+  div.innerHTML=`<div style="position:relative;">
+    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},250)" autocomplete="off" style="font-size:13px;">
     <div id="epr-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="epr-pid-${idx}">
   </div>
-  <div style="width:72px;"><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;flex-shrink:0;margin-bottom:0;" onclick="document.getElementById('epr-row-${idx}').remove()">✕</button>`;
+  <div><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;margin-top:2px;" onclick="document.getElementById('epr-row-${idx}').remove()">✕</button>`;
   cont.appendChild(div);
 }
 function eprFilterParts(idx){
   const q=(document.getElementById('epr-q-'+idx)?.value||'').toLowerCase();
   const drop=document.getElementById('epr-drop-'+idx);if(!drop)return;
   const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
-  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
-  drop.innerHTML=filtered.slice(0,40).map(i=>{const stk=i.qty_in_stock||0;const sc=stk>0?'#059669':'#dc2626';return`<div class="ep-drop-item" onmousedown="eprSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><span><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span>${i.item_name}</span></span><span style="font-size:11px;font-weight:700;color:${sc};margin-left:8px;">Stk:${stk}</span></div>`;}).join('')||'<div style="padding:10px 12px;color:#64748b;">No results</div>';
+  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):[];
+  if(!q){drop.style.display='none';return;}
+  drop.innerHTML=filtered.slice(0,50).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';return`<div class="ep-drop-item" onmousedown="eprSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+    <div><span style="font-size:13px;font-weight:700;color:var(--primary)">${i.part_code||'—'}</span><br><span style="font-size:12px;color:#64748b;">${i.item_name}</span></div>
+    <span style="font-size:12px;font-weight:700;color:${stkColor};white-space:nowrap;margin-left:8px;">Stk:${stk}</span>
+  </div>`;}).join('')||'<div style="padding:12px;color:#94a3b8;text-align:center;font-size:12px;">Part nathi milyu</div>';
   drop.style.display='block';
 }
 function eprSelectPart(idx,partId,label){
@@ -6370,22 +6375,26 @@ function errAddRow(){
   const cont=document.getElementById('err-parts-container');
   const div=document.createElement('div');
   div.id='err-row-'+idx;
-  div.style.cssText='display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;';
-  div.innerHTML=`<div style="flex:1;position:relative;">
-    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code / name..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},200)" autocomplete="off">
+  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:flex-start;margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+  div.innerHTML=`<div style="position:relative;">
+    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},250)" autocomplete="off" style="font-size:13px;">
     <div id="err-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="err-pid-${idx}">
   </div>
-  <div style="width:72px;"><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;flex-shrink:0;margin-bottom:0;" onclick="document.getElementById('err-row-${idx}').remove()">✕</button>`;
+  <div><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;margin-top:2px;" onclick="document.getElementById('err-row-${idx}').remove()">✕</button>`;
   cont.appendChild(div);
 }
 function errFilterParts(idx){
   const q=(document.getElementById('err-q-'+idx)?.value||'').toLowerCase();
   const drop=document.getElementById('err-drop-'+idx);if(!drop)return;
   const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
-  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
-  drop.innerHTML=filtered.slice(0,40).map(i=>`<div class="ep-drop-item" onmousedown="errSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span>${i.item_name}</span></div>`).join('')||'<div style="padding:10px 12px;color:#64748b;">No results</div>';
+  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):[];
+  if(!q){drop.style.display='none';return;}
+  drop.innerHTML=filtered.slice(0,50).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';return`<div class="ep-drop-item" onmousedown="errSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+    <div><span style="font-size:13px;font-weight:700;color:var(--primary)">${i.part_code||'—'}</span><br><span style="font-size:12px;color:#64748b;">${i.item_name}</span></div>
+    <span style="font-size:12px;font-weight:700;color:${stkColor};white-space:nowrap;margin-left:8px;">Stk:${stk}</span>
+  </div>`;}).join('')||'<div style="padding:12px;color:#94a3b8;text-align:center;font-size:12px;">Part nathi milyu</div>';
   drop.style.display='block';
 }
 function errSelectPart(idx,partId,label){
@@ -15687,13 +15696,14 @@ function clearAILog(){
 </div>
 <!-- Engineer self-service: Request Receive -->
 <div class="modal-overlay hidden" id="modal-eng-req-receive" onclick="if(event.target===this)closeModal('modal-eng-req-receive')">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
     <div class="modal-header" style="background:#eff6ff;"><h2>📥 Parts Request (Receive)</h2><button class="close-btn" onclick="closeModal('modal-eng-req-receive')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#1d4ed8;background:#eff6ff;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Tame request submit karo — Admin approve karshe pacchi parts tmare stock ma add thashhe.</p>
-      <div id="epr-parts-container"></div>
-      <button type="button" class="btn btn-sm btn-outline" onclick="eprAddRow()" style="margin-bottom:12px;">+ Part Add Karo</button>
-      <div class="form-group"><label>Notes (optional)</label><input type="text" id="epr-notes" class="form-control" placeholder="Koi note hoy to lakho..."></div>
+      <p style="font-size:12px;color:#1d4ed8;background:#eff6ff;padding:10px 12px;border-radius:8px;margin-bottom:14px;line-height:1.5;">Tame request submit karo — part code/name type karke select karo. Admin approve karshe pacchi tmariya stock ma add thashhe.</p>
+      <p style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;">📦 Parts Needed:</p>
+      <div id="epr-parts-container" style="margin-bottom:10px;"></div>
+      <button type="button" class="btn btn-sm" style="background:#0891b2;color:#fff;margin-bottom:14px;" onclick="eprAddRow()">+ Part Add Karo</button>
+      <div class="form-group"><label style="font-weight:600;font-size:12px;">💬 Additional Notes (optional)</label><input type="text" id="epr-notes" class="form-control" placeholder="Koi note hoy to lakho e.g. 'Urgent chahiye'..." style="font-size:13px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-eng-req-receive')">Cancel</button>
@@ -15703,13 +15713,14 @@ function clearAILog(){
 </div>
 <!-- Engineer self-service: Request Return -->
 <div class="modal-overlay hidden" id="modal-eng-req-return" onclick="if(event.target===this)closeModal('modal-eng-req-return')">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
     <div class="modal-header" style="background:#fdf4ff;"><h2>↩️ Return Parts to Store</h2><button class="close-btn" onclick="closeModal('modal-eng-req-return')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#7c3aed;background:#fdf4ff;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Unused parts store ma pachha maoklo — Admin/WC approve karshe pacchi stock adjust thashhe.</p>
-      <div id="err-parts-container"></div>
-      <button type="button" class="btn btn-sm btn-outline" onclick="errAddRow()" style="margin-bottom:12px;">+ Part Add Karo</button>
-      <div class="form-group"><label>Notes (optional)</label><input type="text" id="err-notes" class="form-control" placeholder="Reason / note..."></div>
+      <p style="font-size:12px;color:#7c3aed;background:#fdf4ff;padding:10px 12px;border-radius:8px;margin-bottom:14px;line-height:1.5;">Unused parts return karo — part code/name type karke select karo. Admin/WC approve karshe pacchi stock adjust thashhe.</p>
+      <p style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;">📦 Parts to Return:</p>
+      <div id="err-parts-container" style="margin-bottom:10px;"></div>
+      <button type="button" class="btn btn-sm" style="background:#7c3aed;color:#fff;margin-bottom:14px;" onclick="errAddRow()">+ Part Add Karo</button>
+      <div class="form-group"><label style="font-weight:600;font-size:12px;">💬 Reason / Notes (optional)</label><input type="text" id="err-notes" class="form-control" placeholder="Why returning? e.g. 'Not needed' / 'Unused'..." style="font-size:13px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-eng-req-return')">Cancel</button>
