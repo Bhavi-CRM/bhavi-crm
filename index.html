@@ -5861,26 +5861,27 @@ function epGetQty(owner,partId){
   const s=allEngStock.find(x=>x.owner===owner&&x.part_id===partId);
   return s?s.qty:0;
 }
-function epQtyCell(qty){
+function epQtyCell(qty,owner,partId){
   const bg=qty<=0?'#fef2f2':qty<=2?'#fefce8':'#f0fdf4';
   const col=qty<=0?'#dc2626':qty<=2?'#d97706':'#059669';
-  return `<td style="text-align:center;padding:8px 6px;background:${bg};color:${col};font-weight:700;font-size:13px;border-top:1px solid #f1f5f9;">${qty}</td>`;
+  const click=owner?`onclick="openEngAdj('${owner}','${partId}','${qty}')" style="cursor:pointer;" title="Click to adjust"`:'';
+  return `<td ${click} style="text-align:center;padding:8px 6px;background:${bg};color:${col};font-weight:700;font-size:13px;border-top:1px solid #f1f5f9;">${qty}</td>`;
 }
 
 function renderEPOverview(engineers){
   const el=document.getElementById('ep-content');
   // Only show inventory items that have some eng_stock OR any inventory item
   const trackedIds=new Set(allEngStock.map(s=>s.part_id));
-  const items=allInventory.filter(i=>trackedIds.has(i.id)||(i.qty_in_stock>0));
+  const items=allInventory.filter(i=>trackedIds.has(i.id)||(i.qty_in_stock>0)).sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
   if(!items.length){el.innerHTML='<div class="card"><p style="color:var(--text-muted);">No inventory items found. Add items in Inventory section first, then Issue to engineers.</p></div>';return;}
   const engCols=engineers.map(e=>`<th style="padding:8px 10px;font-size:11px;text-align:center;background:#f0f9ff;color:#0891b2;white-space:nowrap;">👷 ${e}</th>`).join('');
   const rows=items.map(p=>{
     const officeQty=p.qty_in_stock||0;
-    const engCells=engineers.map(e=>epQtyCell(epGetQty(e,p.id))).join('');
+    const engCells=engineers.map(e=>epQtyCell(epGetQty(e,p.id),e,p.id)).join('');
     const engTotal=engineers.reduce((a,e)=>a+epGetQty(e,p.id),0);
     return `<tr>
+      <td style="padding:8px 12px;font-weight:700;font-size:12px;color:var(--primary);border-top:1px solid #f1f5f9;white-space:nowrap;">${p.part_code||'—'}</td>
       <td style="padding:8px 12px;font-weight:600;font-size:13px;border-top:1px solid #f1f5f9;">${p.item_name}</td>
-      <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.part_code||'—'}</td>
       <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.category||'—'}</td>
       ${epQtyCell(officeQty)}
       ${engCells}
@@ -5891,8 +5892,8 @@ function renderEPOverview(engineers){
     <div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:500px;border-collapse:collapse;width:100%;">
         <thead><tr style="background:#f8fafc;">
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
-          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
+          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
           <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Category</th>
           <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0fdf4;color:#059669;font-weight:700;text-transform:uppercase;">🏢 Office</th>
           ${engCols}
@@ -5915,7 +5916,7 @@ async function renderEPLog(){
       WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
       ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
     };
-    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?p.item_name:'—';};
+    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`<b style="color:var(--primary)">${p.part_code}</b> — ${p.item_name}`:p.item_name):'—';};
     const rows=movs.map(m=>`<tr>
       <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
       <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
@@ -5945,7 +5946,7 @@ async function renderEPLog(){
 
 // ── Modal openers ─────────────────────────────────────────────
 function epPartOpts(){
-  return (allInventory||[]).map(i=>`<option value="${i.id}">${i.item_name}${i.part_code?' ('+i.part_code+')':''}</option>`).join('');
+  return (allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||'')).map(i=>`<option value="${i.id}">${i.part_code?i.part_code+' — ':''}${i.item_name}</option>`).join('');
 }
 function epEngOpts(){
   const fromStock=[...new Set(allEngStock.map(s=>s.owner))];
@@ -6057,6 +6058,38 @@ async function invQtyAdjust(partId,delta){
   const newQty=Math.max(0,(item?.qty_in_stock||0)+delta);
   await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${partId}`);
   if(item) item.qty_in_stock=newQty;
+}
+
+// ── Manual Adjust ─────────────────────────────────────────────
+function openEngAdj(owner,partId,currentQty){
+  const part=allInventory.find(x=>x.id===partId);
+  document.getElementById('adj-label').textContent=`👷 ${owner}  ·  ${part?.part_code?part.part_code+' — '+part.item_name:part?.item_name||'Part'}  ·  Current: ${currentQty}`;
+  document.getElementById('adj-owner').value=owner;
+  document.getElementById('adj-part-id').value=partId;
+  document.getElementById('adj-qty-set').value='';
+  document.getElementById('adj-qty-add').value='';
+  document.getElementById('adj-qty-sub').value='';
+  showModal('modal-eng-adj');
+}
+async function saveEngAdj(){
+  const owner=document.getElementById('adj-owner').value;
+  const partId=document.getElementById('adj-part-id').value;
+  const setVal=document.getElementById('adj-qty-set').value;
+  const addVal=parseInt(document.getElementById('adj-qty-add').value)||0;
+  const subVal=parseInt(document.getElementById('adj-qty-sub').value)||0;
+  const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
+  const curQty=existing?.qty||0;
+  let newQty;
+  if(setVal!=='') newQty=Math.max(0,parseInt(setVal)||0);
+  else newQty=Math.max(0,curQty+addVal-subVal);
+  if(newQty===curQty){alert('No change.');return;}
+  try{
+    const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
+    if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
+    else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
+    await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(newQty-curQty),from_owner:newQty>curQty?'MANUAL':owner,to_owner:newQty>curQty?owner:'MANUAL',notes:`Manual adjust: ${curQty}→${newQty}`,created_by:currentUser?.name||'Admin'});
+    closeModal('modal-eng-adj');renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
 }
 // ════════════════════════════════════════════════════════════
 
@@ -8793,6 +8826,7 @@ function closeEditModelModal(){var el=document.getElementById('edit-model-modal'
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
 function closeModal(id){document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
+function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
 // Mobile menu
 function toggleMobileMenu(){
   const sidebar=document.getElementById('sidebar');
@@ -15065,6 +15099,36 @@ function clearAILog(){
 </div>
 
 <!-- GENERAL PURPOSE MODAL -->
+<!-- ── ENG ADJUST MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal-eng-adj" onclick="if(event.target===this)closeModal('modal-eng-adj')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:360px;">
+    <div class="modal-header"><h2>⚙️ Adjust Stock</h2><button class="close-btn" onclick="closeModal('modal-eng-adj')">✕</button></div>
+    <div class="modal-body">
+      <p id="adj-label" style="font-size:13px;font-weight:600;margin-bottom:12px;color:#1e293b;"></p>
+      <div class="form-group">
+        <label>Set Quantity (direct set)</label>
+        <input type="number" id="adj-qty-set" class="form-control" min="0" placeholder="Enter exact quantity">
+      </div>
+      <div style="text-align:center;color:#94a3b8;font-size:12px;margin:8px 0;">— OR —</div>
+      <div style="display:flex;gap:8px;">
+        <div class="form-group" style="flex:1;margin:0;">
+          <label>Add (+)</label>
+          <input type="number" id="adj-qty-add" class="form-control" min="1" placeholder="Add qty">
+        </div>
+        <div class="form-group" style="flex:1;margin:0;">
+          <label>Remove (−)</label>
+          <input type="number" id="adj-qty-sub" class="form-control" min="1" placeholder="Remove qty">
+        </div>
+      </div>
+      <input type="hidden" id="adj-owner">
+      <input type="hidden" id="adj-part-id">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-eng-adj')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEngAdj()">Save</button>
+    </div>
+  </div>
+</div>
 <!-- ── ENG PARTS MODALS ──────────────────────────────────────── -->
 <!-- Issue to engineer -->
 <div class="modal-overlay hidden" id="modal-eng-issue" onclick="if(event.target===this)closeModal('modal-eng-issue')">
