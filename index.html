@@ -138,9 +138,10 @@ tr:hover td{background:#f8fafc;}
 .ac-list.open{display:block;}
 .ac-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
 .ac-item:hover{background:var(--primary-light);}
-.ep-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;z-index:400;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12);display:none;}
-.ep-drop-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;}
-.ep-drop-item:hover{background:#eff6ff;}
+.ep-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #0891b2;border-radius:8px;z-index:9999;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:none;margin-top:2px;}
+.ep-drop-item{padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;transition:background 0.15s;}
+.ep-drop-item:hover{background:#eff6ff;color:var(--primary);}
+.ep-drop-item:last-child{border-bottom:none;}
 /* REPORT */
 .report-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .report-kpi-card{background:var(--card);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow);}
@@ -6052,9 +6053,10 @@ function epFilterParts(prefix){
   const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):all;
   const items=filtered.slice(0,60);
   drop.innerHTML=items.length
-    ?items.map(i=>{const stk=i.qty_in_stock||0;const sc=stk>0?'#059669':'#dc2626';return`<div class="ep-drop-item" onmousedown="epSelectPart('${prefix}','${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})"><span><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span style="color:#1e293b">${i.item_name}</span></span><span style="font-size:11px;font-weight:700;color:${sc};white-space:nowrap;margin-left:8px;">Stk: ${stk}</span></div>`;}).join('')
+    ?items.map(i=>{const stk=i.qty_in_stock||0;const sc=stk>0?'#059669':'#dc2626';const label=(i.part_code?i.part_code+' — '+i.item_name:i.item_name);return`<div class="ep-drop-item" data-prefix="${prefix}" data-part-id="${i.id}" data-label="${label.replace(/"/g,'&quot;')}"><span><b style="color:var(--primary)">${i.part_code||''}</b>${i.part_code?' — ':''}<span style="color:#1e293b">${i.item_name}</span></span><span style="font-size:11px;font-weight:700;color:${sc};white-space:nowrap;margin-left:8px;">Stk: ${stk}</span></div>`;}).join('')
     :'<div style="padding:10px 12px;font-size:13px;color:#64748b;">No results</div>';
   drop.style.display='block';
+  document.querySelectorAll('[data-prefix="'+prefix+'"]').forEach(el=>el.addEventListener('mousedown',function(e){e.preventDefault();epSelectPart(this.dataset.prefix,this.dataset.partId,this.dataset.label);}));
 }
 function epSelectPart(prefix,partId,label){
   const inp=document.getElementById(prefix+'-part');if(inp)inp.value=partId;
@@ -6313,27 +6315,28 @@ function eprAddRow(){
   const cont=document.getElementById('epr-parts-container');
   const div=document.createElement('div');
   div.id='epr-row-'+idx;
-  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:flex-start;margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-  div.innerHTML=`<div style="position:relative;">
-    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},250)" autocomplete="off" style="font-size:13px;">
+  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:10px;align-items:flex-start;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+  div.innerHTML=`<div style="position:relative;display:flex;flex-direction:column;gap:4px;">
+    <input type="text" id="epr-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="eprFilterParts(${idx})" onfocus="eprFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('epr-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1.5px solid #e2e8f0;padding:10px 12px;">
     <div id="epr-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="epr-pid-${idx}">
   </div>
-  <div><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;margin-top:2px;" onclick="document.getElementById('epr-row-${idx}').remove()">✕</button>`;
+  <div><input type="number" id="epr-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;border:1.5px solid #e2e8f0;padding:10px 8px;"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:10px 8px;margin-top:24px;border:none;" onclick="document.getElementById('epr-row-${idx}').remove(); return false;">✕</button>`;
   cont.appendChild(div);
 }
 function eprFilterParts(idx){
-  const q=(document.getElementById('epr-q-'+idx)?.value||'').toLowerCase();
+  const q=(document.getElementById('epr-q-'+idx)?.value||'').toLowerCase().trim();
   const drop=document.getElementById('epr-drop-'+idx);if(!drop)return;
-  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
-  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):[];
   if(!q){drop.style.display='none';return;}
-  drop.innerHTML=filtered.slice(0,50).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';return`<div class="ep-drop-item" onmousedown="eprSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-    <div><span style="font-size:13px;font-weight:700;color:var(--primary)">${i.part_code||'—'}</span><br><span style="font-size:12px;color:#64748b;">${i.item_name}</span></div>
-    <span style="font-size:12px;font-weight:700;color:${stkColor};white-space:nowrap;margin-left:8px;">Stk:${stk}</span>
-  </div>`;}).join('')||'<div style="padding:12px;color:#94a3b8;text-align:center;font-size:12px;">Part nathi milyu</div>';
+  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
+  const filtered=all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q));
+  drop.innerHTML=filtered.slice(0,60).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';const stkLabel=stk>5?'✅ Good':stk>0?'⚠️ Low':'❌ Out';const label=(i.part_code?i.part_code+' — '+i.item_name:i.item_name);return`<div class="ep-drop-item" data-idx="${idx}" data-part-id="${i.id}" data-label="${label.replace(/"/g,'&quot;')}" style="padding:11px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;">
+    <div style="min-width:0;"><span style="font-size:12px;font-weight:700;color:var(--primary);display:block;">${i.part_code||'—'}</span><span style="font-size:11px;color:#64748b;display:block;overflow:hidden;text-overflow:ellipsis;">${i.item_name}</span></div>
+    <div style="text-align:right;white-space:nowrap;"><span style="font-size:11px;font-weight:700;color:${stkColor};">${stkLabel}</span><br><span style="font-size:10px;color:#94a3b8;">Stk: ${stk}</span></div>
+  </div>`;}).join('')||'<div style="padding:14px;color:#94a3b8;text-align:center;font-size:12px;">❌ Part nathi milyu</div>';
   drop.style.display='block';
+  document.querySelectorAll('[data-idx="'+idx+'"]').forEach(el=>el.addEventListener('mousedown',function(){eprSelectPart(this.dataset.idx,this.dataset.partId,this.dataset.label);}));
 }
 function eprSelectPart(idx,partId,label){
   const pidEl=document.getElementById('epr-pid-'+idx);if(pidEl)pidEl.value=partId;
@@ -6375,27 +6378,28 @@ function errAddRow(){
   const cont=document.getElementById('err-parts-container');
   const div=document.createElement('div');
   div.id='err-row-'+idx;
-  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:8px;align-items:flex-start;margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
-  div.innerHTML=`<div style="position:relative;">
-    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},250)" autocomplete="off" style="font-size:13px;">
+  div.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:10px;align-items:flex-start;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;';
+  div.innerHTML=`<div style="position:relative;display:flex;flex-direction:column;gap:4px;">
+    <input type="text" id="err-q-${idx}" class="form-control" placeholder="🔍 Part code ya name type karo..." oninput="errFilterParts(${idx})" onfocus="errFilterParts(${idx})" onblur="setTimeout(function(){var d=document.getElementById('err-drop-${idx}');if(d)d.style.display='none'},300)" autocomplete="off" style="font-size:13px;border:1.5px solid #e2e8f0;padding:10px 12px;">
     <div id="err-drop-${idx}" class="ep-drop"></div>
     <input type="hidden" id="err-pid-${idx}">
   </div>
-  <div><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;"></div>
-  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:8px 10px;margin-top:2px;" onclick="document.getElementById('err-row-${idx}').remove()">✕</button>`;
+  <div><input type="number" id="err-qty-${idx}" class="form-control" min="1" value="1" placeholder="Qty" style="text-align:center;border:1.5px solid #e2e8f0;padding:10px 8px;"></div>
+  <button type="button" class="btn btn-sm" style="background:#fef2f2;color:#dc2626;padding:10px 8px;margin-top:24px;border:none;" onclick="document.getElementById('err-row-${idx}').remove(); return false;">✕</button>`;
   cont.appendChild(div);
 }
 function errFilterParts(idx){
-  const q=(document.getElementById('err-q-'+idx)?.value||'').toLowerCase();
+  const q=(document.getElementById('err-q-'+idx)?.value||'').toLowerCase().trim();
   const drop=document.getElementById('err-drop-'+idx);if(!drop)return;
-  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
-  const filtered=q?all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q)):[];
   if(!q){drop.style.display='none';return;}
-  drop.innerHTML=filtered.slice(0,50).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';return`<div class="ep-drop-item" onmousedown="errSelectPart(${idx},'${i.id}',${JSON.stringify(i.part_code?i.part_code+' — '+i.item_name:i.item_name)})" style="padding:10px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-    <div><span style="font-size:13px;font-weight:700;color:var(--primary)">${i.part_code||'—'}</span><br><span style="font-size:12px;color:#64748b;">${i.item_name}</span></div>
-    <span style="font-size:12px;font-weight:700;color:${stkColor};white-space:nowrap;margin-left:8px;">Stk:${stk}</span>
-  </div>`;}).join('')||'<div style="padding:12px;color:#94a3b8;text-align:center;font-size:12px;">Part nathi milyu</div>';
+  const all=(allInventory||[]).slice().sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
+  const filtered=all.filter(i=>(i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q));
+  drop.innerHTML=filtered.slice(0,60).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';const stkLabel=stk>5?'✅ Good':stk>0?'⚠️ Low':'❌ Out';const label=(i.part_code?i.part_code+' — '+i.item_name:i.item_name);return`<div class="ep-drop-item" data-idx="${idx}" data-part-id="${i.id}" data-label="${label.replace(/"/g,'&quot;')}" style="padding:11px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;">
+    <div style="min-width:0;"><span style="font-size:12px;font-weight:700;color:var(--primary);display:block;">${i.part_code||'—'}</span><span style="font-size:11px;color:#64748b;display:block;overflow:hidden;text-overflow:ellipsis;">${i.item_name}</span></div>
+    <div style="text-align:right;white-space:nowrap;"><span style="font-size:11px;font-weight:700;color:${stkColor};">${stkLabel}</span><br><span style="font-size:10px;color:#94a3b8;">Stk: ${stk}</span></div>
+  </div>`;}).join('')||'<div style="padding:14px;color:#94a3b8;text-align:center;font-size:12px;">❌ Part nathi milyu</div>';
   drop.style.display='block';
+  document.querySelectorAll('[data-idx="'+idx+'"]').forEach(el=>el.addEventListener('mousedown',function(){errSelectPart(this.dataset.idx,this.dataset.partId,this.dataset.label);}));
 }
 function errSelectPart(idx,partId,label){
   const pidEl=document.getElementById('err-pid-'+idx);if(pidEl)pidEl.value=partId;
