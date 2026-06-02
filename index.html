@@ -6156,6 +6156,18 @@ function renderEPOverview(){
   const trackedIds=new Set(allEngStock.map(s=>s.part_id));
   const allItems=allInventory.filter(i=>trackedIds.has(i.id)||(i.qty_in_stock>0)).sort((a,b)=>(a.part_code||'').localeCompare(b.part_code||''));
   if(!allItems.length){el.innerHTML='<div class="card"><p style="color:var(--text-muted);">No inventory items found. Add items in Inventory section first, then Issue to engineers.</p></div>';return;}
+
+  // Check if search input already exists (if not, create full HTML with input)
+  const searchInput=document.getElementById('ep-ov-search');
+  if(!searchInput){
+    el.innerHTML=`
+      <div style="margin-bottom:10px;">
+        <input type="text" id="ep-ov-search" placeholder="🔍 Search by part code or name..." oninput="renderEPOverview()" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #0891b2;border-radius:8px;font-size:13px;">
+      </div>
+      <div id="ep-ov-results"></div>`;
+  }
+
+  // Now render just the results table
   const searchQ=(document.getElementById('ep-ov-search')?.value||'').toLowerCase();
   const items=searchQ?allItems.filter(p=>(p.part_code||'').toLowerCase().includes(searchQ)||(p.item_name||'').toLowerCase().includes(searchQ)):allItems;
   const rows=items.map(p=>{
@@ -6172,23 +6184,25 @@ function renderEPOverview(){
       <td style="text-align:center;padding:8px;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-top:1px solid #f1f5f9;">${officeQty+engTotal}</td>
     </tr>`;
   }).join('');
-  el.innerHTML=`
-    <div style="margin-bottom:10px;">
-      <input type="text" id="ep-ov-search" placeholder="🔍 Search by part code or name..." oninput="renderEPOverview()" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #0891b2;border-radius:8px;font-size:13px;">
-    </div>
-    <div class="card" style="padding:0;overflow:auto;">
-      <table style="min-width:400px;border-collapse:collapse;width:100%;">
-        <thead><tr style="background:#f8fafc;">
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
-          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
-          <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0fdf4;color:#059669;font-weight:700;text-transform:uppercase;">🏢 Office Stock</th>
-          <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0f9ff;color:#0891b2;font-weight:700;text-transform:uppercase;">👷 With Engineers</th>
-          <th style="padding:10px 8px;font-size:11px;text-align:center;background:#eff6ff;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Total</th>
-        </tr></thead>
-        <tbody>${rows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No results found</td></tr>'}</tbody>
-      </table>
-    </div>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Click on <b style="color:#0891b2;">With Engineers</b> qty to see per-engineer breakdown.</p>`;
+
+  const resultEl=document.getElementById('ep-ov-results');
+  if(resultEl){
+    resultEl.innerHTML=`
+      <div class="card" style="padding:0;overflow:auto;">
+        <table style="min-width:400px;border-collapse:collapse;width:100%;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
+            <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
+            <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0fdf4;color:#059669;font-weight:700;text-transform:uppercase;">🏢 Office Stock</th>
+            <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0f9ff;color:#0891b2;font-weight:700;text-transform:uppercase;">👷 With Engineers</th>
+            <th style="padding:10px 8px;font-size:11px;text-align:center;background:#eff6ff;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Total</th>
+          </tr></thead>
+          <tbody>${rows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No results found</td></tr>'}</tbody>
+        </table>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Click on <b style="color:#0891b2;">With Engineers</b> qty to see per-engineer breakdown.</p>`;
+  }
+}
 }
 
 function showPartEngBreakdown(partId){
@@ -7523,7 +7537,9 @@ async function printJobSheet(){
   let t;try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
   if(!t)return;
   const sp=t.spares||[];const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
-  const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
+  const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+  const other=parseFloat(t.other_charge)||0;
+  const grand=partsTotal+svc+other;
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');const isOOC=t.warranty_coverage==='Out of Coverage';
   const logoHtml=logoData?`<img src="${logoData}" style="max-height:50px;max-width:140px;object-fit:contain;">`:'';
   const win=window.open('','_blank','width=820,height=1000');
@@ -7597,8 +7613,8 @@ async function printJobSheet(){
       <tbody>
         ${sp.length?sp.filter(s=>!s.requested).map(s=>`<tr><td>${s.code||'-'}</td><td>${s.name}</td><td style="text-align:center;">${s.qty}</td><td style="text-align:right;">₹${s.price||0}</td><td style="text-align:right;">₹${((s.qty||0)*(s.price||0)).toFixed(2)}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#999;padding:6px;">No spares used</td></tr>'}
         ${isOOC||!isW?`<tr style="background:#f5f5f5;font-weight:700;"><td colspan="4" style="text-align:right;">Parts</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
-        <tr><td colspan="4" style="text-align:right;">Service Charges</td><td style="text-align:right;">₹${t.labor||t.service_charges||0}</td></tr>
-        <tr><td colspan="4" style="text-align:right;">Other</td><td style="text-align:right;">₹${t.other_charge||0}</td></tr>
+        <tr><td colspan="4" style="text-align:right;">Service Charges</td><td style="text-align:right;">₹${svc.toFixed(2)}</td></tr>
+        <tr><td colspan="4" style="text-align:right;">Other</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>
         <tr style="background:#e8e8e8;font-weight:700;font-size:12px;"><td colspan="4" style="text-align:right;">Grand Total</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>`:''}
       </tbody></table>
     </div></div>
@@ -7610,18 +7626,30 @@ async function printJobSheet(){
     </div></div>
     ${(()=>{
       const wct=(t.wc_type||'').toUpperCase();
-      if(wct==='ICP'){
-        return `<div style="margin-top:10px;border:1px solid #e5e7eb;border-radius:4px;padding:8px 10px;font-size:9px;color:#374151;line-height:1.6;">
-          <strong style="font-size:9px;">&#9432; Important Note (ICP):</strong><br>
-          At this time, only the service/inspection charges have been communicated. Additional parts may be required after engineer diagnosis and will be estimated separately. Repair carries a 7-day testing warranty for the same problem and replaced parts. If the repair estimate is rejected, an inspection charge of <strong>Rs. 295</strong> is <strong>compulsory and payable</strong>.
-        </div>`;
-      } else if(wct==='CSP'){
-        return `<div style="margin-top:10px;border:1px solid #e5e7eb;border-radius:4px;padding:8px 10px;font-size:9px;color:#374151;line-height:1.6;">
-          <strong style="font-size:9px;">&#9432; Important Note (CSP):</strong><br>
-          At this time, only the service/inspection charges have been communicated. Additional parts may be required after engineer diagnosis and will be estimated separately. Repair carries a 7-day testing warranty for the same problem and replaced parts. If the repair estimate is rejected, an inspection charge of <strong>Rs. 413</strong> is payable (waived if repair is completed). If a higher estimate is declined, <strong>Rs. 413</strong> inspection charges are payable.
-        </div>`;
-      }
-      return '';
+      const noteStyle='margin-top:10px;border:1.5px solid #374151;border-radius:4px;font-size:8.5px;color:#1f2937;overflow:hidden;';
+      const titleStyle='background:#374151;color:#fff;padding:4px 10px;font-size:8.5px;font-weight:700;text-align:center;letter-spacing:0.5px;';
+      const bodyStyle='padding:7px 10px;line-height:1.0;';
+      const dot='<span style="color:#6b7280;margin:0 4px;">●</span>';
+      const items=(wct==='ICP')?[
+        'At this time, only the service/inspection charges have been communicated.',
+        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
+        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
+        'If the repair estimate is rejected, a <b>Rs. 295 inspection charge is compulsory and payable</b>.'
+      ]:(wct==='CSP')?[
+        'At this time, only the service/inspection charges have been communicated.',
+        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
+        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
+        'If the repair estimate is rejected, <b>Rs. 413 inspection charges are payable</b> (waived if repair is completed).',
+        'If a higher estimate is declined, <b>Rs. 413</b> inspection charges are payable.'
+      ]:null;
+      if(!items)return '';
+      const label=wct==='ICP'?'ICP':'CSP';
+      return `<div style="${noteStyle}">
+        <div style="${titleStyle}">★ ★ &nbsp; Terms &amp; Conditions (${label}) &nbsp; ★ ★</div>
+        <div style="${bodyStyle}">
+          ${items.map((txt,i)=>`<div style="display:flex;align-items:flex-start;gap:5px;margin-bottom:${i<items.length-1?'4':'0'}px;">${dot}<span>${txt}</span></div>`).join('')}
+        </div>
+      </div>`;
     })()}
     <div class="sig-row-4">
       <div class="sig-box">
