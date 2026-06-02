@@ -5794,39 +5794,33 @@ async function renderReportTasks(c){
 }
 
 // ════════════════════════════════════════════════════════════
-// ENGINEER PARTS TRACKING
+// ENGINEER PARTS TRACKING  (uses existing inventory table)
 // ════════════════════════════════════════════════════════════
-let allEngParts=[], allEngStock=[], editingEngPartId=null;
+let allEngStock=[];
 
 async function renderEngParts(tab){
   tab=tab||'overview';
   const c=document.getElementById('page-content');
   c.innerHTML='<div class="loading">Loading...</div>';
   try{
-    [allEngParts, allEngStock]=await Promise.all([
-      sb('eng_parts','GET',null,'?order=name'),
-      sb('eng_stock','GET',null,'?order=owner'),
-    ]);
+    allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     if(!allEngineers||!allEngineers.length) await loadMasterData();
+    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
 
-    const engineers=[...new Set(allEngStock.map(s=>s.owner).filter(o=>o!=='MAIN'))].sort();
-    const mainStock=allEngStock.filter(s=>s.owner==='MAIN');
-    const totalMainVal=mainStock.reduce((a,s)=>{
-      const p=allEngParts.find(x=>x.id===s.part_id);
+    const engineers=[...new Set(allEngStock.map(s=>s.owner))].sort();
+    const totalEngVal=allEngStock.reduce((a,s)=>{
+      const p=allInventory.find(x=>x.id===s.part_id);
       return a+(s.qty||0)*(p?.unit_price||0);
     },0);
-    const totalEngVal=allEngStock.filter(s=>s.owner!=='MAIN').reduce((a,s)=>{
-      const p=allEngParts.find(x=>x.id===s.part_id);
-      return a+(s.qty||0)*(p?.unit_price||0);
-    },0);
+    const totalInvVal=allInventory.reduce((a,i)=>a+(i.qty_in_stock||0)*(i.unit_price||0),0);
 
     const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">${label}</button>`;
 
     c.innerHTML=`
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
-        <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Part Types</div><div class="kpi-value" style="font-size:22px;">${allEngParts.length}</div></div>
-        <div class="kpi-card" style="padding:12px;border-color:#0891b2;"><div class="kpi-label">Engineers</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${engineers.length}</div></div>
-        <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Office Stock Value</div><div class="kpi-value" style="font-size:15px;color:var(--success);">₹${totalMainVal.toFixed(0)}</div></div>
+        <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Inventory Items</div><div class="kpi-value" style="font-size:22px;">${allInventory.length}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:#0891b2;"><div class="kpi-label">Engineers with Stock</div><div class="kpi-value" style="font-size:22px;color:#0891b2;">${engineers.length}</div></div>
+        <div class="kpi-card" style="padding:12px;border-color:var(--success);"><div class="kpi-label">Office Stock Value</div><div class="kpi-value" style="font-size:15px;color:var(--success);">₹${totalInvVal.toFixed(0)}</div></div>
         <div class="kpi-card" style="padding:12px;border-color:#f59e0b;"><div class="kpi-label">Field Stock Value</div><div class="kpi-value" style="font-size:15px;color:#f59e0b;">₹${totalEngVal.toFixed(0)}</div></div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
@@ -5835,25 +5829,17 @@ async function renderEngParts(tab){
         <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
         <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
       </div>
-      <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('log','📋 Movement Log')}${tabHtml('parts','🔩 Parts Master')}</div>
+      <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('log','📋 Movement Log')}</div>
       <div id="ep-content"></div>`;
 
     if(tab==='overview') renderEPOverview(engineers);
-    else if(tab==='log') await renderEPLog();
-    else renderEPParts();
+    else await renderEPLog();
   }catch(e){
-    document.getElementById('page-content').innerHTML=`<div class="card"><p style="color:red;font-weight:600;">Setup required</p>
-      <p style="font-size:13px;">Run this SQL in Supabase SQL Editor first:</p>
-      <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow:auto;">CREATE TABLE eng_parts (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  part_no TEXT, name TEXT NOT NULL, category TEXT,
-  unit_price DECIMAL(10,2) DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE TABLE eng_stock (
+    document.getElementById('page-content').innerHTML=`<div class="card"><p style="color:red;font-weight:600;">Setup required — Run this SQL in Supabase SQL Editor:</p>
+      <pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow:auto;">CREATE TABLE eng_stock (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   owner TEXT NOT NULL,
-  part_id uuid REFERENCES eng_parts(id) ON DELETE CASCADE,
+  part_id uuid REFERENCES inventory(id) ON DELETE CASCADE,
   qty INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(owner, part_id)
@@ -5862,7 +5848,7 @@ CREATE TABLE eng_movements (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT now(),
   type TEXT NOT NULL,
-  part_id uuid REFERENCES eng_parts(id),
+  part_id uuid REFERENCES inventory(id),
   qty INTEGER NOT NULL,
   from_owner TEXT, to_owner TEXT,
   job_sheet TEXT, warranty BOOLEAN DEFAULT false,
@@ -5883,27 +5869,30 @@ function epQtyCell(qty){
 
 function renderEPOverview(engineers){
   const el=document.getElementById('ep-content');
-  if(!allEngParts.length){el.innerHTML='<div class="card"><p style="color:var(--text-muted);">No parts yet. Go to Parts Master tab → Add Part.</p></div>';return;}
+  // Only show inventory items that have some eng_stock OR any inventory item
+  const trackedIds=new Set(allEngStock.map(s=>s.part_id));
+  const items=allInventory.filter(i=>trackedIds.has(i.id)||(i.qty_in_stock>0));
+  if(!items.length){el.innerHTML='<div class="card"><p style="color:var(--text-muted);">No inventory items found. Add items in Inventory section first, then Issue to engineers.</p></div>';return;}
   const engCols=engineers.map(e=>`<th style="padding:8px 10px;font-size:11px;text-align:center;background:#f0f9ff;color:#0891b2;white-space:nowrap;">👷 ${e}</th>`).join('');
-  const rows=allEngParts.map(p=>{
-    const mainQty=epGetQty('MAIN',p.id);
+  const rows=items.map(p=>{
+    const officeQty=p.qty_in_stock||0;
     const engCells=engineers.map(e=>epQtyCell(epGetQty(e,p.id))).join('');
-    const total=mainQty+engineers.reduce((a,e)=>a+epGetQty(e,p.id),0);
+    const engTotal=engineers.reduce((a,e)=>a+epGetQty(e,p.id),0);
     return `<tr>
-      <td style="padding:8px 12px;font-weight:600;font-size:13px;border-top:1px solid #f1f5f9;">${p.name}</td>
-      <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.part_no||'—'}</td>
+      <td style="padding:8px 12px;font-weight:600;font-size:13px;border-top:1px solid #f1f5f9;">${p.item_name}</td>
+      <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.part_code||'—'}</td>
       <td style="padding:8px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">${p.category||'—'}</td>
-      ${epQtyCell(mainQty)}
+      ${epQtyCell(officeQty)}
       ${engCells}
-      <td style="text-align:center;padding:8px;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-top:1px solid #f1f5f9;">${total}</td>
+      <td style="text-align:center;padding:8px;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-top:1px solid #f1f5f9;">${officeQty+engTotal}</td>
     </tr>`;
   }).join('');
   el.innerHTML=`
     <div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:500px;border-collapse:collapse;width:100%;">
         <thead><tr style="background:#f8fafc;">
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Name</th>
-          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part No</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
+          <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
           <th style="padding:10px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Category</th>
           <th style="padding:10px 8px;font-size:11px;text-align:center;background:#f0fdf4;color:#059669;font-weight:700;text-transform:uppercase;">🏢 Office</th>
           ${engCols}
@@ -5912,25 +5901,25 @@ function renderEPOverview(engineers){
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">🟢 Good &nbsp;|&nbsp; 🟡 Low (≤2) &nbsp;|&nbsp; 🔴 Out of stock</p>`;
+    <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">🟢 Good &nbsp;|&nbsp; 🟡 Low (≤2) &nbsp;|&nbsp; 🔴 Out &nbsp;|&nbsp; Office = inventory stock</p>`;
 }
 
 async function renderEPLog(){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
   try{
-    const movs=await sb('eng_movements','GET',null,'?order=created_at.desc&limit=300&select=*,eng_parts(name)');
+    const movs=await sb('eng_movements','GET',null,'?order=created_at.desc&limit=300');
     const typeLabel={
       ISSUE:'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📤 Issued</span>',
       USE:'<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔧 Used</span>',
       WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
       ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
-      ADJUST:'<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">⚙️ Adjusted</span>',
     };
+    const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?p.item_name:'—';};
     const rows=movs.map(m=>`<tr>
       <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
       <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
-      <td style="padding:8px 12px;font-size:12px;font-weight:600;">${m.eng_parts?.name||'—'}</td>
+      <td style="padding:8px 12px;font-size:12px;font-weight:600;">${getPartName(m.part_id)}</td>
       <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;">${m.qty}</td>
       <td style="padding:8px 12px;font-size:12px;">${m.from_owner||'—'}</td>
       <td style="padding:8px 12px;font-size:12px;">${m.to_owner||'—'}</td>
@@ -5954,48 +5943,19 @@ async function renderEPLog(){
   }catch(e){el.innerHTML=`<div class="card"><p>Error: ${e.message}</p></div>`;}
 }
 
-function renderEPParts(){
-  const el=document.getElementById('ep-content');
-  const rows=allEngParts.map(p=>`<tr>
-    <td style="padding:9px 12px;font-size:12px;color:#64748b;">${p.part_no||'—'}</td>
-    <td style="padding:9px 12px;font-weight:600;">${p.name}</td>
-    <td style="padding:9px 12px;font-size:12px;color:#64748b;">${p.category||'—'}</td>
-    <td style="padding:9px 12px;text-align:right;font-weight:600;">₹${(p.unit_price||0).toFixed(2)}</td>
-    <td style="padding:9px 12px;text-align:center;">
-      <button class="btn btn-sm" onclick="editEngPart('${p.id}')">Edit</button>
-      <button class="btn btn-sm btn-danger" style="margin-left:4px;" onclick="deleteEngPart('${p.id}')">Del</button>
-    </td>
-  </tr>`).join('')||'<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted);">No parts yet. Click + Add Part.</td></tr>';
-  el.innerHTML=`
-    <div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-weight:700;">${allEngParts.length} Parts</span>
-      <button class="btn btn-primary" onclick="openAddEngPart()">+ Add Part</button>
-    </div>
-    <div class="card" style="padding:0;overflow:auto;">
-      <table style="border-collapse:collapse;width:100%;">
-        <thead><tr style="background:#f8fafc;">
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part No</th>
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Name</th>
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Category</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Unit Price</th>
-          <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;color:#64748b;"></th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+// ── Modal openers ─────────────────────────────────────────────
+function epPartOpts(){
+  return (allInventory||[]).map(i=>`<option value="${i.id}">${i.item_name}${i.part_code?' ('+i.part_code+')':''}</option>`).join('');
 }
-
-// ── Modal openers (populate dropdowns) ───────────────────────
-function epPartOpts(){return allEngParts.map(p=>`<option value="${p.id}">${p.name}${p.part_no?' ('+p.part_no+')':''}</option>`).join('');}
 function epEngOpts(){
-  const fromStock=[...new Set(allEngStock.map(s=>s.owner).filter(o=>o!=='MAIN'))];
+  const fromStock=[...new Set(allEngStock.map(s=>s.owner))];
   const fromUsers=(allEngineers||[]).map(e=>e.name);
   const all=[...new Set([...fromStock,...fromUsers])].sort();
   return all.map(n=>`<option value="${n}">${n}</option>`).join('')||'<option disabled>No engineers found</option>';
 }
 
 function openEngIssue(){
-  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
+  if(!allInventory.length){alert('No inventory items found.');return;}
   document.getElementById('ei-part').innerHTML=epPartOpts();
   document.getElementById('ei-engineer').innerHTML=epEngOpts();
   document.getElementById('ei-qty').value=1;
@@ -6009,7 +5969,8 @@ async function saveEngIssue(){
   const notes=document.getElementById('ei-notes').value.trim();
   if(!partId||!engineer||qty<=0){alert('Fill all fields with valid qty.');return;}
   try{
-    await engStockAdjust('MAIN',partId,-qty);
+    // Deduct from inventory (office stock) and add to engineer bag
+    await invQtyAdjust(partId,-qty);
     await engStockAdjust(engineer,partId,qty);
     await sb('eng_movements','POST',{type:'ISSUE',part_id:partId,qty,from_owner:'MAIN',to_owner:engineer,notes,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-issue');renderEngParts('overview');
@@ -6017,7 +5978,6 @@ async function saveEngIssue(){
 }
 
 function openEngUse(){
-  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
   document.getElementById('eu-engineer').innerHTML=epEngOpts();
   document.getElementById('eu-part').innerHTML=epPartOpts();
   document.getElementById('eu-qty').value=1;
@@ -6035,6 +5995,7 @@ async function saveEngUse(){
   const notes=document.getElementById('eu-notes').value.trim();
   if(!partId||!engineer||qty<=0){alert('Fill engineer, part and qty.');return;}
   try{
+    // Deduct from engineer bag only (inventory was deducted at issue time)
     await engStockAdjust(engineer,partId,-qty);
     await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jobSheet,warranty,notes,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-use');renderEngParts('overview');
@@ -6042,7 +6003,6 @@ async function saveEngUse(){
 }
 
 function openEngWarranty(){
-  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
   document.getElementById('ew-part').innerHTML=epPartOpts();
   document.getElementById('ew-qty').value=1;
   document.getElementById('ew-jobsheet').value='';
@@ -6056,14 +6016,14 @@ async function saveEngWarranty(){
   const notes=document.getElementById('ew-notes').value.trim();
   if(!partId||qty<=0){alert('Select part and enter qty.');return;}
   try{
-    await engStockAdjust('MAIN',partId,qty);
+    // Part comes back from company → add to inventory (office stock)
+    await invQtyAdjust(partId,qty);
     await sb('eng_movements','POST',{type:'WARRANTY_RETURN',part_id:partId,qty,from_owner:'COMPANY',to_owner:'MAIN',job_sheet:jobSheet,warranty:true,notes,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-warranty');renderEngParts('overview');
   }catch(e){alert('Error: '+e.message);}
 }
 
 function openEngReturn(){
-  if(!allEngParts.length){alert('Add parts in Parts Master tab first.');return;}
   document.getElementById('er-engineer').innerHTML=epEngOpts();
   document.getElementById('er-part').innerHTML=epPartOpts();
   document.getElementById('er-qty').value=1;
@@ -6077,8 +6037,9 @@ async function saveEngReturn(){
   const notes=document.getElementById('er-notes').value.trim();
   if(!partId||!engineer||qty<=0){alert('Fill all fields.');return;}
   try{
+    // Engineer returns unused → back to inventory (office stock)
     await engStockAdjust(engineer,partId,-qty);
-    await engStockAdjust('MAIN',partId,qty);
+    await invQtyAdjust(partId,qty);
     await sb('eng_movements','POST',{type:'ENG_RETURN',part_id:partId,qty,from_owner:engineer,to_owner:'MAIN',notes,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-return');renderEngParts('overview');
   }catch(e){alert('Error: '+e.message);}
@@ -6086,47 +6047,16 @@ async function saveEngReturn(){
 
 async function engStockAdjust(owner,partId,delta){
   const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
-  const newQty=(existing?.qty||0)+delta;
+  const newQty=Math.max(0,(existing?.qty||0)+delta);
   const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
   if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
-  else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty<0?0:newQty});
+  else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
 }
-
-function openAddEngPart(){
-  editingEngPartId=null;
-  document.getElementById('modal-eng-part-title').textContent='Add Part';
-  ['ep-part-no','ep-part-name','ep-part-price'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('ep-part-cat').value='';
-  showModal('modal-eng-part');
-}
-function editEngPart(id){
-  const p=allEngParts.find(x=>x.id===id);if(!p)return;
-  editingEngPartId=id;
-  document.getElementById('modal-eng-part-title').textContent='Edit Part';
-  document.getElementById('ep-part-no').value=p.part_no||'';
-  document.getElementById('ep-part-name').value=p.name||'';
-  document.getElementById('ep-part-cat').value=p.category||'';
-  document.getElementById('ep-part-price').value=p.unit_price||'';
-  showModal('modal-eng-part');
-}
-async function saveEngPart(){
-  const data={
-    part_no:document.getElementById('ep-part-no').value.trim()||null,
-    name:document.getElementById('ep-part-name').value.trim(),
-    category:document.getElementById('ep-part-cat').value||null,
-    unit_price:parseFloat(document.getElementById('ep-part-price').value)||0,
-  };
-  if(!data.name){alert('Enter part name.');return;}
-  try{
-    if(editingEngPartId) await sb('eng_parts','PATCH',data,`?id=eq.${editingEngPartId}`);
-    else await sb('eng_parts','POST',data);
-    closeModal('modal-eng-part');renderEngParts('parts');
-  }catch(e){alert('Error: '+e.message);}
-}
-async function deleteEngPart(id){
-  if(!confirm('Delete this part? Stock entries for it will also be removed.'))return;
-  try{await sb('eng_parts','DELETE',null,`?id=eq.${id}`);renderEngParts('parts');}
-  catch(e){alert('Error: '+e.message);}
+async function invQtyAdjust(partId,delta){
+  const item=allInventory.find(x=>x.id===partId);
+  const newQty=Math.max(0,(item?.qty_in_stock||0)+delta);
+  await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${partId}`);
+  if(item) item.qty_in_stock=newQty;
 }
 // ════════════════════════════════════════════════════════════
 
