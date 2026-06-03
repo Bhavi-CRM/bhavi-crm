@@ -11026,8 +11026,8 @@ async function renderCourier(){
           <input type="number" id="cr-in-weight" placeholder="e.g. 1.5" step="0.1" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
       </div>
       <hr class="divider">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <label style="font-weight:600;font-size:13px;">Products <span class="req">*</span></label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label style="font-weight:600;font-size:13px;">Products <span style="font-size:11px;color:#f59e0b;font-weight:400;">(optional — box band hoy to baad ma add karjo)</span></label>
         <button class="btn btn-outline btn-sm" onclick="addCourierProduct('in')">+ Add Product</button>
       </div>
       <div id="cr-in-products"></div>
@@ -11246,7 +11246,7 @@ async function saveCourierEntry(dir){
   if(!agency||(isIn&&!awb)||(isIn&&!place)){alert('AWB No and Place jaruri chhe (Inward mate)');return;}
   if(!isIn&&!agency){alert('Agency jaruri chhe');return;}
   var products=getCourierProducts(dir);
-  if(!products.length){alert('Ochhamama ek product add karo');return;}
+  if(!isIn&&!products.length){alert('Outward mate ochhamama ek product add karo');return;}
 
   var today=new Date().toLocaleDateString('en-CA');
   try{
@@ -11365,58 +11365,168 @@ function renderCourierList(entries){
   }).join('');
 }
 
-// Edit modal for adding weight + details
+// Add a product row in the courier edit modal
+function addCourierEditProd(container,data,isOut){
+  var accOpts=(window.ACCESSORIES_LIST||[]).map(function(a){
+    var chk=data&&data.accessories&&data.accessories.indexOf(a)>=0?' checked':'';
+    return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;">'
+      +'<input type="checkbox" class="ced-acc" value="'+a+'"'+chk+' style="cursor:pointer;"> '+a+'</label>';
+  }).join('');
+  var idx=container.querySelectorAll('.ced-prod-row').length;
+  var div=document.createElement('div');
+  div.className='ced-prod-row';
+  div.style.cssText='background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;';
+  div.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    +'<span style="font-size:12px;font-weight:600;color:var(--text-muted);">Product '+(idx+1)+'</span>'
+    +'<button onclick="this.closest(\'.ced-prod-row\').remove()" style="background:none;border:none;cursor:pointer;color:#f05252;font-size:16px;">✕</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
+    +'<div class="form-group"><label>Model No</label>'
+    +'<div style="position:relative;">'
+    +'<input type="text" class="ced-model" placeholder="Type model..." value="'+(data&&data.model||'')+'" autocomplete="off" oninput="showCEDModelSug(this)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
+    +'<div class="ced-model-dd" style="display:none;position:absolute;z-index:600;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:150px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:100%;"></div>'
+    +'</div></div>'
+    +'<div class="form-group"><label>Serial No</label>'
+    +'<input type="text" class="ced-serial" placeholder="Serial number" value="'+(data&&data.serial||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Call ID</label>'
+    +'<input type="text" class="ced-callid" placeholder="Ticket/Call ID" value="'+(data&&data.call_id||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'</div>'
+    +'<div style="margin-bottom:8px;">'
+    +'<div class="form-group"><label>Warranty</label>'
+    +'<select class="ced-warranty" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
+    +'<option value="In Warranty"'+((!data||data.warranty==='In Warranty')?' selected':'')+'>✅ In Warranty</option>'
+    +'<option value="Out of Warranty"'+((data&&data.warranty==='Out of Warranty')?' selected':'')+'>❌ Out of Warranty</option>'
+    +'<option value="Other"'+((data&&data.warranty==='Other')?' selected':'')+'>🔄 Other</option>'
+    +'</select></div>'
+    +'</div>'
+    +(isOut?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
+      +'<div class="form-group"><label>Faulty Part</label>'
+      +'<select class="ced-faulty" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="Yes"'+((data&&data.faulty_part==='Yes')?' selected':'')+'>✅ Yes</option><option value="No"'+((data&&data.faulty_part!=='Yes')?' selected':'')+'>❌ No</option></select></div>'
+      +'<div class="form-group"><label>Invoice</label>'
+      +'<select class="ced-inv" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="No"'+((data&&data.invoice_avail!=='Yes')?' selected':'')+'>❌ No</option><option value="Yes"'+((data&&data.invoice_avail==='Yes')?' selected':'')+'>✅ Yes</option></select></div>'
+      +'</div>':'')
+    +(accOpts?'<div class="form-group"><label>Accessories</label>'
+      +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:2px;">'
+      +accOpts+'</div></div>':'');
+  container.appendChild(div);
+}
+
+function showCEDModelSug(input){
+  var row=input.closest('.ced-prod-row');
+  var dd=row.querySelector('.ced-model-dd');
+  var q=input.value.trim().toLowerCase();
+  if(!q){dd.style.display='none';return;}
+  var models=window.allModels||[];
+  var filtered=models.filter(function(m){return(m.model_no||'').toLowerCase().includes(q)||(m.model_name||'').toLowerCase().includes(q);}).slice(0,8);
+  if(!filtered.length){dd.style.display='none';return;}
+  dd.innerHTML=filtered.map(function(m){
+    return'<div onclick="var i=this.closest(\'.ced-prod-row\').querySelector(\'.ced-model\');i.value=\''+m.model_no+'\';this.closest(\'.ced-model-dd\').style.display=\'none\';" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+      +'<b>'+m.model_no+'</b>'+(m.model_name?' <span style="color:var(--text-muted);font-size:11px;">'+m.model_name+'</span>':'')+'</div>';
+  }).join('');
+  dd.style.display='block';
+}
+
+function getCEDProducts(isOut){
+  var products=[];
+  document.querySelectorAll('#ced-products .ced-prod-row').forEach(function(row){
+    var model=row.querySelector('.ced-model')?.value.trim()||'';
+    var serial=row.querySelector('.ced-serial')?.value.trim()||'';
+    var callId=row.querySelector('.ced-callid')?.value.trim()||'';
+    var warranty=row.querySelector('.ced-warranty')?.value||'In Warranty';
+    var accessories=[];
+    row.querySelectorAll('.ced-acc:checked').forEach(function(cb){accessories.push(cb.value);});
+    var obj={model,serial,call_id:callId,warranty,accessories};
+    if(isOut){
+      obj.faulty_part=row.querySelector('.ced-faulty')?.value||'No';
+      obj.invoice_avail=row.querySelector('.ced-inv')?.value||'No';
+    }
+    if(model||serial)products.push(obj);
+  });
+  return products;
+}
+
+// Edit modal — full details + products
 async function openCourierEdit(id){
   try{
     var entries=await sb('courier_log','GET',null,'?id=eq.'+id);
     var e=entries[0];
     if(!e){alert('Entry not found');return;}
     var isIn=e.direction==='Inward';
+    var isOut=!isIn;
 
-    // Simple modal
     var existing=document.getElementById('cr-edit-modal');
     if(existing)existing.remove();
 
     var modal=document.createElement('div');
     modal.id='cr-edit-modal';
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;';
-    modal.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">'
+    modal.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-      +'<h3 style="font-size:15px;font-weight:700;">✏️ Edit — '+e.awb_no+'</h3>'
-      +'<button onclick="document.getElementById(\'cr-edit-modal\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;">✕</button>'
+      +'<h3 style="font-size:15px;font-weight:700;">'+(isIn?'📥':'📤')+' Edit — '+e.awb_no+'</h3>'
+      +'<button onclick="document.getElementById(\'cr-edit-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;line-height:1;">✕</button>'
       +'</div>'
-      +'<div class="form-grid" style="margin-bottom:10px;">'
-      +'<div class="form-group"><label>AWB No</label><input id="ced-awb" value="'+e.awb_no+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
-      +'<div class="form-group"><label>Agency</label><input id="ced-agency" value="'+e.agency+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-grid" style="margin-bottom:14px;">'
+      +'<div class="form-group"><label>AWB No</label><input id="ced-awb" value="'+(e.awb_no||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>Agency</label><input id="ced-agency" value="'+(e.agency||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'<div class="form-group"><label>'+(isIn?'Sender':'Receiver')+'</label><input id="ced-person" value="'+(e.person_name||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'<div class="form-group"><label>'+(isIn?'From':'To')+' Place</label><input id="ced-place" value="'+(e.place||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'<div class="form-group"><label>⚖️ Weight (kg)</label><input type="number" id="ced-weight" value="'+(e.weight||'')+'" step="0.1" placeholder="e.g. 1.5" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'</div>'
-      +'<button class="btn btn-primary" style="width:100%;" onclick="saveCourierEdit(\''+id+'\')">💾 Save Changes</button>'
+      +'<hr style="margin:0 0 12px;border:none;border-top:1px solid #e2e8f0;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      +'<label style="font-weight:600;font-size:13px;">📦 Products</label>'
+      +'<button id="ced-add-prod-btn" class="btn btn-outline btn-sm">+ Add Product</button>'
+      +'</div>'
+      +'<div id="ced-products"></div>'
+      +'<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="saveCourierEdit(\''+id+'\','+isOut+')">💾 Save Changes</button>'
       +'</div>';
     document.body.appendChild(modal);
     modal.addEventListener('click',function(ev){if(ev.target===modal)modal.remove();});
-  }catch(e){alert('Error: '+e.message);}
+
+    // Load models if not cached
+    if(!window.allModels||!window.allModels.length){
+      try{var res=await sb('models','GET',null,'?order=model_no&limit=500');window.allModels=res||[];}catch(ex){}
+    }
+
+    // Pre-populate existing products
+    var container=document.getElementById('ced-products');
+    var existingProds=e.products||[];
+    if(typeof existingProds==='string'){try{existingProds=JSON.parse(existingProds);}catch(ex){existingProds=[];}}
+    if(existingProds.length){
+      existingProds.forEach(function(p){addCourierEditProd(container,p,isOut);});
+    }
+
+    // "+ Add Product" button
+    document.getElementById('ced-add-prod-btn').onclick=function(){addCourierEditProd(document.getElementById('ced-products'),null,isOut);};
+
+    // Close model dropdown on outside click
+    modal.addEventListener('click',function(ev){
+      if(!ev.target.closest('.ced-prod-row'))modal.querySelectorAll('.ced-model-dd').forEach(function(d){d.style.display='none';});
+    });
+  }catch(err){alert('Error: '+err.message);}
 }
 
-async function saveCourierEdit(id){
+async function saveCourierEdit(id,isOut){
   var awb=document.getElementById('ced-awb').value.trim();
   var agency=document.getElementById('ced-agency').value.trim();
   var person=document.getElementById('ced-person').value.trim();
   var place=document.getElementById('ced-place').value.trim();
   var weight=document.getElementById('ced-weight').value;
+  var products=getCEDProducts(isOut);
   try{
     await sb('courier_log','PATCH',{
       awb_no:awb,agency:agency,
       person_name:person||null,
       place:place,
       weight:weight?parseFloat(weight):null,
+      products:products,
+      product_count:products.length,
       updated_at:new Date().toISOString()
     },'?id=eq.'+id);
     document.getElementById('cr-edit-modal').remove();
     showToastWI('✅ Entry updated!');
     renderCourier();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(err){alert('Error: '+err.message);}
 }
 
 // ===== COURIER REPORT (ADMIN) =====
