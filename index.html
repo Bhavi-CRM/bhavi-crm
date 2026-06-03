@@ -9862,6 +9862,18 @@ async function renderWalkIn(){
   var tokenList=todayLogs.map(function(l,i){return{token:l.token_no||(i+1),name:l.customer_name,id:l.id};});
   var currentServing=parseInt(localStorage.getItem('wi_serving_token_'+today))||0;
 
+  // Compute today's inward/outward product counts from todayLogs
+  var _wiInProd=0,_wiOutProd=0;
+  todayLogs.forEach(function(l){
+    var prods=l.products||[];
+    if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e2){prods=[];}}
+    prods.forEach(function(p){
+      var t=p.type||'Inward';
+      if(t==='Inward'||t==='For Checking Only')_wiInProd++;
+      else if(t==='Outward')_wiOutProd++;
+    });
+  });
+
   pc.innerHTML=`
   <!-- TOKEN CALLING WIDGET -->
   <div class="card" style="margin-bottom:14px;border:2px solid #1d4ed8;">
@@ -9896,6 +9908,24 @@ async function renderWalkIn(){
           +'</div>';
         }).join('')||'<div style="color:#9ca3af;font-size:12px;">No entries yet</div>'}</div>
       </div>
+    </div>
+  </div>
+  <!-- Today's product in/out summary -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+    <div style="background:linear-gradient(135deg,#eff6ff,#fff);border:1.5px solid #1d4ed8;border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📥 Inward Products</div>
+      <div style="font-size:36px;font-weight:900;color:#1d4ed8;line-height:1;" id="wi-in-count">${_wiInProd}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px;">Today's total in</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#ecfdf5,#fff);border:1.5px solid #059669;border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📤 Outward Products</div>
+      <div style="font-size:36px;font-weight:900;color:#059669;line-height:1;" id="wi-out-count">${_wiOutProd}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px;">Today's total out</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#f5f3ff,#fff);border:1.5px solid #7c3aed;border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">👥 Customers Today</div>
+      <div style="font-size:36px;font-weight:900;color:#7c3aed;line-height:1;">${todayLogs.length}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px;">ICP + CSP combined</div>
     </div>
   </div>
   <div class="card" style="margin-bottom:14px;">
