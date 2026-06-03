@@ -16569,129 +16569,158 @@ async function uploadSalesExcel(input){
 }
 
 // ===== PENDING LIST REPORT =====
+window._pendingData=null;
 async function renderPendingList(){
   var pc=document.getElementById('page-content');if(!pc)return;
-  pc.innerHTML='<div style="padding:20px;max-width:1200px;margin:0 auto;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
-
+  pc.innerHTML='<div style="padding:20px;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
   try{
-    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,cname,wc_type,brand_name,status,created_at,assigned_name&order=created_at.desc&limit=2000');
-
-    // Get current date and time
-    var now=new Date();
-    var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-
-    // Default filters
-    var wcFilter=window._pendingWCFilter||'CSP';
-    var brandFilter=window._pendingBrandFilter||'';
-
-    // Filter tickets
-    var filtered=(tickets||[]).filter(function(t){
-      if(wcFilter && t.wc_type!==wcFilter)return false;
-      if(brandFilter && (t.brand_name||'').indexOf(brandFilter)<0)return false;
-      return true;
-    });
-
-    var html='<div style="padding:20px;max-width:1200px;margin:0 auto;">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">'
-      +'<div><h2 style="margin:0;font-size:20px;">📋 Pending Calls List</h2>'
-      +'<div style="font-size:13px;color:#6b7280;margin-top:4px;">As of '+dateStr+', '+timeStr+'</div></div>'
-      +'<button onclick="exportPendingListExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;">📥 Export Excel</button>'
-      +'</div>'
-
-      +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">'
-      +'<label style="font-size:13px;font-weight:600;">WC Type:</label>'
-      +'<select id="pending-wc-filter" onchange="window._pendingWCFilter=this.value;renderPendingList();" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
-      +'<option value="">All</option>'
-      +'<option value="ICP"'+(wcFilter==='ICP'?' selected':'')+'>ICP</option>'
-      +'<option value="CSP"'+(wcFilter==='CSP'?' selected':'')+'>CSP</option>'
-      +'</select>'
-      +'<label style="font-size:13px;font-weight:600;margin-left:10px;">Brand:</label>'
-      +'<select id="pending-brand-filter" onchange="window._pendingBrandFilter=this.value;renderPendingList();" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
-      +'<option value="">All</option>'
-      +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
-      +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
-      +'</select>'
-      +'</div>'
-
-      +'<div style="background:#f3f4f6;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;">'
-      +'<strong style="color:#1f2937;">Total Pending Calls:</strong> '+filtered.length
-      +'</div>'
-
-      +'<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;">'
-      +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-      +'<thead><tr style="background:#f9fafb;border-bottom:1px solid #e2e8f0;">'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Ticket ID</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Customer</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">WC Type</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Brand</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Status</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Created</th>'
-      +'<th style="padding:12px;text-align:left;font-weight:600;color:#1f2937;">Assigned To</th>'
-      +'</tr></thead><tbody>';
-
-    if(!filtered.length){
-      html+='<tr><td colspan="7" style="padding:20px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
-    }else{
-      filtered.forEach(function(t){
-        var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
-        html+='<tr style="border-bottom:1px solid #e2e8f0;hover:background:#f9fafb;">'
-          +'<td style="padding:12px;color:#1f2937;"><strong>'+escHtml(t.id||'—')+'</strong></td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.cname||'—')+'</td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.wc_type||'—')+'</td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.brand_name||'—')+'</td>'
-          +'<td style="padding:12px;"><span style="background:#fef08a;color:#713f12;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;">'+escHtml(t.status||'—')+'</span></td>'
-          +'<td style="padding:12px;color:#6b7280;font-size:12px;">'+createdDate+'</td>'
-          +'<td style="padding:12px;color:#475569;">'+escHtml(t.assigned_name||'—')+'</td>'
-          +'</tr>';
-      });
-    }
-
-    html+='</tbody></table></div></div>';
-    pc.innerHTML=html;
-
-    // Ensure filters are set
-    if(document.getElementById('pending-wc-filter'))document.getElementById('pending-wc-filter').value=wcFilter;
-    if(document.getElementById('pending-brand-filter'))document.getElementById('pending-brand-filter').value=brandFilter;
+    var tickets=await sb('tickets','GET',null,
+      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,assigned_name,call_type'
+      +'&order=created_at.desc&limit=2000');
+    window._pendingData=tickets||[];
+    pendingListRender();
   }catch(e){
-    pc.innerHTML='<div style="padding:40px;text-align:center;color:#ef4444;">Error loading pending calls: '+escHtml(e.message)+'</div>';
+    pc.innerHTML='<div style="padding:40px;text-align:center;color:#ef4444;">Error: '+escHtml(e.message)+'</div>';
   }
+}
+
+function pendingListRender(){
+  var pc=document.getElementById('page-content');if(!pc)return;
+  var all=window._pendingData||[];
+
+  var wcFilter=window._pendingWCFilter||'CSP';
+  var brandFilter=window._pendingBrandFilter||'';
+  var searchQ=(window._pendingSearch||'').toLowerCase();
+
+  var filtered=all.filter(function(t){
+    if(wcFilter && t.wc_type!==wcFilter)return false;
+    if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+    if(searchQ){
+      var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
+      if(!txt.includes(searchQ))return false;
+    }
+    return true;
+  });
+
+  var now=new Date();
+  var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+
+  // Status badge colors
+  function statusBadge(s){
+    var map={'Open':'#eff6ff:#1d4ed8','In Progress':'#fef3c7:#d97706','Pending':'#fdf4ff:#7c3aed',
+      'Hold':'#fff7ed:#c2410c','Assigned':'#f0fdf4:#059669','Visited':'#e0f2fe:#0369a1'};
+    var col=(map[s]||'#f1f5f9:#475569').split(':');
+    return '<span style="background:'+col[0]+';color:'+col[1]+';padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+escHtml(s||'—')+'</span>';
+  }
+
+  var rows='';
+  if(!filtered.length){
+    rows='<tr><td colspan="7" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
+  }else{
+    filtered.forEach(function(t){
+      var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
+      var areaDisplay=(t.pin||t.area)?(escHtml((t.pin||'')+(t.area?' - '+t.area:''))):'<span style="color:#9ca3af;">—</span>';
+      rows+='<tr style="border-bottom:1px solid #e2e8f0;">'
+        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#1d4ed8;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">'+createdDate+'</div></td>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:600;color:#1f2937;font-size:13px;">'+escHtml(t.cname||'—')+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
+        +'<td style="padding:10px 12px;font-size:12px;color:#374151;">'+areaDisplay+'</td>'
+        +'<td style="padding:10px 12px;"><div style="font-size:12px;font-weight:600;color:#1f2937;">'+escHtml(t.model||'—')+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
+        +'<td style="padding:10px 12px;">'+statusBadge(t.status)
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
+        +'<td style="padding:10px 12px;text-align:center;">'
+        +'<button onclick="closeModal(\'modal-ticket\');openAdminEdit(\''+t.id+'\')" '
+        +'style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button>'
+        +'</td>'
+        +'</tr>';
+    });
+  }
+
+  pc.innerHTML='<div style="padding:16px 20px;max-width:1300px;margin:0 auto;">'
+    // Header
+    +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<div><h2 style="margin:0;font-size:20px;">📋 Pending Calls</h2>'
+    +'<div style="font-size:12px;color:#6b7280;margin-top:3px;">As of '+dateStr+', '+timeStr+'</div></div>'
+    +'<button onclick="exportPendingListExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;">📥 Export Excel</button>'
+    +'</div>'
+    // Filters
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">'
+    +'<input type="text" placeholder="🔍 Search name, area, model, serial..." value="'+escHtml(window._pendingSearch||'')+'"'
+    +' oninput="window._pendingSearch=this.value;pendingListRender();"'
+    +' style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<select onchange="window._pendingWCFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<option value="">All WC</option>'
+    +'<option value="ICP"'+(wcFilter==='ICP'?' selected':'')+'>ICP</option>'
+    +'<option value="CSP"'+(wcFilter==='CSP'?' selected':'')+'>CSP</option>'
+    +'</select>'
+    +'<select onchange="window._pendingBrandFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<option value="">All Brands</option>'
+    +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
+    +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
+    +'</select>'
+    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingBrandFilter=\'\';pendingListRender();" '
+    +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
+    +'<span style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' calls</span>'
+    +'</div>'
+    // Table
+    +'<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;background:#fff;">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Ticket / Date</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Customer</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">📍 Area / Pincode</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Model / Serial</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
+    +'<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Action</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table></div></div>';
 }
 
 async function exportPendingListExcel(){
   try{
-    var tickets=await sb('tickets','GET',null,'?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&select=id,cname,wc_type,brand_name,status,created_at,assigned_name&order=created_at.desc&limit=2000');
-
+    var all=window._pendingData||[];
     var wcFilter=window._pendingWCFilter||'CSP';
     var brandFilter=window._pendingBrandFilter||'';
+    var searchQ=(window._pendingSearch||'').toLowerCase();
 
-    var filtered=(tickets||[]).filter(function(t){
+    var filtered=all.filter(function(t){
       if(wcFilter && t.wc_type!==wcFilter)return false;
-      if(brandFilter && (t.brand_name||'').indexOf(brandFilter)<0)return false;
+      if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+      if(searchQ){
+        var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
+        if(!txt.includes(searchQ))return false;
+      }
       return true;
     });
 
+    if(!filtered.length){alert('No data to export');return;}
     var data=filtered.map(function(t){
       return{
         'Ticket ID':t.id||'',
         'Customer':t.cname||'',
+        'Mobile':t.mobile||'',
+        'Pincode':t.pin||'',
+        'Area':t.area||'',
+        'Model':t.model||'',
+        'Serial No':t.serial||'',
         'WC Type':t.wc_type||'',
         'Brand':t.brand_name||'',
+        'Call Type':t.call_type||'',
         'Status':t.status||'',
-        'Created Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
-        'Assigned To':t.assigned_name||''
+        'Assigned To':t.assigned_name||'',
+        'Created Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):''
       };
     });
-
-    if(!data.length){alert('No data to export');return;}
-
     var now=new Date();
-    var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-
     var ws=XLSX.utils.json_to_sheet(data);
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Pending Calls');
-    XLSX.writeFile(wb,'Pending_Calls_'+dateStr+'.xlsx');
+    XLSX.writeFile(wb,'Pending_Calls_'+now.toLocaleDateString('en-CA')+'.xlsx');
   }catch(e){alert('Export failed: '+e.message);}
 }
 
