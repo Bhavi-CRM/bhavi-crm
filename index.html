@@ -16633,7 +16633,7 @@ function pendingListRender(){
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
         +'<td style="padding:10px 12px;text-align:center;">'
-        +'<button onclick="closeModal(\'modal-ticket\');openAdminEdit(\''+t.id+'\')" '
+        +'<button onclick="viewTicket(\''+t.id+'\')" '
         +'style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button>'
         +'</td>'
         +'</tr>';
