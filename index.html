@@ -126,7 +126,7 @@ tr:hover td{background:#f8fafc;}
 .kpi-prem .kp-label{font-size:11px;font-weight:600;opacity:0.75;text-transform:uppercase;letter-spacing:0.6px;}
 .kpi-prem .kp-val{font-size:30px;font-weight:800;line-height:1.1;margin:4px 0 2px;}
 .kpi-prem .kp-sub{font-size:11px;opacity:0.7;}
-.kpi-prem .kp-icon{position:absolute;right:14px;top:14px;font-size:26px;opacity:0.22;}
+.kpi-prem .kp-icon{font-size:20px;line-height:1;}
 .kpi-prem-blue{background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);}
 .kpi-prem-amber{background:linear-gradient(135deg,#78350f 0%,#d97706 100%);}
 .kpi-prem-teal{background:linear-gradient(135deg,#134e4a 0%,#0d9488 100%);}
@@ -138,7 +138,7 @@ tr:hover td{background:#f8fafc;}
 .vchart-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:3px;min-width:0;}
 .vchart-val{font-size:10px;font-weight:700;color:var(--text-muted);line-height:1;}
 .vchart-bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.5s;}
-.vchart-lbl{font-size:9px;color:var(--text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;padding:0 1px;}
+.vchart-lbl{font-size:10px;color:var(--text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;padding:0 1px;}
 /* PIE CHART */
 .pie-wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .pie-donut{border-radius:50%;flex-shrink:0;}
@@ -2783,22 +2783,27 @@ async function renderDashboard(){
       const _pie=(segs,sz)=>{sz=sz||84;const tot=segs.reduce((a,s)=>a+s.v,0)||1;let cum=0;const stops=segs.map(s=>{const p=s.v/tot*100;const r=`${s.c} ${cum.toFixed(1)}% ${(cum+p).toFixed(1)}%`;cum+=p;return r;});const legend=segs.map(s=>'<div class="pie-leg-row"><div class="pie-leg-dot" style="background:'+s.c+';"></div><span style="color:var(--text-muted);">'+s.l+'</span><b style="margin-left:auto;padding-left:6px;">'+s.v+'</b></div>').join('');return '<div class="pie-wrap"><div class="pie-donut" style="width:'+sz+'px;height:'+sz+'px;background:conic-gradient('+stops.join(',')+');"></div><div class="pie-legend">'+legend+'</div></div>';};
       const _engClrs=['#1d4ed8','#0891b2','#7c3aed','#d97706','#0d9488','#6366f1','#ec4899','#475569'];
       const _mClrs=['#bfdbfe','#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8'];
+      const _ctMax=Math.max(warranty,nonWarranty,amc,1);
+      const _ciW=Math.max(0,ciActive-ciPendParts-ciPendRep);
+      const _osW=Math.max(0,osActive-osPendParts-osPendRep);
+      const _ciSeg=[{l:'Working',v:_ciW,c:'#1d4ed8'},{l:'Pend.Parts',v:ciPendParts,c:'#d97706'},{l:'Pend.Repair',v:ciPendRep,c:'#7c3aed'},{l:'Closed',v:ciClosed,c:'#0d9488'}].filter(function(s){return s.v>0;});
+      const _osSeg=[{l:'Working',v:_osW,c:'#0891b2'},{l:'Pend.Parts',v:osPendParts,c:'#d97706'},{l:'Pend.Repair',v:osPendRep,c:'#7c3aed'},{l:'Closed',v:osClosed,c:'#0d9488'}].filter(function(s){return s.v>0;});
 
       chartHtml=`
       <!-- KPI Row 2: Status breakdown -->
       <div class="kpi-prem-grid">
-        <div class="kpi-prem kpi-prem-blue"><span class="kp-icon">⚡</span><div class="kp-label">In Progress</div><div class="kp-val">${inProgress}</div><div class="kp-sub">Being worked on</div></div>
-        <div class="kpi-prem kpi-prem-amber"><span class="kp-icon">🔩</span><div class="kp-label">Pending Parts</div><div class="kp-val">${pendParts}</div><div class="kp-sub">Awaiting spare parts</div></div>
-        <div class="kpi-prem kpi-prem-cyan"><span class="kp-icon">🔧</span><div class="kp-label">Pending Repair</div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Repair scheduled</div></div>
-        <div class="kpi-prem kpi-prem-slate"><span class="kp-icon">🚫</span><div class="kp-label">Cancelled</div><div class="kp-val">${cancelled}</div><div class="kp-sub">Rejected / Cancelled</div></div>
+        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('In Progress',allTickets.filter(function(t){return t.status==='In Progress';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">In Progress</div><span class="kp-icon">⚡</span></div><div class="kp-val">${inProgress}</div><div class="kp-sub">Being worked on</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Pending Parts',allTickets.filter(function(t){return t.status==='Pending Parts';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Parts</div><span class="kp-icon">🔩</span></div><div class="kp-val">${pendParts}</div><div class="kp-sub">Awaiting spare parts</div></div>
+        <div class="kpi-prem kpi-prem-cyan" style="cursor:pointer;" onclick="showKpiDetail('Pending Repair',allTickets.filter(function(t){return t.status==='Pending Repair Carry In'||t.status==='Pending Repair On Site';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Repair</div><span class="kp-icon">🔧</span></div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Repair scheduled</div></div>
+        <div class="kpi-prem kpi-prem-slate" style="cursor:pointer;" onclick="showKpiDetail('Cancelled',allTickets.filter(function(t){return t.status==='Call Cancel'||t.status==='Customer Reject';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancelled</div><span class="kp-icon">🚫</span></div><div class="kp-val">${cancelled}</div><div class="kp-sub">Rejected / Cancelled</div></div>
       </div>
       <!-- Charts Row 1: Engineer vertical bars + Call type pie -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
         <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">👷 Engineer-wise Calls</div>
-          ${_vbar(Object.entries(byEng),maxE,_engClrs,110)}
+          ${_vbar(Object.entries(byEng).map(function(e){return[e[0].split(' ')[0],e[1]];}),maxE,_engClrs,110)}
         </div>
         <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">🏷️ Call Type Breakdown</div>
-          ${_pie([{l:'Warranty',v:warranty,c:'#1d4ed8'},{l:'Non-Warranty',v:nonWarranty,c:'#d97706'},{l:'AMC',v:amc,c:'#0d9488'}],84)}
+          ${_vbar([['Warranty',warranty],['Non-Warranty',nonWarranty],['AMC',amc]],_ctMax,['#1d4ed8','#d97706','#0d9488'],110)}
           <div style="margin-top:10px;display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--border);">
             <span>Total: <b style="color:var(--text);">${total}</b></span>
             <span>Resolution: <b style="color:#0d9488;">${resRate}%</b></span>
@@ -2818,13 +2823,16 @@ async function renderDashboard(){
       </div>
       <!-- Charts Row 3: CI vs OS pie + Historical summary -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">🏠 Carry In vs On Site</div>
-          ${_pie([{l:'Carry In',v:ciTotal,c:'#1d4ed8'},{l:'On Site',v:osTotal,c:'#0891b2'}],84)}
-          <div style="margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
-            <div style="background:#eff6ff;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;color:#1d4ed8;">${ciActive}</div><div style="font-size:9px;color:#1e40af;">CI Active</div></div>
-            <div style="background:#ecfeff;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;color:#0891b2;">${osActive}</div><div style="font-size:9px;color:#164e63;">OS Active</div></div>
-            <div style="background:#f0fdf4;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;color:#0d9488;">${ciClosed}</div><div style="font-size:9px;color:#134e4a;">CI Closed</div></div>
-            <div style="background:#f0fdf4;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;color:#0d9488;">${osClosed}</div><div style="font-size:9px;color:#134e4a;">OS Closed</div></div>
+        <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:12px;">🏠 Carry In &nbsp;·&nbsp; 🚗 On Site</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:6px;text-align:center;">Carry In (${ciTotal})</div>
+              ${_pie(_ciSeg.length?_ciSeg:[{l:'No data',v:1,c:'#e2e8f0'}],66)}
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#0891b2;margin-bottom:6px;text-align:center;">On Site (${osTotal})</div>
+              ${_pie(_osSeg.length?_osSeg:[{l:'No data',v:1,c:'#e2e8f0'}],66)}
+            </div>
           </div>
         </div>
         <div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">📊 Historical Summary</div>
@@ -2897,10 +2905,10 @@ async function renderDashboard(){
         </div>
       </div>
       <div class="kpi-prem-grid">
-        <div class="kpi-prem kpi-prem-blue"><span class="kp-icon">🎫</span><div class="kp-label">Total Tickets</div><div class="kp-val">${total}</div><div class="kp-sub">All time records</div></div>
-        <div class="kpi-prem kpi-prem-amber"><span class="kp-icon">🔥</span><div class="kp-label">Active</div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline now</div></div>
-        <div class="kpi-prem kpi-prem-teal"><span class="kp-icon">✅</span><div class="kp-label">Closed</div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
-        <div class="kpi-prem kpi-prem-violet"><span class="kp-icon">⏳</span><div class="kp-label">${currentUser.role==='admin'?'Pend. Allocation':'Pend. Approval'}</div><div class="kp-val">${currentUser.role==='admin'?unalloc:pendingApproval}</div><div class="kp-sub">Needs attention</div></div>
+        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('All Tickets',allTickets)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">All time records</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets',allTickets.filter(function(t){return !['Closed','Customer Reject','Call Cancel'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline now</div></div>
+        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets',allTickets.filter(function(t){return t.status==='Closed';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
+        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail(currentUser.role==='admin'?'Pending Allocation':'Pending Approval',allTickets.filter(function(t){return currentUser.role==='admin'?t.status==='Pending Allocation':t.status==='Pending Customer Approval';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">${currentUser.role==='admin'?'Pend. Allocation':'Pend. Approval'}</div><span class="kp-icon">⏳</span></div><div class="kp-val">${currentUser.role==='admin'?unalloc:pendingApproval}</div><div class="kp-sub">Needs attention</div></div>
       </div>
       ${engChartHtml}
       ${chartHtml}
@@ -2936,6 +2944,52 @@ async function renderDashboard(){
     var pce=document.getElementById('page-content');
     if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Dashboard load karvama error aavyo:<br><b>'+e.message+'</b><br><br>Supabase connection thapu joie. Internet check karo.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
   }
+}
+
+// KPI DETAIL MODAL
+function showKpiDetail(title,tickets){
+  if(!tickets||!tickets.length){alert('No tickets for: '+title);return;}
+  var existing=document.getElementById('kpi-detail-ov');if(existing)existing.remove();
+  var ov=document.createElement('div');
+  ov.id='kpi-detail-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  window._closeKpiDetail=function(){var el=document.getElementById('kpi-detail-ov');if(el)el.remove();};
+  ov.onclick=function(e){if(e.target===ov)window._closeKpiDetail();};
+  var md=document.createElement('div');
+  md.style.cssText='background:#fff;border-radius:14px;width:100%;max-width:980px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);';
+  var rows=tickets.map(function(t){
+    var action=currentUser&&currentUser.role==='engineer'
+      ?'<button onclick="_closeKpiDetail();openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Update</button>'
+      :'<button onclick="_closeKpiDetail();viewTicket(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">View</button>';
+    return '<tr>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-weight:700;white-space:nowrap;">'+t.id+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">'+(t.cname||'-')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">'+(t.model||'-')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(t.problem||'-')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;white-space:nowrap;">'+(t.assigned_name||'<span style="color:#f05252;font-size:11px;">Unassigned</span>')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">'+statusBadge(t.status)+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">'+action+'</td>'
+      +'</tr>';
+  }).join('');
+  md.innerHTML='<div style="padding:14px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;">'
+    +'<h2 style="font-size:15px;font-weight:700;">'+title+' &nbsp;—&nbsp; <span style="color:#1d4ed8;">'+tickets.length+' calls</span></h2>'
+    +'<button onclick="_closeKpiDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;padding:4px 8px;border-radius:6px;">✕</button>'
+    +'</div>'
+    +'<div style="overflow-x:auto;">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#f8fafc;">'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Ticket</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Customer</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Model</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;">Problem</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Engineer</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Status</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap;">Action</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table></div>';
+  ov.appendChild(md);
+  document.body.appendChild(ov);
 }
 
 // PUNCH IN/OUT - Point 4
