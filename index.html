@@ -134,8 +134,9 @@ tr:hover td{background:#f8fafc;}
 .kpi-prem-violet{background:linear-gradient(135deg,#3b0764 0%,#7c3aed 100%);}
 .kpi-prem-cyan{background:linear-gradient(135deg,#164e63 0%,#0891b2 100%);}
 /* VERTICAL CHART */
-.vchart-wrap{display:flex;align-items:flex-end;gap:6px;padding:0 2px;}
-.vchart-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:3px;min-width:0;}
+.vchart-wrap{display:flex;align-items:stretch;gap:6px;padding:0 2px;}
+.vchart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;}
+.vchart-bar-area{flex:1;display:flex;align-items:flex-end;width:100%;}
 .vchart-val{font-size:10px;font-weight:700;color:var(--text-muted);line-height:1;}
 .vchart-bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.5s;}
 .vchart-lbl{font-size:10px;color:var(--text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;padding:0 1px;}
@@ -2778,7 +2779,7 @@ async function renderDashboard(){
       const osPendParts=activeTickets.filter(t=>t.service_type==='On Site'&&t.status==='Pending Parts').length;
       const resRate=total?Math.round(closed/total*100):0;
       // vertical bar helper
-      const _vbar=(entries,maxV,colors,h)=>{h=h||110;return '<div class="vchart-wrap" style="height:'+h+'px;">'+entries.map(([lbl,val],i)=>{const pct=maxV>0?Math.max(val>0?6:0,Math.round(val/maxV*100)):0;const clr=Array.isArray(colors)?colors[i%colors.length]:colors;return '<div class="vchart-col"><div class="vchart-val">'+(val||'')+'</div><div class="vchart-bar" style="height:'+pct+'%;background:'+clr+';"></div><div class="vchart-lbl" title="'+lbl+'">'+lbl+'</div></div>';}).join('')+'</div>';};
+      const _vbar=(entries,maxV,colors,h)=>{h=h||110;return '<div class="vchart-wrap" style="height:'+h+'px;">'+entries.map(([lbl,val],i)=>{const pct=maxV>0?Math.max(val>0?6:0,Math.round(val/maxV*100)):0;const clr=Array.isArray(colors)?colors[i%colors.length]:colors;return '<div class="vchart-col"><div class="vchart-val">'+(val||'')+'</div><div class="vchart-bar-area"><div class="vchart-bar" style="height:'+pct+'%;background:'+clr+';"></div></div><div class="vchart-lbl" title="'+lbl+'">'+lbl+'</div></div>';}).join('')+'</div>';};
       // pie chart helper (conic-gradient)
       const _pie=(segs,sz)=>{sz=sz||84;const tot=segs.reduce((a,s)=>a+s.v,0)||1;let cum=0;const stops=segs.map(s=>{const p=s.v/tot*100;const r=`${s.c} ${cum.toFixed(1)}% ${(cum+p).toFixed(1)}%`;cum+=p;return r;});const legend=segs.map(s=>'<div class="pie-leg-row"><div class="pie-leg-dot" style="background:'+s.c+';"></div><span style="color:var(--text-muted);">'+s.l+'</span><b style="margin-left:auto;padding-left:6px;">'+s.v+'</b></div>').join('');return '<div class="pie-wrap"><div class="pie-donut" style="width:'+sz+'px;height:'+sz+'px;background:conic-gradient('+stops.join(',')+');"></div><div class="pie-legend">'+legend+'</div></div>';};
       const _engClrs=['#1d4ed8','#0891b2','#7c3aed','#d97706','#0d9488','#6366f1','#ec4899','#475569'];
@@ -2858,7 +2859,7 @@ async function renderDashboard(){
       const last7=Object.entries(daily).slice(-7);const maxD=Math.max(...last7.map(([,v])=>v),1);
       const _dClrs=['#bfdbfe','#93c5fd','#60a5fa','#3b82f6','#2563eb','#1d4ed8','#1e40af'];
       engChartHtml=`<div class="card" style="margin-bottom:14px;"><div style="font-weight:700;font-size:14px;margin-bottom:10px;">📊 My Daily Calls (Last 7 days)</div>
-        <div class="vchart-wrap" style="height:110px;">${last7.map(([d,v],i)=>{const pct=maxD>0?Math.max(v>0?8:0,Math.round(v/maxD*100)):0;return '<div class="vchart-col"><div class="vchart-val">'+v+'</div><div class="vchart-bar" style="height:'+pct+'%;background:'+_dClrs[i%_dClrs.length]+';"></div><div class="vchart-lbl" title="'+d+'">'+d+'</div></div>';}).join('')}</div>
+        <div class="vchart-wrap" style="height:110px;">${last7.map(([d,v],i)=>{const pct=maxD>0?Math.max(v>0?8:0,Math.round(v/maxD*100)):0;return '<div class="vchart-col"><div class="vchart-val">'+v+'</div><div class="vchart-bar-area"><div class="vchart-bar" style="height:'+pct+'%;background:'+_dClrs[i%_dClrs.length]+';"></div></div><div class="vchart-lbl" title="'+d+'">'+d+'</div></div>';}).join('')}</div>
       </div>`;
     }
 
