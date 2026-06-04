@@ -315,6 +315,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
     <div class="nav-item hidden" onclick="navigate('pending-list')" id="nav-pending-list"><span class="icon">📋</span><span>Pending List</span></div>
+    <div class="nav-item hidden" onclick="navigate('route-planning')" id="nav-route-planning"><span class="icon">🗺️</span><span>Route Planning</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
   </div>
@@ -398,7 +399,7 @@ tr:hover td{background:#f8fafc;}
           <select id="call-service-type"><option value="On Site">On Site</option><option value="Carry In">Carry In</option></select>
         </div>
         <div class="form-group"><label>SE Call ID</label><input type="text" id="call-se-id"></div>
-        <div class="form-group"><label>Priority</label><select id="call-priority"><option>Normal</option><option>High</option><option>Low</option></select></div>
+        <div class="form-group"><label>Priority</label><select id="call-priority"><option value="Normal">Normal</option><option value="High">High 🟡</option><option value="Urgent">Urgent 🔴</option></select></div>
         <div class="form-group" id="call-service-charges-row" style="display:none;">
           <label>💰 Service / Labour Charges (₹)</label>
           <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="0">
@@ -453,6 +454,7 @@ tr:hover td{background:#f8fafc;}
       <div class="form-grid">
         <div class="form-group"><label>Engineer <small>(Optional)</small></label><select id="call-eng"><option value="">-- Pending Allocation --</option></select></div>
         <div class="form-group"><label>Physical JS No</label><input type="text" id="call-phys-js"></div>
+        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="datetime-local" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Canon portal se call date + SLA thi TAT set karo</div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2553,11 +2555,15 @@ function setupNav(){
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',isAutoEng);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
+      // ENG001 = CSP Manager: extra access
+      var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
+      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-walk-in',true);sv('nav-courier',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
+      sv('nav-pending-list',true);sv('nav-route-planning',true);
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
       var wib=document.getElementById('walkin-quick-btn');
@@ -2569,7 +2575,7 @@ function setupNav(){
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
-      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);
+      sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -2627,9 +2633,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning}[page];
   if(renderFn)await renderFn();
 }
 
@@ -2638,6 +2644,11 @@ const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','I
 function statusBadge(s){
   const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
+}
+function priorityBadge(p){
+  if(p==='Urgent')return '<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;display:inline-block;">🔴 Urgent</span>';
+  if(p==='High')return '<span style="background:#fef9c3;color:#d97706;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;display:inline-block;">🟡 High</span>';
+  return '<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;display:inline-block;">⚪ Normal</span>';
 }
 // Workflow-based status transitions
 function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus){
@@ -3556,10 +3567,13 @@ async function exportFilteredTickets(){
 async function renderMyCalls(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
+    const engId=currentUser.eng_id||currentUser.user_id;
     const[tickets,tasks]=await Promise.all([
-      sb('tickets','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&order=created_at.desc`),
-      sb('tasks','GET',null,`?assigned_to=eq.${currentUser.eng_id||currentUser.user_id}&status=neq.Closed&order=created_at.desc`)
+      sb('tickets','GET',null,`?assigned_to=eq.${engId}&order=created_at.desc`),
+      sb('tasks','GET',null,`?assigned_to=eq.${engId}&status=neq.Closed&order=created_at.desc`)
     ]);
+    const todayStr=new Date().toLocaleDateString('en-CA');
+    const todayRoute=tickets.filter(t=>t.planned_date===todayStr&&!['Closed','Call Cancel','Customer Reject'].includes(t.status)).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
     // Punch bar
     const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
     // Check 10PM auto punch out
@@ -3586,6 +3600,29 @@ async function renderMyCalls(){
         <div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Closed</div><div class="kpi-value">${tickets.filter(t=>t.status==='Closed').length}</div></div>
         <div class="kpi-card" style="border-color:#7c3aed"><div class="kpi-label">Tasks</div><div class="kpi-value">${tasks.length}</div></div>
       </div>
+      ${todayRoute.length?`<div class="card" style="margin-bottom:14px;border-left:4px solid #1d4ed8;">
+        <div class="section-header" style="margin-bottom:10px;">
+          <h2 style="font-size:15px;">🗺️ Today's Route — ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</h2>
+          <span style="font-size:12px;color:var(--text-muted);">${todayRoute.length} calls planned</span>
+        </div>
+        ${todayRoute.map((t,i)=>{
+          var tatHtml='';
+          if(t.tat_date){var diff=new Date(t.tat_date)-new Date();var hrs=Math.round(diff/3600000);tatHtml=hrs<0?'<span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⚠️ Overdue</span>':hrs<4?'<span style="background:#fef9c3;color:#ca8a04;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⏰ '+hrs+'h left</span>':'<span style="background:#f0fdf4;color:#15803d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">✅ '+hrs+'h</span>';}
+          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
+            +'<div style="width:28px;height:28px;background:#1d4ed8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">'+(i+1)+'</div>'
+            +'<div style="flex:1;min-width:0;">'
+            +'<div style="font-weight:700;font-size:13px;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
+            +'<div style="font-size:12px;color:var(--text-muted);">'+(t.cname||'-')+' &nbsp;·&nbsp; '+(t.area||t.city||'-')+'</div>'
+            +'<div style="font-size:11px;color:var(--text-muted);">'+(t.model||'-')+(tatHtml?' &nbsp;'+tatHtml:'')+'</div>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;gap:4px;">'
+            +statusBadge(t.status)
+            +'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Update</button>'
+            +'</div>'
+            +'</div>';
+        }).join('')}
+      </div>`:''}
+
       ${last7.length?`<div class="card" style="margin-bottom:14px;"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📊 My Daily Calls</h3>
         <div class="chart-bar-wrap">${last7.map(([d,v])=>`<div class="chart-bar-row"><div class="chart-bar-label">${d}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(v/maxD*100)}%">${v}</div></div></div>`).join('')}</div>
       </div>`:''}
@@ -3627,7 +3664,7 @@ async function openNewCall(){
     await loadMasterData();
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
-  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
@@ -3787,6 +3824,7 @@ async function saveCall(){
     rerepair:document.getElementById('call-rerepair').value||'No',
     rerepair_foc:(()=>{const el=document.querySelector('input[name="rr-charges"]:checked');return el?el.value==='foc':false;})(),
     phys_js:document.getElementById('call-phys-js').value,
+    tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v?new Date(v).toISOString():null;})(),
     assigned_to:engId||null,assigned_name:engName||null,
     status:engId?'Assigned':'Pending Allocation',
     warranty_coverage:isW?'Under Coverage':'NA',
@@ -16905,6 +16943,121 @@ async function exportPendingListExcel(){
     XLSX.writeFile(wb,'Pending_Calls_'+now.toLocaleDateString('en-CA')+'.xlsx');
   }catch(e){alert('Export failed: '+e.message);}
 }
+
+// ─── ROUTE PLANNING ────────────────────────────────────────────────────────
+async function renderRoutePlanning(){
+  var pc=document.getElementById('page-content');if(!pc)return;
+  if(!allEngineers||!allEngineers.length)await loadMasterData();
+  var today=new Date().toLocaleDateString('en-CA');
+  pc.innerHTML=`
+    <div class="card" style="margin-bottom:14px;">
+      <div class="section-header"><h2>🗺️ Route Planning</h2><span style="font-size:12px;color:var(--text-muted);">Engineer na calls sequence set karo</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="form-group" style="flex:1;min-width:180px;">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Engineer</label>
+          <select id="rp-eng" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;">
+            <option value="">-- Select Engineer --</option>
+            ${(allEngineers||[]).map(e=>`<option value="${e.eng_id}">${e.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="min-width:160px;">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Date</label>
+          <input type="date" id="rp-date" value="${today}" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">
+        </div>
+        <button class="btn btn-primary" onclick="loadRoutePlan()">📥 Load Calls</button>
+      </div>
+    </div>
+    <div id="rp-content"></div>`;
+}
+async function loadRoutePlan(){
+  var engId=document.getElementById('rp-eng')?.value;
+  var date=document.getElementById('rp-date')?.value;
+  var rpc=document.getElementById('rp-content');
+  if(!engId){alert('Engineer select karo');return;}
+  if(!date){alert('Date select karo');return;}
+  rpc.innerHTML='<div class="loading">Loading calls...</div>';
+  try{
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=neq.Closed&status=neq.Call+Cancel&status=neq.Customer+Reject&order=sequence_no.asc,created_at.asc');
+    window._rpTickets=tickets||[];window._rpDate=date;window._rpEngId=engId;
+    renderRoutePlanTable();
+  }catch(e){rpc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+function renderRoutePlanTable(){
+  var tickets=window._rpTickets||[];
+  var date=window._rpDate;
+  var rpc=document.getElementById('rp-content');if(!rpc)return;
+  if(!tickets.length){rpc.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text-muted);">No active calls for this engineer</div>';return;}
+  // Sort: today-planned first by seq, then others
+  var forDate=tickets.filter(t=>t.planned_date===date).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
+  var other=tickets.filter(t=>t.planned_date!==date);
+  window._rpTickets=[...forDate,...other];
+  tickets=window._rpTickets;
+  var dateLabel=new Date(date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  rpc.innerHTML=`<div class="card">
+    <div class="section-header" style="margin-bottom:8px;">
+      <div><h2>Active Calls (${tickets.length})</h2><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">▲▼ thi order set karo → Save karo → Engineer ne ae sequence ma dekhase</div></div>
+      <button class="btn btn-primary" onclick="saveRoutePlan()">💾 Save Route — ${dateLabel}</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th style="width:55px;text-align:center;"># Seq</th>
+        <th>Ticket / Customer</th>
+        <th>Area</th>
+        <th>Model</th>
+        <th>Priority</th>
+        <th>TAT</th>
+        <th>Status</th>
+        <th style="width:70px;">Move</th>
+      </tr></thead>
+      <tbody>${tickets.map(function(t,i){
+        var tatHtml='—';
+        if(t.tat_date){var diff=new Date(t.tat_date)-new Date();var hrs=Math.round(diff/3600000);tatHtml=hrs<0?'<span style="color:#dc2626;font-weight:700;font-size:11px;">⚠️ Overdue</span>':hrs<4?'<span style="color:#ca8a04;font-weight:700;font-size:11px;">⏰ '+hrs+'h</span>':'<span style="color:#15803d;font-size:11px;">✅ '+hrs+'h</span>';}
+        var isPlanned=t.planned_date===date;
+        return '<tr style="'+(isPlanned?'background:#eff6ff;':'')+'">'+
+          '<td style="text-align:center;"><input type="number" value="'+(i+1)+'" min="1" max="'+tickets.length+'" id="rp-seq-'+t.id+'" style="width:46px;border:1px solid #cbd5e1;border-radius:6px;padding:4px;font-size:13px;text-align:center;" onchange="rpReorder(\''+t.id+'\',this.value)"></td>'+
+          '<td><b style="font-size:13px;">'+t.id+'</b>'+(isPlanned?' <span style="background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">PLANNED</span>':'')+'<br><span style="font-size:12px;">'+escHtml(t.cname||'-')+'</span><br><span style="font-size:11px;color:var(--text-muted);">📞 '+(t.mobile||'-')+'</span></td>'+
+          '<td style="font-size:12px;">'+(t.area||t.city||'<span style="color:#9ca3af;">—</span>')+'</td>'+
+          '<td style="font-size:12px;">'+(t.model||'-')+'</td>'+
+          '<td>'+priorityBadge(t.priority||'Normal')+'</td>'+
+          '<td>'+tatHtml+'</td>'+
+          '<td>'+statusBadge(t.status)+'</td>'+
+          '<td style="white-space:nowrap;"><button class="btn-icon" onclick="rpMove(\''+t.id+'\',-1)" title="Up">▲</button><button class="btn-icon" onclick="rpMove(\''+t.id+'\',1)" title="Down">▼</button></td>'+
+          '</tr>';
+      }).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+function rpMove(id,dir){
+  var arr=window._rpTickets||[];
+  var idx=arr.findIndex(function(t){return t.id===id;});
+  if(idx===-1)return;
+  var ni=idx+dir;if(ni<0||ni>=arr.length)return;
+  var tmp=arr[idx];arr[idx]=arr[ni];arr[ni]=tmp;
+  window._rpTickets=arr;renderRoutePlanTable();
+}
+function rpReorder(id,newSeq){
+  var arr=window._rpTickets||[];
+  var idx=arr.findIndex(function(t){return t.id===id;});
+  if(idx===-1)return;
+  var ns=parseInt(newSeq)-1;if(isNaN(ns)||ns<0||ns>=arr.length)return;
+  var item=arr.splice(idx,1)[0];arr.splice(ns,0,item);
+  window._rpTickets=arr;renderRoutePlanTable();
+}
+async function saveRoutePlan(){
+  var tickets=window._rpTickets||[];var date=window._rpDate;
+  if(!tickets.length||!date){alert('Pehla engineer + date select kari calls load karo');return;}
+  var btn=document.querySelector('[onclick*="saveRoutePlan"]');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  try{
+    await Promise.all(tickets.map(function(t,i){
+      return sb('tickets','PATCH',{sequence_no:i+1,planned_date:date,updated_at:new Date().toISOString()},'?id=eq.'+t.id);
+    }));
+    alert('✅ Route saved!\nEngineer ne calls ae sequence ma dekhase aavtika.');
+    renderRoutePlanTable();
+  }catch(e){alert('Error: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='💾 Save Route';}}
+}
+// ─── END ROUTE PLANNING ──────────────────────────────────────────────────────
 
 async function renderSales(){
   var pc=document.getElementById('page-content');if(!pc)return;
