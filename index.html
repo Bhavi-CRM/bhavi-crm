@@ -1298,6 +1298,8 @@ async function renderImportCalls(c){
 }
 
 function downloadImportTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun. Page reload karo (Ctrl+Shift+R).');return;}
+  try{
   const headers=['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','final_charges','warranty_coverage','wc_type','rerepair','rerepair_foc','remarks','visit_date','created_at'];
   const mandatory=['','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','optional','★ MANDATORY','optional','optional','optional','optional','★ MANDATORY','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional'];
   const notes=['Blank — auto generate','Dropdown select karo','Dropdown select karo','Dropdown select karo','Canon/Panasonic/Fujifilm','Model number','Serial number','Customer full name','10 digit mobile','Alternate mobile','City name','State','Full address','PIN code','Area/locality','Problem description','Detailed description','Action taken (closed calls)','Engineer exact name','Engineer ID e.g. ENG001','Canon/SE call ID','Service/Labour ₹','Final charges ₹','Dropdown select karo','Dropdown: ICP/CSP','Dropdown: No/Yes','Dropdown: FALSE/TRUE','Remarks','YYYY-MM-DD','YYYY-MM-DD (blank=today)'];
@@ -1379,6 +1381,7 @@ function downloadImportTemplate(){
   XLSX.utils.book_append_sheet(wb,'Instructions',ws2);
 
   XLSX.writeFile(wb,'Bhavi_CRM_Import_Template.xlsx');
+  }catch(e){alert('Download error: '+e.message);}
 }
 
 async function handleImportFile(input){
@@ -9828,6 +9831,8 @@ function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(e
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
 function closeModal(id){document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
 function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
+// Fix: dragging text inside modal must not close it
+(function(){var _dn=null;document.addEventListener('mousedown',function(e){_dn=e.target;});document.addEventListener('click',function(e){if(_dn!==e.target&&e.target.classList&&e.target.classList.contains('modal-overlay')){e.stopImmediatePropagation();}},true);})();
 // Mobile menu
 function toggleMobileMenu(){
   const sidebar=document.getElementById('sidebar');
