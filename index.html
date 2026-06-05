@@ -1347,7 +1347,12 @@ function downloadImportTemplate(){
   ws2['!cols']=[{wch:22},{wch:65}];
   XLSX.utils.book_append_sheet(wb,'Instructions',ws2);
 
-  XLSX.writeFile(wb,'Bhavi_CRM_Import_Template.xlsx');
+  var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  var blob=new Blob([wbout],{type:'application/octet-stream'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='Bhavi_CRM_Import_Template.xlsx';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }catch(e){alert('Download error: '+e.message);}
 }
 
