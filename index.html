@@ -2551,6 +2551,7 @@ function setupNav(){
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
+      sv('nav-sales',false);sv('nav-route-planning',false);sv('nav-pending-list',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',isAutoEng);
