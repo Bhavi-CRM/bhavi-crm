@@ -1298,62 +1298,19 @@ async function renderImportCalls(c){
 }
 
 function downloadImportTemplate(){
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun. Page reload karo (Ctrl+Shift+R).');return;}
-  try{
-  const headers=['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','final_charges','warranty_coverage','wc_type','rerepair','rerepair_foc','remarks','visit_date','created_at'];
-  const mandatory=['','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','★ MANDATORY','optional','★ MANDATORY','optional','optional','optional','optional','★ MANDATORY','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional','optional'];
-  const notes=['Blank — auto generate','Dropdown select karo','Dropdown select karo','Dropdown select karo','Canon/Panasonic/Fujifilm','Model number','Serial number','Customer full name','10 digit mobile','Alternate mobile','City name','State','Full address','PIN code','Area/locality','Problem description','Detailed description','Action taken (closed calls)','Engineer exact name','Engineer ID e.g. ENG001','Canon/SE call ID','Service/Labour ₹','Final charges ₹','Dropdown select karo','Dropdown: ICP/CSP','Dropdown: No/Yes','Dropdown: FALSE/TRUE','Remarks','YYYY-MM-DD','YYYY-MM-DD (blank=today)'];
-  const sample=['','Non-Warranty','Carry In','Pending Allocation','Canon','EOS R50','SN1234567','Ramesh Shah','9898989898','','Ahmedabad','Gujarat','Nr. SBI Bank, Maninagar','380008','Maninagar','Camera not turning on','','','','','CD2026001','500','','NA','ICP','No','FALSE','','2026-04-15','2026-04-15'];
-
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([headers,mandatory,notes,sample]);
-
-  // Column widths
-  const widths=[18,18,14,26,14,18,18,24,16,16,14,14,32,10,16,30,30,30,22,12,16,14,14,20,10,12,14,30,14,20];
-  ws['!cols']=widths.map(w=>({wch:w}));
-
-  // Row heights
-  ws['!rows']=[{hpt:32},{hpt:22},{hpt:38},{hpt:22}];
-
-  XLSX.utils.book_append_sheet(wb,'Import Template',ws);
-
-  // Instructions sheet
-  const inst=[
-    ['Bhavi CRM — Ticket Import Guide',''],
-    ['',''],
-    ['HOW TO USE',''],
-    ['Step 1','Row 4 (sample) delete karo pehela'],
-    ['Step 2','Row 5 thi data bharo'],
-    ['Step 3','Dropdown columns — cell click karo, arrow aavse, list mathi select karo'],
-    ['Step 4','CRM → Reports → Import Calls tab → file upload karo'],
-    ['Step 5','Preview joi ne Import button dabao'],
-    ['',''],
-    ['DROPDOWN VALUES',''],
-    ['call_type','Warranty / Non-Warranty / AMC / Warranty Repeat / Non-Warranty Repeat / Other'],
-    ['service_type','Carry In (product shop par laave) / On Site (engineer customer tyaan jaay)'],
-    ['status','Pending Allocation / Assigned / In Progress / Pending Parts / Pending Repair Carry In / Pending Repair On Site / Pending Customer Approval / Closed / Call Cancel / Customer Reject'],
-    ['warranty_coverage','Under Coverage / Out of Coverage / NA'],
-    ['wc_type','ICP / CSP'],
-    ['rerepair','No (default) / Yes (same problem fari aavyu)'],
-    ['rerepair_foc','FALSE (charges levo) / TRUE (service free — within 30 days)'],
-    ['',''],
-    ['DATE FORMAT','YYYY-MM-DD — e.g. 2026-05-08'],
-    ['ticket_id','Blank rakho — system auto generate karashe (BEA-2026-XXX)'],
-    ['assigned_name','Engineer nu exact naam — CRM ma je chhe te j'],
-    ['',''],
-    ['LIMITS','Max 500 rows per file'],
+  // CSV template — no XLSX dependency, opens directly in Excel
+  var rows=[
+    ['ticket_id','call_type','service_type','status','brand_name','model','serial','cname','mobile','alt_mobile','city','state','address','pin','area','problem','description','action','assigned_name','assigned_to','se_call_id','service_charges','final_charges','warranty_coverage','wc_type','rerepair','rerepair_foc','remarks','visit_date','created_at'],
+    ['blank=auto generate','Warranty/Non-Warranty/AMC/Warranty Repeat/Non-Warranty Repeat/Other','Carry In / On Site','Pending Allocation/Assigned/In Progress/Pending Parts/Pending Repair Carry In/Pending Repair On Site/Pending Customer Approval/Closed/Call Cancel/Customer Reject','Canon/Panasonic/Fujifilm/Casio','Model number','Serial number','Customer full name','10 digit mobile','Alternate (optional)','City','State (optional)','Address (optional)','PIN code','Area/locality','Problem description','Detailed notes (optional)','Action taken - closed only','Engineer exact name as in CRM','Engineer ID e.g. ENG001','Canon/SE call ID (optional)','Service charges Rs (number)','Final charges Rs (number)','Under Coverage/Out of Coverage/NA','ICP/CSP','No/Yes','FALSE/TRUE','Remarks (optional)','YYYY-MM-DD (optional)','YYYY-MM-DD blank=today'],
+    ['SAMPLE DELETE THIS ROW','Non-Warranty','Carry In','Pending Allocation','Canon','EOS R50','SN1234567','Ramesh Shah','9898989898','','Ahmedabad','Gujarat','Nr. SBI Bank Maninagar','380008','Maninagar','Camera not turning on','','','','','CD2026001','500','','NA','ICP','No','FALSE','','2026-04-15','2026-04-15'],
   ];
-  const ws2=XLSX.utils.aoa_to_sheet(inst);
-  ws2['!cols']=[{wch:22},{wch:65}];
-  XLSX.utils.book_append_sheet(wb,'Instructions',ws2);
-
-  var wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-  var blob=new Blob([wbout],{type:'application/octet-stream'});
+  function csvEsc(v){var s=String(v==null?'':v);return(s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0)?'"'+s.replace(/"/g,'""')+'"':s;}
+  var csv=rows.map(function(r){return r.map(csvEsc).join(',');}).join('\r\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');a.href=url;a.download='Bhavi_CRM_Import_Template.xlsx';
+  var a=document.createElement('a');a.href=url;a.download='Bhavi_CRM_Import_Template.csv';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  }catch(e){alert('Download error: '+e.message);}
 }
 
 async function handleImportFile(input){
