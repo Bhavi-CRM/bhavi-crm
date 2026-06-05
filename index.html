@@ -1312,39 +1312,6 @@ function downloadImportTemplate(){
   const widths=[18,18,14,26,14,18,18,24,16,16,14,14,32,10,16,30,30,30,22,12,16,14,14,20,10,12,14,30,14,20];
   ws['!cols']=widths.map(w=>({wch:w}));
 
-  // Style header row (row 1) — blue background via cell styles
-  headers.forEach((h,i)=>{
-    const cellRef=XLSX.utils.encode_cell({r:0,c:i});
-    if(!ws[cellRef])ws[cellRef]={v:h,t:'s'};
-    ws[cellRef].s={
-      fill:{patternType:'solid',fgColor:{rgb:'1A56DB'}},
-      font:{bold:true,color:{rgb:'FFFFFF'},sz:11},
-      alignment:{horizontal:'center',vertical:'center',wrapText:true},
-      border:{top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}}
-    };
-  });
-
-  // Style mandatory row (row 2)
-  mandatory.forEach((m,i)=>{
-    const cellRef=XLSX.utils.encode_cell({r:1,c:i});
-    if(!ws[cellRef])ws[cellRef]={v:m,t:'s'};
-    ws[cellRef].s={
-      fill:{patternType:'solid',fgColor:{rgb:m.includes('MANDATORY')?'FFF3CD':'D1FAE5'}},
-      font:{bold:m.includes('MANDATORY'),color:{rgb:m.includes('MANDATORY')?'856404':'065F46'},sz:10},
-      alignment:{horizontal:'center'}
-    };
-  });
-
-  // Style sample row (row 4) — light gray
-  sample.forEach((s,i)=>{
-    const cellRef=XLSX.utils.encode_cell({r:3,c:i});
-    if(!ws[cellRef])ws[cellRef]={v:s,t:'s'};
-    ws[cellRef].s={
-      fill:{patternType:'solid',fgColor:{rgb:'F8F9FA'}},
-      font:{italic:true,color:{rgb:'495057'},sz:10}
-    };
-  });
-
   // Row heights
   ws['!rows']=[{hpt:32},{hpt:22},{hpt:38},{hpt:22}];
 
