@@ -16789,6 +16789,50 @@ async function uploadSalesExcel(input){
   reader.readAsBinaryString(file);input.value='';
 }
 
+// ===== ROUTE PLANNING INLINE =====
+window._routeMode=window._routeMode||false;
+window._routeChanges=window._routeChanges||{};
+function _rpEngChange(tid,selId){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var parts=(sel.value||'').split('|');
+  var engId=parts[0]||'';var engName=parts[1]||'';
+  var seqSel=document.getElementById('rp-seq-'+tid);
+  if(seqSel){
+    var prefix=engName?engName.trim().charAt(0).toUpperCase():'';
+    var h='<option value="">—</option>';
+    if(prefix){for(var i=1;i<=10;i++)h+='<option value="'+i+'">'+prefix+i+'</option>';}
+    seqSel.innerHTML=h;
+  }
+  if(!window._routeChanges[tid])window._routeChanges[tid]={};
+  window._routeChanges[tid].eng_id=engId;
+  window._routeChanges[tid].eng_name=engName;
+  window._routeChanges[tid].seq=seqSel?seqSel.value:'';
+}
+function _rpSeqSel(tid,val){
+  if(!window._routeChanges[tid])window._routeChanges[tid]={};
+  window._routeChanges[tid].seq=val;
+}
+async function saveRoutePlanInline(){
+  var changes=window._routeChanges||{};
+  var keys=Object.keys(changes).filter(function(k){return changes[k].eng_id||changes[k].seq;});
+  if(!keys.length){alert('Koi changes nathi karo');return;}
+  var btn=document.getElementById('rp-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Saving...';}
+  var today=new Date().toISOString().slice(0,10);
+  var saved=0;
+  for(var i=0;i<keys.length;i++){
+    var tid=keys[i];var c=changes[tid];
+    var patch={planned_date:today};
+    if(c.eng_id){patch.assigned_to=c.eng_id;patch.assigned_name=c.eng_name;patch.status='Assigned';}
+    if(c.seq)patch.sequence_no=parseInt(c.seq)||null;
+    try{await sb('tickets','PATCH',patch,'?id=eq.'+encodeURIComponent(tid));saved++;}catch(e){console.error(e);}
+  }
+  if(btn){btn.disabled=false;btn.textContent='💾 Save Route Plan';}
+  window._routeChanges={};
+  alert(saved+' calls route plan set thayu! ✅');
+  await renderPendingList();
+}
+
 // ===== PENDING LIST REPORT =====
 window._pendingData=null;
 async function renderPendingList(){
@@ -16797,9 +16841,10 @@ async function renderPendingList(){
   try{
     var tickets=await sb('tickets','GET',null,
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,assigned_name,call_type'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,assigned_to,assigned_name,call_type,sequence_no'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
+    if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
     pendingListRender();
   }catch(e){
     pc.innerHTML='<div style="padding:40px;text-align:center;color:#ef4444;">Error: '+escHtml(e.message)+'</div>';
@@ -16838,11 +16883,25 @@ function pendingListRender(){
 
   var rows='';
   if(!filtered.length){
-    rows='<tr><td colspan="7" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
+    rows='<tr><td colspan="'+(window._routeMode?9:7)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
   }else{
     filtered.forEach(function(t){
       var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
       var areaDisplay=(t.pin||t.area)?(escHtml((t.pin||'')+(t.area?' - '+t.area:''))):'<span style="color:#9ca3af;">—</span>';
+      var rpCols='';
+      if(window._routeMode){
+        var curEngId=t.assigned_to||'';
+        var curEngName=t.assigned_name||'';
+        var curPrefix=curEngName?curEngName.trim().charAt(0).toUpperCase():'';
+        var seqOpts='<option value="">—</option>';
+        if(curPrefix){for(var si=1;si<=10;si++)seqOpts+='<option value="'+si+'"'+(t.sequence_no==si?' selected':'')+'>'+curPrefix+si+'</option>';}
+        var engOpts='<option value="">— Select Eng —</option>';
+        (allEngineers||[]).forEach(function(e){engOpts+='<option value="'+escHtml(e.eng_id)+'|'+escHtml(e.name)+'"'+(curEngId===e.eng_id?' selected':'')+'>'+escHtml(e.name)+'</option>';});
+        rpCols='<td style="padding:6px 8px;min-width:160px;vertical-align:middle;">'
+          +'<select id="rp-eng-'+t.id+'" onchange="_rpEngChange(\''+t.id+'\',\'rp-eng-'+t.id+'\')" style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;">'+engOpts+'</select></td>'
+          +'<td style="padding:6px 8px;min-width:72px;vertical-align:middle;">'
+          +'<select id="rp-seq-'+t.id+'" onchange="_rpSeqSel(\''+t.id+'\',this.value)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;">'+seqOpts+'</select></td>';
+      }
       rows+='<tr style="border-bottom:1px solid #e2e8f0;">'
         +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#1d4ed8;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
         +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">'+createdDate+'</div></td>'
@@ -16853,6 +16912,7 @@ function pendingListRender(){
         +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
+        +rpCols
         +'<td style="padding:10px 12px;text-align:center;">'
         +'<button onclick="viewTicket(\''+t.id+'\')" '
         +'style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button>'
@@ -16866,7 +16926,11 @@ function pendingListRender(){
     +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
     +'<div><h2 style="margin:0;font-size:20px;">📋 Pending Calls</h2>'
     +'<div style="font-size:12px;color:#6b7280;margin-top:3px;">As of '+dateStr+', '+timeStr+'</div></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;">'
     +'<button onclick="exportPendingListExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;">📥 Export Excel</button>'
+    +'<button onclick="window._routeMode=!window._routeMode;window._routeChanges={};pendingListRender();" style="background:'+(window._routeMode?'#7c3aed':'#e0e7ff')+';color:'+(window._routeMode?'#fff':'#4338ca')+';border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:700;">🗺️ Route Plan '+(window._routeMode?'ON ✓':'OFF')+'</button>'
+    +(window._routeMode?'<button id="rp-save-btn" onclick="saveRoutePlanInline()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:700;">💾 Save Route Plan</button>':'')
+    +'</div>'
     +'</div>'
     // Filters
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">'
@@ -16896,6 +16960,7 @@ function pendingListRender(){
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">📍 Area / Pincode</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Model / Serial</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
+    +(window._routeMode?'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">🧑‍🔧 Assign Eng</th><th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">Seq</th>':'')
     +'<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Action</th>'
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody>'
