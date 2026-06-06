@@ -11968,7 +11968,7 @@ async function sendDailyReport(){
   var btn=document.getElementById('btn-daily-report');
   if(btn){btn.disabled=true;btn.textContent='⏳...';}
   try{
-    var res=await fetch(SB_URL+'/functions/v1/report',{
+    var res=await fetch(SB_URL+'/functions/v1/bright-action',{
       method:'POST',
       headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({type:'daily'})
@@ -12010,7 +12010,7 @@ async function doSendWeeklyReport(){
   var btn=document.getElementById('wr-send-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Sending...';}
   try{
-    var res=await fetch(SB_URL+'/functions/v1/report',{
+    var res=await fetch(SB_URL+'/functions/v1/bright-action',{
       method:'POST',
       headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({type:'weekly',from:from,to:to})
