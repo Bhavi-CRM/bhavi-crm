@@ -2622,7 +2622,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         return['In Progress','Closed'];
 
       case 'In Progress': {
-        const isCarryIn = (callType||'').toLowerCase().includes('carry');
+        const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
         if(isRepeat) return['Closed'];
         return [isCarryIn ? 'Repaired' : 'Closed'];
       }
@@ -9370,7 +9370,7 @@ window.submitFeedback=async function(ticketId){
   try{
     var existing=await sb('customer_feedback','GET',null,'?ticket_id=eq.'+encodeURIComponent(ticketId)+'&limit=1');
     if(existing&&existing.length>0){
-      await sb('customer_feedback','PATCH',{customer_name:name,rating:window._fbRating,comment:comment,updated_at:new Date().toISOString()},'?ticket_id=eq.'+encodeURIComponent(ticketId));
+      await sb('customer_feedback','PATCH',{customer_name:name,rating:window._fbRating,comment:comment},'?ticket_id=eq.'+encodeURIComponent(ticketId));
     }else{
       await sb('customer_feedback','POST',{ticket_id:ticketId,customer_name:name,rating:window._fbRating,comment:comment,created_at:new Date().toISOString()});
     }
