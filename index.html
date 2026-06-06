@@ -2486,6 +2486,7 @@ function setupNav(){
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
       sv('nav-sales',false);sv('nav-route-planning',false);sv('nav-pending-list',false);
+      sv('btn-daily-report',false);sv('btn-weekly-report',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',isAutoEng);
@@ -4655,7 +4656,15 @@ async function saveEngUpdate(){
         // No auto traveling — engineer will manually Visit Start next call
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
-    if(status==='Closed')saveLocationEvent('ticket_close',id);
+    if(status==='Closed'){
+      saveLocationEvent('ticket_close',id);
+      if(t.service_type==='On Site'){
+        closeModal('modal-eng-update');currentSpares=[];
+        if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+        showFeedbackSharePrompt(id,t.cname||'Customer',t.mobile||'',currentUser.name||'');
+        return;
+      }
+    }
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
@@ -9266,6 +9275,33 @@ async function loadFeedback(){
     document.getElementById('fb-list').innerHTML=html;
   }catch(e){document.getElementById('fb-list').innerHTML='<div style="color:red;padding:20px;">Error loading feedback: '+e.message+'<br><small>SQL: Create customer_feedback table first</small></div>';}
 }
+function showFeedbackSharePrompt(ticketId,customerName,mobile,engName){
+  var existing=document.getElementById('modal-feedback-share');if(existing)existing.remove();
+  var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
+  var fbUrl=window.location.href.split('?')[0]+'?feedback='+ticketId;
+  var waMsg='Dear '+customerName+',\n\nThank you for choosing *'+(ci.name||'Bhavi Electronics')+'*! 🙏\n\nYour service has been completed by '+engName+'.\n\nPlease rate our service:\n'+fbUrl+'\n\nYour feedback helps us improve.\n\n'+(ci.phone?'📞 '+ci.phone:'');
+  var mob=(mobile||'').replace(/\D/g,'');
+  if(mob.length===10)mob='91'+mob;
+  var m=document.createElement('div');
+  m.id='modal-feedback-share';
+  m.className='modal-overlay';
+  m.innerHTML='<div class="modal" style="max-width:380px;text-align:center;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">⭐ Share Feedback Link</h2>'
+    +'<button class="close-btn" onclick="document.getElementById(\'modal-feedback-share\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="text-align:center;">'
+    +'<div style="font-size:40px;margin-bottom:10px;">📲</div>'
+    +'<p style="font-size:14px;font-weight:700;color:#1f2937;margin:0 0 4px;">Call Closed Successfully!</p>'
+    +'<p style="font-size:13px;color:#6b7280;margin:0 0 14px;">Share feedback link with <b>'+escHtml(customerName)+'</b> ('+escHtml(mobile)+')?</p>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:11px;color:#374151;word-break:break-all;margin-bottom:4px;text-align:left;">'+escHtml(fbUrl)+'</div>'
+    +'<div style="font-size:11px;color:#9ca3af;margin-bottom:16px;">Customer can rate & update anytime via this link</div>'
+    +'</div>'
+    +'<div class="modal-footer" style="justify-content:center;gap:10px;">'
+    +'<a href="https://wa.me/'+mob+'?text='+encodeURIComponent(waMsg)+'" target="_blank" onclick="setTimeout(function(){document.getElementById(\'modal-feedback-share\').remove();},500);" '
+    +'style="background:#25d366;color:#fff;text-decoration:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;display:inline-block;">📲 Send on WhatsApp</a>'
+    +'<button class="btn btn-outline" style="width:auto;" onclick="document.getElementById(\'modal-feedback-share\').remove()">Skip</button>'
+    +'</div></div>';
+  document.body.appendChild(m);
+}
 function sendFeedbackWA(ticketId,customerName,mobile,engName){
   var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
   var fbUrl=window.location.href.split('?')[0]+'?feedback='+ticketId;
@@ -9303,6 +9339,22 @@ function sendFeedbackWA(ticketId,customerName,mobile,engName){
     document.body.appendChild(overlay);
     window._fbOverlay=overlay;
     window._fbRating=0;
+    // Pre-populate if customer already submitted feedback for this ticket
+    (async function(){
+      try{
+        var ex=await sb('customer_feedback','GET',null,'?ticket_id=eq.'+encodeURIComponent(fbTicket)+'&limit=1');
+        if(ex&&ex.length>0){
+          var fb=ex[0];
+          var nameEl=document.getElementById('fb-name');
+          var cmtEl=document.getElementById('fb-comment');
+          var resEl=document.getElementById('fb-result');
+          if(nameEl)nameEl.value=fb.customer_name||'';
+          if(cmtEl)cmtEl.value=fb.comment||'';
+          if(fb.rating)window.setFbStar(fb.rating);
+          if(resEl){resEl.style.color='#7c3aed';resEl.textContent='You have already rated this service — update your rating and submit again to change it.';}
+        }
+      }catch(e){}
+    })();
   });
 })();
 window.setFbStar=function(n){
@@ -9313,12 +9365,23 @@ window.submitFeedback=async function(ticketId){
   var name=(document.getElementById('fb-name')?.value||'').trim()||'Customer';
   var comment=(document.getElementById('fb-comment')?.value||'').trim();
   if(!window._fbRating){document.getElementById('fb-result').textContent='Please select a star rating!';return;}
+  var btn=document.querySelector('[onclick="submitFeedback(\''+ticketId+'\')"]');
+  if(btn){btn.disabled=true;btn.textContent='Submitting...';}
   try{
-    await sb('customer_feedback','POST',{ticket_id:ticketId,customer_name:name,rating:window._fbRating,comment:comment,created_at:new Date().toISOString()});
-    if(window._fbOverlay)window._fbOverlay.innerHTML='<div style="background:#fff;border-radius:16px;padding:40px;text-align:center;width:300px;">'
-      +'<div style="font-size:48px;">🎉</div><h2 style="color:#10b981;">Thank You!</h2>'
-      +'<p style="color:#6b7280;">Your feedback has been submitted successfully.</p></div>';
-  }catch(e){document.getElementById('fb-result').style.color='red';document.getElementById('fb-result').textContent='Error: '+e.message;}
+    var existing=await sb('customer_feedback','GET',null,'?ticket_id=eq.'+encodeURIComponent(ticketId)+'&limit=1');
+    if(existing&&existing.length>0){
+      await sb('customer_feedback','PATCH',{customer_name:name,rating:window._fbRating,comment:comment,updated_at:new Date().toISOString()},'?ticket_id=eq.'+encodeURIComponent(ticketId));
+    }else{
+      await sb('customer_feedback','POST',{ticket_id:ticketId,customer_name:name,rating:window._fbRating,comment:comment,created_at:new Date().toISOString()});
+    }
+    if(window._fbOverlay)window._fbOverlay.innerHTML='<div style="background:#fff;border-radius:16px;padding:40px;text-align:center;width:340px;">'
+      +'<div style="font-size:56px;">🎉</div><h2 style="color:#10b981;margin:8px 0;">Thank You!</h2>'
+      +'<p style="color:#6b7280;font-size:13px;">Your feedback has been saved. You can update it anytime by opening this link again.</p></div>';
+  }catch(e){
+    var r=document.getElementById('fb-result');
+    if(r){r.style.color='red';r.textContent='Error: '+e.message;}
+    if(btn){btn.disabled=false;btn.textContent='Submit Feedback';}
+  }
 };
 // ===== END MODULE 4 =====
 
