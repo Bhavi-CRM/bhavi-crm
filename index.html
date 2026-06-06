@@ -347,6 +347,8 @@ tr:hover td{background:#f8fafc;}
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
       <button id="wc-daily-btn" class="btn btn-primary btn-sm" onclick="openWCDailyReport()" style="display:none;font-size:11px;padding:5px 8px;">📋 WC Report</button>
+      <button id="btn-daily-report" class="btn btn-sm hidden" onclick="sendDailyReport()" style="background:#1d4ed8;color:#fff;border:none;font-size:11px;padding:5px 9px;">📧 Daily</button>
+      <button id="btn-weekly-report" class="btn btn-sm hidden" onclick="sendWeeklyReport()" style="background:#7c3aed;color:#fff;border:none;font-size:11px;padding:5px 9px;">📊 Weekly</button>
       <button id="walkin-quick-btn" class="btn btn-sm hidden" onclick="navigate('walk-in')" style="background:#f59e0b;color:#fff;border-color:#d97706;font-size:11px;padding:5px 8px;">🚶 Walk-in</button>
       <button id="auto-visit-btn" class="btn btn-sm hidden" onclick="openSiteVisitModal()" style="background:#7c3aed;color:#fff;font-size:11px;padding:5px 8px;">🏗️ Site Visit</button>
       <button class="btn btn-outline btn-sm" onclick="refreshPage()" title="Refresh" style="padding:5px 8px;">🔄</button>
@@ -2497,6 +2499,7 @@ function setupNav(){
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);
+      sv('btn-daily-report',true);sv('btn-weekly-report',true);
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
       var wib=document.getElementById('walkin-quick-btn');
@@ -2509,6 +2512,7 @@ function setupNav(){
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
+      sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
@@ -11958,6 +11962,67 @@ async function printDCNow(id,dcNo){
   win.document.close();
 }
 
+
+// ===== MANUAL REPORT SEND =====
+async function sendDailyReport(){
+  var btn=document.getElementById('btn-daily-report');
+  if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  try{
+    var res=await fetch(SB_URL+'/functions/v1/report',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({type:'daily'})
+    });
+    var txt=await res.text();
+    if(res.ok)alert('✅ Daily report send thayu! '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' par mail check karo.');
+    else alert('❌ Error: '+txt);
+  }catch(e){alert('❌ Error: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='📧 Daily';}}
+}
+function sendWeeklyReport(){
+  var existing=document.getElementById('modal-send-weekly');if(existing)existing.remove();
+  var now=new Date(Date.now()+5.5*3600000);
+  var day=now.getDay();var diff=day===0?6:day-1;
+  var monDate=new Date(now);monDate.setDate(now.getDate()-diff);
+  var monStr=monDate.toISOString().slice(0,10);
+  var todayStr=now.toISOString().slice(0,10);
+  var m=document.createElement('div');m.id='modal-send-weekly';m.className='modal-overlay';
+  m.innerHTML='<div class="modal" style="max-width:380px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">📊 Weekly Report Send</h2>'
+    +'<button class="close-btn" onclick="document.getElementById(\'modal-send-weekly\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:14px;"><label>From Date (Monday)</label>'
+    +'<input type="date" id="wr-from" value="'+monStr+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
+    +'<div class="form-group"><label>To Date</label>'
+    +'<input type="date" id="wr-to" value="'+todayStr+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-top:10px;">Default: aa week (Monday to aaj)</div>'
+    +'</div>'
+    +'<div class="modal-footer" style="justify-content:flex-start;gap:8px;">'
+    +'<button class="btn btn-primary" style="width:auto;" id="wr-send-btn" onclick="doSendWeeklyReport()">📨 Send Report</button>'
+    +'<button class="btn btn-outline" style="width:auto;" onclick="document.getElementById(\'modal-send-weekly\').remove()">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(m);
+}
+async function doSendWeeklyReport(){
+  var from=(document.getElementById('wr-from')||{}).value;
+  var to=(document.getElementById('wr-to')||{}).value;
+  if(!from||!to){alert('Date select karo');return;}
+  var btn=document.getElementById('wr-send-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Sending...';}
+  try{
+    var res=await fetch(SB_URL+'/functions/v1/report',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({type:'weekly',from:from,to:to})
+    });
+    var txt=await res.text();
+    if(res.ok){
+      document.getElementById('modal-send-weekly')?.remove();
+      alert('✅ Weekly report send thayu! ('+from+' → '+to+')\nMail check karo.');
+    }else alert('❌ Error: '+txt);
+  }catch(e){alert('❌ Error: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='📨 Send Report';}}
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
