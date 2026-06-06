@@ -2597,17 +2597,18 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   const repairStatus = serviceType==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
 
   // Terminal states — only admin can reopen
-  if(['Closed','Customer Reject','Call Cancel','Delivered Not Approved'].includes(current)){
+  if(['Closed','Customer Reject','Call Cancel','Delivered Not Approved','Delivered'].includes(current)){
     if(isAdminOrWC) return['Assigned'];
     return[];
   }
 
-  // ADMIN / WC — only handle approvals and allocation
+  // ADMIN / WC — handle approvals, allocation, and delivery
   if(isAdminOrWC){
     switch(current){
       case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
       case 'Pending Allocation': return['Assigned','Call Cancel'];
       case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
+      case 'Repaired': return['Delivered'];
       default: return[];
     }
   }
@@ -2619,26 +2620,19 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // Engineer can start work OR close directly (small repair)
         return['In Progress','Closed'];
 
-      case 'In Progress':
-        if(isRepeat){
-          // Re-Repair — direct close, no estimate needed again
-          return['Closed'];
-        }
-        if(isW && !isOOC){
-          // Warranty: Out of Coverage button + Request Part button + Closed
-          return['Closed'];
-        } else {
-          // OW: Request Part button (→ estimate) or direct Closed
-          return['Closed'];
-        }
+      case 'In Progress': {
+        const isCarryIn = (callType||'').toLowerCase().includes('carry');
+        if(isRepeat) return['Closed'];
+        return [isCarryIn ? 'Repaired' : 'Closed'];
+      }
 
       case 'Pending Parts':
         // Waiting for parts — engineer cannot change, auto-moves when stock added
         return[];
 
       case 'Pending Repair Carry In':
+        return['Repaired'];
       case 'Pending Repair On Site':
-        // After repair — close
         return['Closed'];
 
       case 'Customer Approved':
@@ -4534,7 +4528,7 @@ async function saveEngUpdate(){
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
 
   // Strict: cannot update terminal status
-  if(['Closed','Customer Reject','Call Cancel'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
+  if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
   // Validate engineer status change
   const allowedEng=getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage);
   if(!allowedEng.includes(status)){
@@ -16839,8 +16833,8 @@ async function renderPendingList(){
   pc.innerHTML='<div style="padding:20px;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
   try{
     var tickets=await sb('tickets','GET',null,
-      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,assigned_to,assigned_name,call_type,sequence_no'
+      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
     if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
@@ -16858,7 +16852,11 @@ function pendingListRender(){
   var brandFilter=window._pendingBrandFilter||'';
   var searchQ=(window._pendingSearch||'').toLowerCase();
 
-  var filtered=all.filter(function(t){
+  // Split: Ready for Pickup (Repaired) vs actionable (all other statuses)
+  var readyForPickup=all.filter(function(t){return t.status==='Repaired';});
+  var actionable=all.filter(function(t){return t.status!=='Repaired';});
+
+  var filtered=actionable.filter(function(t){
     if(wcFilter && t.wc_type!==wcFilter)return false;
     if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
     if(searchQ){
@@ -16871,15 +16869,58 @@ function pendingListRender(){
   var now=new Date();
   var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var isAdminOrWC=currentUser&&(currentUser.role==='admin'||currentUser.role==='work_controller');
 
   // Status badge colors
   function statusBadge(s){
     var map={'Open':'#eff6ff:#1d4ed8','In Progress':'#fef3c7:#d97706','Pending':'#fdf4ff:#7c3aed',
-      'Hold':'#fff7ed:#c2410c','Assigned':'#f0fdf4:#059669','Visited':'#e0f2fe:#0369a1'};
+      'Hold':'#fff7ed:#c2410c','Assigned':'#f0fdf4:#059669','Visited':'#e0f2fe:#0369a1',
+      'Repaired':'#fdf4ff:#7c3aed'};
     var col=(map[s]||'#f1f5f9:#475569').split(':');
     return '<span style="background:'+col[0]+';color:'+col[1]+';padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+escHtml(s||'—')+'</span>';
   }
 
+  // ── Ready for Pickup section ──────────────────────────────────
+  var pickupSection='';
+  if(readyForPickup.length>0){
+    var pickupRows='';
+    readyForPickup.forEach(function(t){
+      var repairedDate=t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
+      pickupRows+='<tr style="border-bottom:1px solid #e9d5ff;">'
+        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#7c3aed;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">Repaired: '+repairedDate+'</div></td>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:600;color:#1f2937;font-size:13px;">'+escHtml(t.cname||'—')+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
+        +'<td style="padding:10px 12px;"><div style="font-size:12px;font-weight:600;color:#1f2937;">'+escHtml(t.model||'—')+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
+        +'<td style="padding:10px 12px;font-size:11px;color:#374151;font-weight:600;">'+escHtml(t.call_type||'—')+'</td>'
+        +'<td style="padding:10px 12px;">'
+        +'<span style="background:#fdf4ff;color:#7c3aed;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🟣 Ready for Pickup</span>'
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'—')+'</div></td>'
+        +'<td style="padding:10px 12px;text-align:center;">'
+        +(isAdminOrWC?'<button onclick="markDelivered(\''+t.id+'\')" style="background:#059669;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600;">✅ Mark Delivered</button>':'<span style="font-size:11px;color:#9ca3af;">Awaiting pickup</span>')
+        +'</td></tr>';
+    });
+    pickupSection='<div style="margin-bottom:20px;">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+      +'<div style="border-left:4px solid #7c3aed;padding-left:10px;font-size:15px;font-weight:800;color:#1e293b;">🟣 Ready for Pickup</div>'
+      +'<span style="background:#fdf4ff;color:#7c3aed;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">'+readyForPickup.length+' device'+(readyForPickup.length!==1?'s':'')+' in office</span>'
+      +'</div>'
+      +'<div style="overflow-x:auto;border:1.5px solid #e9d5ff;border-radius:8px;background:#faf5ff;">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:#f5f0ff;border-bottom:2px solid #e9d5ff;">'
+      +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Ticket / Repaired</th>'
+      +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Customer</th>'
+      +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Model / Serial</th>'
+      +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Call Type</th>'
+      +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Status</th>'
+      +'<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;">Action</th>'
+      +'</tr></thead>'
+      +'<tbody>'+pickupRows+'</tbody>'
+      +'</table></div></div>';
+  }
+
+  // ── Main pending table ─────────────────────────────────────────
   var rows='';
   if(!filtered.length){
     rows='<tr><td colspan="'+(window._routeMode?9:7)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
@@ -16931,7 +16972,7 @@ function pendingListRender(){
     +(window._routeMode?'<button id="rp-save-btn" onclick="saveRoutePlanInline()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:700;">💾 Save Route Plan</button>':'')
     +'</div>'
     +'</div>'
-    // Filters
+    // Filters (apply only to actionable calls)
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">'
     +'<input type="text" placeholder="🔍 Search name, area, model, serial..." value="'+escHtml(window._pendingSearch||'')+'"'
     +' oninput="window._pendingSearch=this.value;pendingListRender();"'
@@ -16948,9 +16989,12 @@ function pendingListRender(){
     +'</select>'
     +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingBrandFilter=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
-    +'<span style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' calls</span>'
+    +'<span style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
-    // Table
+    // Ready for Pickup section (above main table)
+    +pickupSection
+    // Main pending table header
+    +'<div style="border-left:4px solid #1d4ed8;padding-left:10px;font-size:15px;font-weight:800;color:#1e293b;margin-bottom:8px;">📋 Actionable Calls</div>'
     +'<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;background:#fff;">'
     +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     +'<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
@@ -16964,6 +17008,21 @@ function pendingListRender(){
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody>'
     +'</table></div></div>';
+}
+
+async function markDelivered(ticketId){
+  if(!confirm('Mark ticket '+ticketId+' as Delivered?\nThis confirms the customer has collected the device.'))return;
+  try{
+    var tRow=await sb('tickets','GET',null,'?id=eq.'+ticketId);
+    if(!tRow||!tRow[0]){alert('Ticket not found');return;}
+    var t=tRow[0];
+    var tl=[...(t.timeline||[]),{action:'Delivered',by:currentUser.name,at:new Date().toISOString(),note:'Customer collected device'}];
+    await sb('tickets','PATCH',{status:'Delivered',timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
+    // Remove from local data and re-render
+    window._pendingData=(window._pendingData||[]).filter(function(x){return x.id!==ticketId;});
+    pendingListRender();
+    alert('✅ Ticket '+ticketId+' marked as Delivered.');
+  }catch(e){alert('Error: '+e.message);}
 }
 
 async function exportPendingListExcel(){
