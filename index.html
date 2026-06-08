@@ -2323,6 +2323,18 @@ async function autoFillCallForm(mob){
     if(hint){hint.style.display='';hint.style.color='#059669';hint.innerHTML='✅ Customer found: <b>'+escHtml(c.cname||'')+'</b>'+(c.city?' · '+escHtml(c.city):'');}
   }catch(e){if(hint){hint.style.display='';hint.style.color='#dc2626';hint.textContent='Error looking up customer';}}
 }
+async function autoFillFromMobile(mobile, fields){
+  if(!/^\d{10}$/.test(mobile)) return;
+  try{
+    var res=await sb('customers','GET',null,'?mobile=eq.'+mobile+'&limit=1');
+    var c=res&&res[0];
+    if(!c) return;
+    if(fields.name){var en=document.getElementById(fields.name);if(en&&!en.value)en.value=c.cname||'';}
+    if(fields.alt){var ea=document.getElementById(fields.alt);if(ea&&!ea.value)ea.value=c.alt_mobile||'';}
+    if(fields.address){var ed=document.getElementById(fields.address);if(ed&&!ed.value)ed.value=c.address||'';}
+    if(fields.city){var ec=document.getElementById(fields.city);if(ec&&!ec.value)ec.value=c.city||'';}
+  }catch(e){}
+}
 
 function filterPinList(val){
   var pinEl=document.getElementById('call-pin');
@@ -2641,8 +2653,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   if(isEng){
     switch(current){
       case 'Assigned':
-        // Engineer can start work OR close directly (small repair)
-        return['In Progress','Closed'];
+        return['In Progress','Sent to MSC'];
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
@@ -9023,7 +9034,7 @@ async function renderAMC(){
         </div>
         <div>
           <label style="font-size:12px;color:#6b7280;font-weight:600;">Mobile *</label>
-          <input id="amc-mobile" type="tel" placeholder="9876543210" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
+          <input id="amc-mobile" type="tel" placeholder="9876543210" oninput="if(this.value.length===10)autoFillFromMobile(this.value,{name:'amc-customer',address:'amc-address'})" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-top:4px;box-sizing:border-box;">
         </div>
         <div>
           <label style="font-size:12px;color:#6b7280;font-weight:600;">Product / System</label>
@@ -10109,7 +10120,7 @@ async function renderWalkIn(){
       <div class="form-group">
         <label>Mobile No <span class="req">*</span></label>
         <div style="display:flex;gap:8px;">
-          <input type="tel" id="wi-mobile" maxlength="10" placeholder="10 digit mobile" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
+          <input type="tel" id="wi-mobile" maxlength="10" placeholder="10 digit mobile" oninput="if(this.value.length===10)fetchWalkInCustomer()" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
           <button class="btn btn-primary btn-sm" onclick="fetchWalkInCustomer()" style="flex-shrink:0;">🔍 Fetch</button>
         </div>
       </div>
@@ -13276,7 +13287,7 @@ async function openNewSiteModal(editData){
     +'<div class="form-grid">'
     +'<div class="form-group form-full"><label>Site Name <span class="req">*</span></label><input type="text" id="ns-name" placeholder="e.g. Rajesh Villa, ABC Office" value="'+(editData?.site_name||'')+'"></div>'
     +'<div class="form-group"><label>Client Name <span class="req">*</span></label><input type="text" id="ns-client" value="'+(editData?.client_name||'')+'"></div>'
-    +'<div class="form-group"><label>Mobile No</label><input type="tel" id="ns-mobile" value="'+(editData?.mobile||'')+'"></div>'
+    +'<div class="form-group"><label>Mobile No</label><input type="tel" id="ns-mobile" value="'+(editData?.mobile||'')+'" oninput="if(this.value.length===10)autoFillFromMobile(this.value,{name:\'ns-client\',address:\'ns-address\'})"></div>'
     +'<div class="form-group form-full"><label>Address</label><textarea id="ns-address" rows="2">'+(editData?.address||'')+'</textarea></div>'
     +'</div>'
     +'</div>'
@@ -17562,7 +17573,7 @@ async function openNewSalesOrder(){
     '<div style="display:flex;flex-direction:column;gap:10px;">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Customer Name *</label><input id="so-cname" class="form-input" placeholder="Full Name"></div>'
-    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Mobile No. *</label><input id="so-mob" type="tel" class="form-input" placeholder="10-digit mobile"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Mobile No. *</label><input id="so-mob" type="tel" class="form-input" placeholder="10-digit mobile" oninput="if(this.value.length===10)autoFillFromMobile(this.value,{name:\'so-cname\',address:\'so-addr\'})"></div>'
     +'</div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Delivery Address</label><textarea id="so-addr" class="form-input" rows="2"></textarea></div>'
     +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Notes</label><input id="so-notes" class="form-input" placeholder="Special instructions..."></div>'
