@@ -4382,8 +4382,7 @@ async function openEngUpdate(id){
         ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
-      <div class="form-group"><label>Cause</label><input type="text" id="upd-cause" value="${t.cause||''}"></div>
-      <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"></div>
+      <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
     </div>
     ${t.service_type==='On Site'?`
     <hr class="divider">
@@ -17805,100 +17804,31 @@ window.shopSubmitOrder=async function(){
 // ===== AI REMARK ASSISTANT =====
 const AI_ASSIST_URL = SB_URL + '/functions/v1/ai-assist';
 
-function getAIRemarkContext(targetId) {
-  var ctx = {};
-  // Engineer update modal
-  if (targetId === 'upd-remarks') {
-    var t = window._currentUpdateTicket || {};
-    ctx.ticket_no = t.ticket_no || '';
-    ctx.customer = t.customer_name || '';
-    ctx.problem = t.problem_description || t.issue || '';
-    ctx.product = t.product_type || t.call_type || '';
-    ctx.status = document.getElementById('upd-status')?.value || t.status || '';
-    ctx.engineer = currentUser?.name || '';
-    return 'type:update\n' + Object.entries(ctx).filter(function(e){return e[1];}).map(function(e){return e[0]+': '+e[1];}).join('\n');
-  }
-  // Customer feedback
-  if (targetId === 'fb-comment') {
-    var rating = window._fbRating || 0;
-    ctx.rating = rating + ' out of 5 stars';
-    ctx.ticket = window._fbTicketData || {};
-    ctx.product = ctx.ticket.product_type || ctx.ticket.call_type || '';
-    ctx.engineer = ctx.ticket.engineer_name || ctx.ticket.assigned_to || '';
-    ctx.problem = ctx.ticket.problem_description || '';
-    return 'type:feedback\nRating: ' + ctx.rating + '\nProduct: ' + (ctx.product||'') + '\nEngineer: ' + (ctx.engineer||'') + '\nIssue: ' + (ctx.problem||'');
-  }
-  // Work log
-  if (targetId === 'wl-task') {
-    var from = document.getElementById('wl-from')?.value || '';
-    var to = document.getElementById('wl-to')?.value || '';
-    return 'type:worklog\nEngineer: ' + (currentUser?.name||'') + '\nTime: ' + from + ' to ' + to;
-  }
-  // Daily report — engineer
-  if (targetId === 'dr-remarks') {
-    var drDate = document.getElementById('dr-date')?.value || new Date().toLocaleDateString('en-CA');
-    var drEng = document.getElementById('dr-eng-name')?.textContent || currentUser?.name || '';
-    return 'type:dailyreport\nEngineer: ' + drEng + '\nDate: ' + drDate;
-  }
-  // Daily report — WC
-  if (targetId === 'wc-dr-remarks') {
-    var wcDate = document.getElementById('wc-dr-date')?.value || new Date().toLocaleDateString('en-CA');
-    var wcName = document.getElementById('wc-dr-wc-name')?.textContent || currentUser?.name || '';
-    return 'type:dailyreport\nWork Controller: ' + wcName + '\nDate: ' + wcDate;
-  }
-  // Quick visit
-  if (targetId === 'qv-work') {
-    var site = document.getElementById('qv-site');
-    var siteName = site?.options[site.selectedIndex]?.text || '';
-    return 'type:visit\nSite: ' + siteName + '\nDate: ' + (document.getElementById('qv-date')?.value||'');
-  }
-  // Inquiry / Edit inquiry
-  if (targetId === 'inq-desc') {
-    var cust = document.getElementById('inq-name')?.value || '';
-    var mob = document.getElementById('inq-mobile')?.value || '';
-    var type = document.getElementById('inq-type')?.value || '';
-    return 'type:inquiry\nCustomer: ' + cust + '\nMobile: ' + mob + '\nInquiry Type: ' + type;
-  }
-  if (targetId === 'einq-desc') {
-    var cust2 = document.getElementById('einq-name')?.value || '';
-    var type2 = document.getElementById('einq-type')?.value || '';
-    return 'type:inquiry\nCustomer: ' + cust2 + '\nInquiry Type: ' + type2;
-  }
-  // Dynamic visit (av-work-<siteId>)
-  if (targetId.startsWith('av-work-')) {
-    var sid = targetId.replace('av-work-', '');
-    var avDate = document.getElementById('av-date-' + sid)?.value || '';
-    return 'type:visit\nSite ID: ' + sid + '\nDate: ' + avDate;
-  }
-  return 'type:update';
-}
-
-function _aiRemarkType(contextStr) {
-  var m = contextStr.match(/^type:(\w+)/);
-  return m ? m[1] : 'update';
+function _aiTypeForField(targetId) {
+  if (targetId === 'upd-work') return 'action';
+  if (targetId === 'fb-comment') return 'feedback';
+  if (targetId === 'wl-task') return 'worklog';
+  if (targetId === 'dr-remarks' || targetId === 'wc-dr-remarks') return 'dailyreport';
+  if (targetId === 'qv-work' || targetId.startsWith('av-work-')) return 'visit';
+  if (targetId === 'inq-desc' || targetId === 'einq-desc') return 'inquiry';
+  return 'update';
 }
 
 function showAIRemarkPicker(targetId) {
   var existing = document.getElementById('ai-picker-overlay');
   if (existing) existing.remove();
 
-  var ctx = getAIRemarkContext(targetId);
-  var type = _aiRemarkType(ctx);
-  var selectedLang = 'english';
+  var fieldLabel = targetId === 'upd-work' ? 'Action Taken' : 'Remark';
 
   var overlay = document.createElement('div');
   overlay.id = 'ai-picker-overlay';
   overlay.className = 'ai-picker-overlay';
   overlay.innerHTML =
     '<div class="ai-picker-box" onclick="event.stopPropagation()">'
-    + '<div class="ai-picker-title">✨ AI Remark Assistant</div>'
-    + '<div class="ai-picker-sub">Choose language — AI will generate a professional remark based on the ticket context.</div>'
-    + '<div class="ai-lang-grid">'
-    +   '<button class="ai-lang-btn selected" id="ailang-english" onclick="aiSelectLang(\'english\')">🇬🇧 English</button>'
-    +   '<button class="ai-lang-btn" id="ailang-gujarati" onclick="aiSelectLang(\'gujarati\')">🇮🇳 ગુજ.</button>'
-    +   '<button class="ai-lang-btn" id="ailang-hindi" onclick="aiSelectLang(\'hindi\')">🇮🇳 हिंदी</button>'
-    + '</div>'
-    + '<button class="ai-gen-btn" id="ai-gen-btn" onclick="callAIAssist(\'' + targetId + '\')">✨ Generate Remark</button>'
+    + '<div class="ai-picker-title">✨ AI ' + fieldLabel + ' Assistant</div>'
+    + '<div class="ai-picker-sub">Rough ma lakhso — AI professional English ma convert karsi.</div>'
+    + '<textarea id="ai-rough-input" rows="3" placeholder="Ex: camera repr ok, dust on cmos clean done, tested working..." style="width:100%;padding:9px 12px;border:1px solid #c7d2fe;border-radius:10px;font-size:13px;margin-bottom:10px;box-sizing:border-box;resize:none;font-family:inherit;outline:none;"></textarea>'
+    + '<button class="ai-gen-btn" id="ai-gen-btn" onclick="callAIAssist(\'' + targetId + '\')">✨ Polish with AI</button>'
     + '<div class="ai-result-box" id="ai-result-box" contenteditable="true"></div>'
     + '<button class="ai-insert-btn" id="ai-insert-btn" onclick="insertAIRemark(\'' + targetId + '\')">✅ Insert into Field</button>'
     + '<button class="ai-cancel-btn" onclick="document.getElementById(\'ai-picker-overlay\').remove()">Cancel</button>'
@@ -17906,27 +17836,24 @@ function showAIRemarkPicker(targetId) {
 
   overlay.addEventListener('click', function() { overlay.remove(); });
   document.body.appendChild(overlay);
-  window._aiCurrentLang = 'english';
-  window._aiCurrentCtx = ctx;
-  window._aiCurrentType = type;
-}
-
-function aiSelectLang(lang) {
-  window._aiCurrentLang = lang;
-  ['english','gujarati','hindi'].forEach(function(l) {
-    var el = document.getElementById('ailang-' + l);
-    if (el) el.classList.toggle('selected', l === lang);
-  });
+  window._aiCurrentType = _aiTypeForField(targetId);
+  // Focus the rough input
+  setTimeout(function(){ var el=document.getElementById('ai-rough-input'); if(el)el.focus(); }, 100);
 }
 
 async function callAIAssist(targetId) {
   var btn = document.getElementById('ai-gen-btn');
   var resultBox = document.getElementById('ai-result-box');
   var insertBtn = document.getElementById('ai-insert-btn');
-  if (!btn || !resultBox) return;
+  var roughInput = document.getElementById('ai-rough-input');
+  if (!btn || !resultBox || !roughInput) return;
+
+  var roughText = roughInput.value.trim();
+  if (!roughText) { roughInput.style.borderColor='#ef4444'; roughInput.focus(); return; }
+  roughInput.style.borderColor='#c7d2fe';
 
   btn.disabled = true;
-  btn.textContent = '⏳ Generating...';
+  btn.textContent = '⏳ Polishing...';
   resultBox.style.display = 'none';
   if (insertBtn) insertBtn.style.display = 'none';
 
@@ -17935,8 +17862,7 @@ async function callAIAssist(targetId) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY },
       body: JSON.stringify({
-        context: window._aiCurrentCtx || '',
-        language: window._aiCurrentLang || 'english',
+        roughText: roughText,
         type: window._aiCurrentType || 'update'
       })
     });
@@ -17950,15 +17876,14 @@ async function callAIAssist(targetId) {
     resultBox.style.display = 'block';
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔄 Regenerate';
+    btn.textContent = '🔄 Re-polish';
   }
 }
 
 function insertAIRemark(targetId) {
   var resultBox = document.getElementById('ai-result-box');
   if (!resultBox) return;
-  var text = resultBox.innerText || resultBox.textContent || '';
-  text = text.trim();
+  var text = (resultBox.innerText || resultBox.textContent || '').trim();
   if (!text) return;
   var el = document.getElementById(targetId);
   if (el) {
