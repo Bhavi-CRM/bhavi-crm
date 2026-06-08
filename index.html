@@ -4597,9 +4597,9 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Validate status change for current role
+  // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,currentUser?.role||'engineer',t.service_type,t.call_type,t.warranty_coverage);
-  if(!allowedEng.includes(status)){
+  if(status!==t.status && !allowedEng.includes(status)){
     alert('❌ Cannot change to "'+status+'" at this stage.\nCurrent: '+t.status+'\nAllowed: '+(allowedEng.length?allowedEng.join(', '):'None — contact Admin'));
     return;
   }
