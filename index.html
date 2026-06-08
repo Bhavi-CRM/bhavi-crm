@@ -12147,7 +12147,7 @@ async function renderWorkLog(){
     +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Add Log</button>'
     +'</div>'
     // Today logs
-    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 Today's Logs</h2><div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span>'+(logs.length?'<button onclick="shareWorkLogsWA(window._todayWorkDate,window._todayWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>':'')+'</div></div>'
+    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 Today\'s Logs</h2><div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span>'+(logs.length?'<button onclick="shareWorkLogsWA(window._todayWorkDate,window._todayWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>':'')+'</div></div>'
     +'<div id="wl-list">'+logsHtml(logs)+'</div></div>'
     // Past logs search section
     +'<div class="card">'
