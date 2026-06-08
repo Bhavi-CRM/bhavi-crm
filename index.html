@@ -257,6 +257,9 @@ tr:hover td{background:#f8fafc;}
   #mobile-menu-btn{display:none!important;}
   #sidebar{transform:none!important;}
 }
+/* ── MSC Status Badges ──────────────────────────────────── */
+.badge-msc{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;}
+.badge-delivery{background:#dcfce7;color:#166534;border:1px solid #86efac;}
 /* ── AI Remark Assistant ────────────────────────────────── */
 .ai-remark-btn{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px;transition:opacity .15s;}
 .ai-remark-btn:hover{opacity:.85;}
@@ -2596,9 +2599,9 @@ async function navigate(page){
 }
 
 // STATUS SYSTEM
-const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed'];
+const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery'];
 function statusBadge(s){
-  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress'};
+  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
 function priorityBadge(p){
@@ -2627,7 +2630,9 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
       case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
       case 'Pending Allocation': return['Assigned','Call Cancel'];
       case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
-      case 'Repaired': return['Delivered'];
+      case 'Repaired': return['Delivered','Sent to MSC'];
+      case 'Sent to MSC': return[];
+      case 'Pending for Delivery': return['Delivered'];
       default: return[];
     }
   }
@@ -2642,7 +2647,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
         if(isRepeat) return['Closed'];
-        return [isCarryIn ? 'Repaired' : 'Closed'];
+        return [isCarryIn ? 'Repaired' : 'Closed', 'Sent to MSC'];
       }
 
       case 'Pending Parts':
@@ -2650,9 +2655,9 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         return[];
 
       case 'Pending Repair Carry In':
-        return['Repaired'];
+        return['Repaired','Sent to MSC'];
       case 'Pending Repair On Site':
-        return['Closed'];
+        return['Closed','Sent to MSC'];
 
       case 'Customer Approved':
         // OW approved — check parts
@@ -2883,7 +2888,7 @@ async function renderDashboard(){
             <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">Unassigned</span>'}</td>
             <td>${statusBadge(t.status)}</td>
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td>${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
+            <td>${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:t.status==='Sent to MSC'?`<button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;" onclick="openEngUpdate('${t.id}')">📬 Received?</button>`:t.status==='Pending for Delivery'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">🚚 Deliver</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
@@ -3594,7 +3599,7 @@ async function renderMyCalls(){
             <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
             <td>${statusBadge(t.status)}</td>
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td>${['Closed','Customer Reject','Call Cancel'].includes(t.status)?
+            <td>${['Closed','Customer Reject','Call Cancel','Sent to MSC'].includes(t.status)?
               `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
               `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
             </td>
@@ -4371,11 +4376,18 @@ async function openEngUpdate(id){
         <span style="color:#065f46;">🔧 Work In Progress — Time In: <b>${t.visit_in}</b></span>
       </div>
     </div>` : ''}
+    ${t.status==='Sent to MSC'?`
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:14px;">
+      <h3 style="color:#1d4ed8;font-size:14px;font-weight:700;margin-bottom:8px;">📦 Product at MSC — Awaiting Return</h3>
+      <div id="msc-dispatch-info" style="font-size:13px;color:#374151;margin-bottom:12px;line-height:1.7;">Loading MSC details...</div>
+      <div class="form-group" style="margin-bottom:10px;"><label>Received Date</label><input type="date" id="msc-received-date" value="${dateNow}"></div>
+      <button onclick="saveMSCReceived('${t.id}')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">📬 Mark Received → Pending for Delivery</button>
+    </div>`:''}
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group">
         <label>Status *</label>
-        <select id="upd-status">
-          ${getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
+        <select id="upd-status" onchange="onMSCStatusSelect(this.value)">
+          ${getAllowedStatuses(t.status,currentUser?.role||'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
         ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
@@ -4383,6 +4395,19 @@ async function openEngUpdate(id){
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
       <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
+    </div>
+    <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;" data-role="engineer-only">
+      <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:10px;">📦 MSC Dispatch Details</h3>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>MSC Center <span class="req">*</span></label>
+        <input type="text" id="msc-name-input" list="msc-datalist" placeholder="Search MSC center..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">
+        <datalist id="msc-datalist"></datalist>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="msc-dispatch-date" value="${dateNow}"></div>
+        <div class="form-group"><label>Courier Service</label><input type="text" id="msc-courier" placeholder="DTDC, Blue Dart, Speed Post..."></div>
+      </div>
+      <div class="form-group"><label>Docket / Tracking No <span class="req">*</span></label><input type="text" id="msc-docket" placeholder="Enter courier docket or tracking number"></div>
     </div>
     ${t.service_type==='On Site'?`
     <hr class="divider">
@@ -4411,6 +4436,8 @@ async function openEngUpdate(id){
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
     <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-remarks')">✨ AI Remark</button></div>`;
   openModal('modal-eng-update');
+  loadMSCCentersDropdown();
+  if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
 }
 
 // Point 8: Auto time buttons
@@ -4548,10 +4575,43 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Validate engineer status change
-  const allowedEng=getAllowedStatuses(t.status,'engineer',t.service_type,t.call_type,t.warranty_coverage);
+  // Validate status change for current role
+  const allowedEng=getAllowedStatuses(t.status,currentUser?.role||'engineer',t.service_type,t.call_type,t.warranty_coverage);
   if(!allowedEng.includes(status)){
     alert('❌ Cannot change to "'+status+'" at this stage.\nCurrent: '+t.status+'\nAllowed: '+(allowedEng.length?allowedEng.join(', '):'None — contact Admin'));
+    return;
+  }
+
+  // MSC Dispatch — engineer just marks status, WC adds dispatch details later
+  if(status==='Sent to MSC'){
+    const isEng=(currentUser?.role||'engineer')==='engineer';
+    if(isEng){
+      // Engineer: just change status, no dispatch form needed
+      try{
+        const tl=[...(t.timeline||[]),{action:'Sent to MSC',by:currentUser.name,at:new Date().toISOString(),note:'Engineer marked for MSC — WC to add dispatch details'}];
+        await sb('tickets','PATCH',{status:'Sent to MSC',work_done:document.getElementById('upd-work')?.value||t.work_done||'',eng_remarks:document.getElementById('upd-remarks')?.value||'',fault_code:document.getElementById('upd-fault')?.value||'',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+        closeModal('modal-eng-update');
+        if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+        alert('✅ Marked as Sent to MSC.\nWC will add courier & docket details.');
+      }catch(e){alert('Error: '+e.message);}
+      return;
+    }
+    // WC/Admin: dispatch form required
+    const mscName=(document.getElementById('msc-name-input')?.value||'').trim();
+    const mscDate=document.getElementById('msc-dispatch-date')?.value||'';
+    const mscCourier=(document.getElementById('msc-courier')?.value||'').trim();
+    const mscDocket=(document.getElementById('msc-docket')?.value||'').trim();
+    if(!mscName){alert('❌ Please select MSC center');document.getElementById('msc-name-input')?.focus();return;}
+    if(!mscDate){alert('❌ Please select dispatch date');return;}
+    if(!mscDocket){alert('❌ Please enter docket/tracking number');document.getElementById('msc-docket')?.focus();return;}
+    try{
+      await sb('auto_msc_dispatch','POST',{ticket_id:id,msc_name:mscName,dispatch_date:mscDate,courier_name:mscCourier,docket_no:mscDocket,dispatched_by:currentUser.name,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
+      const tl=[...(t.timeline||[]),{action:'Sent to MSC',by:currentUser.name,at:new Date().toISOString(),note:`MSC: ${mscName} | Date: ${mscDate} | Courier: ${mscCourier||'N/A'} | Docket: ${mscDocket}`}];
+      await sb('tickets','PATCH',{status:'Sent to MSC',work_done:document.getElementById('upd-work')?.value||t.work_done||'',eng_remarks:document.getElementById('upd-remarks')?.value||'',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      closeModal('modal-eng-update');
+      if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+      alert('✅ Dispatch details saved!\nMSC: '+mscName+'\nDocket: '+mscDocket);
+    }catch(e){alert('Error saving MSC dispatch: '+e.message);}
     return;
   }
 
@@ -7316,6 +7376,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('logo',this)">🖼️ Logo</button>
       <button class="tab" onclick="switchSettings('company',this)">🏢 Company Info</button>
       <button class="tab" onclick="switchSettings('portal',this)">🌐 Portal Services</button>
+      <button class="tab" onclick="switchSettings('msc',this)">🏭 MSC Centers</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -7325,6 +7386,7 @@ function switchSettings(tab,el){
   else if(tab==='wc')sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&order=name').then(wcs=>document.getElementById('settings-content').innerHTML=renderWCTab(wcs));
   else if(tab==='admin') renderAdminTab();
   else if(tab==='portal') renderPortalServicesTab();
+  else if(tab==='msc') renderMSCTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -17799,6 +17861,155 @@ window.shopSubmitOrder=async function(){
     document.getElementById('shop-order-form').innerHTML='<div style="text-align:center;padding:32px 20px;"><div style="font-size:56px;margin-bottom:14px;">🎉</div><h2 style="color:#10b981;margin:0 0 8px;font-size:22px;">Order Placed Successfully!</h2><p style="color:#6b7280;font-size:14px;margin:0 0 6px;">Order No: <b style="color:#111;">'+escHtml(data.order_no)+'</b></p><p style="color:#6b7280;font-size:14px;margin:0 0 16px;">Total: <b style="color:#1d4ed8;font-size:16px;">₹'+Math.round(total).toLocaleString('en-IN')+'</b></p><div style="background:#f0fdf4;border-radius:10px;padding:14px;font-size:13px;color:#166534;margin-bottom:16px;text-align:left;line-height:1.8;"><b>What happens next?</b><br>✅ Your order has been received.<br>📞 We will contact you within 24 hours on <b>'+mob+'</b>.<br>💳 Payment details will be shared via WhatsApp.<br>🚚 Order dispatched after payment confirmation.</div><p style="color:#9ca3af;font-size:12px;">Thank you for choosing <b>Bhavi Electronics</b><br><i>Where Customer Delight is First</i></p></div>';
   }catch(e){alert('Unable to place order. Please try again.\nError: '+e.message);}
 };
+// ===== MSC WORKFLOW =====
+function onMSCStatusSelect(val){
+  var sec=document.getElementById('msc-dispatch-section');
+  if(sec) sec.style.display=(val==='Sent to MSC')?'block':'none';
+  if(val==='Sent to MSC') loadMSCCentersDropdown();
+}
+
+async function loadMSCCentersDropdown(){
+  try{
+    var dl=document.getElementById('msc-datalist');
+    if(!dl)return;
+    var list=await sb('auto_msc_centers','GET',null,'?order=name&select=name,city');
+    dl.innerHTML=list.map(function(m){return'<option value="'+escHtml(m.name)+(m.city?' — '+m.city:'')+'">';}).join('');
+  }catch(e){}
+}
+
+async function loadMSCDispatchInfo(ticketId){
+  var el=document.getElementById('msc-dispatch-info');
+  if(!el)return;
+  var today=new Date().toLocaleDateString('en-CA');
+  var existing={};
+  try{
+    var rows=await sb('auto_msc_dispatch','GET',null,'?ticket_id=eq.'+ticketId+'&order=created_at.desc&limit=1');
+    if(rows&&rows.length)existing=rows[0];
+  }catch(e){}
+
+  // Always show editable dispatch form (pre-filled if data exists)
+  var hasDocket=!!(existing.docket_no);
+  el.innerHTML=
+    (hasDocket?'':'<div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;">⏳ Engineer has marked this for MSC. Fill dispatch details below — docket can be added later.</div>')
+    +'<div class="form-group" style="margin-bottom:10px;"><label>MSC Center <span class="req">*</span></label>'
+    +'<input type="text" id="msc-wc-name" list="msc-datalist-wc" value="'+(existing.msc_name||'')+'" placeholder="Search MSC center..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'
+    +'<datalist id="msc-datalist-wc"></datalist></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'
+    +'<div class="form-group"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="msc-wc-date" value="'+(existing.dispatch_date||today)+'"></div>'
+    +'<div class="form-group"><label>Courier Agency</label><input type="text" id="msc-wc-courier" value="'+(existing.courier_name||'')+'" placeholder="DTDC, Blue Dart, Speed Post..."></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:12px;"><label>Docket / Tracking No</label>'
+    +'<input type="text" id="msc-wc-docket" value="'+(existing.docket_no||'')+'" placeholder="Add when courier picks up (can leave blank now)"></div>'
+    +'<button onclick="saveMSCDispatchFromWC(\''+ticketId+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-bottom:10px;">💾 Save / Update Dispatch Details</button>'
+    // Show received section only when docket is filled
+    +(hasDocket
+      ?'<hr style="border:none;border-top:1px solid #bfdbfe;margin:12px 0;">'
+       +'<div class="form-group" style="margin-bottom:10px;"><label>Received Date</label><input type="date" id="msc-received-date" value="'+today+'"></div>'
+       +'<button onclick="saveMSCReceived(\''+ticketId+'\')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">📬 Mark Received → Pending for Delivery</button>'
+      :'<div style="font-size:12px;color:#6b7280;text-align:center;">📋 "Mark Received" option will appear once docket number is saved.</div>');
+
+  // Load MSC centers datalist
+  try{
+    var list=await sb('auto_msc_centers','GET',null,'?order=name&select=name,city');
+    var dl=document.getElementById('msc-datalist-wc');
+    if(dl)dl.innerHTML=list.map(function(m){return'<option value="'+escHtml(m.name)+(m.city?' — '+m.city:'')+'">';}).join('');
+  }catch(e2){}
+}
+
+async function saveMSCDispatchFromWC(ticketId){
+  var mscName=(document.getElementById('msc-wc-name')?.value||'').trim();
+  var mscDate=document.getElementById('msc-wc-date')?.value||'';
+  var mscCourier=(document.getElementById('msc-wc-courier')?.value||'').trim();
+  var mscDocket=(document.getElementById('msc-wc-docket')?.value||'').trim();
+  if(!mscName){alert('❌ Please enter MSC center name');document.getElementById('msc-wc-name')?.focus();return;}
+  if(!mscDate){alert('❌ Please select dispatch date');return;}
+  try{
+    var existing=await sb('auto_msc_dispatch','GET',null,'?ticket_id=eq.'+ticketId+'&limit=1');
+    var payload={msc_name:mscName,dispatch_date:mscDate,courier_name:mscCourier,docket_no:mscDocket,updated_at:new Date().toISOString()};
+    if(existing&&existing.length){
+      // Update existing record
+      await sb('auto_msc_dispatch','PATCH',payload,'?ticket_id=eq.'+ticketId);
+    }else{
+      // Create new record
+      await sb('auto_msc_dispatch','POST',Object.assign({},payload,{ticket_id:ticketId,dispatched_by:currentUser.name,created_at:new Date().toISOString()}));
+    }
+    var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
+    var note='MSC: '+mscName+' | Date: '+mscDate+(mscCourier?' | Courier: '+mscCourier:'')+(mscDocket?' | Docket: '+mscDocket:' | Docket: Pending');
+    var tl=[...(t.timeline||[]),{action:'MSC Dispatch Updated',by:currentUser.name,at:new Date().toISOString(),note:note}];
+    await sb('tickets','PATCH',{timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
+    alert('✅ '+(mscDocket?'Dispatch details saved!':'Details saved — add docket when courier picks up.')+'\nMSC: '+mscName+(mscDocket?'\nDocket: '+mscDocket:''));
+    loadMSCDispatchInfo(ticketId);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function saveMSCReceived(ticketId){
+  var dateEl=document.getElementById('msc-received-date');
+  var receivedDate=dateEl?dateEl.value:new Date().toLocaleDateString('en-CA');
+  if(!receivedDate){alert('Please select received date');return;}
+  try{
+    var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
+    // Update dispatch record
+    await sb('auto_msc_dispatch','PATCH',{received_date:receivedDate,updated_at:new Date().toISOString()},'?ticket_id=eq.'+ticketId);
+    // Update ticket status
+    var tl=[...(t.timeline||[]),{action:'Received from MSC',by:currentUser.name,at:new Date().toISOString(),note:'Received Date: '+receivedDate+' — Ready for delivery'}];
+    await sb('tickets','PATCH',{status:'Pending for Delivery',timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
+    closeModal('modal-eng-update');
+    if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+    alert('✅ Received from MSC! Ticket moved to Pending for Delivery.');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// MSC Centers Settings Tab
+async function renderMSCTab(){
+  var cont=document.getElementById('settings-content');
+  if(!cont)return;
+  cont.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:20px;">Loading...</div>';
+  try{
+    var list=await sb('auto_msc_centers','GET',null,'?order=name');
+    cont.innerHTML='<div class="card">'
+      +'<div class="section-header"><h2>🏭 MSC Centers</h2></div>'
+      +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Add Master Service Centers — these appear as options when sending a product to MSC for repair.</div>'
+      +'<div class="form-grid" style="margin-bottom:12px;">'
+      +'<div class="form-group"><label>MSC Name <span class="req">*</span></label><input id="msc-add-name" placeholder="e.g. Fujifilm Service Center Mumbai"></div>'
+      +'<div class="form-group"><label>City</label><input id="msc-add-city" placeholder="e.g. Mumbai"></div>'
+      +'</div>'
+      +'<div class="form-grid" style="margin-bottom:12px;">'
+      +'<div class="form-group"><label>Contact Person</label><input id="msc-add-contact" placeholder="Name / Phone"></div>'
+      +'<div class="form-group"><label>Address</label><input id="msc-add-address" placeholder="Full address"></div>'
+      +'</div>'
+      +'<button class="btn btn-primary btn-sm" onclick="saveMSCCenter()">+ Add MSC Center</button>'
+      +'<hr class="divider" style="margin:16px 0;">'
+      +(list.length?'<div class="table-wrap"><table><thead><tr><th>Name</th><th>City</th><th>Contact</th><th>Action</th></tr></thead><tbody>'
+        +list.map(function(m){return'<tr>'
+          +'<td><b>'+escHtml(m.name||'')+'</b></td>'
+          +'<td>'+(m.city||'-')+'</td>'
+          +'<td>'+(m.contact||'-')+'</td>'
+          +'<td><button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;" onclick="deleteMSCCenter('+m.id+')">🗑️ Delete</button></td>'
+          +'</tr>';}).join('')
+        +'</tbody></table></div>'
+        :'<div class="alert alert-info">No MSC centers added yet. Add your first MSC center above.</div>')
+      +'</div>';
+  }catch(e){cont.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br><small>Create the <b>auto_msc_centers</b> table in Supabase (see SQL below).</small><pre style="font-size:11px;margin-top:10px;background:#f1f5f9;padding:10px;border-radius:8px;">CREATE TABLE auto_msc_centers (\n  id BIGSERIAL PRIMARY KEY,\n  name TEXT NOT NULL,\n  city TEXT,\n  contact TEXT,\n  address TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nCREATE TABLE auto_msc_dispatch (\n  id BIGSERIAL PRIMARY KEY,\n  ticket_id TEXT,\n  msc_name TEXT,\n  dispatch_date DATE,\n  courier_name TEXT,\n  docket_no TEXT,\n  received_date DATE,\n  dispatched_by TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);</pre></div>';}
+}
+
+async function saveMSCCenter(){
+  var name=(document.getElementById('msc-add-name')?.value||'').trim();
+  if(!name){alert('MSC name required');return;}
+  var city=(document.getElementById('msc-add-city')?.value||'').trim();
+  var contact=(document.getElementById('msc-add-contact')?.value||'').trim();
+  var address=(document.getElementById('msc-add-address')?.value||'').trim();
+  try{
+    await sb('auto_msc_centers','POST',{name,city,contact,address,created_at:new Date().toISOString()});
+    renderMSCTab();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteMSCCenter(id){
+  if(!confirm('Delete this MSC center?'))return;
+  try{await sb('auto_msc_centers','DELETE',null,'?id=eq.'+id);renderMSCTab();}catch(e){alert('Error: '+e.message);}
+}
+// ===== END MSC WORKFLOW =====
+
 // ===== END SALES MODULE =====
 
 // ===== AI REMARK ASSISTANT =====
