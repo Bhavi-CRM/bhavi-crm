@@ -15634,7 +15634,7 @@ async function renderVirtualAgent(){
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label>City / Location Tag</label>
-          <input type="text" id="ai-post-city" value="Surat" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+          <input type="text" id="ai-post-city" value="Ahmedabad" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
         </div>
         <button class="btn btn-primary" style="width:100%;" onclick="generateAIPost()">✨ Generate AI Post</button>
       </div>
@@ -15691,7 +15691,7 @@ Are you available to speak now?
 Please reply for a FREE consultation with our experts. ✅
 
 📞 Call: +91-XXXXXXXXXX
-📍 Surat, Gujarat</div>
+📍 Ahmedabad, Gujarat</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
       <button class="btn btn-outline btn-sm" onclick="editInquiryTemplate()">✏️ Edit Template</button>
       <button class="btn btn-success btn-sm" onclick="copyTemplate('inquiry-wa-template')">📋 Copy</button>
@@ -15801,12 +15801,12 @@ var generatedHashtags=[];
 var generatedCanvas=null;
 
 const AI_HASHTAG_SETS={
-  offer:['#BhaviElectronics','#ElectronicsRepair','#ACService','#SuratElectronics','#HomeAppliances','#ServiceCenter','#SpecialOffer','#DiscountAlert','#SummerSale','#Surat','#Gujarat','#RepairService','#TechService','#ApplianceRepair'],
-  service:['#BhaviElectronics','#ServiceTips','#ACMaintenance','#HomeAppliances','#ElectronicsRepair','#ProTips','#Surat','#Gujarat','#TechTips','#DIYRepair','#ApplianceCare','#MaintenanceTips'],
-  festival:['#BhaviElectronics','#FestivalOffer','#Diwali','#Navratri','#Gujarat','#Surat','#FestiveSeason','#SpecialDiscount','#ElectronicsGifts','#HomeAppliances','#FestivalSale','#CelebrationDeals'],
-  product:['#BhaviElectronics','#NewArrival','#ElectronicsIndia','#HomeAppliances','#Surat','#Gujarat','#TechProducts','#Innovation','#SmartHome','#BestBuy','#QualityProducts','#NewProduct'],
-  review:['#BhaviElectronics','#CustomerReview','#HappyCustomer','#5Stars','#Surat','#Gujarat','#TrustedService','#BestService','#CustomerSatisfaction','#Reviews','#ServiceExcellence','#Recommend'],
-  custom:['#BhaviElectronics','#Surat','#Gujarat','#ElectronicsRepair','#HomeAppliances','#ServiceCenter','#TechService']
+  offer:['#BhaviElectronics','#ElectronicsRepair','#ACService','#AhmedabadElectronics','#HomeAppliances','#ServiceCenter','#SpecialOffer','#DiscountAlert','#SummerSale','#Ahmedabad','#Gujarat','#RepairService','#TechService','#ApplianceRepair'],
+  service:['#BhaviElectronics','#ServiceTips','#ACMaintenance','#HomeAppliances','#ElectronicsRepair','#ProTips','#Ahmedabad','#Gujarat','#TechTips','#DIYRepair','#ApplianceCare','#MaintenanceTips'],
+  festival:['#BhaviElectronics','#FestivalOffer','#Diwali','#Navratri','#Gujarat','#Ahmedabad','#FestiveSeason','#SpecialDiscount','#ElectronicsGifts','#HomeAppliances','#FestivalSale','#CelebrationDeals'],
+  product:['#BhaviElectronics','#NewArrival','#ElectronicsIndia','#HomeAppliances','#Ahmedabad','#Gujarat','#TechProducts','#Innovation','#SmartHome','#BestBuy','#QualityProducts','#NewProduct'],
+  review:['#BhaviElectronics','#CustomerReview','#HappyCustomer','#5Stars','#Ahmedabad','#Gujarat','#TrustedService','#BestService','#CustomerSatisfaction','#Reviews','#ServiceExcellence','#Recommend'],
+  custom:['#BhaviElectronics','#Ahmedabad','#Gujarat','#ElectronicsRepair','#HomeAppliances','#ServiceCenter','#TechService']
 };
 
 // Canvas template visual configs
@@ -15962,7 +15962,7 @@ function drawPostCanvas(content,city,template){
 
 function generatePostContent(template,userDetail,city){
   const companyName='Bhavi Electronics & Automation';
-  const city2=city||'Surat';
+  const city2=city||'Ahmedabad';
   const templates={
     offer:{
       headline:'🎉 SPECIAL OFFER!',
@@ -15990,7 +15990,7 @@ function generatePostContent(template,userDetail,city){
     },
     product:{
       headline:'✨ NEW PRODUCT',
-      body:userDetail||'Latest automation products available at '+companyName+'! Smart home, CCTV, Home Theatre ane vadhare — Surat na best dealers.',
+      body:userDetail||'Latest automation products available at '+companyName+'! Smart home, CCTV, Home Theatre and more — Ahmedabad\'s best dealers.',
       cta:'🏪 Visit Us | 📞 Call for Demo | 🚚 Installation Available',
       hashtags:'#NewProduct #SmartHome #HomeAutomation #CCTV #'+city2+' #BhaviElectronics #Automation'
     },
@@ -16007,7 +16007,7 @@ function generatePostContent(template,userDetail,city){
 
 function generateAIPost(){
   const detail=(document.getElementById('ai-post-input').value||'').trim();
-  const city=(document.getElementById('ai-post-city').value||'Surat').trim();
+  const city=(document.getElementById('ai-post-city').value||'Ahmedabad').trim();
   if(!detail){alert('Please enter post details first!');return;}
 
   // Generate smart post content
@@ -16170,7 +16170,7 @@ function sendPaymentWA(id,phone,name,ticketId,model,amount){
     .replace('{ticket_id}',ticketId||'-')
     .replace('{model}',model||'-')
     .replace('{amount}',amount||'0')
-    .replace('{shop_address}','Bhavi Electronics, Surat');
+    .replace('{shop_address}','Bhavi Electronics, Ahmedabad');
   window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(tmpl)}`,'_blank');
   addAILog('payment',`💰 Payment reminder sent to ${name} (₹${amount})`,'log-wa');
 }
