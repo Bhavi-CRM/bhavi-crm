@@ -257,6 +257,22 @@ tr:hover td{background:#f8fafc;}
   #mobile-menu-btn{display:none!important;}
   #sidebar{transform:none!important;}
 }
+/* ── AI Remark Assistant ────────────────────────────────── */
+.ai-remark-btn{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;margin-top:6px;transition:opacity .15s;}
+.ai-remark-btn:hover{opacity:.85;}
+.ai-remark-btn:disabled{opacity:.5;cursor:not-allowed;}
+.ai-picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:center;justify-content:center;}
+.ai-picker-box{background:#fff;border-radius:16px;padding:22px;width:340px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.ai-picker-title{font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.ai-picker-sub{font-size:12px;color:#6b7280;margin-bottom:14px;}
+.ai-lang-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.ai-lang-btn{padding:9px 4px;border:2px solid #e2e8f0;border-radius:10px;background:#f9fafb;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;}
+.ai-lang-btn:hover,.ai-lang-btn.selected{border-color:#7c3aed;background:#f5f3ff;color:#7c3aed;}
+.ai-gen-btn{width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.ai-gen-btn:disabled{opacity:.5;cursor:not-allowed;}
+.ai-result-box{background:#f8faff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;min-height:60px;white-space:pre-wrap;margin-bottom:10px;display:none;}
+.ai-insert-btn{width:100%;background:#059669;color:#fff;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;display:none;}
+.ai-cancel-btn{width:100%;background:#f1f5f9;color:#374151;border:none;border-radius:10px;padding:9px;font-size:13px;cursor:pointer;margin-top:6px;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -837,6 +853,7 @@ tr:hover td{background:#f8fafc;}
       <div class="form-group">
         <label>Remarks</label>
         <textarea id="wc-dr-remarks" rows="2" placeholder="Any additional notes..."></textarea>
+        <button class="ai-remark-btn" onclick="showAIRemarkPicker('wc-dr-remarks')">✨ AI Remark</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -915,6 +932,7 @@ tr:hover td{background:#f8fafc;}
       <div class="form-group" style="margin-top:4px;">
         <label>Remarks</label>
         <textarea id="dr-remarks" rows="2" placeholder="Any additional notes..."></textarea>
+        <button class="ai-remark-btn" onclick="showAIRemarkPicker('dr-remarks')">✨ AI Remark</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -4311,6 +4329,7 @@ async function processApproval(decision){
 // ENG UPDATE - Points 4, 6, 7, 8
 async function openEngUpdate(id){
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];if(!t)return;
+  window._currentUpdateTicket=t;
   viewingTicketId=id;currentSpares=[...(t.spares||[])];
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
   const isRepeatCall = t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat';
@@ -4391,7 +4410,7 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
-    <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea></div>`;
+    <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-remarks')">✨ AI Remark</button></div>`;
   openModal('modal-eng-update');
 }
 
@@ -9332,15 +9351,22 @@ function sendFeedbackWA(ticketId,customerName,mobile,engName){
       +[1,2,3,4,5].map(function(n){return '<span data-r="'+n+'" onclick="setFbStar('+n+')" style="font-size:36px;cursor:pointer;transition:transform 0.1s;">☆</span>';}).join('')
       +'</div>'
       +'<input id="fb-name" type="text" placeholder="Your name" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">'
-      +'<textarea id="fb-comment" rows="3" placeholder="Any comments? (optional)" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:14px;box-sizing:border-box;resize:none;"></textarea>'
+      +'<textarea id="fb-comment" rows="3" placeholder="Any comments? (optional)" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:6px;box-sizing:border-box;resize:none;"></textarea>'
+      +'<button class="ai-remark-btn" style="margin-bottom:10px;" onclick="showAIRemarkPicker(\'fb-comment\')">✨ AI Comment</button>'
       +'<button onclick="submitFeedback(\''+fbTicket+'\')" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;cursor:pointer;">Submit Feedback</button>'
       +'<div id="fb-result" style="margin-top:10px;font-size:13px;"></div>'
       +'</div>';
     document.body.appendChild(overlay);
     window._fbOverlay=overlay;
     window._fbRating=0;
+    window._fbTicketData={};
     // Pre-populate if customer already submitted feedback for this ticket
     (async function(){
+      try{
+        // Load ticket data for AI context
+        var td=await sb('auto_tickets','GET',null,'?ticket_no=eq.'+encodeURIComponent(fbTicket)+'&limit=1');
+        if(td&&td.length>0)window._fbTicketData=td[0];
+      }catch(e){}
       try{
         var ex=await sb('customer_feedback','GET',null,'?ticket_id=eq.'+encodeURIComponent(fbTicket)+'&limit=1');
         if(ex&&ex.length>0){
@@ -12143,7 +12169,8 @@ async function renderWorkLog(){
     +'<div class="form-group"><label>To Time</label><select id="wl-to" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===toDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:12px;"><label>What work was done? <span class="req">*</span></label>'
-    +'<textarea id="wl-task" rows="3" placeholder="e.g. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea></div>'
+    +'<textarea id="wl-task" rows="3" placeholder="e.g. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea>'
+    +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'wl-task\')">✨ AI Remark</button></div>'
     +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Add Log</button>'
     +'</div>'
     // Today logs
@@ -13547,7 +13574,8 @@ async function openSiteVisitModal(){
       +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="qv-date" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
       +'<div class="form-group"><label>Time</label><input type="time" id="qv-time"></div>'
       +'</div>'
-      +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done..."></textarea></div>'
+      +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done..."></textarea>'
+      +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'qv-work\')">✨ AI Remark</button></div>'
       +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable..."></textarea></div>'
       +'</div>'
       +'<div class="modal-footer">'
@@ -13576,7 +13604,8 @@ async function openAddVisitModal(siteId,siteName){
     +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="av-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
     +'<div class="form-group"><label>Time</label><input type="time" id="av-time-'+siteId+'"></div>'
     +'</div>'
-    +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Describe the work done..."></textarea></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Describe the work done..."></textarea>'
+    +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'av-work-'+siteId+'\')">✨ AI Remark</button></div>'
     +'<hr class="divider">'
     +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Material Delivered</h3>'
     +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Site items — Purchase & Selling price will be auto-filled, just enter Qty</p>'
@@ -15333,7 +15362,8 @@ function openAddInquiryModal(){
     +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select></div>'
     +'<div class="form-group"><label>📅 Followup Date</label>'+inp('inq-followup','','','date')+'</div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea>'
+    +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'inq-desc\')">✨ AI Remark</button></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-add-inquiry\').remove()">Cancel</button>'
@@ -15376,7 +15406,8 @@ function openEditInquiryModal(id){
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('einq-address','Address',inq.address)+'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
-    +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea></div>'
+    +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea>'
+    +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'einq-desc\')">✨ AI Remark</button></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">Cancel</button>'
@@ -17770,6 +17801,175 @@ window.shopSubmitOrder=async function(){
   }catch(e){alert('Unable to place order. Please try again.\nError: '+e.message);}
 };
 // ===== END SALES MODULE =====
+
+// ===== AI REMARK ASSISTANT =====
+const AI_ASSIST_URL = SB_URL + '/functions/v1/ai-assist';
+
+function getAIRemarkContext(targetId) {
+  var ctx = {};
+  // Engineer update modal
+  if (targetId === 'upd-remarks') {
+    var t = window._currentUpdateTicket || {};
+    ctx.ticket_no = t.ticket_no || '';
+    ctx.customer = t.customer_name || '';
+    ctx.problem = t.problem_description || t.issue || '';
+    ctx.product = t.product_type || t.call_type || '';
+    ctx.status = document.getElementById('upd-status')?.value || t.status || '';
+    ctx.engineer = currentUser?.name || '';
+    return 'type:update\n' + Object.entries(ctx).filter(function(e){return e[1];}).map(function(e){return e[0]+': '+e[1];}).join('\n');
+  }
+  // Customer feedback
+  if (targetId === 'fb-comment') {
+    var rating = window._fbRating || 0;
+    ctx.rating = rating + ' out of 5 stars';
+    ctx.ticket = window._fbTicketData || {};
+    ctx.product = ctx.ticket.product_type || ctx.ticket.call_type || '';
+    ctx.engineer = ctx.ticket.engineer_name || ctx.ticket.assigned_to || '';
+    ctx.problem = ctx.ticket.problem_description || '';
+    return 'type:feedback\nRating: ' + ctx.rating + '\nProduct: ' + (ctx.product||'') + '\nEngineer: ' + (ctx.engineer||'') + '\nIssue: ' + (ctx.problem||'');
+  }
+  // Work log
+  if (targetId === 'wl-task') {
+    var from = document.getElementById('wl-from')?.value || '';
+    var to = document.getElementById('wl-to')?.value || '';
+    return 'type:worklog\nEngineer: ' + (currentUser?.name||'') + '\nTime: ' + from + ' to ' + to;
+  }
+  // Daily report — engineer
+  if (targetId === 'dr-remarks') {
+    var drDate = document.getElementById('dr-date')?.value || new Date().toLocaleDateString('en-CA');
+    var drEng = document.getElementById('dr-eng-name')?.textContent || currentUser?.name || '';
+    return 'type:dailyreport\nEngineer: ' + drEng + '\nDate: ' + drDate;
+  }
+  // Daily report — WC
+  if (targetId === 'wc-dr-remarks') {
+    var wcDate = document.getElementById('wc-dr-date')?.value || new Date().toLocaleDateString('en-CA');
+    var wcName = document.getElementById('wc-dr-wc-name')?.textContent || currentUser?.name || '';
+    return 'type:dailyreport\nWork Controller: ' + wcName + '\nDate: ' + wcDate;
+  }
+  // Quick visit
+  if (targetId === 'qv-work') {
+    var site = document.getElementById('qv-site');
+    var siteName = site?.options[site.selectedIndex]?.text || '';
+    return 'type:visit\nSite: ' + siteName + '\nDate: ' + (document.getElementById('qv-date')?.value||'');
+  }
+  // Inquiry / Edit inquiry
+  if (targetId === 'inq-desc') {
+    var cust = document.getElementById('inq-name')?.value || '';
+    var mob = document.getElementById('inq-mobile')?.value || '';
+    var type = document.getElementById('inq-type')?.value || '';
+    return 'type:inquiry\nCustomer: ' + cust + '\nMobile: ' + mob + '\nInquiry Type: ' + type;
+  }
+  if (targetId === 'einq-desc') {
+    var cust2 = document.getElementById('einq-name')?.value || '';
+    var type2 = document.getElementById('einq-type')?.value || '';
+    return 'type:inquiry\nCustomer: ' + cust2 + '\nInquiry Type: ' + type2;
+  }
+  // Dynamic visit (av-work-<siteId>)
+  if (targetId.startsWith('av-work-')) {
+    var sid = targetId.replace('av-work-', '');
+    var avDate = document.getElementById('av-date-' + sid)?.value || '';
+    return 'type:visit\nSite ID: ' + sid + '\nDate: ' + avDate;
+  }
+  return 'type:update';
+}
+
+function _aiRemarkType(contextStr) {
+  var m = contextStr.match(/^type:(\w+)/);
+  return m ? m[1] : 'update';
+}
+
+function showAIRemarkPicker(targetId) {
+  var existing = document.getElementById('ai-picker-overlay');
+  if (existing) existing.remove();
+
+  var ctx = getAIRemarkContext(targetId);
+  var type = _aiRemarkType(ctx);
+  var selectedLang = 'english';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'ai-picker-overlay';
+  overlay.className = 'ai-picker-overlay';
+  overlay.innerHTML =
+    '<div class="ai-picker-box" onclick="event.stopPropagation()">'
+    + '<div class="ai-picker-title">✨ AI Remark Assistant</div>'
+    + '<div class="ai-picker-sub">Choose language — AI will generate a professional remark based on the ticket context.</div>'
+    + '<div class="ai-lang-grid">'
+    +   '<button class="ai-lang-btn selected" id="ailang-english" onclick="aiSelectLang(\'english\')">🇬🇧 English</button>'
+    +   '<button class="ai-lang-btn" id="ailang-gujarati" onclick="aiSelectLang(\'gujarati\')">🇮🇳 ગુજ.</button>'
+    +   '<button class="ai-lang-btn" id="ailang-hindi" onclick="aiSelectLang(\'hindi\')">🇮🇳 हिंदी</button>'
+    + '</div>'
+    + '<button class="ai-gen-btn" id="ai-gen-btn" onclick="callAIAssist(\'' + targetId + '\')">✨ Generate Remark</button>'
+    + '<div class="ai-result-box" id="ai-result-box" contenteditable="true"></div>'
+    + '<button class="ai-insert-btn" id="ai-insert-btn" onclick="insertAIRemark(\'' + targetId + '\')">✅ Insert into Field</button>'
+    + '<button class="ai-cancel-btn" onclick="document.getElementById(\'ai-picker-overlay\').remove()">Cancel</button>'
+    + '</div>';
+
+  overlay.addEventListener('click', function() { overlay.remove(); });
+  document.body.appendChild(overlay);
+  window._aiCurrentLang = 'english';
+  window._aiCurrentCtx = ctx;
+  window._aiCurrentType = type;
+}
+
+function aiSelectLang(lang) {
+  window._aiCurrentLang = lang;
+  ['english','gujarati','hindi'].forEach(function(l) {
+    var el = document.getElementById('ailang-' + l);
+    if (el) el.classList.toggle('selected', l === lang);
+  });
+}
+
+async function callAIAssist(targetId) {
+  var btn = document.getElementById('ai-gen-btn');
+  var resultBox = document.getElementById('ai-result-box');
+  var insertBtn = document.getElementById('ai-insert-btn');
+  if (!btn || !resultBox) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+  resultBox.style.display = 'none';
+  if (insertBtn) insertBtn.style.display = 'none';
+
+  try {
+    var resp = await fetch(AI_ASSIST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY },
+      body: JSON.stringify({
+        context: window._aiCurrentCtx || '',
+        language: window._aiCurrentLang || 'english',
+        type: window._aiCurrentType || 'update'
+      })
+    });
+    var data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    resultBox.textContent = data.text || '(No response)';
+    resultBox.style.display = 'block';
+    if (insertBtn) insertBtn.style.display = 'block';
+  } catch (e) {
+    resultBox.textContent = 'Error: ' + e.message;
+    resultBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄 Regenerate';
+  }
+}
+
+function insertAIRemark(targetId) {
+  var resultBox = document.getElementById('ai-result-box');
+  if (!resultBox) return;
+  var text = resultBox.innerText || resultBox.textContent || '';
+  text = text.trim();
+  if (!text) return;
+  var el = document.getElementById(targetId);
+  if (el) {
+    el.value = text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
+  }
+  var overlay = document.getElementById('ai-picker-overlay');
+  if (overlay) overlay.remove();
+}
+// ===== END AI REMARK ASSISTANT =====
 </script>
 </body>
 </html>
