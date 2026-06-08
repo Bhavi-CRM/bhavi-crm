@@ -3614,7 +3614,7 @@ async function renderMyCalls(){
             <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
             <td>${statusBadge(t.status)}</td>
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td>${['Closed','Customer Reject','Call Cancel','Sent to MSC'].includes(t.status)?
+            <td>${['Closed','Customer Reject','Call Cancel'].includes(t.status)?
               `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
               `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
             </td>
@@ -4393,11 +4393,18 @@ async function openEngUpdate(id){
     </div>` : ''}
     ${t.status==='Sent to MSC'?`
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:14px;">
-      <h3 style="color:#1d4ed8;font-size:14px;font-weight:700;margin-bottom:8px;">📦 Product at MSC — Awaiting Return</h3>
-      <div id="msc-dispatch-info" style="font-size:13px;color:#374151;margin-bottom:12px;line-height:1.7;">Loading MSC details...</div>
-      <div class="form-group" style="margin-bottom:10px;"><label>Received Date</label><input type="date" id="msc-received-date" value="${dateNow}"></div>
-      <button onclick="saveMSCReceived('${t.id}')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">📬 Mark Received → Pending for Delivery</button>
+      <h3 style="color:#1d4ed8;font-size:14px;font-weight:700;margin-bottom:8px;">📦 MSC Status</h3>
+      <div id="msc-dispatch-info" style="font-size:13px;color:#374151;line-height:1.7;">Loading MSC details...</div>
     </div>`:''}
+    <datalist id="msc-datalist-eng"></datalist>
+    <div id="msc-eng-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;">
+      <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:8px;">📦 Send to MSC</h3>
+      <div class="form-group">
+        <label>MSC Center (optional)</label>
+        <input type="text" id="msc-eng-name" list="msc-datalist-eng" placeholder="Which MSC center?" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="font-size:12px;color:#6b7280;margin-top:6px;">WC will add courier & docket details after dispatch.</div>
+    </div>
     <div class="form-grid" style="margin-bottom:12px;">
       <div class="form-group">
         <label>Status *</label>
@@ -4411,7 +4418,7 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
       <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
     </div>
-    <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;" data-role="engineer-only">
+    <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;">
       <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:10px;">📦 MSC Dispatch Details</h3>
       <div class="form-group" style="margin-bottom:10px;">
         <label>MSC Center <span class="req">*</span></label>
@@ -4422,7 +4429,7 @@ async function openEngUpdate(id){
         <div class="form-group"><label>Dispatch Date <span class="req">*</span></label><input type="date" id="msc-dispatch-date" value="${dateNow}"></div>
         <div class="form-group"><label>Courier Service</label><input type="text" id="msc-courier" placeholder="DTDC, Blue Dart, Speed Post..."></div>
       </div>
-      <div class="form-group"><label>Docket / Tracking No <span class="req">*</span></label><input type="text" id="msc-docket" placeholder="Enter courier docket or tracking number"></div>
+      <div class="form-group"><label>Docket / Tracking No</label><input type="text" id="msc-docket" placeholder="Add when courier picks up (optional now)"></div>
     </div>
     ${t.service_type==='On Site'?`
     <hr class="divider">
@@ -4601,13 +4608,17 @@ async function saveEngUpdate(){
   if(status==='Sent to MSC'){
     const isEng=(currentUser?.role||'engineer')==='engineer';
     if(isEng){
-      // Engineer: just change status, no dispatch form needed
+      const mscCenter=(document.getElementById('msc-eng-name')?.value||'').trim();
+      const mscNote=mscCenter?`Sent to MSC: ${mscCenter} — WC to add dispatch details`:'Marked for MSC — WC to add dispatch details';
       try{
-        const tl=[...(t.timeline||[]),{action:'Sent to MSC',by:currentUser.name,at:new Date().toISOString(),note:'Engineer marked for MSC — WC to add dispatch details'}];
+        const tl=[...(t.timeline||[]),{action:'Sent to MSC',by:currentUser.name,at:new Date().toISOString(),note:mscNote}];
         await sb('tickets','PATCH',{status:'Sent to MSC',work_done:document.getElementById('upd-work')?.value||t.work_done||'',eng_remarks:document.getElementById('upd-remarks')?.value||'',fault_code:document.getElementById('upd-fault')?.value||'',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+        if(mscCenter){
+          try{await sb('auto_msc_dispatch','POST',{ticket_id:id,msc_name:mscCenter,dispatched_by:currentUser.name,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});}catch(e2){}
+        }
         closeModal('modal-eng-update');
         if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
-        alert('✅ Marked as Sent to MSC.\nWC will add courier & docket details.');
+        alert('✅ Marked as Sent to MSC.'+(mscCenter?'\nMSC: '+mscCenter:'')+'\nWC will add courier & docket details.');
       }catch(e){alert('Error: '+e.message);}
       return;
     }
@@ -4618,7 +4629,6 @@ async function saveEngUpdate(){
     const mscDocket=(document.getElementById('msc-docket')?.value||'').trim();
     if(!mscName){alert('❌ Please select MSC center');document.getElementById('msc-name-input')?.focus();return;}
     if(!mscDate){alert('❌ Please select dispatch date');return;}
-    if(!mscDocket){alert('❌ Please enter docket/tracking number');document.getElementById('msc-docket')?.focus();return;}
     try{
       await sb('auto_msc_dispatch','POST',{ticket_id:id,msc_name:mscName,dispatch_date:mscDate,courier_name:mscCourier,docket_no:mscDocket,dispatched_by:currentUser.name,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
       const tl=[...(t.timeline||[]),{action:'Sent to MSC',by:currentUser.name,at:new Date().toISOString(),note:`MSC: ${mscName} | Date: ${mscDate} | Courier: ${mscCourier||'N/A'} | Docket: ${mscDocket}`}];
@@ -17878,17 +17888,21 @@ window.shopSubmitOrder=async function(){
 };
 // ===== MSC WORKFLOW =====
 function onMSCStatusSelect(val){
-  var sec=document.getElementById('msc-dispatch-section');
-  if(sec) sec.style.display=(val==='Sent to MSC')?'block':'none';
+  var isEng=(currentUser?.role||'engineer')==='engineer';
+  var engSec=document.getElementById('msc-eng-section');
+  var wcSec=document.getElementById('msc-dispatch-section');
+  if(engSec) engSec.style.display=(val==='Sent to MSC'&&isEng)?'block':'none';
+  if(wcSec) wcSec.style.display=(val==='Sent to MSC'&&!isEng)?'block':'none';
   if(val==='Sent to MSC') loadMSCCentersDropdown();
 }
 
 async function loadMSCCentersDropdown(){
   try{
-    var dl=document.getElementById('msc-datalist');
-    if(!dl)return;
     var list=await sb('auto_msc_centers','GET',null,'?order=name&select=name,city');
-    dl.innerHTML=list.map(function(m){return'<option value="'+escHtml(m.name)+(m.city?' — '+m.city:'')+'">';}).join('');
+    var opts=list.map(function(m){return'<option value="'+escHtml(m.name)+(m.city?' — '+m.city:'')+'">';}).join('');
+    var dl=document.getElementById('msc-datalist');if(dl)dl.innerHTML=opts;
+    var dl2=document.getElementById('msc-datalist-eng');if(dl2)dl2.innerHTML=opts;
+    var dl3=document.getElementById('msc-datalist-wc');if(dl3)dl3.innerHTML=opts;
   }catch(e){}
 }
 
@@ -17902,10 +17916,23 @@ async function loadMSCDispatchInfo(ticketId){
     if(rows&&rows.length)existing=rows[0];
   }catch(e){}
 
-  // Always show editable dispatch form (pre-filled if data exists)
+  var isEng=(currentUser?.role||'engineer')==='engineer';
+
+  if(isEng){
+    // Engineer: read-only summary
+    el.innerHTML=existing.msc_name
+      ?'<div style="font-size:13px;">MSC Center: <b>'+escHtml(existing.msc_name)+'</b>'
+        +(existing.dispatch_date?' &nbsp;·&nbsp; Date: '+existing.dispatch_date:'')
+        +(existing.docket_no?' &nbsp;·&nbsp; Docket: <b>'+escHtml(existing.docket_no)+'</b>':'<span style="color:#d97706;"> &nbsp;·&nbsp; Docket: Pending</span>')
+        +'</div>'
+      :'<div style="color:#6b7280;font-size:13px;">WC will add dispatch details soon.</div>';
+    return;
+  }
+
+  // WC/Admin: editable dispatch form
   var hasDocket=!!(existing.docket_no);
   el.innerHTML=
-    (hasDocket?'':'<div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;">⏳ Engineer has marked this for MSC. Fill dispatch details below — docket can be added later.</div>')
+    (!hasDocket?'<div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;">⏳ Fill dispatch details — docket can be added later when courier picks up.</div>':'')
     +'<div class="form-group" style="margin-bottom:10px;"><label>MSC Center <span class="req">*</span></label>'
     +'<input type="text" id="msc-wc-name" list="msc-datalist-wc" value="'+(existing.msc_name||'')+'" placeholder="Search MSC center..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'
     +'<datalist id="msc-datalist-wc"></datalist></div>'
@@ -17914,21 +17941,15 @@ async function loadMSCDispatchInfo(ticketId){
     +'<div class="form-group"><label>Courier Agency</label><input type="text" id="msc-wc-courier" value="'+(existing.courier_name||'')+'" placeholder="DTDC, Blue Dart, Speed Post..."></div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:12px;"><label>Docket / Tracking No</label>'
-    +'<input type="text" id="msc-wc-docket" value="'+(existing.docket_no||'')+'" placeholder="Add when courier picks up (can leave blank now)"></div>'
+    +'<input type="text" id="msc-wc-docket" value="'+(existing.docket_no||'')+'" placeholder="Add when courier picks up (optional)"></div>'
     +'<button onclick="saveMSCDispatchFromWC(\''+ticketId+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-bottom:10px;">💾 Save / Update Dispatch Details</button>'
-    // Show received section only when docket is filled
     +(hasDocket
       ?'<hr style="border:none;border-top:1px solid #bfdbfe;margin:12px 0;">'
        +'<div class="form-group" style="margin-bottom:10px;"><label>Received Date</label><input type="date" id="msc-received-date" value="'+today+'"></div>'
        +'<button onclick="saveMSCReceived(\''+ticketId+'\')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;width:100%;">📬 Mark Received → Pending for Delivery</button>'
-      :'<div style="font-size:12px;color:#6b7280;text-align:center;">📋 "Mark Received" option will appear once docket number is saved.</div>');
+      :'<div style="font-size:12px;color:#6b7280;text-align:center;padding:8px 0;">📋 "Mark Received" appears after docket is saved.</div>');
 
-  // Load MSC centers datalist
-  try{
-    var list=await sb('auto_msc_centers','GET',null,'?order=name&select=name,city');
-    var dl=document.getElementById('msc-datalist-wc');
-    if(dl)dl.innerHTML=list.map(function(m){return'<option value="'+escHtml(m.name)+(m.city?' — '+m.city:'')+'">';}).join('');
-  }catch(e2){}
+  loadMSCCentersDropdown();
 }
 
 async function saveMSCDispatchFromWC(ticketId){
