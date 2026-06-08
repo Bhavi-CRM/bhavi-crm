@@ -20,7 +20,7 @@
 body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;}
 #sidebar{width:220px;min-width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100;overflow-y:auto;}
 #sidebar-user{position:sticky;bottom:0;background:var(--sidebar-bg);padding-bottom:8px;}
-#sidebar-logo{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);background:#fff;display:flex;align-items:center;justify-content:center;min-height:70px;}
+#sidebar-logo{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);background:#fff;display:flex;align-items:center;justify-content:center;min-height:70px;position:sticky;top:0;z-index:10;}
 #sidebar-logo img{max-width:160px;max-height:52px;object-fit:contain;}
 .nav-section{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);}
 .nav-section-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#546e7a;padding:5px 16px 3px;}
@@ -365,7 +365,7 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-body">
       <!-- Customer Search - Point 9 -->
       <div class="alert alert-info" style="margin-bottom:14px;">
-        <b>Customer Search</b> — Mobile No, Name, ya Serial No thi search karo
+        <b>Customer Search</b> — Mobile No, Name, or Serial No to search
         <div style="display:flex;gap:8px;margin-top:8px;">
           <input type="text" id="search-customer-q" placeholder="Mobile / Name / Serial No..." style="flex:1;border:1px solid #bfdbfe;border-radius:8px;padding:7px 12px;font-size:13px;outline:none;" oninput="searchCustomerLive(this.value)">
           <button class="btn btn-outline btn-sm" onclick="clearCustomerSearch()">Clear</button>
@@ -405,7 +405,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group" id="call-service-charges-row" style="display:none;">
           <label>💰 Service / Labour Charges (₹)</label>
           <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="0">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts add thashhe to ae upar add thashe</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts will appear here once added above</div>
         </div>
       </div>
       <hr class="divider">
@@ -434,7 +434,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group">
           <label>Pin Code <span class="req">*</span></label>
           <div style="position:relative;">
-            <input type="text" id="call-pin" autocomplete="off" placeholder="District select karo pachhi type karo..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterPinList(this.value)" onfocus="filterPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('call-pin-drop');if(d)d.style.display='none';},200)">
+            <input type="text" id="call-pin" autocomplete="off" placeholder="Select district first, then type..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterPinList(this.value)" onfocus="filterPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('call-pin-drop');if(d)d.style.display='none';},200)">
             <div id="call-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
           </div>
         </div>
@@ -456,7 +456,7 @@ tr:hover td{background:#f8fafc;}
       <div class="form-grid">
         <div class="form-group"><label>Engineer <small>(Optional)</small></label><select id="call-eng"><option value="">-- Pending Allocation --</option></select></div>
         <div class="form-group"><label>Physical JS No</label><input type="text" id="call-phys-js"></div>
-        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="datetime-local" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Canon portal se call date + SLA thi TAT set karo</div></div>
+        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="datetime-local" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Set TAT from Canon portal call date + SLA</div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -773,7 +773,7 @@ tr:hover td{background:#f8fafc;}
 
       <!-- Section 1: Inward Calls -->
       <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #1d4ed8;">
-        <h3 style="font-size:14px;font-weight:700;color:#1d4ed8;margin-bottom:10px;">1. 📥 Inward Calls (Customer Aavya)</h3>
+        <h3 style="font-size:14px;font-weight:700;color:#1d4ed8;margin-bottom:10px;">1. 📥 Inward Calls (Customers Received)</h3>
         <div class="form-grid">
           <div class="form-group">
             <label>Warranty <span class="req">*</span></label>
@@ -796,7 +796,7 @@ tr:hover td{background:#f8fafc;}
 
       <!-- Section 2: Outward Calls -->
       <div style="background:#fff7ed;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ff9800;">
-        <h3 style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px;">2. 📤 Outward Calls (Customer Gaya)</h3>
+        <h3 style="font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px;">2. 📤 Outward Calls (Customers Dispatched)</h3>
         <div class="form-grid">
           <div class="form-group">
             <label>Warranty <span class="req">*</span></label>
@@ -1107,7 +1107,7 @@ async function renderReportPunch(c){
   try{
     var logs=[];
     try{logs=await sb('punch_logs','GET',null,'?order=created_at.desc&limit=200');}
-    catch(e){c.innerHTML='<div class="alert alert-info">🕐 No punch logs yet. Engineers punch in/out karshhe tyare data aavshhe.</div>';return;}
+    catch(e){c.innerHTML='<div class="alert alert-info">🕐 No punch logs yet. Data will appear once engineers punch in/out.</div>';return;}
     if(!logs||!logs.length){c.innerHTML='<div class="alert alert-info">🕐 No punch logs yet.</div>';return;}
     var pending=logs.filter(function(l){return l.status==='late_pending';});
     var html='<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">'
@@ -1179,7 +1179,7 @@ async function renderDailyReports(c){
     var reports=[];
     try{reports=await sb('daily_reports','GET',null,'?order=report_date.desc&limit=100');}
     catch(e){c.innerHTML='<div class="alert alert-info">📋 No daily reports yet.</div>';return;}
-    if(!reports||!reports.length){c.innerHTML='<div class="alert alert-info">📋 No daily reports yet. Engineers submit karshhe tyare dekhashhe.</div>';return;}
+    if(!reports||!reports.length){c.innerHTML='<div class="alert alert-info">📋 No daily reports yet. Data will appear once engineers submit their reports.</div>';return;}
     var engs=[...new Set(reports.map(function(r){return r.eng_name;}).filter(Boolean))];
     window._dailyReports=reports;
     
@@ -1278,20 +1278,20 @@ function setTrendView(view){
 async function renderImportCalls(c){
   c.innerHTML=`<div class="card" style="max-width:800px;">
     <h2 style="font-weight:700;font-size:16px;margin-bottom:4px;">📥 Import Calls</h2>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Excel file thi multiple calls ek saath import karo — WC office nathi hota tyare na pending calls add karva mate</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Import multiple calls at once from an Excel file — useful for adding calls when the WC is away from office</p>
 
     <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;">
-      <b>Template download karo pehela:</b>
+      <b>Download the template first:</b>
       <button class="btn btn-primary btn-sm" style="margin-left:10px;" onclick="downloadImportTemplate()">📄 Download Template</button>
       <div style="margin-top:8px;color:var(--text-muted);font-size:12px;">
-        Template ma dropdown options chhe — spelling mistake nai thashe. Row 4 = sample (delete karjo). Rows 5+ ma data bharo.
+        Dropdown options are pre-filled to avoid spelling errors. Row 4 is a sample row (delete it). Enter data from Row 5 onwards.
       </div>
     </div>
 
     <div style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;" onclick="document.getElementById('import-file-input').click()" id="import-drop-zone">
       <div style="font-size:32px;margin-bottom:8px;">📂</div>
-      <div style="font-weight:600;font-size:14px;">Excel file select karo</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">.xlsx ya .xls file — max 200 rows</div>
+      <div style="font-weight:600;font-size:14px;">Select Excel File</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">.xlsx or .xls file — max 200 rows</div>
       <input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleImportFile(this)">
     </div>
 
@@ -1329,7 +1329,7 @@ async function handleImportFile(input){
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-      if(rows.length < 2){preview.innerHTML='<div class="alert alert-warning">File khali chhe</div>';return;}
+      if(rows.length < 2){preview.innerHTML='<div class="alert alert-warning">File is empty</div>';return;}
 
       // Find header row (row 1 = index 0)
       const headers = rows[0].map(h=>String(h).trim().toLowerCase());
@@ -1337,7 +1337,7 @@ async function handleImportFile(input){
       // Skip rows 1,2,3 (header, mandatory, notes) — data starts row 4 (index 3)
       const dataRows = rows.slice(3).filter(r=>r.some(c=>c!==''));
 
-      if(dataRows.length === 0){preview.innerHTML='<div class="alert alert-warning">Data rows nathi mili — Row 4 thi data bharo</div>';return;}
+      if(dataRows.length === 0){preview.innerHTML='<div class="alert alert-warning">No data rows found — please enter data starting from Row 4</div>';return;}
 
       // Parse rows
       const parsed = dataRows.map((row,i)=>{
@@ -1367,7 +1367,7 @@ async function handleImportFile(input){
 
       // Show preview
       const errHtml = errors.length ? '<div style="background:#fef2f2;border-radius:8px;padding:12px;margin-bottom:12px;">'
-        +'<b style="color:#dc2626;">⚠️ '+errors.length+' rows ma errors chhe — import nahi thashe:</b><br>'
+        +'<b style="color:#dc2626;">⚠️ '+errors.length+' rows have errors and will not be imported:</b><br>'
         +errors.map(e=>'Row '+e.row+': '+e.errors.join(', ')).join('<br>')+'</div>' : '';
 
       const previewRows = valid.slice(0,10).map(r=>`<tr>
@@ -1379,7 +1379,7 @@ async function handleImportFile(input){
 
       preview.innerHTML = errHtml
         +'<div style="background:#f0fdf4;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'
-        +'<span style="font-size:13px;"><b style="color:#0e9f6e;">'+valid.length+' valid rows</b> — import thashe</span>'
+        +'<span style="font-size:13px;"><b style="color:#0e9f6e;">'+valid.length+' valid rows</b> — ready to import</span>'
         +(valid.length>0?'<button class="btn btn-success" onclick="processImport('+JSON.stringify(valid).replace(/"/g,"&quot;")+')" >✅ Import '+valid.length+' Calls</button>':'')
         +'</div>'
         +(valid.length>0?'<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Model</th><th>Call Type</th><th>Service</th><th>Status</th><th>City</th><th>Engineer</th></tr></thead>'
@@ -1396,7 +1396,7 @@ async function handleImportFile(input){
 
 async function processImport(data){
   const rows = data || window._importData;
-  if(!rows||!rows.length){alert('Koi data nathi');return;}
+  if(!rows||!rows.length){alert('No data found');return;}
 
   const btn = event.target;
   btn.disabled=true; btn.textContent='Importing...';
@@ -1483,7 +1483,7 @@ async function renderWCDailyReports(c){
     var reports=[];
     try{reports=await sb('wc_daily_reports','GET',null,'?order=report_date.desc&limit=100');}
     catch(e){c.innerHTML='<div class="alert alert-info">🎯 No WC daily reports yet.</div>';return;}
-    if(!reports||!reports.length){c.innerHTML='<div class="alert alert-info">🎯 No WC daily reports yet. WC submit karshhe tyare dekhashhe.</div>';return;}
+    if(!reports||!reports.length){c.innerHTML='<div class="alert alert-info">🎯 No WC daily reports yet. Data will appear once the WC submits reports.</div>';return;}
     window._wcDailyReports=reports;
     var wcs=[...new Set(reports.map(function(r){return r.wc_name;}).filter(Boolean))];
     
@@ -1730,7 +1730,7 @@ function previewReportCount(){
   const ci=filtered.filter(t=>t.service_type==='Carry In').length;
   const os=filtered.filter(t=>t.service_type==='On Site').length;
   document.getElementById('rpt-preview').innerHTML=
-    `<b style="color:var(--primary);">${filtered.length} records</b> malshe &nbsp;|&nbsp; `+
+    `<b style="color:var(--primary);">${filtered.length} records</b> will be exported &nbsp;|&nbsp; `+
     `Active: <b>${active}</b> &nbsp;|&nbsp; Closed: <b style="color:var(--success);">${closed}</b> &nbsp;|&nbsp; `+
     `Carry In: <b>${ci}</b> &nbsp;|&nbsp; On Site: <b>${os}</b>`;
 }
@@ -1748,7 +1748,7 @@ function getTicketFinancials(t){
 
 function downloadReport(type){
   const filtered=applyReportFilters(allTickets);
-  if(!filtered.length){alert('Koi data nathi selected filters ma');return;}
+  if(!filtered.length){alert('No data found for the selected filters');return;}
   const period=document.getElementById('rpt-period')?.value||'all';
   const dateStr=new Date().toLocaleDateString('en-CA');
 
@@ -2886,7 +2886,7 @@ async function renderDashboard(){
   }catch(e){
     console.error('Dashboard error:',e);
     var pce=document.getElementById('page-content');
-    if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Dashboard load karvama error aavyo:<br><b>'+e.message+'</b><br><br>Supabase connection thapu joie. Internet check karo.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
+    if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Error loading dashboard:<br><b>'+e.message+'</b><br><br>Check your internet connection and Supabase connectivity.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
   }
 }
 
@@ -2946,7 +2946,7 @@ async function doPunchIn(){
       const ex=existing[0];
       const ps={punched_in:true,punch_in_time:ex.punch_in_time,punch_in_date:ex.punch_in_date,start_meter:ex.start_meter||'',end_meter:''};
       localStorage.setItem(key,JSON.stringify(ps));
-      alert('Already Punched In!\nTime: '+ex.punch_in_time+'\nKoi baja device par punch in thi gayo chhe.');
+      alert('Already Punched In!\nTime: '+ex.punch_in_time+'\nAlready punched in from another device.');
       navigate('dashboard');
       return;
     }
@@ -2978,8 +2978,8 @@ async function doPunchIn(){
   // Status chips (GPS + Selfie)
   var statusRow=document.createElement('div');
   statusRow.style.cssText='display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;';
-  statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 GPS aawe chhe...</span>'
-    +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie baaki chhe</span>';
+  statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS...</span>'
+    +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>';
   box.appendChild(statusRow);
 
   // Camera video
@@ -3015,7 +3015,7 @@ async function doPunchIn(){
     retakeBtn.style.display='none';
     submitBtn.disabled=true;
     var sEl3=document.getElementById('pin-selfie-status');
-    if(sEl3){sEl3.style.background='#fef3c7';sEl3.style.color='#92400e';sEl3.textContent='📸 Selfie baaki chhe';}
+    if(sEl3){sEl3.style.background='#fef3c7';sEl3.style.color='#92400e';sEl3.textContent='📸 Selfie Pending';}
     startPunchCamera('pin-video');
   };
 
@@ -3063,7 +3063,7 @@ async function doPunchIn(){
     var gEl=document.getElementById('pin-gps-status');
     if(gEl){
       if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
-      else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS meli nathi';}
+      else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
     }
     if(loc&&window._punchSelfieIn){var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;}
   });
@@ -3194,7 +3194,7 @@ function showPunchOutModal(ps,key){
     poutCapBtn.style.display='';
     poutRetBtn.style.display='none';
     var sEl2=document.getElementById('pout-selfie-status');
-    if(sEl2){sEl2.style.background='#fef3c7';sEl2.style.color='#92400e';sEl2.textContent='📸 Selfie baaki chhe';}
+    if(sEl2){sEl2.style.background='#fef3c7';sEl2.style.color='#92400e';sEl2.textContent='📸 Selfie Pending';}
     var cb2=document.getElementById('pout-confirm-btn');if(cb2){cb2.disabled=true;cb2.style.opacity='0.5';}
     startPunchCamera('pout-selfie-video');
   };
@@ -3206,8 +3206,8 @@ function showPunchOutModal(ps,key){
   // Status chips
   var poutStatusRow=document.createElement('div');
   poutStatusRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
-  poutStatusRow.innerHTML='<span id="pout-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 GPS aawe chhe...</span>'
-    +'<span id="pout-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie baaki chhe</span>';
+  poutStatusRow.innerHTML='<span id="pout-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS...</span>'
+    +'<span id="pout-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>';
   box.appendChild(poutStatusRow);
   // --- End Selfie Section ---
 
@@ -3245,7 +3245,7 @@ function showPunchOutModal(ps,key){
       var gEl=document.getElementById('pout-gps-status');
       if(gEl){
         if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
-        else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS meli nathi';}
+        else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
       }
       if(loc&&window._punchSelfieOut){
         var cb=document.getElementById('pout-confirm-btn');
@@ -3264,8 +3264,8 @@ function previewPunchPhoto(input){
   r.readAsDataURL(f);
 }
 async function savePunchOut(key){
-  if(!window._punchSelfieOut){alert('📸 Selfie farjiyat chhe! Pehela selfie lo.');return;}
-  if(!window._poutLocCache){alert('📍 GPS Location farjiyat chhe! Location meli nathi, try karo.');return;}
+  if(!window._punchSelfieOut){alert('📸 Selfie is required! Please take a selfie first.');return;}
+  if(!window._poutLocCache){alert('📍 GPS Location is required! Location not found, please try again.');return;}
   var outLoc=window._poutLocCache;
   const meter=document.getElementById('pout-meter')?.value||'';
 
@@ -3295,7 +3295,7 @@ async function savePunchOut(key){
     }
   }catch(e){console.log('Punch log fetch error:',e);}
 
-  if(!ps){alert('Punch In data nathi mili. Pehela Punch In karo.');return;}
+  if(!ps){alert('Punch In record not found. Please Punch In first.');return;}
 
   // Determine if late: after 10PM OR next day morning
   const isLatePunchOut = hour>=22 || hour<6 || isNextDay;
@@ -3304,11 +3304,11 @@ async function savePunchOut(key){
   let lateRemark='';
   if(isNextDay || isLatePunchOut){
     const msg = isNextDay
-      ? '⚠️ Next Day Punch Out!\nKal Punch Out karyu nohtu.\n\nReason mandatory chhe (Admin approval jaashe):'
-      : '⚠️ Late Punch Out (10 PM pachhi)!\n\nReason mandatory chhe (Admin approval jaashe):';
+      ? '⚠️ Next Day Punch Out!\nYou did not punch out yesterday.\n\nReason is mandatory (Admin approval required):'
+      : '⚠️ Late Punch Out (After 10 PM)!\n\nReason is mandatory (Admin approval required):';
     lateRemark=prompt(msg);
     if(lateRemark===null)return; // User cancelled
-    if(!lateRemark.trim()){alert('Reason mandatory chhe!');return;}
+    if(!lateRemark.trim()){alert('Reason is mandatory!');return;}
   }
 
   ps.punched_in=false;
@@ -3513,7 +3513,7 @@ async function renderMyCalls(){
     if(ps&&ps.punched_in&&(nowHr>=22||nowHr<6)){
       // Auto punch out reminder
       setTimeout(()=>{
-        if(confirm('⚠️ 10 PM thayi gayi! Punch Out karvu farjiyat chhe.\nHavar punch out karso?'))doPunchOut();
+        if(confirm('⚠️ 10 PM passed! Punch Out is mandatory.\nWould you like to punch out now?'))doPunchOut();
       },500);
     }
     const punchHtml=ps&&ps.punched_in?
@@ -3711,7 +3711,7 @@ async function checkReRepair(serial){
           <input type="radio" name="rr-charges" value="charge" onchange="setReRepairCharges('charge')"> Charges apply
         </label>
       </div>
-      <div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ Parts replace karva hoy to estimate aavse — service charges upar thi decide thase</div>
+      <div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ If parts need replacement, an estimate will be provided — service charges will be decided on top</div>
     </div>`;
 
     // Default FOC
@@ -4088,7 +4088,7 @@ function shareInvoiceWA(){
 
   const win=window.open('','_blank','width=900,height=700');
   if(win){win.document.write(html);win.document.close();}
-  else{alert('Popup blocked — browser ma popup allow karo');}
+  else{alert('Popup blocked — please allow popups in your browser');}
 }
 
 async function voidWarranty(id){
@@ -4112,7 +4112,7 @@ async function quickStatusChange(id,status){
   // Cancel Call needs mandatory remark
   if(status==='Call Cancel'){
     const reason=prompt('🚫 Call Cancel - Reason (mandatory):');
-    if(!reason||!reason.trim()){alert('Reason mandatory chhe!');return;}
+    if(!reason||!reason.trim()){alert('Reason is mandatory!');return;}
     const tl=[...(t.timeline||[]),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
     await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     closeModal('modal-ticket');
@@ -4235,7 +4235,7 @@ async function processApproval(decision){
     newStatus='Customer Reject';action='Customer Rejected Estimate';
     // Ask inspection charges for rejection - this is FINAL
     const serviceChargesAtCreation=parseFloat(t?.service_charges)||parseFloat(t?.labor)||0;
-    const inspInput=prompt('⚠️ Customer e Reject karyu!\n\nInspection / Visit Charges (₹) enter karo — aa FINAL thashe:',serviceChargesAtCreation||300);
+    const inspInput=prompt('⚠️ Customer Rejected!\n\nEnter Inspection / Visit Charges (₹) — this will be FINAL:',serviceChargesAtCreation||300);
     if(inspInput===null){return;}
     const inspCharges=parseFloat(inspInput)||0;
     window._pendingInspCharges=inspCharges;
@@ -4360,7 +4360,7 @@ async function openEngUpdate(id){
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
         ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
-        ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem fari aavyu. Direct close karo — novu estimate nahi banshe.</div>':''}
+        ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
       <div class="form-group"><label>Cause</label><input type="text" id="upd-cause" value="${t.cause||''}"></div>
@@ -4407,10 +4407,10 @@ function setWorkEnd(){
 
 async function engVoidWarranty(id){
   const r=prompt('Out of Coverage - Reason (mandatory):');
-  if(!r||!r.trim()){alert('Reason mandatory chhe!');return;}
+  if(!r||!r.trim()){alert('Reason is mandatory!');return;}
   
   // Ask service charges immediately
-  const svcInput=prompt('Service / Labour Charges (₹) - aa final thashe, part add thay to ae upar thashe:','300');
+  const svcInput=prompt('Service / Labour Charges (₹) — this will be final; additional parts will be added on top:','300');
   if(svcInput===null)return;
   const svcCharges=parseFloat(svcInput)||0;
   
@@ -4933,7 +4933,7 @@ async function savePurchaseEntry(){
   const cost=parseFloat(document.getElementById('pur-cost').value)||0;
   const invoice=document.getElementById('pur-invoice').value.trim();
   const note=document.getElementById('pur-note').value.trim();
-  if(!date||!supplier||!partCode||!qty||!cost){alert('Badha mandatory fields bharo');return;}
+  if(!date||!supplier||!partCode||!qty||!cost){alert('Please fill all required fields');return;}
   try{
     // Save purchase record
     await sb('inventory_purchases','POST',{
@@ -5019,8 +5019,8 @@ async function saveManualSale(){
   const qty=parseInt(document.getElementById('sale-qty').value)||0;
   const price=parseFloat(document.getElementById('sale-price').value)||0;
   const note=document.getElementById('sale-note').value.trim();
-  if(!date||!customer||!partCode||!qty||!price){alert('Badha mandatory fields bharo');return;}
-  if(qty>availStock){alert('Stock ochhu chhe! Available: '+availStock);return;}
+  if(!date||!customer||!partCode||!qty||!price){alert('Please fill all required fields');return;}
+  if(qty>availStock){alert('Insufficient stock! Available: '+availStock);return;}
   try{
     await sb('inventory_sales','POST',{
       sale_date:date,part_code:partCode,part_name:partName,
@@ -5150,7 +5150,7 @@ async function showPartHistoryTab(tab){
     try{
       var invId=window._phInvId;
       var logs=invId?await sb('inventory_log','GET',null,'?inventory_id=eq.'+invId+'&order=created_at.desc&limit=100'):[];
-      if(!logs.length){content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock adjust karo to yahan record thashe.</small></div>';return;}
+      if(!logs.length){content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 No transaction records found.<br><small>Records will appear once stock is adjusted.</small></div>';return;}
       var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
       var totOut=logs.filter(function(l){return l.type==='out';}).reduce(function(a,l){return a+(l.qty||0);},0);
       var totSell=logs.filter(function(l){return l.type==='sell';}).reduce(function(a,l){return a+(l.qty||0);},0);
@@ -5180,10 +5180,10 @@ async function showPartHistoryTab(tab){
   }else{
     try{
       var partCode=window._phPartCode;
-      if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code nathi</div>';return;}
+      if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code not found</div>';return;}
       const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
       const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
-      if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi ticket ma use nathi thayo</div>';return;}
+      if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Not used in any ticket</div>';return;}
       const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
       const totalAmt=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1)*(s?.price||0);},0);
       const rows=used.map(t=>{
@@ -5225,8 +5225,8 @@ function getSelectedInvIds(){
 
 async function deleteSelectedInv(){
   const ids=getSelectedInvIds();
-  if(!ids.length){alert('Koi part select karo pehla');return;}
-  if(!confirm(`${ids.length} parts delete karva chho?`))return;
+  if(!ids.length){alert('Please select at least one part');return;}
+  if(!confirm(`Delete ${ids.length} selected part(s)?`))return;
   try{
     for(const id of ids){
       await sb('inventory','DELETE',null,`?id=eq.${id}`);
@@ -6656,7 +6656,7 @@ async function renderEPMyRequests(){
         <td style="padding:8px 12px;">${stLabel[r.status]||r.status}</td>
         <td style="padding:8px 12px;font-size:11px;color:#64748b;">${r.approved_by||'—'}</td>
       </tr>`;
-    }).join('')||'<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">No requests yet. "Parts Request" button thi navo request submit karo.</td></tr>';
+    }).join('')||'<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">No requests yet. "Parts Request" button thi navo request submit .</td></tr>';
     el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:600px;border-collapse:collapse;width:100%;">
         <thead><tr style="background:#f8fafc;">
@@ -6669,7 +6669,7 @@ async function renderEPMyRequests(){
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
-  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: "eng_part_requests" table Supabase ma create karo (Admin ne SQL aapshe).</p></div>`;}
+  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: Please create the "eng_part_requests" table in Supabase (SQL will be provided to Admin).</p></div>`;}
 }
 
 async function renderEPPending(typeFilter){
@@ -6695,7 +6695,7 @@ async function renderEPPending(typeFilter){
           ${!isWC?`<button class="btn btn-sm epr-reject-btn" style="background:#fef2f2;color:#dc2626;">❌ Reject</button>`:''}
         </td>
       </tr>`;
-    }).join('')||`<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">✅ Koi pending request nathi.</td></tr>`;
+    }).join('')||`<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">✅ No pending requests.</td></tr>`;
     el.innerHTML=`<div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:650px;border-collapse:collapse;width:100%;">
         <thead><tr style="background:#f8fafc;">
@@ -6710,13 +6710,13 @@ async function renderEPPending(typeFilter){
       </table></div>`;
     document.querySelectorAll('.epr-approve-btn').forEach(btn=>btn.addEventListener('click',function(){const row=this.closest('tr');const reqId=row.dataset.reqId;const reqData=JSON.parse(row.dataset.reqData);approveEngReq(reqId,reqData);}));
     document.querySelectorAll('.epr-reject-btn').forEach(btn=>btn.addEventListener('click',function(){const row=this.closest('tr');const reqId=row.dataset.reqId;rejectEngReq(reqId);}));
-  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: "eng_part_requests" table Supabase ma create karo — SQL admin ne dikhe chhe.</p></div>`;}
+  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p><p style="font-size:12px;margin-top:8px;">Note: Please create the "eng_part_requests" table in Supabase — SQL is visible to Admin.</p></div>`;}
 }
 
 // ── Engineer request — Receive parts ──────────────────────
 var _eprRowCount=0;
 function openEngReqReceive(){
-  if(!allInventory.length){alert('Inventory load nathi thayu. Fari try karo.');return;}
+  if(!allInventory.length){alert('Inventory not loaded. Please try again.');return;}
   _eprRowCount=0;
   document.getElementById('epr-parts-container').innerHTML='';
   eprAddRow();
@@ -6747,7 +6747,7 @@ function eprFilterParts(idx){
   drop.innerHTML=filtered.slice(0,60).map(i=>{const stk=i.qty_in_stock||0;const stkColor=stk>5?'#059669':stk>0?'#d97706':'#dc2626';const stkLabel=stk>5?'✅ Good':stk>0?'⚠️ Low':'❌ Out';const label=(i.part_code?i.part_code+' — '+i.item_name:i.item_name);return`<div class="ep-drop-item" data-idx="${idx}" data-part-id="${i.id}" data-label="${label.replace(/"/g,'&quot;')}" style="padding:11px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;">
     <div style="min-width:0;"><span style="font-size:12px;font-weight:700;color:var(--primary);display:block;">${i.part_code||'—'}</span><span style="font-size:11px;color:#64748b;display:block;overflow:hidden;text-overflow:ellipsis;">${i.item_name}</span></div>
     <div style="text-align:right;white-space:nowrap;"><span style="font-size:11px;font-weight:700;color:${stkColor};">${stkLabel}</span><br><span style="font-size:10px;color:#94a3b8;">Stk: ${stk}</span></div>
-  </div>`;}).join('')||'<div style="padding:14px;color:#94a3b8;text-align:center;font-size:12px;">❌ Part nathi milyu</div>';
+  </div>`;}).join('')||'<div style="padding:14px;color:#94a3b8;text-align:center;font-size:12px;">❌ Part not found</div>';
   drop.style.display='block';
   document.querySelectorAll('[data-idx="'+idx+'"]').forEach(el=>el.addEventListener('mousedown',function(){eprSelectPart(this.dataset.idx,this.dataset.partId,this.dataset.label);}));
 }
@@ -6766,12 +6766,12 @@ async function saveEngReqReceive(){
     const qty=parseInt(document.getElementById('epr-qty-'+idx)?.value)||0;
     if(partId&&qty>0) parts.push({part_id:partId,label,qty});
   });
-  if(!parts.length){alert('Ochhamaa ek part select karo.');return;}
+  if(!parts.length){alert('Ochhamaa ek part select .');return;}
   const notes=document.getElementById('epr-notes').value.trim();
   try{
     await sb('eng_part_requests','POST',{type:'RECEIVE',status:'PENDING',engineer_id:currentUser.eng_id||currentUser.user_id,engineer_name:currentUser.name,parts,notes});
     closeModal('modal-eng-req-receive');
-    alert('✅ Request submit thayu! Admin approve karshe pacchi stock malshe.');
+    alert('✅ Request submitted! Stock will be available after Admin approval.');
     renderEngParts('my-requests');
   }catch(e){alert('Error: '+e.message+'\n\nNote: eng_part_requests table Supabase ma create kari nakhvo.');}
 }
@@ -6779,7 +6779,7 @@ async function saveEngReqReceive(){
 // ── Engineer request — Return parts ───────────────────────
 var _myEngStock=[], _errSelectedParts={};
 async function openEngReqReturn(){
-  if(!allInventory.length){alert('Inventory load nathi thayu. Fari try karo.');return;}
+  if(!allInventory.length){alert('Inventory not loaded. Please try again.');return;}
   const engName=currentUser.name;
   try{
     _myEngStock=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(engName)+'&qty=gt.0&order=part_id');
@@ -6884,8 +6884,8 @@ async function saveEngReqReturn(){
 // ── Approve / Reject requests (Admin + WC for RETURN) ─────
 async function approveEngReq(reqId,req){
   const parts=req.parts||[];
-  if(!parts.length){alert('Request ma koi part nathi.');return;}
-  if(!confirm(`Approve karvu chhe?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
+  if(!parts.length){alert('No parts found in this request.');return;}
+  if(!confirm(`Approve this request?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
   try{
     if(!allEngStock) allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
@@ -6901,12 +6901,12 @@ async function approveEngReq(reqId,req){
       }
     }
     await sb('eng_part_requests','PATCH',{status:'APPROVED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
-    alert('✅ Approved! Stock update thayu.');
+    alert('✅ Approved! Stock has been updated.');
     renderEngParts('pending');
   }catch(e){alert('Error: '+e.message);console.error(e);}
 }
 async function rejectEngReq(reqId){
-  if(!confirm('Reject karvu chhe aa request?'))return;
+  if(!confirm('Reject this request?'))return;
   try{
     await sb('eng_part_requests','PATCH',{status:'REJECTED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
     renderEngParts('pending');
@@ -6984,14 +6984,14 @@ async function switchMasterTab(tab,el){
     <div class="card" style="margin-bottom:12px;">
       <h3 style="font-weight:700;font-size:14px;margin-bottom:8px;">📍 Pincode Data</h3>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:#f8fafc;padding:10px 12px;border-radius:8px;">
-        <b>Format:</b> File ma 4 columns hava joie: <code>pincode</code>, <code>area</code>, <code>district</code>, <code>state</code><br>
+        <b>Format:</b> File must have 4 columns: <code>pincode</code>, <code>area</code>, <code>district</code>, <code>state</code><br>
         Accepted: <b>.csv</b> or <b>.xlsx / .xls</b> &nbsp;|&nbsp; Current records: <b id="pin-db-count">${cnt.toLocaleString('en-IN')}</b>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
         <button class="btn btn-outline btn-sm" onclick="downloadPincodeTemplate()">📄 Template Download</button>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label style="font-size:12px;font-weight:600;">File Select karo</label>
+        <label style="font-size:12px;font-weight:600;">Select File</label>
         <input type="file" id="pin-import-file" accept=".csv,.xlsx,.xls" style="display:block;margin-top:6px;" onchange="previewPincodeFile(this)">
       </div>
       <div id="pin-import-preview" style="display:none;margin-bottom:12px;font-size:13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;"></div>
@@ -7032,7 +7032,7 @@ async function switchMasterTab(tab,el){
           <div style="padding:6px 8px;"><div style="font-size:11px;font-weight:700;color:var(--primary);">${svcNames[p.service_id]||p.service_id}</div>
           ${p.caption?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${p.caption}</div>`:''}
           <button onclick="deleteGalleryPhoto('${p.id}')" style="margin-top:6px;background:none;border:none;color:var(--danger);font-size:11px;cursor:pointer;padding:0;">🗑️ Delete</button></div>
-        </div>`).join(''):'<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:30px;">Koi photos nahi abhi tak.</div>'}
+        </div>`).join(''):'<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:30px;">No photos yet.</div>'}
       </div>
     </div>`;
   }
@@ -7071,9 +7071,9 @@ function previewPincodeFile(input){
 }
 async function importPincodes(clearFirst){
   var rows=window._pinImportRows||[];
-  if(!rows.length){alert('Pehla file select karo.');return;}
+  if(!rows.length){alert('Please select a file first.');return;}
   var status=document.getElementById('pin-import-status');
-  if(clearFirst&&!confirm('Supabase mathi BADHA pincodes delete thashe ane new file import thashe. Sure?'))return;
+  if(clearFirst&&!confirm('ALL existing pincodes will be deleted from Supabase and replaced with the new file. Are you sure?'))return;
   status.innerHTML='<span style="color:#d97706;">⏳ Starting...</span>';
   try{
     if(clearFirst){
@@ -7395,11 +7395,11 @@ async function changeAdminPassword(){
   const cur=document.getElementById('admin-cur-pass')?.value;
   const newP=document.getElementById('admin-new-pass')?.value;
   const conf=document.getElementById('admin-conf-pass')?.value;
-  if(!cur||!newP||!conf){alert('Badha fields bharvo');return;}
-  if(newP!==conf){alert('New password match nathi thato!');return;}
-  if(newP.length<4){alert('Password kem se kem 4 characters joie');return;}
+  if(!cur||!newP||!conf){alert('Please fill all fields');return;}
+  if(newP!==conf){alert('New password does not match!');return;}
+  if(newP.length<4){alert('Password must be at least 4 characters');return;}
   // Verify current password
-  if(cur!==currentUser.password){alert('Current password wrong chhe!');return;}
+  if(cur!==currentUser.password){alert('Current password is incorrect!');return;}
   try{
     await sb('users','PATCH',{password:newP},`?id=eq.${currentUser.id}`);
     currentUser.password=newP;
@@ -7546,7 +7546,7 @@ async function savePortalService(existingId){
   var includes=includesRaw?includesRaw.split('\n').map(function(x){return x.trim();}).filter(Boolean):[];
   var fieldsRaw=(document.getElementById('ps-fields')?.value||'[]').trim();
   var formFields=[];try{formFields=JSON.parse(fieldsRaw||'[]');}catch(e){formFields=[];}
-  if(!name||!priceDisp){alert('Service Name ane Price Display jaruri chhe.');return;}
+  if(!name||!priceDisp){alert('Service Name and Price Display are required.');return;}
   var data={id,name,icon,price_display:priceDisp,price_amount:priceAmt,service_type:svcType,
     repair_cat:svcType==='repair'?repairCat:null,inquiry_type:svcType==='inquiry'?(inqType||name):null,
     subtitle,includes:JSON.stringify(includes),form_fields:JSON.stringify(formFields),
@@ -7900,7 +7900,7 @@ async function doVisitStart(ticketId){
     if(openLogs&&openLogs.length){
       const ol=openLogs[0];
       const isWork=ol.log_type==='work';
-      alert('⚠️ Already '+(isWork?'Work':'Traveling')+' log OPEN chhe!\n\n"'+ol.task_description+'"\n\nPehela ae call Closed karo — pachhi j navo Visit Start thase.');
+      alert('⚠️ A '+(isWork?'Work':'Traveling')+' log is already OPEN!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting a new Visit.');
       return;
     }
   }catch(ex){}
@@ -7941,7 +7941,7 @@ async function doWorkStart(ticketId){
     const openLogs=await sb('work_logs','GET',null,
       '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN&log_type=eq.work');
     if(openLogs&&openLogs.length){
-      alert('⚠️ Already ek call Work Start chhe!\n\n"'+openLogs[0].task_description+'"\n\nPehela ae call Closed karo — pachhi j aa call Work Start thase.');
+      alert('⚠️ A Work call is already in progress!\n\n"'+openLogs[0].task_description+'"\n\nPlease close that call first before starting this one.');
       return;
     }
   }catch(ex){}
@@ -8137,7 +8137,7 @@ async function saveWCDailyReport(){
   var other=0;
   var total=inward+outward;
   var remarks=document.getElementById('wc-dr-remarks').value;
-  if(!date){alert('Date select karo');return;}
+  if(!date){alert('Please select a date');return;}
 
   // Collect reviews
   var reviews=[];
@@ -8256,7 +8256,7 @@ async function saveDailyReport(){
   var petrolKm=parseFloat(document.getElementById('dr-petrol-km').value)||0;
   var remarks=document.getElementById('dr-remarks').value;
 
-  if(!date){alert('Date select karo');return;}
+  if(!date){alert('Please select a date');return;}
 
   // Collect site visits
   var siteVisits=[];
@@ -8423,7 +8423,7 @@ function showDailyReportShare(d){
     +'<button onclick="document.getElementById(\'dr-share-panel\').remove();" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
     +'</div>'
     +'<div style="padding:14px 18px;flex:1;overflow-y:auto;">'
-    +'<p style="font-size:12px;color:#6b7280;margin-bottom:8px;">WhatsApp ma share karva niche nu message copy thase:</p>'
+    +'<p style="font-size:12px;color:#6b7280;margin-bottom:8px;">The following message will be copied to share on WhatsApp:</p>'
     +'<pre id="dr-share-text" style="white-space:pre-wrap;font-size:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:0;font-family:inherit;line-height:1.6;max-height:320px;overflow-y:auto;"></pre>'
     +'</div>'
     +'<div style="padding:12px 18px;border-top:1px solid #e5e7eb;display:flex;gap:10px;">'
@@ -8588,7 +8588,7 @@ function _handleVisibility(){
       w=document.createElement('div');
       w.id='gps-bg-warn';
       w.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.3);text-align:center;max-width:320px;';
-      w.innerHTML='⚠️ GPS Background Warning<br><span style="font-weight:400;font-size:11px;">Browser maa GPS minimize thata band thay chhe. Sachi route track mate browser open rakhjo.</span>';
+      w.innerHTML='⚠️ GPS Background Warning<br><span style="font-weight:400;font-size:11px;">GPS stops when the browser is minimized. Keep the browser open for accurate route tracking.</span>';
       document.body.appendChild(w);
       setTimeout(function(){if(w&&w.parentNode)w.parentNode.removeChild(w);},8000);
     }
@@ -8671,9 +8671,9 @@ async function renderLiveMap(){
   var locs=[];
   try{
     locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+selDate+'&order=recorded_at.asc&limit=2000');
-  }catch(e){pc.innerHTML+='<div class="alert alert-warning">Table nathi — SQL run karo</div>';return;}
+  }catch(e){pc.innerHTML+='<div class="alert alert-warning">Table not found — please run the SQL script</div>';return;}
 
-  if(typeof L==='undefined'){pc.innerHTML+='<div class="alert alert-warning">Map library load nathi thayun — internet check karo</div>';return;}
+  if(typeof L==='undefined'){pc.innerHTML+='<div class="alert alert-warning">Map library failed to load — please check your internet connection</div>';return;}
 
   var mapEl=document.getElementById('lm-map');
   if(!mapEl)return;
@@ -8744,7 +8744,7 @@ async function renderLiveMap(){
   if(bounds.length)map.fitBounds(bounds,{padding:[30,30]});
   else{pc.innerHTML+='';map.setView([23.0225,72.5714],11);}
 
-  document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — Koi location data nathi</span>';
+  document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — No location data found</span>';
 
   // Summary table
   var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary — '+selDate+'</h2></div>'
@@ -8763,7 +8763,7 @@ async function renderLiveMap(){
       +'<td style="padding:8px;text-align:center;">'+(closes||'-')+'</td></tr>';
   });
   summaryHtml+='</tbody></table></div>'
-    +'<div style="padding:10px 16px 14px;font-size:12px;color:#9ca3af;">⚠️ GPS KM = GPS tracking thi auto-calculated. Actual road distance thodi vadhi hoi shake. Daily Report ma manual KM entry pan available chhe.</div>'
+    +'<div style="padding:10px 16px 14px;font-size:12px;color:#9ca3af;">⚠️ GPS KM = auto-calculated from GPS tracking. Actual road distance may be slightly higher. Manual KM entry is also available in the Daily Report.</div>'
     +'</div>';
   document.getElementById('lm-route-info').innerHTML=summaryHtml;
 }
@@ -8887,7 +8887,7 @@ async function loadTargetReport(){
     });
     repHtml+='</div></div>';
     repArea.innerHTML=repHtml;
-  }catch(e){setArea.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br><b>SQL run karo:</b> CREATE TABLE engineer_targets...</div>';repArea.innerHTML='';}
+  }catch(e){setArea.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br><b>Run SQL:</b> CREATE TABLE engineer_targets...</div>';repArea.innerHTML='';}
 }
 
 function getNextMonth(ym){
@@ -9496,7 +9496,7 @@ async function fuSnooze(id){
 }
 // Set follow-up from ticket update modal
 async function setFollowUp(ticketId){
-  var d=prompt('Follow-up date set karo (YYYY-MM-DD):',new Date().toLocaleDateString('en-CA'));
+  var d=prompt('Set follow-up date (YYYY-MM-DD):',new Date().toLocaleDateString('en-CA'));
   if(!d)return;
   var note=prompt('Note (optional):');
   try{await sb('tickets','PATCH',{follow_up_date:d,follow_up_note:note||null,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);alert('✅ Follow-up set: '+d);}
@@ -9791,8 +9791,8 @@ async function loadWeekly(from,to){
 }
 
 async function downloadWeeklyExcel(){
-  var d=window._wrData;if(!d){alert('Pehela report load karo.');return;}
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun.');return;}
+  var d=window._wrData;if(!d){alert('Please load the report first.');return;}
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
   var wb=XLSX.utils.book_new();
   // Summary sheet
   var sumData=[
@@ -10281,7 +10281,7 @@ async function fetchWalkInCustomer(){
         document.getElementById('wi-name').value=tkts[0].cname||'';
         showToastWI('✅ Customer found from tickets!');return;
       }
-      showToastWI('ℹ️ New customer — name enter karo');return;
+      showToastWI('ℹ️ New customer — please enter their name');return;
     }
     document.getElementById('wi-name').value=custs[0].name||custs[0].cname||'';
     showToastWI('✅ Customer found: '+document.getElementById('wi-name').value);
@@ -10850,7 +10850,7 @@ function showPortalQR(){
     +'</div>'
     +'<div style="font-size:11px;color:#1e40af;word-break:break-all;font-weight:600;">'+url+'</div>'
     +'</div>'
-    +'<div style="font-size:13px;color:#374151;margin-bottom:14px;line-height:1.6;">Customer aa QR scan karke Services book kari shake chhe ya Shop ma thi product kharidi shake chhe. Shop/counter par display karo.</div>'
+    +'<div style="font-size:13px;color:#374151;margin-bottom:14px;line-height:1.6;">Customers can scan this QR to book services or purchase products from the shop. Display it at the shop counter.</div>'
     +'<div style="display:flex;gap:8px;justify-content:center;">'
     +'<button class="btn btn-primary btn-sm" onclick="window.open(\''+url+'\',\'_blank\')">🔗 Open Portal</button>'
     +'<button class="btn btn-outline btn-sm" onclick="printPortalQR()">🖨️ Print QR</button>'
@@ -11005,7 +11005,7 @@ async function loadWalkInReport(){
 
 async function downloadWalkInExcel(){
   var logs=window._wirLogs||[];
-  if(!logs.length){alert('Pehela Search karo');return;}
+  if(!logs.length){alert('Please search first');return;}
 
   var wb=XLSX.utils.book_new();
 
@@ -11115,10 +11115,10 @@ async function renderCourier(){
       <div class="section-header"><h2>📤 Outward Entry</h2></div>
       <div class="form-grid" style="margin-bottom:10px;">
         <div class="form-group"><label>AWB No <span style="color:var(--text-muted);font-size:11px;">(optional — bija divase add kari shakay)</span></label>
-          <input type="text" id="cr-out-awb" placeholder="Paste AWB number (jya hoy to)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+          <input type="text" id="cr-out-awb" placeholder="Paste AWB number (if applicable)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>Courier Agency <span class="req">*</span></label>
           <input type="text" id="cr-out-agency" placeholder="e.g. BlueDart, DTDC, FedEx" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
-        <div class="form-group" style="grid-column:1/-1;"><label>Receiver <span class="req">*</span> <span style="font-size:11px;color:var(--text-muted);">(Master માંથી select કરો)</span></label>
+        <div class="form-group" style="grid-column:1/-1;"><label>Receiver <span class="req">*</span> <span style="font-size:11px;color:var(--text-muted);">(Select from Master)</span></label>
           <div style="position:relative;">
             <input type="text" id="cr-out-recv-search" placeholder="Type receiver name to search..." autocomplete="off" oninput="searchReceiverDD()" onfocus="searchReceiverDD()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
             <div id="cr-recv-dd" style="display:none;position:absolute;z-index:300;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12);width:100%;top:100%;left:0;"></div>
@@ -11144,7 +11144,7 @@ async function renderCourier(){
 
       <!-- Manual Add Form -->
       <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;">➕ New Receiver Add કરો</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;">➕ Add New Receiver</div>
         <div class="form-grid" style="margin-bottom:10px;">
           <div class="form-group"><label>Name <span class="req">*</span></label>
             <input type="text" id="recv-new-name" placeholder="e.g. BOSS COLOR LAB" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
@@ -11313,16 +11313,16 @@ async function saveCourierEntry(dir){
   } else {
     recvId=document.getElementById('cr-out-recv-id')?.value||'';
     var recvData=window._selectedReceiver||null;
-    if(!recvData||!recvId){alert('Receiver select karo (Master માંથી)');return;}
+    if(!recvData||!recvId){alert('Please select a Receiver (from Master)');return;}
     person=recvData.name;
     place=recvData.city||'';
   }
   var weight=isIn?document.getElementById('cr-in-weight').value:document.getElementById('cr-out-weight').value;
 
-  if(!agency||(isIn&&!awb)||(isIn&&!place)){alert('AWB No and Place jaruri chhe (Inward mate)');return;}
-  if(!isIn&&!agency){alert('Agency jaruri chhe');return;}
+  if(!agency||(isIn&&!awb)||(isIn&&!place)){alert('AWB No and Place are required for Inward entries');return;}
+  if(!isIn&&!agency){alert('Agency is required');return;}
   var products=getCourierProducts(dir);
-  if(!isIn&&!products.length){alert('Outward mate ochhamama ek product add karo');return;}
+  if(!isIn&&!products.length){alert('Please add at least one product for Outward entries');return;}
 
   var today=new Date().toLocaleDateString('en-CA');
   try{
@@ -11678,7 +11678,7 @@ async function loadCourierReport(){
 
 async function downloadCourierExcel(){
   var entries=window._crrEntries||[];
-  if(!entries.length){alert('Pehela Search karo');return;}
+  if(!entries.length){alert('Please search first');return;}
   var wb=XLSX.utils.book_new();
 
   function fmtExcelDate(d){if(!d)return'';var p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:d;}
@@ -11734,7 +11734,7 @@ async function downloadWCCourierExcel(){
   try{
     showToastWI('⏳ Loading data...');
     var entries=await sb('courier_log','GET',null,'?wc_id=eq.'+encodeURIComponent(currentUser.user_id)+'&order=entry_date.desc,created_at.desc&limit=200');
-    if(!entries||!entries.length){alert('Koi data nathi');return;}
+    if(!entries||!entries.length){alert('No data found');return;}
     window._crrEntries=entries;
     downloadCourierExcel();
   }catch(e){alert('Error: '+e.message);}
@@ -11750,7 +11750,7 @@ async function saveManualReceiver(){
   var state=document.getElementById('recv-new-state')?.value.trim()||'';
   var pin=document.getElementById('recv-new-pin')?.value.trim()||'';
   var phone=document.getElementById('recv-new-phone')?.value.trim()||'';
-  if(!name||!city){alert('Name and City jaruri chhe');return;}
+  if(!name||!city){alert('Name and City are required');return;}
   try{
     await sb('receiver_master','POST',{name,address:addr,city,state,pin,phone,created_at:new Date().toISOString()});
     // Clear fields
@@ -11966,7 +11966,7 @@ function onDCRecvSel(sel){
 async function printDCNow(id,dcNo){
   var sel=document.getElementById('dc-recv-sel');
   var opt=sel?.selectedOptions[0];
-  if(!opt||!opt.value){alert('Receiver select karo');return;}
+  if(!opt||!opt.value){alert('Please select a receiver');return;}
   var name=opt.getAttribute('data-name')||'';
   var addr=opt.getAttribute('data-addr')||'';
   var city=opt.getAttribute('data-city')||'';
@@ -12031,7 +12031,7 @@ async function sendDailyReport(){
       body:JSON.stringify({type:'daily'})
     });
     var txt=await res.text();
-    if(res.ok)alert('✅ Daily report send thayu! '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+' par mail check karo.');
+    if(res.ok)alert('✅ Daily report sent! Check your email at '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})+'.');
     else alert('❌ Error: '+txt);
   }catch(e){alert('❌ Error: '+e.message);}
   finally{if(btn){btn.disabled=false;btn.textContent='📧 Daily';}}
@@ -12052,7 +12052,7 @@ function sendWeeklyReport(){
     +'<input type="date" id="wr-from" value="'+monStr+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
     +'<div class="form-group"><label>To Date</label>'
     +'<input type="date" id="wr-to" value="'+todayStr+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
-    +'<div style="font-size:12px;color:var(--text-muted);margin-top:10px;">Default: aa week (Monday to aaj)</div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-top:10px;">Default: this week (Monday to today)</div>'
     +'</div>'
     +'<div class="modal-footer" style="justify-content:flex-start;gap:8px;">'
     +'<button class="btn btn-primary" style="width:auto;" id="wr-send-btn" onclick="doSendWeeklyReport()">📨 Send Report</button>'
@@ -12063,7 +12063,7 @@ function sendWeeklyReport(){
 async function doSendWeeklyReport(){
   var from=(document.getElementById('wr-from')||{}).value;
   var to=(document.getElementById('wr-to')||{}).value;
-  if(!from||!to){alert('Date select karo');return;}
+  if(!from||!to){alert('Please select a date range');return;}
   var btn=document.getElementById('wr-send-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Sending...';}
   try{
@@ -12075,7 +12075,7 @@ async function doSendWeeklyReport(){
     var txt=await res.text();
     if(res.ok){
       document.getElementById('modal-send-weekly')?.remove();
-      alert('✅ Weekly report send thayu! ('+from+' → '+to+')\nMail check karo.');
+      alert('✅ Weekly report sent! ('+from+' → '+to+')\nPlease check your email.');
     }else alert('❌ Error: '+txt);
   }catch(e){alert('❌ Error: '+e.message);}
   finally{if(btn){btn.disabled=false;btn.textContent='📨 Send Report';}}
@@ -12114,7 +12114,7 @@ async function renderWorkLog(){
   try{logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+today+'&order=from_time');}catch(e){}
   window._todayWorkLogs=logs;window._todayWorkDate=today;
   function logsHtml(items){
-    if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 આજ નો કોઈ log નથી</div>';
+    if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 No log entries found</div>';
     return items.map(function(l){
       var isOpen=l.to_time==='OPEN';
       var isTravel=l.log_type==='travel';
@@ -12122,7 +12122,7 @@ async function renderWorkLog(){
       var borderColor=isTravel?'#f59e0b':isOpen?'#10b981':'var(--primary)';
       var timeBg=isTravel?'#fef3c7':isOpen?'#d1fae5':'#ede9fe';
       var timeColor=isTravel?'#92400e':isOpen?'#065f46':'#4c1d95';
-      var timeLabel=l.from_time+' – '+(isOpen?'<span style="color:#10b981;font-weight:700;">ચાલુ ⏳</span>':l.to_time);
+      var timeLabel=l.from_time+' – '+(isOpen?'<span style="color:#10b981;font-weight:700;">Running ⏳</span>':l.to_time);
       return'<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+borderColor+';position:relative;">'
         +(isAuto?'<span style="position:absolute;top:10px;right:'+(isAuto&&!isOpen?'36px':'10px')+'";font-size:10px;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:99px;">⚡ Auto</span>':'')
         +(!isAuto?'<button onclick="deleteWorkLog(\''+l.id+'\')" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:15px;">✕</button>':'')
@@ -12137,21 +12137,21 @@ async function renderWorkLog(){
     +'</div>'
     // Add entry card
     +'<div class="card" style="margin-bottom:14px;">'
-    +'<div class="section-header"><h2>➕ Entry ઉમેરો</h2></div>'
+    +'<div class="section-header"><h2>➕ Add Entry</h2></div>'
     +'<div class="form-grid" style="margin-bottom:10px;">'
     +'<div class="form-group"><label>From Time</label><select id="wl-from" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===fromDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
     +'<div class="form-group"><label>To Time</label><select id="wl-to" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===toDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
     +'</div>'
-    +'<div class="form-group" style="margin-bottom:12px;"><label>શું કામ કર્યું? <span class="req">*</span></label>'
-    +'<textarea id="wl-task" rows="3" placeholder="દા.ત. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea></div>'
-    +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Log ઉમેરો</button>'
+    +'<div class="form-group" style="margin-bottom:12px;"><label>What work was done? <span class="req">*</span></label>'
+    +'<textarea id="wl-task" rows="3" placeholder="e.g. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea></div>'
+    +'<button class="btn btn-primary" onclick="saveWorkLog()">+ Add Log</button>'
     +'</div>'
     // Today logs
-    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 આજના Logs</h2><div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span>'+(logs.length?'<button onclick="shareWorkLogsWA(window._todayWorkDate,window._todayWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>':'')+'</div></div>'
+    +'<div class="card" style="margin-bottom:14px;"><div class="section-header"><h2>📝 Today's Logs</h2><div style="display:flex;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">'+logs.length+' entries</span>'+(logs.length?'<button onclick="shareWorkLogsWA(window._todayWorkDate,window._todayWorkLogs,\''+currentUser.name+'\')" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">📲 Share</button>':'')+'</div></div>'
     +'<div id="wl-list">'+logsHtml(logs)+'</div></div>'
     // Past logs search section
     +'<div class="card">'
-    +'<div class="section-header"><h2>🔍 જૂના Logs શોધો</h2></div>'
+    +'<div class="section-header"><h2>🔍 Search Past Logs</h2></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
     +'<div class="form-group" style="flex:1;min-width:140px;"><label>Date</label><input type="date" id="wl-search-date" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
     +'<button class="btn btn-primary btn-sm" onclick="searchMyWorkLogs()" style="margin-bottom:0;height:38px;">🔍 Search</button>'
@@ -12164,8 +12164,8 @@ async function saveWorkLog(){
   var from=document.getElementById('wl-from').value;
   var to=document.getElementById('wl-to').value;
   var task=document.getElementById('wl-task').value.trim();
-  if(!task){alert('Task description lakhvo jaruri chhe');return;}
-  if(from>=to){alert('To time > From time hovo joie');return;}
+  if(!task){alert('Task description is required');return;}
+  if(from>=to){alert('To time must be greater than From time');return;}
   var today=new Date().toLocaleDateString('en-CA');
   // Engineer uses eng_id, WC uses user_id — store role type too
   var memberId=currentUser.eng_id||currentUser.user_id;
@@ -12184,7 +12184,7 @@ async function saveWorkLog(){
     document.getElementById('wl-task').value='';
     alert('✅ Entry save thayi!');
     renderWorkLog();
-  }catch(e){alert('Error: '+e.message+'\n\nNote: Supabase ma "work_logs" table banavo jaruri chhe.');}
+  }catch(e){alert('Error: '+e.message+'\n\nNote: Please create the "work_logs" table in Supabase.');}
 }
 
 function formatWorkLogWA(date, logs, name){
@@ -12201,7 +12201,7 @@ function formatWorkLogWA(date, logs, name){
   lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
   logs.forEach(function(l,i){
     var isOpen=l.to_time==='OPEN';
-    var timeLabel=l.from_time+' → '+(isOpen?'ચાલુ ⏳':l.to_time);
+    var timeLabel=l.from_time+' → '+(isOpen?'Running ⏳':l.to_time);
     if(!isOpen&&l.from_time&&l.to_time){
       var f=l.from_time.split(':');var t=l.to_time.split(':');
       var diff=(parseInt(t[0])*60+parseInt(t[1]))-(parseInt(f[0])*60+parseInt(f[1]));
@@ -12224,7 +12224,7 @@ function formatWorkLogWA(date, logs, name){
 }
 
 function shareWorkLogsWA(date, logs, name){
-  if(!logs||!logs.length){alert('Share karva koi log nathi');return;}
+  if(!logs||!logs.length){alert('No logs available to share');return;}
   var text=formatWorkLogWA(date,logs,name);
   var old=document.getElementById('dr-share-panel');if(old)old.remove();
   var panel=document.createElement('div');
@@ -12258,14 +12258,14 @@ async function searchMyWorkLogs(){
   var date=document.getElementById('wl-search-date')?.value||'';
   var res=document.getElementById('wl-past-list');
   if(!res)return;
-  if(!date){res.innerHTML='<div class="alert alert-warning">Date select karo</div>';return;}
+  if(!date){res.innerHTML='<div class="alert alert-warning">Please select a date</div>';return;}
   res.innerHTML='<div class="loading">Loading...</div>';
   try{
     var logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+date+'&order=from_time');
     if(!logs.length){
       var dObj=new Date(date+'T00:00:00');
       var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-      res.innerHTML='<div class="alert alert-info">'+dLabel+' નો કોઈ log નથી.</div>';
+      res.innerHTML='<div class="alert alert-info">'+dLabel+' : no logs found.</div>';
       return;
     }
     var dObj=new Date(date+'T00:00:00');
@@ -12351,7 +12351,7 @@ async function renderAutoInventory(){
       +'<thead><tr><th>Brand / Made In</th><th>Model No</th><th>Item Name</th><th>Category</th><th>Unit</th><th style="text-align:right;">Purchase ₹</th><th style="text-align:right;">Sell ₹</th><th style="text-align:center;">GST</th><th style="text-align:center;">Stock</th><th style="text-align:right;">Stock Value</th><th>Action</th></tr></thead>'
       +'<tbody>';
     if(!items.length){
-      html+='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">Koi item nathi. "Add Item" thi sharu karo!</td></tr>';
+      html+='<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">No items yet. Click "Add Item" to get started!</td></tr>';
     }else{
       items.forEach(function(it){
         var sv2=(it.purchase_price||0)*(it.stock_qty||0);
@@ -12567,7 +12567,7 @@ function downloadInventoryTemplate(){
 }
 
 function importInventoryExcel(){
-  if(typeof XLSX==='undefined'){alert('XLSX library load nathi thayo. Page reload karo (Ctrl+Shift+R).');return;}
+  if(typeof XLSX==='undefined'){alert('XLSX library failed to load. Please reload the page (Ctrl+Shift+R).');return;}
   var input=document.createElement('input');
   input.type='file';input.accept='.xlsx,.xls,.csv';
   input.onchange=async function(e){
@@ -12591,8 +12591,8 @@ function importInventoryExcel(){
           selling_price:parseFloat(r['Selling Price (Basic)'])||0,
           stock_qty:parseFloat(r['Opening Stock'])||0
         };}).filter(function(i){return i.item_name;});
-        if(!items.length){alert('Koi valid rows nathi. Template format check karo.');return;}
-        if(!confirm(items.length+' items import karva chhe?'))return;
+        if(!items.length){alert('No valid rows found. Please check the template format.');return;}
+        if(!confirm('Import '+items.length+' items?'))return;
         var ok=0,failed=0;
         for(var i=0;i<items.length;i++){
           var itm=items[i];
@@ -12622,7 +12622,7 @@ function openBulkAddInventory(){
   modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>📥 Bulk Add Items</h2><button class="close-btn" onclick="document.getElementById(\'modal-bulk-ainv\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +'<div class="alert alert-info" style="margin-bottom:12px;">Ek saath multiple items add karo. Blank rows ignore thashe.</div>'
+    +'<div class="alert alert-info" style="margin-bottom:12px;">Add multiple items at once. Blank rows will be ignored.</div>'
     +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
     +'<thead><tr style="background:#f8fafc;"><th style="padding:8px;text-align:left;font-size:12px;">Brand</th><th style="padding:8px;text-align:left;font-size:12px;">Item Name *</th><th style="padding:8px;text-align:left;font-size:12px;">Category</th><th style="padding:8px;text-align:left;font-size:12px;">Purchase ₹</th><th style="padding:8px;text-align:left;font-size:12px;">Stock</th><th style="padding:8px;text-align:left;font-size:12px;">Unit</th></tr></thead>'
     +'<tbody id="bulk-rows">'
@@ -12670,7 +12670,7 @@ async function saveBulkInventory(){
       unit:document.getElementById('br-unit-'+i)?.value||'pcs'
     });
   }
-  if(!items.length){alert('Koi item nathi filled!');return;}
+  if(!items.length){alert('No items filled!');return;}
   try{
     await fetch(SB_URL+'/rest/v1/auto_inventory',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(items)});
     document.getElementById('modal-bulk-ainv').remove();
@@ -12770,7 +12770,7 @@ async function saveStockModal(id,currentStock){
   var t=window._stockModalType||'in';
   var qty=parseFloat(document.getElementById('sm-qty')?.value)||0;
   var date=document.getElementById('sm-date')?.value||new Date().toISOString().slice(0,10);
-  if(!qty||qty<=0){alert('Quantity enter karo!');return;}
+  if(!qty||qty<=0){alert('Please enter a valid quantity!');return;}
   if(t==='sell'&&!document.getElementById('sm-cust')?.value.trim()){alert('Customer name required for Sell!');return;}
 
   var newStock=t==='in'?currentStock+qty:Math.max(0,currentStock-qty);
@@ -12812,7 +12812,7 @@ async function openAutoInvHistory(id,name){
     var content=document.getElementById('ainv-hist-content');
     if(!content)return;
     if(!logs||!logs.length){
-      content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 Koi transaction record nathi.<br><small>Stock update karo to yahan record thashe.</small></div>';
+      content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);">📭 No transaction records found.<br><small>Records will appear once stock is updated.</small></div>';
       return;
     }
     var totIn=logs.filter(function(l){return l.type==='in';}).reduce(function(a,l){return a+(l.qty||0);},0);
@@ -12843,7 +12843,7 @@ async function openAutoInvHistory(id,name){
       +'<tbody>'+rows+'</tbody></table></div>';
   }catch(e){
     var c=document.getElementById('ainv-hist-content');
-    if(c)c.innerHTML='<div class="alert alert-warning">Log table available nathi. Supabase ma <b>auto_inventory_log</b> table create karo.</div>';
+    if(c)c.innerHTML='<div class="alert alert-warning">Log table not found. Please create the <b>auto_inventory_log</b> table in Supabase.</div>';
   }
 }
 
@@ -12867,7 +12867,7 @@ function openBulkStockModal(type){
       +'<div class="form-group"><label>Date</label><input type="date" id="bsm-date" value="'+new Date().toISOString().slice(0,10)+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
       +'</div>'
     )
-    +'<div class="alert alert-info" style="margin-bottom:10px;padding:8px 12px;font-size:12px;">Item search karo, quantity lakho. Navin item automatically inventory ma add thashe.</div>'
+    +'<div class="alert alert-info" style="margin-bottom:10px;padding:8px 12px;font-size:12px;">Search for an item and enter quantity. New items will be automatically added to inventory.</div>'
     +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:700px;" id="bsm-table">'
     +'<thead><tr style="background:#f8fafc;font-size:11px;">'
     +'<th style="padding:8px;text-align:left;min-width:200px;">Item / Product</th>'
@@ -12904,7 +12904,7 @@ function buildBSMRow(i,isIn,items){
     +'<td style="padding:4px;min-width:200px;position:relative;">'
     +'<input type="hidden" id="bsm-itemid-'+i+'" value="">'
     +'<input type="hidden" id="bsm-pricePP-'+i+'" value="0">'
-    +'<input type="text" id="bsm-item-'+i+'" placeholder="Item search karo..." autocomplete="off"'
+    +'<input type="text" id="bsm-item-'+i+'" placeholder="Item search ..." autocomplete="off"'
       +' oninput="filterBSMDrop('+i+')" onfocus="filterBSMDrop('+i+')"'
       +' onblur="setTimeout(function(){hideBSMDrop('+i+');},200)"'
       +' style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;">'
@@ -13008,7 +13008,7 @@ function bsmPickNew(i){
   var ppH=document.getElementById('bsm-pricePP-'+i);
   if(idEl)idEl.value='__new__';
   if(ppH)ppH.value=0;
-  if(input){input.value='';input.placeholder='Navu item name type karo...';}
+  if(input){input.value='';input.placeholder='Navu item name type ...';}
 }
 
 function hideBSMDrop(i){
@@ -13053,13 +13053,13 @@ async function saveBulkStockModal(type){
     var note=document.getElementById('bsm-note-'+i)?.value.trim()||'';
     rows.push({itemId,itemName,qty,price,sprice,pprice,gst,unit,note});
   }
-  if(!rows.length){alert('Koi item fill nathi karyu!');return;}
+  if(!rows.length){alert('No items filled!');return;}
   // Warn if any sell price < purchase price (OUT only)
   if(type!=='in'){
     var warnings=rows.filter(function(r){return r.pprice>0&&r.sprice>0&&r.sprice<r.pprice;});
     if(warnings.length){
       var wList=warnings.map(function(r){return r.itemName+': Purchase ₹'+r.pprice+' > Sell ₹'+r.sprice;}).join('\n');
-      if(!confirm('⚠️ Sell price, Purchase price thi ochhi chhe:\n\n'+wList+'\n\nPan bhi save karvu chhe?'))return;
+      if(!confirm('⚠️ Sell price is lower than Purchase price:\n\n'+wList+'\n\nDo you still want to save?'))return;
     }
   }
   var errors=[];
@@ -13114,7 +13114,7 @@ async function renderAutoSites(){
       +'<input type="text" id="site-search" placeholder="Search site / client / mobile..." style="flex:1;min-width:200px;" oninput="filterSiteList()">'
       +'</div>';
     if(!sites.length){
-      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🏗️ Koi site nathi abhi. "New Site" thi sharu karo!</div>';
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🏗️ No sites yet. Click "New Site" to get started!</div>';
     }else{
       html+='<div id="sites-list">';
       sites.forEach(function(s){html+=renderSiteCard(s,payMap[s.id]||0,itemMap[s.id]||0,delivMap[s.id]||{total:0,delivered:0});});
@@ -13377,7 +13377,7 @@ async function openDispatchModal(siteId,siteName){
   var items=[];
   try{items=await sb('auto_site_items','GET',null,'?site_id=eq.'+siteId+'&order=id');}catch(e){}
   var pendingItems=items.filter(function(i){return i.delivery_status!=='delivered';});
-  if(!pendingItems.length){alert('Badha items already delivered chhe!');return;}
+  if(!pendingItems.length){alert('All items are already delivered!');return;}
   window._dispatchItems=pendingItems;
   var existing=document.getElementById('modal-dispatch');if(existing)existing.remove();
   var today=new Date().toLocaleDateString('en-CA');
@@ -13408,7 +13408,7 @@ async function openDispatchModal(siteId,siteName){
     +'</div>'
     +'<div class="form-group"><label>Note</label><input type="text" id="disp-notes" placeholder="Koi note..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'<hr class="divider">'
-    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">📦 Pending Items — Select karo je dispatch karva chhe</h3>'
+    +'<h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">📦 Pending Items — Select items to dispatch</h3>'
     +itemRows
     +'</div>'
     +'<div class="modal-footer">'
@@ -13510,11 +13510,11 @@ async function viewSiteVisits(siteId,siteName){
         +'</div>'
         +(matItemsForDC.length?'<button class="btn btn-outline btn-sm" style="font-size:11px;padding:3px 10px;" onclick="openSiteDCPrint(\''+siteId+'\',\''+escQ(siteName)+'\','+JSON.stringify(matItemsForDC)+','+JSON.stringify(dd||null)+')">🚚 DC Print</button>':'')
         +'</div>'
-        +(v.work_done?'<div style="margin-top:6px;font-size:13px;"><b>🔧 Kaam:</b> '+v.work_done+'</div>':'')
+        +(v.work_done?'<div style="margin-top:6px;font-size:13px;"><b>🔧 Work Done:</b> '+v.work_done+'</div>':'')
         +matHtml
         +ddHtml
         +'</div>';
-    }).join(''):'<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi visit nathi abhi</div>';
+    }).join(''):'<div style="text-align:center;padding:30px;color:var(--text-muted);">No visits yet</div>';
     modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
       +'<div class="modal-header"><h2>📋 '+siteName+' — Visits ('+visits.length+')</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
       +'<div class="modal-body">'
@@ -13532,14 +13532,14 @@ async function viewSiteVisits(siteId,siteName){
 async function openSiteVisitModal(){
   try{
     var sites=await sb('auto_sites','GET',null,'?order=site_name');
-    if(!sites.length){alert('Pehela koi site banavo!');navigate('auto-sites');return;}
+    if(!sites.length){alert('Please create a site first!');navigate('auto-sites');return;}
     var modal=document.createElement('div');
     modal.id='modal-site-visit-quick';
     modal.className='modal-overlay';
     modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
-      +'<div class="modal-header"><h2>🏗️ Site Visit Add Karo</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">✕</button></div>'
+      +'<div class="modal-header"><h2>🏗️ Add Site Visit</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">✕</button></div>'
       +'<div class="modal-body">'
-      +'<div class="form-group" style="margin-bottom:12px;"><label>Site Select Karo <span class="req">*</span></label>'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Select Site <span class="req">*</span></label>'
       +'<select id="qv-site" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Select Site --</option>'
       +sites.map(function(s){return'<option value="'+s.id+'">'+s.site_name+' — '+s.client_name+'</option>';}).join('')
       +'</select></div>'
@@ -13547,7 +13547,7 @@ async function openSiteVisitModal(){
       +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="qv-date" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
       +'<div class="form-group"><label>Time</label><input type="time" id="qv-time"></div>'
       +'</div>'
-      +'<div class="form-group" style="margin-top:10px;"><label>Shu Kaam Karyu? 🔧</label><textarea id="qv-work" rows="3" placeholder="Kaam ni detail lakhav..."></textarea></div>'
+      +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done..."></textarea></div>'
       +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable..."></textarea></div>'
       +'</div>'
       +'<div class="modal-footer">'
@@ -13562,7 +13562,7 @@ async function openAddVisitModal(siteId,siteName){
   // Load site items (has selling price) + cross-ref inventory for purchase price
   var siteItems=[];
   try{siteItems=await sb('auto_site_items','GET',null,'?site_id=eq.'+siteId+'&order=id');}catch(e){}
-  // Only show pending/partial items — delivered items skip karva
+  // Only show pending/partial items — skip delivered items
   siteItems=siteItems.filter(function(i){return i.delivery_status!=='delivered';});
   window._visitSiteItems=siteItems;
   window._nsItemCount=0;
@@ -13576,12 +13576,12 @@ async function openAddVisitModal(siteId,siteName){
     +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="av-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
     +'<div class="form-group"><label>Time</label><input type="time" id="av-time-'+siteId+'"></div>'
     +'</div>'
-    +'<div class="form-group" style="margin-top:10px;"><label>Shu Kaam Karyu? 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Kaam ni detail lakhav..."></textarea></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Describe the work done..."></textarea></div>'
     +'<hr class="divider">'
     +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Material Delivered</h3>'
-    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Site na items — Purchase & Selling price auto aavse, bas Qty aapvo</p>'
+    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Site items — Purchase & Selling price will be auto-filled, just enter Qty</p>'
     +(siteItems.length?''
-      :'<div class="alert alert-warning">Aa site ma koi items nathi. Pehela site ma items add karo.</div>')
+      :'<div class="alert alert-warning">No items found for this site. Please add items to the site first.</div>')
     +'<div id="vm-items-list-'+siteId+'"></div>'
     +(siteItems.length?'<button class="btn btn-outline btn-sm" onclick="addVisitMaterialRow('+siteId+')" style="margin-top:6px;">+ Add Material</button>':'')
     +'<hr class="divider" style="margin-top:14px;">'
@@ -13612,7 +13612,7 @@ function addVisitMaterialRow(siteId){
   window._nsItemCount=(window._nsItemCount||0)+1;
 
   // Build options from site items
-  var options='<option value="">-- Item Select Karo --</option>'
+  var options='<option value="">-- Select Item --</option>'
     +siteItems.map(function(it){
       return'<option value="'+it.id+'" data-pp="'+(it.purchase_price||0)+'" data-sp="'+(it.unit_price||0)+'" data-gst="'+(it.gst_percent||0)+'" data-name="'+escQ(it.item_name)+'">'
         +it.item_name+' — Sell ₹'+(it.unit_price||0)+(it.gst_percent?' +'+it.gst_percent+'%GST':'')+'</option>';
@@ -13780,7 +13780,7 @@ async function saveQuickVisit(){
   var time=document.getElementById('qv-time')?.value||null;
   var work=document.getElementById('qv-work')?.value.trim()||null;
   var material=document.getElementById('qv-material')?.value.trim()||null;
-  if(!siteId){alert('Site select karo!');return;}
+  if(!siteId){alert('Please select a site!');return;}
   if(!date){alert('Date required!');return;}
   try{
     await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({site_id:parseInt(siteId),visit_date:date,visit_time:time,work_done:work,material_delivered:material,created_by:currentUser?.user_id||'ENG002',created_by_name:currentUser?.name||currentUser?.user_id||''})});
@@ -13829,7 +13829,7 @@ async function loadAutoVisitReport(){
     var sites=window._avrSites||[];
     var siteMap={};sites.forEach(function(s){siteMap[s.id]=s;});
     window._avrVisits=visits.map(function(v){var s=siteMap[v.site_id]||{};return Object.assign({},v,{site_name:s.site_name||'-',client_name:s.client_name||'-'});});
-    if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">Koi visits nathi selected filter ma.</div>';return;}
+    if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">No visits found for the selected filter.</div>';return;}
     // KPI
     var totalVisits=window._avrVisits.length;
     var sitesVisited=new Set(window._avrVisits.map(function(v){return v.site_id;})).size;
@@ -13850,7 +13850,7 @@ async function loadAutoVisitReport(){
       html+='<div class="card" style="margin-bottom:14px;">'
         +'<div style="font-size:15px;font-weight:700;color:#7c3aed;margin-bottom:2px;">🏗️ '+sg.site_name+'</div>'
         +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">👤 '+sg.client_name+' &nbsp;|&nbsp; '+sg.visits.length+' visits</div>'
-        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Logged By</th><th>Kaam Karyu</th><th>Material Delivered</th></tr></thead><tbody>'
+        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Logged By</th><th>Work Done</th><th>Material Delivered</th></tr></thead><tbody>'
         +sg.visits.map(function(v){
           var loggedBy=v.created_by_name||v.created_by||'—';
           return '<tr>'
@@ -13869,14 +13869,14 @@ async function loadAutoVisitReport(){
 
 function downloadVisitExcel(){
   var visits=window._avrVisits||[];
-  if(!visits.length){alert('Pehela Search karo');return;}
+  if(!visits.length){alert('Please search first');return;}
   var wb=XLSX.utils.book_new();
   // All visits sheet
   var data=visits.map(function(v){return{
     'Site':v.site_name,'Client':v.client_name,
     'Visit Date':fmtDate(v.visit_date),'Time':v.visit_time||'',
     'Logged By':v.created_by_name||(v.created_by&&window._userNameMap&&window._userNameMap[v.created_by])||v.created_by||'',
-    'Kaam Karyu':v.work_done||'','Material Delivered':v.material_delivered||''
+    'Work Done':v.work_done||'','Material Delivered':v.material_delivered||''
   };});
   var ws=XLSX.utils.json_to_sheet(data);
   ws['!cols']=[{wch:20},{wch:18},{wch:14},{wch:10},{wch:18},{wch:40},{wch:35}];
@@ -13889,7 +13889,7 @@ function downloadVisitExcel(){
     bySite[k].push(v);
   });
   Object.entries(bySite).forEach(function([sn,svs]){
-    var sd=svs.map(function(v){return{'Date':fmtDate(v.visit_date),'Time':v.visit_time||'','Kaam':v.work_done||'','Material':v.material_delivered||''};});
+    var sd=svs.map(function(v){return{'Date':fmtDate(v.visit_date),'Time':v.visit_time||'','Work Done':v.work_done||'','Material':v.material_delivered||''};});
     var sw=XLSX.utils.json_to_sheet(sd);
     sw['!cols']=[{wch:14},{wch:10},{wch:45},{wch:35}];
     XLSX.utils.book_append_sheet(wb,sn.replace(/[:\\\/\?\*\[\]]/g,'').slice(0,31),sw);
@@ -13954,7 +13954,7 @@ async function loadWorkLogReport(){
           var borderColor=isTravel?'#f59e0b':isOpen?'#10b981':'var(--primary)';
           var timeBg=isTravel?'#fef3c7':isOpen?'#d1fae5':'#ede9fe';
           var timeColor=isTravel?'#92400e':isOpen?'#065f46':'#4c1d95';
-          var timeLabel=l.from_time+' – '+(isOpen?'ચાલુ ⏳':l.to_time);
+          var timeLabel=l.from_time+' – '+(isOpen?'Running ⏳':l.to_time);
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
@@ -13970,7 +13970,7 @@ async function loadWorkLogReport(){
 
 async function downloadWorkLogExcel(){
   var logs=window._wlrLogs||[];
-  if(!logs.length){alert('Pehela Search karo');return;}
+  if(!logs.length){alert('Please search first');return;}
 
   function fmtWLD(d){if(!d)return'';var p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:d;}
 
@@ -13982,7 +13982,7 @@ async function downloadWorkLogExcel(){
     'Name':l.eng_name,
     'Date':fmtWLD(l.log_date),
     'From':l.from_time,
-    'To':l.to_time==='OPEN'?'ચાલુ':l.to_time,
+    'To':l.to_time==='OPEN'?'Running':l.to_time,
     'Task':l.task_description
   };});
   var wsAll=XLSX.utils.json_to_sheet(allData);
@@ -14001,7 +14001,7 @@ async function downloadWorkLogExcel(){
     var data=mLogs.map(function(l){return{
       'Date':fmtWLD(l.log_date),
       'From':l.from_time,
-      'To':l.to_time==='OPEN'?'ચાલુ':l.to_time,
+      'To':l.to_time==='OPEN'?'Running':l.to_time,
       'Task':l.task_description
     };});
     var ws=XLSX.utils.json_to_sheet(data);
@@ -14034,7 +14034,7 @@ async function savePayment(){
   var date=document.getElementById('pay-date').value;
   var ref=document.getElementById('pay-ref').value;
   var note=document.getElementById('pay-note').value;
-  if(!amount||!mode){alert('Amount ane Payment Mode jaruri chhe!');return;}
+  if(!amount||!mode){alert('Amount and Payment Mode are required!');return;}
   try{
     await sb('auto_site_payments','POST',{site_id:window._paymentSiteId,amount:parseFloat(amount),payment_mode:mode,payment_date:date||new Date().toISOString().split('T')[0],reference_no:ref||null,note:note||null,created_by:currentUser?.user_id||'ENG002'});
     alert('✅ Payment Saved!\nAmount: ₹'+amount+'\nMode: '+mode);
@@ -14377,11 +14377,11 @@ async function openAddSiteItem(siteId,siteName){
     +'<button id="asi-type-service" onclick="switchASIType(\'service\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;background:#f3f4f6;color:var(--text-muted);cursor:pointer;border-left:1px solid var(--border);">🔧 Service Charge</button>'
     +'</div>'
     +'<div id="asi-product-section">'
-    +'<div class="form-group" style="margin-bottom:10px;position:relative;"><label>Item Search Karo</label>'
+    +'<div class="form-group" style="margin-bottom:10px;position:relative;"><label>Search Item</label>'
     +'<input type="text" id="asi-search" placeholder="Type item name..." oninput="filterASIDropdown()" onfocus="showASIDropdown()" onblur="setTimeout(function(){hideASIDropdown();},200)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
     +'<div id="asi-dropdown" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);top:100%;left:0;"></div></div>'
     +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-custom-group"><label>Custom Item Name <span class="req">*</span></label>'
-    +'<input type="text" id="asi-name" placeholder="Item name lakhav..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+    +'<input type="text" id="asi-name" placeholder="Enter item name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:10px;display:none;" id="asi-selected-name-group"><label>Item</label>'
     +'<input type="text" id="asi-name-readonly" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f0f9ff;outline:none;"></div>'
     +'</div>'
@@ -14554,7 +14554,7 @@ function renderASIDropdown(items){
       +'</div>';
   }).join('')
   +(items.length>50?'<div style="padding:8px;font-size:11px;color:#6b7280;text-align:center;">Type more to narrow down ('+items.length+' items)</div>':'')
-  +(items.length===0?'<div style="padding:12px;text-align:center;color:#6b7280;font-size:12px;">Koi item nathi — Custom use karo</div>':'');
+  +(items.length===0?'<div style="padding:12px;text-align:center;color:#6b7280;font-size:12px;">No items found — use Custom</div>':'');
   el.innerHTML+='<div onclick="selectASICustom()" style="padding:8px 12px;cursor:pointer;font-size:13px;color:#7c3aed;border-top:1px solid #e5e7eb;" onmouseenter="this.style.background=\'#faf5ff\'" onmouseleave="this.style.background=\'\'">✏️ Custom Item...</div>';
 }
 function selectASIItem(id,name,brand,pp,sp,gst,unit){
@@ -14611,7 +14611,7 @@ async function saveASIItem(siteId,siteName){
   var gst=parseFloat(document.getElementById('asi-gst').value)||0;
   var total=Math.round(sp*qty*(1+gst/100));
   var note=document.getElementById('asi-note').value;
-  if(!name){alert('Item name jaruri chhe!');return;}
+  if(!name){alert('Item name is required!');return;}
   try{
     var asiData={site_id:parseInt(siteId),item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,gst_percent:gst,note:note};
     var asiR=await fetch(SB_URL+'/rest/v1/auto_site_items',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(asiData)});
@@ -14908,7 +14908,7 @@ function openQuotationPrint(items,siteInfo,payInfo,tcLines){
         +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:center;">'+(gst?gst+'%':'—')+'</td>'
         +'<td style="padding:6px;border:1px solid #e5e7eb;text-align:right;font-weight:700;">₹'+Number(total).toLocaleString('en-IN')+'</td>'
         +'</tr>';
-    }).join('')||'<tr><td colspan="10" style="padding:12px;text-align:center;color:#6b7280;">Koi items nathi</td></tr>';
+    }).join('')||'<tr><td colspan="10" style="padding:12px;text-align:center;color:#6b7280;">No items</td></tr>';
   }
   var grandEl=document.getElementById('quot-grand-total');
   if(grandEl)grandEl.textContent='₹'+Number(grand).toLocaleString('en-IN');
@@ -15056,7 +15056,7 @@ async function saveEditSiteItem(itemId,siteId,siteName){
   var gst=parseFloat(document.getElementById('esi-gst')?.value)||0;
   var total=Math.round(sp*qty*(1+gst/100));
   var note=document.getElementById('esi-note')?.value||'';
-  if(!name){alert('Item name jaruri chhe!');return;}
+  if(!name){alert('Item name is required!');return;}
   try{
     var esiData={item_name:name,qty:qty,unit:unit,purchase_price:pp,unit_price:sp,gst_percent:gst,note:note};
     var esiR=await fetch(SB_URL+'/rest/v1/auto_site_items?id=eq.'+itemId,{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(esiData)});
@@ -15131,13 +15131,13 @@ async function viewSiteContacts(siteId,siteName){
       +'<td style="padding:8px 10px;"><a href="tel:'+c.mobile+'" style="color:#2563eb;">'+c.mobile+'</a></td>'
       +'<td style="padding:8px 10px;"><button onclick="deleteSiteContact('+c.id+')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">🗑️</button></td>'
       +'</tr>';
-  }).join('')||'<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted);">Koi contact nathi</td></tr>';
+  }).join('')||'<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted);">No contacts found</td></tr>';
   var agDl=_contactAgencies.map(function(a){return'<option value="'+a+'">';}).join('');
   modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>📞 '+siteName+' — Contacts</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-contacts\').remove()">✕</button></div>'
     +'<div class="modal-body">'
     +'<div class="table-wrap" style="margin-bottom:16px;"><table><thead><tr><th>Agency</th><th>Name</th><th>Mobile</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-    +'<hr class="divider"><h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">➕ New Contact Add Karo</h3>'
+    +'<hr class="divider"><h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">➕ Add New Contact</h3>'
     +'<datalist id="sc-agency-list">'+agDl+'</datalist>'
     +'<div class="form-grid">'
     +'<div class="form-group"><label>Agency <span class="req">*</span></label><input type="text" id="sc-agency" list="sc-agency-list" placeholder="Mistry, Electrician..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
@@ -15156,7 +15156,7 @@ async function saveSiteContact(){
   var agency=document.getElementById('sc-agency')?.value.trim();
   var name=document.getElementById('sc-name')?.value.trim();
   var mobile=document.getElementById('sc-mobile')?.value.trim();
-  if(!agency||!name||!mobile){alert('Agency, Name ane Mobile jaruri chhe!');return;}
+  if(!agency||!name||!mobile){alert('Agency, Name and Mobile are required!');return;}
   try{
     await sb('auto_site_contacts','POST',{site_id:window._contactSiteId,agency:agency,contact_name:name,mobile:mobile});
     viewSiteContacts(window._contactSiteId,window._contactSiteName);
@@ -15164,7 +15164,7 @@ async function saveSiteContact(){
 }
 
 async function deleteSiteContact(id){
-  if(!confirm('Aa contact delete karvu?'))return;
+  if(!confirm('Delete this contact?'))return;
   try{
     await sb('auto_site_contacts','DELETE',null,'?id=eq.'+id);
     viewSiteContacts(window._contactSiteId,window._contactSiteName);
@@ -15224,7 +15224,7 @@ async function renderInquiries(){
     if(followupToday.length){
       html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
         +'<span style="font-size:20px;">🔔</span><div>'
-        +'<b style="color:#92400e;">Aaj '+followupToday.length+' inquiry(s) na followup chhe!</b><br>'
+        +'<b style="color:#92400e;">'+followupToday.length+' inquiry follow-up(s) due today!</b><br>'
         +'<span style="font-size:12px;color:#78350f;">'+followupToday.map(function(i){return i.customer_name;}).join(', ')+'</span>'
         +'</div></div>';
     }
@@ -15234,7 +15234,7 @@ async function renderInquiries(){
       +'<option value="">All Status</option><option value="Open">Open</option><option value="In Progress">In Progress</option><option value="Converted">Converted</option><option value="Lost">Lost</option>'
       +'</select></div>';
     if(!inqs.length){
-      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🔍 Koi inquiry nathi. "New Inquiry" thi add karo!</div>';
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🔍 No inquiries found. Click "New Inquiry" to add one!</div>';
     }else{
       html+='<div id="inq-list">';
       inqs.forEach(function(inq){
@@ -15287,7 +15287,7 @@ function openInquiryDetail(id){
   var noteLines=(inq.notes||'').split('\n').filter(function(l){return l.trim();});
   var notesHtml=noteLines.length
     ?noteLines.map(function(l){return'<div style="padding:8px 12px;border-left:3px solid var(--primary);background:#f8fafc;border-radius:0 8px 8px 0;margin-bottom:6px;font-size:13px;color:var(--text);">'+escQ(l)+'</div>';}).reverse().join('')
-    :'<div style="color:var(--text-muted);font-size:13px;padding:8px;">Koi updates nahi abhi tak.</div>';
+    :'<div style="color:var(--text-muted);font-size:13px;padding:8px;">No updates yet.</div>';
   var modal=document.createElement('div');
   modal.id='modal-inq-detail';modal.className='modal-overlay';
   modal.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:540px;">'
@@ -15349,7 +15349,7 @@ async function saveNewInquiry(){
   var type=document.getElementById('inq-type')?.value||'Other';
   var desc=(document.getElementById('inq-desc')?.value||'').trim();
   var followup=document.getElementById('inq-followup')?.value||null;
-  if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
+  if(!name||!mobile){alert('Name and Mobile are required!');return;}
   try{
     await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
@@ -15369,7 +15369,7 @@ function openEditInquiryModal(id){
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>✏️ Edit Inquiry Details</h2><button class="close-btn" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customer nu naam, mobile, address ya description correct karo. Status change karvam ate "📝 Update" button vaapro.</div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Customer nu naam, mobile, address ya description correct . Status change karvam ate "📝 Update" button vaapro.</div>'
     +'<div class="form-grid">'
     +'<div class="form-group"><label>Customer Name <span class="req">*</span></label>'+inp('einq-name','Customer name',inq.customer_name)+'</div>'
     +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('einq-mobile','Mobile number',inq.mobile,'tel')+'</div>'
@@ -15388,7 +15388,7 @@ function openEditInquiryModal(id){
 async function saveEditInquiry(id){
   var name=(document.getElementById('einq-name')?.value||'').trim();
   var mobile=(document.getElementById('einq-mobile')?.value||'').trim();
-  if(!name||!mobile){alert('Name ane Mobile jaruri chhe!');return;}
+  if(!name||!mobile){alert('Name and Mobile are required!');return;}
   try{
     await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),updated_at:new Date().toISOString()},'?id=eq.'+id);
     document.getElementById('modal-edit-inquiry').remove();
@@ -15568,7 +15568,7 @@ async function renderVirtualAgent(){
 <div class="ai-hero">
   <div class="ai-hero-left">
     <h2>🤖 Virtual AI Agent — Bhavi Electronics</h2>
-    <p>Tamara daily kaam ne automate karo — Social Media posts, CRM followups, Payment reminders, Inquiry replies badhu ek jagahe thi.</p>
+    <p>Automate your daily tasks — Social Media posts, CRM followups, Payment reminders, and Inquiry replies all in one place.</p>
   </div>
   <div class="ai-status-pill"><div class="ai-dot"></div><span>Agent Active</span></div>
 </div>
@@ -15611,7 +15611,7 @@ async function renderVirtualAgent(){
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
     <div>
       <div class="ai-card">
-        <div class="ai-card-title">📝 Post Type Select Karo</div>
+        <div class="ai-card-title">📝 Select Post Type</div>
         <div class="ai-template-grid">
           <div class="ai-template-btn selected" id="tmpl-offer" onclick="selectTemplate('offer')"><div class="t-icon">🎁</div><div class="t-label">Offer / Sale</div></div>
           <div class="ai-template-btn" id="tmpl-service" onclick="selectTemplate('service')"><div class="t-icon">🔧</div><div class="t-label">Service Tips</div></div>
@@ -15622,7 +15622,7 @@ async function renderVirtualAgent(){
         </div>
         <div class="form-group" style="margin-bottom:10px;">
           <label>Post Details (Gujarati / Hindi / English)</label>
-          <textarea id="ai-post-input" rows="4" style="border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;width:100%;outline:none;resize:vertical;" placeholder="Post ni details likho... jema ke: '25% off on all AC service this summer'"></textarea>
+          <textarea id="ai-post-input" rows="4" style="border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;width:100%;outline:none;resize:vertical;" placeholder="Enter post details... e.g. '25% off on all AC service this summer'"></textarea>
         </div>
         <div class="form-group" style="margin-bottom:10px;">
           <label>Platform</label>
@@ -15636,14 +15636,14 @@ async function renderVirtualAgent(){
           <label>City / Location Tag</label>
           <input type="text" id="ai-post-city" value="Surat" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
         </div>
-        <button class="btn btn-primary" style="width:100%;" onclick="generateAIPost()">✨ AI Post Generate Karo</button>
+        <button class="btn btn-primary" style="width:100%;" onclick="generateAIPost()">✨ Generate AI Post</button>
       </div>
     </div>
     <div>
       <div class="ai-card">
         <div class="ai-card-title">👁️ Post Preview</div>
         <div class="ai-post-preview" id="ai-post-preview-box">
-          <div style="opacity:0.6;text-align:center;padding:20px 0;">Post generate karo to preview yahan aavse...</div>
+          <div style="opacity:0.6;text-align:center;padding:20px 0;">Generate a post to see the preview here...</div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
           <button class="btn btn-outline btn-sm" onclick="copyAIPost()" id="btn-copy-post" style="display:none;">📋 Copy</button>
@@ -15654,7 +15654,7 @@ async function renderVirtualAgent(){
       <div class="ai-card" id="ai-hashtag-card" style="display:none;">
         <div class="ai-card-title">🏷️ Suggested Hashtags</div>
         <div id="ai-hashtag-box"></div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Post sathe aapamele-le hashtags add thay chhe — copy karva upar click karo.</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Hashtags are automatically included with the post — click above to copy.</div>
       </div>
       <div class="ai-card" id="ai-schedule-card" style="display:none;">
         <div class="ai-card-title">⏰ Post Schedule</div>
@@ -15676,24 +15676,24 @@ async function renderVirtualAgent(){
     <div class="ai-card-title">🔍 Pending Inquiry Followups
       <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllInquiryFollowups()">📤 Send All WhatsApp</button>
     </div>
-    <div class="alert alert-info" style="margin-bottom:12px;">Agent automatically pending inquiries ne WhatsApp message mokle. Tamara Twilio / Meta WABA account sathe connected hovu joiye.</div>
+    <div class="alert alert-info" style="margin-bottom:12px;">The agent automatically sends WhatsApp messages to pending inquiries. Requires a connected Twilio / Meta WABA account.</div>
     <div id="ai-inquiry-list"><div class="loading">Loading...</div></div>
   </div>
   <div class="ai-card">
     <div class="ai-card-title">💬 Inquiry Message Template</div>
-    <div class="ai-msg-template" id="inquiry-wa-template">Namaste {name}! 🙏
+    <div class="ai-msg-template" id="inquiry-wa-template">Hello {name}! 🙏
 
-Bhavi Electronics & Automation thi baat kar raha hun.
+This is Bhavi Electronics & Automation.
 
-Apne hamare yahan inquiry di thi — {product} ke bare mein.
-Kya aap abhi baat kar sakte hain?
+You had submitted an inquiry with us regarding — {product}.
+Are you available to speak now?
 
-Hamare experts se FREE consultation ke liye reply karein. ✅
+Please reply for a FREE consultation with our experts. ✅
 
 📞 Call: +91-XXXXXXXXXX
 📍 Surat, Gujarat</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editInquiryTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-outline btn-sm" onclick="editInquiryTemplate()">✏️ Edit Template</button>
       <button class="btn btn-success btn-sm" onclick="copyTemplate('inquiry-wa-template')">📋 Copy</button>
     </div>
   </div>
@@ -15705,26 +15705,26 @@ Hamare experts se FREE consultation ke liye reply karein. ✅
     <div class="ai-card-title">💰 Payment Pending Tickets
       <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllPaymentFollowups()">📤 Send All Reminders</button>
     </div>
-    <div class="alert alert-warning" style="margin-bottom:12px;">Jema payment pending chhe aeva completed tickets niche dikhe chhe. Agent auto-reminder mokle chhe.</div>
+    <div class="alert alert-warning" style="margin-bottom:12px;">Completed tickets with pending payment are listed below. The agent will send auto-reminders.</div>
     <div id="ai-payment-list"><div class="loading">Loading...</div></div>
   </div>
   <div class="ai-card">
     <div class="ai-card-title">💬 Payment Reminder Template</div>
-    <div class="ai-msg-template orange" id="payment-wa-template">Namaste {name}! 🙏
+    <div class="ai-msg-template orange" id="payment-wa-template">Hello {name}! 🙏
 
-Bhavi Electronics thi reminder chhe.
+This is a reminder from Bhavi Electronics.
 
-Tamara ticket #{ticket_id} ({model}) ni service complete thai gayi chhe.
+Your ticket #{ticket_id} ({model}) service has been completed.
 
 💰 Due Amount: ₹{amount}
 
-Krpaya payment karo:
+Please make the payment:
 • Cash / UPI / Card accepted
-• Shop par: {shop_address}
+• Visit us at: {shop_address}
 
-Koi sawaal hoy to reply karo. Aabhaar! 🙏</div>
+If you have any questions, please reply. Thank you! 🙏</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editPaymentTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-outline btn-sm" onclick="editPaymentTemplate()">✏️ Edit Template</button>
       <button class="btn btn-success btn-sm" onclick="copyTemplate('payment-wa-template')">📋 Copy</button>
     </div>
   </div>
@@ -15736,27 +15736,27 @@ Koi sawaal hoy to reply karo. Aabhaar! 🙏</div>
     <div class="ai-card-title">📞 Pending Allocation Calls
       <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sendAllCallFollowups()">📤 Send All Updates</button>
     </div>
-    <div class="alert alert-info" style="margin-bottom:12px;">Customers ne automatically "Tamaro call registered thayo chhe" message moklo. Customer confidence vadhse.</div>
+    <div class="alert alert-info" style="margin-bottom:12px;">Automatically send a "Your call has been registered" message to customers. This builds customer confidence.</div>
     <div id="ai-calls-list"><div class="loading">Loading...</div></div>
   </div>
   <div class="ai-card">
     <div class="ai-card-title">💬 Call Acknowledgement Template</div>
-    <div class="ai-msg-template blue" id="call-wa-template">Namaste {name}! 🙏
+    <div class="ai-msg-template blue" id="call-wa-template">Hello {name}! 🙏
 
-Bhavi Electronics & Automation thi suchit karvama aave chhe ke tamaro service call *registered* thayo chhe.
+Bhavi Electronics & Automation informs you that your service call has been *registered*.
 
 🎫 Ticket No: *{ticket_id}*
 📱 Product: {model}
 🔧 Problem: {problem}
 📍 Service Type: {service_type}
 
-Amaro engineer 24 kaalaak ni andar contact karshe.
+Our engineer will contact you within 24 hours.
 
-Status track karvaa WhatsApp par reply karo: *STATUS {ticket_id}*
+To track your status, reply on WhatsApp: *STATUS {ticket_id}*
 
-Aabhaar! — Bhavi Electronics 🙏</div>
+Thank you! — Bhavi Electronics 🙏</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <button class="btn btn-outline btn-sm" onclick="editCallTemplate()">✏️ Template Edit Karo</button>
+      <button class="btn btn-outline btn-sm" onclick="editCallTemplate()">✏️ Edit Template</button>
       <button class="btn btn-success btn-sm" onclick="copyTemplate('call-wa-template')">📋 Copy</button>
     </div>
   </div>
@@ -15771,7 +15771,7 @@ Aabhaar! — Bhavi Electronics 🙏</div>
     <div id="ai-activity-log">
       <div style="text-align:center;padding:40px;color:var(--text-muted);">
         <div style="font-size:36px;margin-bottom:10px;">🤖</div>
-        <div>Koi activity nathi. Agent kaam sharu karshe to yahan dekhashhe.</div>
+        <div>No activity yet. Data will appear here once the agent starts working.</div>
       </div>
     </div>
   </div>
@@ -15966,25 +15966,25 @@ function generatePostContent(template,userDetail,city){
   const templates={
     offer:{
       headline:'🎉 SPECIAL OFFER!',
-      body:userDetail||'Ghar baithke Electronics Service karvao! Bhavi Electronics ma trusted repair service maate contact karo.',
+      body:userDetail||'Ghar baithke Electronics Service karvao! Bhavi Electronics ma trusted repair service maate contact .',
       cta:'📞 Call Now | ✅ Expert Technicians | 🏠 Home Service Available',
       hashtags:'#'+city2+'Electronics #BhaviElectronics #SpecialOffer #DiscountAlert #ElectronicsRepair #ACService #HomeAppliances #ServiceCenter #'+city2+'Gujarat'
     },
     service:{
       headline:'🔧 PROFESSIONAL SERVICE',
-      body:userDetail||'AC, TV, Washing Machine, Refrigerator — tamara ghar na badha electronics mate trusted repair service. '+companyName+', '+city2+'.',
+      body:userDetail||'AC, TV, Washing Machine, Refrigerator — trusted repair service for all your home electronics. '+companyName+', '+city2+'.',
       cta:'🏠 On-Site Service | 🔧 All Brands | ⚡ Same Day',
       hashtags:'#'+city2+'Service #ACRepair #TVRepair #ApplianceRepair #BhaviElectronics #HomeService #'+city2+'Electronics #Gujarat'
     },
     festival:{
       headline:'🪔 FESTIVE GREETINGS!',
-      body:userDetail||companyName+' taraf thi tamne ane tamara parivarnu khub khub abhinandan! Tamara vishwaas aur pyar mate aabhaari chhi.',
+      body:userDetail||companyName+' wishes you and your family a very Happy Festival! Thank you for your trust and continued support.',
       cta:'💙 '+companyName+' Team',
       hashtags:'#FestivalGreetings #BhaviElectronics #'+city2+' #Gujarat #Celebration #HappyFestival'
     },
     tip:{
       headline:'💡 SERVICE TIP',
-      body:userDetail||'AC filter mahine ma ek vaara saaf karo — cooling vadhse ane electricity bill ghatshe! Expert tip by '+companyName+'.',
+      body:userDetail||'Clean your AC filter once a month — it improves cooling and reduces electricity bills! Expert tip by '+companyName+'.',
       cta:'🔧 Need Service? Call Us! | ✅ Free Consultation',
       hashtags:'#ServiceTip #ACTips #ElectronicsCare #BhaviElectronics #'+city2+' #HomeAppliance #EnergySaving'
     },
@@ -15996,7 +15996,7 @@ function generatePostContent(template,userDetail,city){
     },
     custom:{
       headline:'📢 ANNOUNCEMENT',
-      body:userDetail||companyName+' — '+city2+'ma Electronics Repair ane Automation Solutions mate tamaro bharosapaatr partner.',
+      body:userDetail||companyName+' — your trusted partner for Electronics Repair and Automation Solutions in '+city2+'.',
       cta:'📞 Call Now | 🌐 bhavi-electronics.com',
       hashtags:'#BhaviElectronics #'+city2+' #Electronics #Automation #Gujarat #TrustedService'
     }
@@ -16008,7 +16008,7 @@ function generatePostContent(template,userDetail,city){
 function generateAIPost(){
   const detail=(document.getElementById('ai-post-input').value||'').trim();
   const city=(document.getElementById('ai-post-city').value||'Surat').trim();
-  if(!detail){alert('Pehela post details lakho!');return;}
+  if(!detail){alert('Please enter post details first!');return;}
 
   // Generate smart post content
   var content=generatePostContent(selectedTemplate,detail,city);
@@ -16046,12 +16046,12 @@ function generateAIPost(){
 
 function copyAIPost(){
   const txt=generatedHashtags.join(' ');
-  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Hashtags copied!\n\nImage ne Download karine Instagram/Facebook par post karo.'));}
+  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert('Hashtags copied!\n\nImage ne Download karine Instagram/Facebook par post .'));}
   else{alert(txt);}
 }
 
 function downloadAIPost(){
-  if(!generatedCanvas){alert('Pehela Design Generate Karo!');return;}
+  if(!generatedCanvas){alert('Please generate a design first!');return;}
   const a=document.createElement('a');
   a.download='BhaviElectronics_Post_'+new Date().toISOString().slice(0,10)+'.png';
   a.href=generatedCanvas.toDataURL('image/png');
@@ -16070,7 +16070,7 @@ function confirmSchedulePost(){
   const msg=document.getElementById('schedule-confirm-msg');
   if(msg){
     msg.style.display='';
-    msg.textContent=`✅ Post scheduled for ${d} at ${t}. (Integration sathe auto-post thashe)`;
+    msg.textContent=`✅ Post scheduled for ${d} at ${t}. (Will auto-post via integration)`;
   }
   addAILog('social',`⏰ Post scheduled for ${d} ${t}`,'log-social');
 }
@@ -16082,7 +16082,7 @@ async function loadAIInquiries(){
   try{
     const data=await sb('auto_inquiries','GET',null,'?status=not.in.(Converted,Lost)&order=followup_date.asc&limit=30');
     if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending inquiry nathi. 🎉</div>';
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">No pending inquiries. 🎉</div>';
       return;
     }
     el.innerHTML=data.map(inq=>`
@@ -16111,7 +16111,7 @@ function sendInquiryWA(id,phone,name){
 }
 
 function sendInquirySMS(id,phone){
-  window.open(`sms:+91${phone}?body=${encodeURIComponent('Namaste! Bhavi Electronics thi — tamari inquiry maate contact karo: +91-XXXXXXXXXX')}`, '_blank');
+  window.open(`sms:+91${phone}?body=${encodeURIComponent('Hello! This is Bhavi Electronics — please contact us regarding your inquiry: +91-XXXXXXXXXX')}`, '_blank');
   addAILog('inquiry',`📱 Inquiry SMS to ${phone}`,'log-sms');
 }
 
@@ -16124,7 +16124,7 @@ async function markInquiryDone(id){
 }
 
 async function sendAllInquiryFollowups(){
-  if(!confirm('Badha pending inquiries ne WhatsApp message mokavo?'))return;
+  if(!confirm('Send WhatsApp messages to all pending inquiries?'))return;
   const items=document.querySelectorAll('#ai-inquiry-list .followup-item');
   items.forEach(item=>{
     const waBtn=item.querySelector('.ai-btn-wa');
@@ -16145,7 +16145,7 @@ async function loadAIPayments(){
   try{
     const data=await sb('tickets','GET',null,'?status=in.(Completed,Closed)&call_type=not.in.(Warranty,Warranty+Repeat)&order=updated_at.desc&limit=30');
     if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending payment nathi. 🎉</div>';
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">No pending payments. 🎉</div>';
       return;
     }
     el.innerHTML=data.map(call=>`
@@ -16176,7 +16176,7 @@ function sendPaymentWA(id,phone,name,ticketId,model,amount){
 }
 
 async function sendAllPaymentFollowups(){
-  if(!confirm('Badha pending payments ne reminder mokavo?'))return;
+  if(!confirm('Send payment reminders to all pending payments?'))return;
   document.querySelectorAll('#ai-payment-list .ai-btn-wa').forEach(btn=>btn.click());
   addAILog('payment','📤 Bulk payment reminders sent','log-wa');
 }
@@ -16198,7 +16198,7 @@ async function loadAICalls(){
   try{
     const data=await sb('tickets','GET',null,'?status=eq.Open&order=created_at.desc&limit=30');
     if(!Array.isArray(data)||data.length===0){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi pending allocation call nathi. 🎉</div>';
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">No pending allocation calls. 🎉</div>';
       return;
     }
     el.innerHTML=data.map(call=>`
@@ -16229,7 +16229,7 @@ function sendCallAck(id,phone,name,ticketId,model,problem,serviceType){
 }
 
 async function sendAllCallFollowups(){
-  if(!confirm('Badha pending calls ne acknowledgement mokavo?'))return;
+  if(!confirm('Send acknowledgements to all pending calls?'))return;
   document.querySelectorAll('#ai-calls-list .ai-btn-wa').forEach(btn=>btn.click());
   addAILog('calls','📤 Bulk call acknowledgements sent','log-wa');
 }
@@ -16258,7 +16258,7 @@ function renderAILog(){
   const el=document.getElementById('ai-activity-log');
   if(!el)return;
   if(aiAgentLog.length===0){
-    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">🤖</div><div>Koi activity nathi.</div></div>';
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">🤖</div><div>No activity yet.</div></div>';
     return;
   }
   el.innerHTML=aiAgentLog.map(log=>`
@@ -16427,11 +16427,11 @@ function clearAILog(){
   <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">
     <div class="modal-header" style="background:#eff6ff;"><h2>📥 Parts Request (Receive)</h2><button class="close-btn" onclick="closeModal('modal-eng-req-receive')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#1d4ed8;background:#eff6ff;padding:10px 12px;border-radius:8px;margin-bottom:14px;line-height:1.5;">Tame request submit karo — part code/name type karke select karo. Admin approve karshe pacchi tmariya stock ma add thashhe.</p>
+      <p style="font-size:12px;color:#1d4ed8;background:#eff6ff;padding:10px 12px;border-radius:8px;margin-bottom:14px;line-height:1.5;">Submit a request — type part code/name and select. Parts will be added to your stock after Admin approval.</p>
       <p style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;">📦 Parts Needed:</p>
       <div id="epr-parts-container" style="margin-bottom:10px;"></div>
-      <button type="button" class="btn btn-sm" style="background:#0891b2;color:#fff;margin-bottom:14px;" onclick="eprAddRow()">+ Part Add Karo</button>
-      <div class="form-group"><label style="font-weight:600;font-size:12px;">💬 Additional Notes (optional)</label><input type="text" id="epr-notes" class="form-control" placeholder="Koi note hoy to lakho e.g. 'Urgent chahiye'..." style="font-size:13px;"></div>
+      <button type="button" class="btn btn-sm" style="background:#0891b2;color:#fff;margin-bottom:14px;" onclick="eprAddRow()">+ Add Part</button>
+      <div class="form-group"><label style="font-weight:600;font-size:12px;">💬 Additional Notes (optional)</label><input type="text" id="epr-notes" class="form-control" placeholder="Any notes e.g. 'Urgent required'..." style="font-size:13px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-eng-req-receive')">Cancel</button>
@@ -16647,7 +16647,7 @@ async function loadAttendanceReport(){
       +'<div style="background:#fff8e1;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#92400e;">'+fmtH(totalOTMins)+'</div><div style="font-size:11px;color:#64748b;">Overtime</div></div>'
       +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>';
     // Table
-    if(!logs.length){wrap.innerHTML='<div class="alert alert-info">Koi record nathi</div>';return;}
+    if(!logs.length){wrap.innerHTML='<div class="alert alert-info">No records found</div>';return;}
     var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px;">'
       +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
       +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
@@ -16688,7 +16688,7 @@ function showPhotoFull(encodedSrc){
 
 async function downloadAttendanceExcel(){
   var logs=window._attLogs||[];
-  if(!logs.length){alert('Pehla search karo');return;}
+  if(!logs.length){alert('Please search first');return;}
   function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
   var data=logs.map(function(l){return{
     'Employee':l.eng_name,'Date':l.punch_in_date,
@@ -16698,7 +16698,7 @@ async function downloadAttendanceExcel(){
     'In Location':(l.punch_in_lat&&l.punch_in_lng)?l.punch_in_lat+','+l.punch_in_lng:'-',
     'Status':l.is_late?'Late':l.status||'-'
   };});
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load');return;}
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Attendance');
   XLSX.writeFile(wb,'attendance_report_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
@@ -16728,7 +16728,7 @@ async function renderShiftSettings(){
     });
     html+='</tbody></table>';
     pc.innerHTML=html;
-  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br>SQL run karo: CREATE TABLE shift_settings...</div>';}
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'<br>Run SQL: CREATE TABLE shift_settings...</div>';}
 }
 
 async function saveShiftSetting(empId, empName, empRole){
@@ -16871,7 +16871,7 @@ function _rpSeqSel(tid,val){
 async function saveRoutePlanInline(){
   var changes=window._routeChanges||{};
   var keys=Object.keys(changes).filter(function(k){return changes[k].eng_id||changes[k].seq;});
-  if(!keys.length){alert('Koi changes nathi karo');return;}
+  if(!keys.length){alert('No changes to save');return;}
   var btn=document.getElementById('rp-save-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Saving...';}
   var today=new Date().toISOString().slice(0,10);
@@ -16885,7 +16885,7 @@ async function saveRoutePlanInline(){
   }
   if(btn){btn.disabled=false;btn.textContent='💾 Save Route Plan';}
   window._routeChanges={};
-  alert(saved+' calls route plan set thayu! ✅');
+  alert(saved+' call route plan(s) saved! ✅');
   await renderPendingList();
 }
 
@@ -17138,7 +17138,7 @@ async function renderRoutePlanning(){
   var today=new Date().toLocaleDateString('en-CA');
   pc.innerHTML=`
     <div class="card" style="margin-bottom:14px;">
-      <div class="section-header"><h2>🗺️ Route Planning</h2><span style="font-size:12px;color:var(--text-muted);">Engineer na calls sequence set karo</span></div>
+      <div class="section-header"><h2>🗺️ Route Planning</h2><span style="font-size:12px;color:var(--text-muted);">Set the call sequence for the engineer</span></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
         <div class="form-group" style="flex:1;min-width:180px;">
           <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Engineer</label>
@@ -17160,8 +17160,8 @@ async function loadRoutePlan(){
   var engId=document.getElementById('rp-eng')?.value;
   var date=document.getElementById('rp-date')?.value;
   var rpc=document.getElementById('rp-content');
-  if(!engId){alert('Engineer select karo');return;}
-  if(!date){alert('Date select karo');return;}
+  if(!engId){alert('Please select an engineer');return;}
+  if(!date){alert('Please select a date');return;}
   rpc.innerHTML='<div class="loading">Loading calls...</div>';
   try{
     var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=neq.Closed&status=neq.Call+Cancel&status=neq.Customer+Reject&order=sequence_no.asc,created_at.asc');
@@ -17182,7 +17182,7 @@ function renderRoutePlanTable(){
   var dateLabel=new Date(date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   rpc.innerHTML=`<div class="card">
     <div class="section-header" style="margin-bottom:8px;">
-      <div><h2>Active Calls (${tickets.length})</h2><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">▲▼ thi order set karo → Save karo → Engineer ne ae sequence ma dekhase</div></div>
+      <div><h2>Active Calls (${tickets.length})</h2><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">▲▼ to set order → Save → Engineer will see calls in this sequence</div></div>
       <button class="btn btn-primary" onclick="saveRoutePlan()">💾 Save Route — ${dateLabel}</button>
     </div>
     <div class="table-wrap"><table>
@@ -17232,7 +17232,7 @@ function rpReorder(id,newSeq){
 }
 async function saveRoutePlan(){
   var tickets=window._rpTickets||[];var date=window._rpDate;
-  if(!tickets.length||!date){alert('Pehla engineer + date select kari calls load karo');return;}
+  if(!tickets.length||!date){alert('Please select an engineer and date to load calls first');return;}
   var btn=document.querySelector('[onclick*="saveRoutePlan"]');
   if(btn){btn.disabled=true;btn.textContent='Saving...';}
   try{
