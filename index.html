@@ -2652,13 +2652,17 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   // ENGINEER workflow
   if(isEng){
     switch(current){
-      case 'Assigned':
-        return['In Progress','Sent to MSC'];
+      case 'Assigned': {
+        const isCarryIn=(serviceType||'').toLowerCase().includes('carry');
+        // Carry In: no Closed (must go Repaired → Delivered). On-Site: engineer goes to repair, no MSC.
+        return isCarryIn?['In Progress','Repaired','Sent to MSC']:['In Progress','Closed'];
+      }
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
         if(isRepeat) return['Closed'];
-        return [isCarryIn ? 'Repaired' : 'Closed', 'Sent to MSC'];
+        // Carry In: Repaired + Sent to MSC. On-Site: only Closed (engineer repairs on location).
+        return isCarryIn?['Repaired','Sent to MSC']:['Closed'];
       }
 
       case 'Pending Parts':
