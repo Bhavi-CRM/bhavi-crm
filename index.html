@@ -17051,6 +17051,17 @@ function pendingListRender(){
   var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
   var isAdminOrWC=currentUser&&(currentUser.role==='admin'||currentUser.role==='work_controller');
 
+  // TAT badge
+  function tatBadge(tat_date){
+    if(!tat_date)return'<span style="color:#9ca3af;font-size:11px;">—</span>';
+    var d=new Date(tat_date);var diff=d-new Date();var hrs=Math.round(diff/3600000);
+    var dateLabel=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+    if(hrs<0)return'<span style="background:#fef2f2;color:#dc2626;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⚠️ Overdue</span><div style="font-size:10px;color:#dc2626;margin-top:2px;">'+dateLabel+'</div>';
+    if(hrs<=24)return'<span style="background:#fef9c3;color:#ca8a04;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⏰ '+hrs+'h left</span><div style="font-size:10px;color:#ca8a04;margin-top:2px;">'+dateLabel+'</div>';
+    var days=Math.floor(hrs/24);
+    return'<span style="background:#f0fdf4;color:#15803d;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">✅ '+days+'d left</span><div style="font-size:10px;color:#6b7280;margin-top:2px;">'+dateLabel+'</div>';
+  }
+
   // Status badge colors
   function statusBadge(s){
     var map={'Open':'#eff6ff:#1d4ed8','In Progress':'#fef3c7:#d97706','Pending':'#fdf4ff:#7c3aed',
@@ -17103,7 +17114,7 @@ function pendingListRender(){
   // ── Main pending table ─────────────────────────────────────────
   var rows='';
   if(!filtered.length){
-    rows='<tr><td colspan="'+(window._routeMode?9:7)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
+    rows='<tr><td colspan="'+(window._routeMode?10:8)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
   }else{
     filtered.forEach(function(t){
       var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
@@ -17132,6 +17143,7 @@ function pendingListRender(){
         +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
+        +'<td style="padding:10px 12px;">'+tatBadge(t.tat_date)+'</td>'
         +rpCols
         +'<td style="padding:10px 12px;text-align:center;">'
         +'<button onclick="viewTicket(\''+t.id+'\')" '
@@ -17183,6 +17195,7 @@ function pendingListRender(){
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">📍 Area / Pincode</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Model / Serial</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">⏱ TAT</th>'
     +(window._routeMode?'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">🧑‍🔧 Assign Eng</th><th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">Seq</th>':'')
     +'<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Action</th>'
     +'</tr></thead>'
