@@ -3845,13 +3845,13 @@ async function checkTATReminder(){
   var isEng=currentUser.role==='engineer';
   if(!isAdminOrWC&&!isEng)return;
   try{
-    var now=new Date();
-    var soon=new Date(now.getTime()+4*60*60*1000); // next 4 hours
+    var now=new Date();var today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     var engFilter=isEng?'&assigned_to=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id):'';
     var rows=await sb('tickets','GET',null,'?tat_date=not.is.null&status=not.in.(Closed,Delivered,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to&limit=20'+engFilter);
     if(!rows||!rows.length)return;
-    var overdue=rows.filter(function(t){return new Date(t.tat_date)<now;});
-    var urgent=rows.filter(function(t){var d=new Date(t.tat_date);return d>=now&&d<=soon;});
+    function tatDayOf(t){var d=new Date(t.tat_date);return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+    var overdue=rows.filter(function(t){return tatDayOf(t)<today;});
+    var urgent=rows.filter(function(t){return tatDayOf(t).getTime()===today.getTime();});
     if(!overdue.length&&!urgent.length)return;
     var old=document.getElementById('modal-tat-reminder');if(old)old.remove();
     var html='';
@@ -3859,24 +3859,23 @@ async function checkTATReminder(){
       html+='<div style="margin-bottom:12px;">'
         +'<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ OVERDUE ('+overdue.length+')</div>';
       overdue.forEach(function(t){
-        var hrs=Math.round((now-new Date(t.tat_date))/3600000);
+        var daysOver=Math.round((today-tatDayOf(t))/86400000);
         html+='<div onclick="document.getElementById(\'modal-tat-reminder\').remove();viewTicket(\''+t.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin-bottom:5px;">'
           +'<div><div style="font-weight:700;color:#dc2626;font-size:13px;">'+escHtml(t.id)+'</div>'
           +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.cname||'')+(t.model?' · '+escHtml(t.model):'')+'</div></div>'
-          +'<span style="background:#dc2626;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+hrs+'h overdue</span>'
+          +'<span style="background:#dc2626;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+(daysOver===1?'1 day':''+daysOver+' days')+' overdue</span>'
           +'</div>';
       });
       html+='</div>';
     }
     if(urgent.length){
       html+='<div>'
-        +'<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px;">⏰ DUE WITHIN 4 HOURS ('+urgent.length+')</div>';
+        +'<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px;">⏰ DUE TODAY ('+urgent.length+')</div>';
       urgent.forEach(function(t){
-        var hrs=Math.round((new Date(t.tat_date)-now)/3600000);
         html+='<div onclick="document.getElementById(\'modal-tat-reminder\').remove();viewTicket(\''+t.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#fef9c3;border:1px solid #fde68a;border-radius:6px;margin-bottom:5px;">'
           +'<div><div style="font-weight:700;color:#d97706;font-size:13px;">'+escHtml(t.id)+'</div>'
           +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.cname||'')+(t.model?' · '+escHtml(t.model):'')+'</div></div>'
-          +'<span style="background:#d97706;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+hrs+'h left</span>'
+          +'<span style="background:#d97706;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">Due Today</span>'
           +'</div>';
       });
       html+='</div>';
@@ -3894,25 +3893,23 @@ async function checkTATReminder(){
   }catch(e){}
 }
 function openSetTAT(ticketId, currentTAT){
-  var existing=currentTAT?new Date(currentTAT).toISOString().slice(0,16):'';
+  var existing=currentTAT?currentTAT.slice(0,10):'';
   var old=document.getElementById('modal-set-tat');if(old)old.remove();
   var m=document.createElement('div');m.className='modal-overlay';m.id='modal-set-tat';
   m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
     +'<div class="modal-header"><h2>⏱ Set TAT Deadline</h2><button class="close-btn" onclick="document.getElementById(\'modal-set-tat\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +(existing?'<div style="font-size:12px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 10px;margin-bottom:12px;">Current TAT: <b>'+new Date(currentTAT).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</b></div>':'')
-    // Canon received time helper
+    +(existing?'<div style="font-size:12px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 10px;margin-bottom:12px;">Current TAT: <b>'+new Date(currentTAT).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</b></div>':'')
     +'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-bottom:14px;">'
     +'<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">📅 Canon Portal — Call Received Date &amp; Time</div>'
     +'<input type="datetime-local" id="tat-received-input" oninput="autoCalcTAT()" style="border:1px solid #86efac;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'
-    +'<div style="font-size:11px;color:#166534;margin-top:5px;">Enter exact time from Canon system → TAT auto-set to +24 hours</div>'
+    +'<div style="font-size:11px;color:#166534;margin-top:5px;">Enter exact time from Canon system → TAT deadline auto-set to next day</div>'
     +'</div>'
-    // Manual TAT field
     +'<div class="form-group">'
-    +'<label>TAT Deadline <span style="font-size:11px;color:#6b7280;">(auto-filled above, or set manually)</span></label>'
-    +'<input type="datetime-local" id="tat-set-input" value="'+existing+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;outline:none;box-sizing:border-box;">'
+    +'<label>TAT Deadline Date <span style="font-size:11px;color:#6b7280;">(auto-filled above, or set manually)</span></label>'
+    +'<input type="date" id="tat-set-input" value="'+existing+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;outline:none;box-sizing:border-box;">'
     +'</div>'
-    +'<div style="font-size:12px;color:#6b7280;margin-top:4px;">⚠️ Overdue = red &nbsp;|&nbsp; &lt;24h = yellow &nbsp;|&nbsp; OK = green &nbsp;—&nbsp; Pending List shows live status. Leave blank to clear.</div>'
+    +'<div style="font-size:12px;color:#6b7280;margin-top:4px;">⚠️ Overdue = red &nbsp;|&nbsp; Due Today/Tomorrow = yellow &nbsp;|&nbsp; Leave blank to clear.</div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-set-tat\').remove()">Cancel</button>'
@@ -3924,9 +3921,11 @@ function autoCalcTAT(){
   var recv=document.getElementById('tat-received-input')?.value;
   if(!recv)return;
   var d=new Date(recv);
-  d.setTime(d.getTime()+24*60*60*1000);
+  d.setDate(d.getDate()+1);
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var nextDay=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   var tatInput=document.getElementById('tat-set-input');
-  if(tatInput)tatInput.value=d.toISOString().slice(0,16);
+  if(tatInput)tatInput.value=nextDay;
 }
 async function saveTATDate(ticketId){
   var val=document.getElementById('tat-set-input')?.value;
@@ -3935,14 +3934,14 @@ async function saveTATDate(ticketId){
   var recvNote=recv?' | Canon received: '+new Date(recv).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
   try{
     var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
-    var note=tatIso?'TAT set to '+new Date(tatIso).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+recvNote:'TAT cleared';
+    var note=tatIso?'TAT deadline: '+new Date(tatIso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+recvNote:'TAT cleared';
     var tl=[...(t.timeline||[]),{action:'TAT Updated',by:currentUser.name,at:new Date().toISOString(),note:note}];
     await sb('tickets','PATCH',{tat_date:tatIso,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
     document.getElementById('modal-set-tat')?.remove();
     if(currentPage==='pending-list'){await renderPendingList();}
     else if(currentPage==='tickets'){renderTickets();}
     else{renderDashboard();}
-    alert('✅ TAT '+(tatIso?'set to '+new Date(tatIso).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'cleared')+'.');
+    alert('✅ TAT '+(tatIso?'deadline set: '+new Date(tatIso).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'cleared')+'.');
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -17163,11 +17162,13 @@ function pendingListRender(){
   // TAT badge
   function tatBadge(tat_date){
     if(!tat_date)return'<span style="color:#9ca3af;font-size:11px;">—</span>';
-    var d=new Date(tat_date);var diff=d-new Date();var hrs=Math.round(diff/3600000);
+    var d=new Date(tat_date);
+    var tatDay=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+    var n=new Date();var today=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+    var days=Math.round((tatDay-today)/86400000);
     var dateLabel=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-    if(hrs<0)return'<span style="background:#fef2f2;color:#dc2626;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⚠️ Overdue</span><div style="font-size:10px;color:#dc2626;margin-top:2px;">'+dateLabel+'</div>';
-    if(hrs<=24)return'<span style="background:#fef9c3;color:#ca8a04;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⏰ '+hrs+'h left</span><div style="font-size:10px;color:#ca8a04;margin-top:2px;">'+dateLabel+'</div>';
-    var days=Math.floor(hrs/24);
+    if(days<0)return'<span style="background:#fef2f2;color:#dc2626;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⚠️ Overdue</span><div style="font-size:10px;color:#dc2626;margin-top:2px;">'+dateLabel+'</div>';
+    if(days===0)return'<span style="background:#fef9c3;color:#ca8a04;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⏰ Due Today</span><div style="font-size:10px;color:#ca8a04;margin-top:2px;">'+dateLabel+'</div>';
     return'<span style="background:#f0fdf4;color:#15803d;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">✅ '+days+'d left</span><div style="font-size:10px;color:#6b7280;margin-top:2px;">'+dateLabel+'</div>';
   }
 
