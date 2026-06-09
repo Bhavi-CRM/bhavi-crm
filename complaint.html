@@ -432,14 +432,11 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
       <div class="inp-group"><label id="lbl-mob2">Mobile <span class="req">*</span></label><input class="inp" type="tel" id="inp-mob2" maxlength="10" readonly style="background:#f3f4f6;"></div>
       <div class="inp-group"><label id="lbl-alt">Alternate No</label><input class="inp" type="tel" id="inp-alt" maxlength="10" placeholder="Alt. mobile"></div>
     </div>
-    <div class="inp-group"><label id="lbl-addr">Full Address <span class="req">*</span></label><textarea class="inp" id="inp-addr" rows="2" placeholder="House no, Street, Area..."></textarea></div>
-    <div class="form-row">
-      <div class="inp-group"><label id="lbl-pin">Pin Code <span class="req">*</span></label><input class="inp" type="tel" id="inp-pin" maxlength="6" placeholder="6 digit" inputmode="numeric"></div>
-      <div class="inp-group"><label id="lbl-city">City <span class="req">*</span></label><input class="inp" type="text" id="inp-city" placeholder="City"></div>
-    </div>
+    <div class="inp-group"><label id="lbl-addr">Address Line 1 <span class="req">*</span></label><input class="inp" type="text" id="inp-addr" placeholder="House No, Street, Building..."></div>
+    <div class="inp-group"><label id="lbl-addr2">Address Line 2</label><input class="inp" type="text" id="inp-addr2" placeholder="Society, Landmark, Colony..."></div>
     <div class="inp-group">
       <label id="lbl-state">State <span class="req">*</span></label>
-      <select class="inp" id="inp-state">
+      <select class="inp" id="inp-state" onchange="onComplaintStateChange()">
         <option value="">— Select State —</option>
         <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option>
         <option>Bihar</option><option>Chhattisgarh</option><option>Goa</option>
@@ -452,6 +449,20 @@ textarea.inp{resize:none;min-height:80px;font-family:inherit;}
         <option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option>
         <option>West Bengal</option><option>Delhi</option>
       </select>
+    </div>
+    <div class="inp-group"><label id="lbl-city">City <span class="req">*</span></label><input class="inp" type="text" id="inp-city" placeholder="City / District"></div>
+    <div class="form-row">
+      <div class="inp-group">
+        <label id="lbl-pin">Pin Code <span class="req">*</span></label>
+        <div style="position:relative;">
+          <input class="inp" type="text" id="inp-pin" autocomplete="off" placeholder="Type area or 6-digit pin..." oninput="filterComplaintPin(this.value)" onfocus="filterComplaintPin(this.value)" onblur="setTimeout(function(){var d=document.getElementById('cp-pin-drop');if(d)d.style.display='none';},200)">
+          <div id="cp-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
+        </div>
+      </div>
+      <div class="inp-group">
+        <label id="lbl-area">Area</label>
+        <input class="inp" type="text" id="inp-area" placeholder="Auto-filled from Pin Code" readonly style="background:#f8fafc;color:#64748b;cursor:not-allowed;">
+      </div>
     </div>
     <div class="err-msg" id="err-cust"></div>
   </div>
@@ -1087,6 +1098,53 @@ function routeAfterMobile(){
   else{buildInquiryForm();goPage('pg-inquiry');}
 }
 
+// ---- Complaint Portal Pin Search ----
+var _cpPinTimer=null;
+var _cpPincodeCache={};
+function onComplaintStateChange(){
+  var pinEl=document.getElementById('inp-pin');
+  if(pinEl)pinEl._pinState=document.getElementById('inp-state')?.value||'';
+  var areaEl=document.getElementById('inp-area');if(areaEl)areaEl.value='';
+}
+function filterComplaintPin(val){
+  var pinEl=document.getElementById('inp-pin');
+  var drop=document.getElementById('cp-pin-drop');
+  if(!pinEl||!drop)return;
+  var q=(val||'').trim();
+  if(!q){drop.style.display='none';return;}
+  clearTimeout(_cpPinTimer);
+  _cpPinTimer=setTimeout(async function(){
+    try{
+      var pinState=pinEl._pinState||document.getElementById('inp-state')?.value||'';
+      var isNum=/^\d+$/.test(q);
+      var qs='?select=pincode,area,district&limit=60&order=pincode';
+      if(!isNum&&pinState)qs+='&state=eq.'+encodeURIComponent(pinState);
+      if(isNum)qs+='&pincode=like.'+q+'*';
+      else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
+      var r=await fetch(SB_URL+'/rest/v1/pincodes'+qs,{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      if(!r.ok)throw new Error();
+      var rows=await r.json();
+      if(rows&&rows.length){
+        rows.forEach(function(x){_cpPincodeCache[x.pincode]=x.area;});
+        drop.innerHTML=rows.map(function(x){
+          var safePin=x.pincode;
+          var safeArea=(x.area||'').replace(/'/g,'&#39;');
+          var displayText=(x.area?x.area+' - ':'')+x.pincode;
+          return'<div onmousedown="complaintPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-size:13px;font-weight:600;color:#2563eb">'+displayText+'</span>'+(x.district?'<span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+x.district+'</span>':'')+'</div>';
+        }).join('');
+        drop.style.display='block';return;
+      }
+    }catch(e){}
+    drop.style.display='none';
+  },200);
+}
+function complaintPinSelect(pin,area){
+  var el=document.getElementById('inp-pin');
+  if(el){el.value=pin;el.dataset.pin=pin;}
+  var areaEl=document.getElementById('inp-area');if(areaEl&&area)areaEl.value=area;
+  var drop=document.getElementById('cp-pin-drop');if(drop)drop.style.display='none';
+}
+
 function backFromWarranty(){
   if(state.isNew)goPage('pg-customer');else goPage('pg-mobile');
 }
@@ -1103,19 +1161,23 @@ async function submitCustomer(){
   var fname=document.getElementById('inp-fname').value.trim();
   var lname=document.getElementById('inp-lname').value.trim();
   var alt=document.getElementById('inp-alt').value.trim();
-  var addr=document.getElementById('inp-addr').value.trim();
-  var pin=document.getElementById('inp-pin').value.trim();
+  var addrL1=document.getElementById('inp-addr').value.trim();
+  var addrL2=(document.getElementById('inp-addr2')?.value||'').trim();
+  var addr=addrL1+(addrL2?', '+addrL2:'');
+  var pinEl=document.getElementById('inp-pin');
+  var pin=(pinEl?.dataset?.pin||pinEl?.value||'').trim();
+  var area=(document.getElementById('inp-area')?.value||'').trim();
   var city=document.getElementById('inp-city').value.trim();
   var stateVal=document.getElementById('inp-state').value;
   var err=document.getElementById('err-cust');err.style.display='none';
   if(!fname){err.textContent='Please enter first name.';err.style.display='block';return;}
   if(!lname){err.textContent='Please enter last name.';err.style.display='block';return;}
-  if(!addr){err.textContent='Please enter full address.';err.style.display='block';return;}
-  if(!pin||pin.length!==6){err.textContent='Please enter 6-digit pin code.';err.style.display='block';return;}
+  if(!addrL1){err.textContent='Please enter Address Line 1.';err.style.display='block';return;}
+  if(!pin||pin.length<5){err.textContent='Please select a valid pin code.';err.style.display='block';return;}
   if(!city){err.textContent='Please enter city.';err.style.display='block';return;}
   if(!stateVal){err.textContent='Please select state.';err.style.display='block';return;}
   state.firstName=fname;state.lastName=lname;state.altMobile=alt;
-  state.address=addr;state.pin=pin;state.city=city;state.custState=stateVal;
+  state.address=addr;state.pin=pin;state.area=area;state.city=city;state.custState=stateVal;
   if(state.serviceType==='repair'){goPage('pg-warranty');}
   else{buildInquiryForm();goPage('pg-inquiry');}
 }

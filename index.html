@@ -433,8 +433,8 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Name <span class="req">*</span></label><input type="text" id="call-cname"></div>
         <div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="call-mobile" oninput="debounceCallMobile(this.value)" maxlength="10" inputmode="numeric"><div id="call-cust-hint" style="font-size:11px;margin-top:4px;display:none;"></div></div>
         <div class="form-group"><label>Alternate</label><input type="tel" id="call-alt"></div>
-        <div class="form-group form-full"><label>Address <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street..."></div>
-        <div class="form-group"><label>Area</label><input type="text" id="call-area" placeholder="Society / Landmark"></div>
+        <div class="form-group form-full"><label>Address Line 1 <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street, Building..."></div>
+        <div class="form-group form-full"><label>Address Line 2</label><input type="text" id="call-address2" placeholder="Society, Landmark, Colony..."></div>
         <div class="form-group">
           <label>State <span class="req">*</span></label>
           <select id="call-state" onchange="onStateChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
@@ -453,9 +453,13 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group">
           <label>Pin Code <span class="req">*</span></label>
           <div style="position:relative;">
-            <input type="text" id="call-pin" autocomplete="off" placeholder="Select district first, then type..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterPinList(this.value)" onfocus="filterPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('call-pin-drop');if(d)d.style.display='none';},200)">
+            <input type="text" id="call-pin" autocomplete="off" placeholder="Type area name or pin code..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterPinList(this.value)" onfocus="filterPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('call-pin-drop');if(d)d.style.display='none';},200)">
             <div id="call-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Area</label>
+          <input type="text" id="call-area" placeholder="Auto-filled from Pin Code" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;background:#f8fafc;color:#64748b;cursor:not-allowed;">
         </div>
       </div>
       <hr class="divider">
@@ -2280,11 +2284,74 @@ function filterPinList(val){
   },200);
 }
 function callPinSelect(pin,area){
-  var el=document.getElementById('call-pin');if(el)el.value=pin;
-  var areaEl=document.getElementById('call-area');if(areaEl&&area&&!areaEl.value)areaEl.value=area;
+  var el=document.getElementById('call-pin');
+  if(el){el.value=pin;el.dataset.pin=pin;}
+  var areaEl=document.getElementById('call-area');if(areaEl&&area)areaEl.value=area;
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
-function setAddressDropdowns(state,city,pin){
+function onWiStateChange(){
+  var state=document.getElementById('wi-state')?.value||'';
+  var cityEl=document.getElementById('wi-city');
+  var pinEl=document.getElementById('wi-pin');
+  if(!cityEl||!pinEl)return;
+  var cities=getCities(state).sort();
+  cityEl.innerHTML='<option value="">-- Select District --</option>'+cities.map(function(c){return'<option value="'+c+'">'+c+'</option>';}).join('');
+  pinEl.value='';pinEl._allPins=[];pinEl._pinState=state;
+  var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
+  var areaEl=document.getElementById('wi-area');if(areaEl)areaEl.value='';
+}
+function onWiCityChange(){
+  var state=document.getElementById('wi-state')?.value||'';
+  var city=document.getElementById('wi-city')?.value||'';
+  var pinEl=document.getElementById('wi-pin');
+  if(!pinEl)return;
+  pinEl._allPins=getPins(state,city);
+  pinEl._pinState=state;pinEl._pinDistrict=city;
+  pinEl.value='';
+  var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
+  var areaEl=document.getElementById('wi-area');if(areaEl)areaEl.value='';
+}
+var _wiPinTimer=null;
+function filterWiPinList(val){
+  var pinEl=document.getElementById('wi-pin');
+  var drop=document.getElementById('wi-pin-drop');
+  if(!pinEl||!drop)return;
+  var q=(val||'').trim();
+  if(!q){drop.style.display='none';return;}
+  clearTimeout(_wiPinTimer);
+  _wiPinTimer=setTimeout(async function(){
+    try{
+      var state=pinEl._pinState||'';
+      var isNum=/^\d+$/.test(q);
+      var qs='?select=pincode,area,district&limit=60&order=pincode';
+      if(!isNum&&state)qs+='&state=eq.'+encodeURIComponent(state);
+      if(isNum)qs+='&pincode=like.'+q+'*';
+      else qs+='&area=ilike.*'+encodeURIComponent(q)+'*';
+      var rows=await sb('pincodes','GET',null,qs);
+      if(rows&&rows.length){
+        rows.forEach(function(r){_pincodeCache[r.pincode]=r.area;});
+        drop.innerHTML=rows.map(function(r){
+          var safePin=r.pincode;
+          var safeArea=(r.area||'').replace(/'/g,'&#39;');
+          var displayText=(r.area?r.area+' - ':'')+r.pincode;
+          return'<div onmousedown="wiPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-size:13px;font-weight:600;color:var(--primary)">'+displayText+'</span>'+(r.district?'<span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+escHtml(r.district)+'</span>':'')+'</div>';
+        }).join('');
+        drop.style.display='block';return;
+      }
+    }catch(e){}
+    var pins=(pinEl._allPins||[]).filter(function(p){return p.startsWith(q);}).slice(0,60);
+    if(!pins.length){drop.style.display='none';return;}
+    drop.innerHTML=pins.map(function(p){return'<div onmousedown="wiPinSelect(\''+p+'\',\'\')" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+p+'</div>';}).join('');
+    drop.style.display='block';
+  },200);
+}
+function wiPinSelect(pin,area){
+  var el=document.getElementById('wi-pin');
+  if(el){el.value=pin;el.dataset.pin=pin;}
+  var areaEl=document.getElementById('wi-area');if(areaEl&&area)areaEl.value=area;
+  var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
+}
+function setAddressDropdowns(state,city,pin,area){
   const stateEl=document.getElementById('call-state');
   if(stateEl&&state){stateEl.value=state;onStateChange();}
   setTimeout(()=>{
@@ -2293,7 +2360,10 @@ function setAddressDropdowns(state,city,pin){
     onCityChange();
     setTimeout(()=>{
       const pinEl=document.getElementById('call-pin');
-      if(pinEl&&pin)pinEl.value=pin;
+      if(pinEl&&pin){pinEl.value=pin;pinEl.dataset.pin=pin;}
+      const areaEl=document.getElementById('call-area');
+      if(areaEl&&area)areaEl.value=area;
+      else if(areaEl&&pin&&_pincodeCache[pin])areaEl.value=_pincodeCache[pin];
     },100);
   },100);
 }
@@ -2318,8 +2388,8 @@ async function autoFillCallForm(mob){
     const ne=document.getElementById('call-cname');if(ne&&!ne.value)ne.value=c.cname||'';
     const ae=document.getElementById('call-alt');if(ae&&!ae.value)ae.value=c.alt_mobile||'';
     const addr=document.getElementById('call-address');if(addr&&!addr.value)addr.value=c.address||'';
-    const area=document.getElementById('call-area');if(area&&!area.value)area.value=c.area||'';
-    if(c.state||c.city||c.pin)setAddressDropdowns(c.state||'',c.city||'',c.pin||'');
+    if(c.state||c.city||c.pin)setAddressDropdowns(c.state||'',c.city||'',c.pin||'',c.area||'');
+    else{const areaEl=document.getElementById('call-area');if(areaEl&&c.area)areaEl.value=c.area;}
     if(hint){hint.style.display='';hint.style.color='#059669';hint.innerHTML='✅ Customer found: <b>'+escHtml(c.cname||'')+'</b>'+(c.city?' · '+escHtml(c.city):'');}
   }catch(e){if(hint){hint.style.display='';hint.style.color='#dc2626';hint.textContent='Error looking up customer';}}
 }
@@ -3632,7 +3702,7 @@ async function openNewCall(){
     await loadMasterData();
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
-  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
@@ -3686,11 +3756,10 @@ function selectCustomerForCall(serial,cname,mobile,address,model,alt,pin,city,ar
   document.getElementById('call-address').value=address;
   document.getElementById('call-model').value=model;
   document.getElementById('call-alt').value=alt;
-  document.getElementById('call-area').value=area||'';
-  if(state) setAddressDropdowns(state, city, pin);
+  if(state) setAddressDropdowns(state, city, pin, area);
   else {
-    // fallback: set city/pin as text if no state
-    const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value=pin;
+    const pinEl=document.getElementById('call-pin');if(pinEl){pinEl.value=pin;pinEl.dataset.pin=pin;}
+    const areaEl=document.getElementById('call-area');if(areaEl&&area)areaEl.value=area;
   }
   document.getElementById('customer-search-results').innerHTML=`<div style="color:var(--success);font-size:13px;margin-top:6px;">✅ Selected: <b>${cname}</b> | ${mobile}</div>`;
 }
@@ -3784,8 +3853,8 @@ async function saveCall(){
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
-    alt_mobile:document.getElementById('call-alt').value,address:document.getElementById('call-address').value,
-    city:document.getElementById('call-city')?.value||'',pin:document.getElementById('call-pin')?.value||'',state:document.getElementById('call-state')?.value||'',
+    alt_mobile:document.getElementById('call-alt').value,address:(function(){var l1=(document.getElementById('call-address').value||'').trim();var l2=((document.getElementById('call-address2')||{}).value||'').trim();return l1+(l2?', '+l2:'');}()),
+    city:document.getElementById('call-city')?.value||'',pin:(function(){var pe=document.getElementById('call-pin');if(!pe)return'';if(pe.dataset.pin)return pe.dataset.pin;var m=(pe.value||'').match(/\d{5,6}/);return m?m[0]:pe.value||'';}()),state:document.getElementById('call-state')?.value||'',
     area:document.getElementById('call-area').value,problem:document.getElementById('call-problem').value,
     description:document.getElementById('call-desc').value,condition:document.getElementById('call-condition').value,
     accessories:document.getElementById('call-accessories').value,
@@ -10278,6 +10347,39 @@ async function renderWalkIn(){
     </div>
 
     <hr class="divider">
+    <h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text-muted);">📍 Address <small style="font-weight:400;">(optional — auto-filled if customer exists)</small></h3>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="form-group form-full"><label>Address Line 1</label><input type="text" id="wi-address" placeholder="House No, Street, Building..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+      <div class="form-group form-full"><label>Address Line 2</label><input type="text" id="wi-address2" placeholder="Society, Landmark, Colony..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+      <div class="form-group">
+        <label>State</label>
+        <select id="wi-state" onchange="onWiStateChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+          <option value="">-- Select State --</option>
+          <option value="Gujarat">Gujarat</option>
+          <option value="Rajasthan">Rajasthan</option>
+          <option value="Maharashtra">Maharashtra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>City</label>
+        <select id="wi-city" onchange="onWiCityChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+          <option value="">-- Select City --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Pin Code</label>
+        <div style="position:relative;">
+          <input type="text" id="wi-pin" autocomplete="off" placeholder="Type area name or pin code..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterWiPinList(this.value)" onfocus="filterWiPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('wi-pin-drop');if(d)d.style.display='none';},200)">
+          <div id="wi-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Area</label>
+        <input type="text" id="wi-area" placeholder="Auto-filled from Pin Code" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;background:#f8fafc;color:#64748b;cursor:not-allowed;">
+      </div>
+    </div>
+
+    <hr class="divider">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <label style="font-weight:600;font-size:13px;">Products <span class="req">*</span></label>
       <button class="btn btn-outline btn-sm" onclick="addWalkInProduct()">+ Add Product</button>
@@ -10506,19 +10608,30 @@ async function fetchWalkInCustomer(){
   var mob=document.getElementById('wi-mobile').value.trim();
   if(mob.length!==10){alert('Please enter a valid 10-digit mobile number.');return;}
   try{
-    // Search in customers table first
     var custs=await sb('customers','GET',null,'?mobile=eq.'+mob);
     if(!custs||!custs.length){
-      // Try tickets table
       var tkts=await sb('tickets','GET',null,'?mobile=eq.'+mob+'&order=created_at.desc&limit=1');
       if(tkts&&tkts.length){
         document.getElementById('wi-name').value=tkts[0].cname||'';
+        var t=tkts[0];
+        var wadEl=document.getElementById('wi-address');if(wadEl&&!wadEl.value)wadEl.value=t.address||'';
+        var waEl=document.getElementById('wi-area');if(waEl)waEl.value=t.area||'';
+        var wpEl=document.getElementById('wi-pin');if(wpEl&&!wpEl.value&&t.pin){wpEl.value=t.pin;wpEl.dataset.pin=t.pin;}
         showToastWI('✅ Customer found from tickets!');return;
       }
       showToastWI('ℹ️ New customer — please enter their name');return;
     }
-    document.getElementById('wi-name').value=custs[0].name||custs[0].cname||'';
-    showToastWI('✅ Customer found: '+document.getElementById('wi-name').value);
+    var c=custs[0];
+    document.getElementById('wi-name').value=c.name||c.cname||'';
+    var wadEl=document.getElementById('wi-address');if(wadEl)wadEl.value=c.address||'';
+    var waEl=document.getElementById('wi-area');if(waEl)waEl.value=c.area||'';
+    var wpEl=document.getElementById('wi-pin');if(wpEl&&c.pin){wpEl.value=c.pin;wpEl.dataset.pin=c.pin;}
+    var wcEl=document.getElementById('wi-city');
+    if(c.state){
+      var wsEl=document.getElementById('wi-state');if(wsEl){wsEl.value=c.state;onWiStateChange();}
+      setTimeout(function(){if(wcEl&&c.city)wcEl.value=c.city;},150);
+    }else if(wcEl&&c.city){wcEl.value=c.city;}
+    showToastWI('✅ Customer found: '+(c.cname||c.name||''));
   }catch(e){showToastWI('Error: '+e.message);}
 }
 
@@ -10571,6 +10684,13 @@ async function saveWalkIn(){
     return;
   }
 
+  var wiAddrL1=((document.getElementById('wi-address')||{}).value||'').trim();
+  var wiAddrL2=((document.getElementById('wi-address2')||{}).value||'').trim();
+  var wiAddress=wiAddrL1+(wiAddrL2?', '+wiAddrL2:'');
+  var wiPin=(function(){var pe=document.getElementById('wi-pin');if(!pe)return'';if(pe.dataset.pin)return pe.dataset.pin;var m=(pe.value||'').match(/\d{5,6}/);return m?m[0]:pe.value||'';}());
+  var wiArea=((document.getElementById('wi-area')||{}).value||'').trim();
+  var wiCity=document.getElementById('wi-city')?.value||'';
+  var wiState=document.getElementById('wi-state')?.value||'';
   var today=new Date().toLocaleDateString('en-CA');
   // Determine routing wc_id
   var saveWcId=currentUser.user_id,saveWcName=currentUser.name;
@@ -10589,6 +10709,11 @@ async function saveWalkIn(){
       visit_date:today,
       mobile,
       customer_name:name,
+      address:wiAddress||null,
+      pin:wiPin||null,
+      area:wiArea||null,
+      city:wiCity||null,
+      state:wiState||null,
       arrival_time:arrival,
       departure_time:departure||null,
       products:products,
