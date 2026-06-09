@@ -2951,7 +2951,7 @@ async function renderDashboard(){
             <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">Unassigned</span>'}</td>
             <td>${statusBadge(t.status)}</td>
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td style="white-space:nowrap;">${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:t.status==='Repaired'?`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?` <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:''}`:t.status==='Sent to MSC'?`<button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;" onclick="openEngUpdate('${t.id}')">📬 Received?</button>`:t.status==='Pending for Delivery'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">🚚 Deliver</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
+            <td style="white-space:nowrap;">${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:t.status==='Repaired'?((currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`):t.status==='Sent to MSC'?`<button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;" onclick="openEngUpdate('${t.id}')">📬 Received?</button>`:t.status==='Pending for Delivery'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">🚚 Deliver</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
@@ -3543,7 +3543,6 @@ function ticketRow(t){
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
       ${!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn-icon" onclick="openAdminEdit('${t.id}')">✏️</button>`:''}
       <button class="btn-icon" title="Job Sheets" onclick="openJobSheets('${t.id}')">🖨️</button>
-      ${t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<button class="btn-icon" title="Mark Delivered" onclick="markDelivered('${t.id}')">✅</button>`:''}
     </td></tr>`;
 }
 function filterTickets(){
@@ -3654,9 +3653,7 @@ async function renderMyCalls(){
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'
             +statusBadge(t.status)
-            +((t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller'))
-              ?'<button onclick="markDelivered(\''+t.id+'\')" style="background:#059669;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Delivered</button>'
-              :'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Update</button>')
+            +'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Update</button>'
             +'</div>'
             +'</div>';
         }).join('')}
@@ -3685,8 +3682,7 @@ async function renderMyCalls(){
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
             <td style="white-space:nowrap;">${['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?
               `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
-              `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`
-              +((t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller'))?` <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:'')}
+              `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
             </td>
           </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>'}</tbody>
         </table></div>
@@ -4602,7 +4598,7 @@ async function openEngUpdate(id){
       <div class="form-group">
         <label>Status *</label>
         <select id="upd-status" onchange="onMSCStatusSelect(this.value)">
-          ${getAllowedStatuses(t.status,currentUser?.role||'engineer',t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
+          ${getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
         ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
@@ -4791,7 +4787,7 @@ async function saveEngUpdate(){
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
-  const allowedEng=getAllowedStatuses(t.status,currentUser?.role||'engineer',t.service_type,t.call_type,t.warranty_coverage);
+  const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
   if(status!==t.status && !allowedEng.includes(status)){
     alert('❌ Cannot change to "'+status+'" at this stage.\nCurrent: '+t.status+'\nAllowed: '+(allowedEng.length?allowedEng.join(', '):'None — contact Admin'));
     return;
@@ -8017,30 +8013,28 @@ async function printJobSheet(){
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');const isOOC=t.warranty_coverage==='Out of Coverage';
   const logoHtml=logoData?`<img src="${logoData}" style="max-height:50px;max-width:140px;object-fit:contain;">`:'';
   const win=window.open('','_blank','width=820,height=1000');
-  win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#000;padding:14px;}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:8px;}
-    .co-name{font-size:15px;font-weight:900;}.co-info{font-size:9px;color:#333;margin-top:2px;line-height:1.5;}
-    .js-right{text-align:right;}.js-title{font-size:13px;font-weight:700;}
-    .section{border:1px solid #999;border-radius:3px;margin-bottom:7px;}
-    .sec-title{background:#e8e8e8;padding:4px 8px;font-weight:700;font-size:10px;text-transform:uppercase;}
-    .sec-body{padding:6px 8px;}.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
-    .field{margin-bottom:4px;}.field label{font-size:8px;color:#555;text-transform:uppercase;display:block;}.field .val{font-size:10px;font-weight:700;border-bottom:1px solid #ccc;min-height:14px;padding-bottom:1px;}
-    table.sp{width:100%;border-collapse:collapse;font-size:10px;}table.sp th,table.sp td{border:1px solid #999;padding:3px 5px;}table.sp th{background:#e8e8e8;}
-    .sig-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
-    .sig-row-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:12px;}
-    .sig-box{border:1px solid #999;border-radius:3px;padding:6px;text-align:center;min-height:80px;}
-    .sig-line{border-top:1px solid #333;margin-top:50px;font-size:8px;color:#555;padding-top:3px;}
-    .void{background:#fee2e2;border:2px solid #f05252;padding:6px;font-weight:700;color:#dc2626;text-align:center;margin-bottom:7px;border-radius:3px;}
-    @media print{body{padding:8px;}}
+  win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;padding:8px;}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:6px;}
+    .co-name{font-size:14px;font-weight:900;}.co-info{font-size:8.5px;color:#333;margin-top:1px;line-height:1.4;}
+    .js-right{text-align:right;}.js-title{font-size:12px;font-weight:700;}
+    .section{border:1px solid #999;border-radius:3px;margin-bottom:4px;}
+    .sec-title{background:#e8e8e8;padding:3px 8px;font-weight:700;font-size:9px;text-transform:uppercase;}
+    .sec-body{padding:4px 8px;}.row2{display:grid;grid-template-columns:1fr 1fr;gap:5px;}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
+    .field{margin-bottom:2px;}.field label{font-size:7.5px;color:#555;text-transform:uppercase;display:block;}.field .val{font-size:10px;font-weight:700;border-bottom:1px solid #ccc;min-height:12px;padding-bottom:1px;}
+    table.sp{width:100%;border-collapse:collapse;font-size:9.5px;}table.sp th,table.sp td{border:1px solid #999;padding:2px 5px;}table.sp th{background:#e8e8e8;}
+    .sig-row-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:8px;}
+    .sig-box{border:1px solid #999;border-radius:3px;padding:5px;text-align:center;min-height:62px;}
+    .sig-line{border-top:1px solid #333;margin-top:36px;font-size:7.5px;color:#555;padding-top:2px;}
+    .void{background:#fee2e2;border:2px solid #f05252;padding:4px;font-weight:700;color:#dc2626;text-align:center;margin-bottom:4px;border-radius:3px;font-size:9px;}
+    @media print{body{padding:4px;}@page{size:A4;margin:6mm;}}
   </style></head><body>
     <div class="header">
       <div>${logoHtml}<div class="co-name">BHAVI ELECTRONICS & AUTOMATION</div>
         <div class="co-info">101, Shivalik-10, Opp. SBI Zonal Office, S.M. Road, Ambawadi, Ahmedabad-380015<br>079-26306293/94 | +91 9574004969</div></div>
       <div class="js-right"><div class="js-title">SERVICE JOB SHEET</div>
-        <div style="font-size:10px;margin-top:3px;">Ticket: <b>${t.id}</b></div>
-        <div style="font-size:10px;">JS: <b>${t.job_sheet||'-'}</b>${t.phys_js?' | Phys: '+t.phys_js:''}</div>
-        <div style="font-size:10px;">Date: <b>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</b></div>
-        ${t.se_call_id?`<div style="font-size:10px;">SE: <b>${t.se_call_id}</b></div>`:''}
+        <div style="font-size:9.5px;margin-top:2px;">Ticket: <b>${t.id}</b> &nbsp;|&nbsp; JS: <b>${t.job_sheet||'-'}</b>${t.phys_js?' | Phys: '+t.phys_js:''}</div>
+        <div style="font-size:9.5px;">Date: <b>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</b></div>
+        ${t.se_call_id?`<div style="font-size:9.5px;">SE: <b>${t.se_call_id}</b></div>`:''}
       </div>
     </div>
     ${isOOC?`<div class="void">⚠️ WARRANTY VOID — ${t.coverage_remark||''}</div>`:''}
@@ -8070,9 +8064,9 @@ async function printJobSheet(){
         <div class="field"><label>Problem</label><div class="val">${t.problem||''}</div></div>
         <div class="field"><label>Fault Code</label><div class="val">${t.fault_code||''}</div></div>
       </div>
-      <div class="field"><label>Description</label><div class="val" style="min-height:18px;">${t.description||''}</div></div>
-      <div class="field" style="margin-top:4px;"><label>Cause</label><div class="val" style="min-height:18px;">${t.cause||''}</div></div>
-      <div class="field" style="margin-top:6px;"><label>Action Taken</label><div class="val" style="min-height:36px;border-top:1px solid #e5e7eb;padding-top:4px;">${t.work_done||''}</div></div>
+      ${t.description?`<div class="field"><label>Description</label><div class="val">${t.description}</div></div>`:''}
+      ${t.cause?`<div class="field"><label>Cause</label><div class="val">${t.cause}</div></div>`:''}
+      <div class="field" style="margin-top:3px;"><label>Action Taken</label><div class="val" style="min-height:22px;">${t.work_done||''}</div></div>
     </div></div>
     ${t.service_type==='On Site'?`<div class="section"><div class="sec-title">Visit Details</div><div class="sec-body row3">
       <div class="field"><label>Date</label><div class="val">${t.visit_date||''}</div></div>
@@ -8085,18 +8079,19 @@ async function printJobSheet(){
     <div class="section"><div class="sec-title">Spares / Parts</div><div class="sec-body">
       <table class="sp"><thead><tr><th>Code</th><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
       <tbody>
-        ${sp.length?sp.filter(s=>!s.requested).map(s=>`<tr><td>${s.code||'-'}</td><td>${s.name}</td><td style="text-align:center;">${s.qty}</td><td style="text-align:right;">₹${s.price||0}</td><td style="text-align:right;">₹${((s.qty||0)*(s.price||0)).toFixed(2)}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#999;padding:6px;">No spares used</td></tr>'}
+        ${sp.length?sp.filter(s=>!s.requested).map(s=>`<tr><td>${s.code||'-'}</td><td>${s.name}</td><td style="text-align:center;">${s.qty}</td><td style="text-align:right;">₹${s.price||0}</td><td style="text-align:right;">₹${((s.qty||0)*(s.price||0)).toFixed(2)}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#999;padding:4px;">No spares used</td></tr>'}
         ${isOOC||!isW?`<tr style="background:#f5f5f5;font-weight:700;"><td colspan="4" style="text-align:right;">Parts</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>
         <tr><td colspan="4" style="text-align:right;">Service Charges</td><td style="text-align:right;">₹${svc.toFixed(2)}</td></tr>
         <tr><td colspan="4" style="text-align:right;">Other</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>
-        <tr style="background:#e8e8e8;font-weight:700;font-size:12px;"><td colspan="4" style="text-align:right;">Grand Total</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>`:''}
+        <tr style="background:#e8e8e8;font-weight:700;font-size:11px;"><td colspan="4" style="text-align:right;">Grand Total</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>`:''}
       </tbody></table>
     </div></div>
     <div class="section"><div class="sec-title">Feedback</div><div class="sec-body">
-      <div style="display:flex;gap:14px;align-items:center;margin-bottom:6px;font-size:10px;"><span>Rating:</span>
-        ${['Excellent','Good','Average','Poor'].map(r=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:11px;height:11px;border:1px solid #333;display:inline-block;"></span>${r}</span>`).join('')}
+      <div style="display:flex;gap:12px;align-items:center;font-size:9.5px;"><span>Rating:</span>
+        ${['Excellent','Good','Average','Poor'].map(r=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border:1px solid #333;display:inline-block;"></span>${r}</span>`).join('')}
+        &nbsp;&nbsp;<span style="color:#555;">Remarks:</span>
       </div>
-      <div class="field"><label>Remarks</label><div class="val" style="min-height:16px;">${t.eng_remarks||t.remarks||''}</div></div>
+      <div class="val" style="min-height:14px;margin-top:2px;">${t.eng_remarks||t.remarks||''}</div>
     </div></div>
     ${(()=>{
       const wct=(t.wc_type||'').toUpperCase();
@@ -17458,7 +17453,7 @@ function pendingListRender(){
         +'<span style="background:#fdf4ff;color:#7c3aed;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🟣 Ready for Pickup</span>'
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'—')+'</div></td>'
         +'<td style="padding:10px 12px;text-align:center;">'
-        +(isAdminOrWC?'<button onclick="markDelivered(\''+t.id+'\')" style="background:#059669;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600;">✅ Mark Delivered</button>':'<span style="font-size:11px;color:#9ca3af;">Awaiting pickup</span>')
+        +(isAdminOrWC?'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:600;">🔄 Update</button>':'<span style="font-size:11px;color:#9ca3af;">Awaiting pickup</span>')
         +'</td></tr>';
     });
     pickupSection='<div style="margin-bottom:20px;">'
