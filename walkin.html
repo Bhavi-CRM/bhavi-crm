@@ -170,12 +170,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <input class="inp" type="text" id="inp-name" autocomplete="name">
       </div>
       <div class="inp-group">
-        <label id="lbl-address-field">Address</label>
-        <input class="inp" type="text" id="inp-address" autocomplete="street-address">
+        <label id="lbl-address-field">Address Line 1</label>
+        <input class="inp" type="text" id="inp-address" autocomplete="street-address" placeholder="House No, Street, Building...">
       </div>
       <div class="inp-group">
-        <label id="lbl-area-field">Area / Society</label>
-        <input class="inp" type="text" id="inp-area" autocomplete="address-line2">
+        <label id="lbl-address2-field">Address Line 2</label>
+        <input class="inp" type="text" id="inp-address2" autocomplete="address-line2" placeholder="Society, Landmark, Colony...">
       </div>
       <div class="inp-group">
         <label id="lbl-state-field">State</label>
@@ -193,10 +193,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div class="inp-group">
           <label id="lbl-pin-field">Pin Code</label>
           <div style="position:relative;">
-            <input class="inp" type="tel" id="wi-pin" maxlength="6" autocomplete="off" placeholder="Type to search pin..." oninput="wiFilterPin(this.value)" onfocus="wiFilterPin(this.value)" onblur="setTimeout(function(){var d=document.getElementById('wi-pin-drop');if(d)d.style.display='none';},200)">
+            <input class="inp" type="text" id="wi-pin" autocomplete="off" placeholder="Type area or pin..." oninput="wiFilterPin(this.value)" onfocus="wiFilterPin(this.value)" onblur="setTimeout(function(){var d=document.getElementById('wi-pin-drop');if(d)d.style.display='none';},200)">
             <div id="wi-pin-drop" style="display:none;position:absolute;z-index:600;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1.5px solid #1a56db;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
           </div>
         </div>
+      </div>
+      <div class="inp-group">
+        <label id="lbl-area-field">Area</label>
+        <input class="inp" type="text" id="inp-area" placeholder="Auto-filled from Pin Code" readonly style="background:#f8fafc;color:#64748b;cursor:not-allowed;">
       </div>
     </div>
     <button class="btn-primary" onclick="submitCustomer()" style="margin-top:18px;"><span id="lbl-confirm">Confirm &amp; Continue →</span></button>
@@ -616,9 +620,11 @@ function submitCustomer(){
   state.name=name;
   state.state_=(document.getElementById('wi-state')||{}).value||'';
   state.city=(document.getElementById('wi-city')||{}).value||'';
-  state.pin=(document.getElementById('wi-pin')||{}).value||'';
+  var _wpEl=document.getElementById('wi-pin');state.pin=(_wpEl&&_wpEl.dataset.pin)||(_wpEl&&_wpEl.value)||'';
   state.area=(document.getElementById('inp-area')||{}).value||'';
-  state.address=(document.getElementById('inp-address')||{}).value||'';
+  var _wl1=(document.getElementById('inp-address')||{}).value||'';
+  var _wl2=(document.getElementById('inp-address2')||{}).value||'';
+  state.address=_wl1+(_wl2?', '+_wl2:'');
   goPage('pg-category');
 }
 
@@ -1055,8 +1061,8 @@ function wiFilterPin(val){
       if(rows&&rows.length){
         drop.innerHTML=rows.map(function(r){
           var safeArea=(r.area||'').replace(/'/g,'&#39;');
-          var displayText=r.pincode+(r.area?'-'+r.area:'');
-          return'<div onmousedown="wiSelectPin(\''+r.pincode+'\',\''+safeArea+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-weight:600;">'+displayText+'</span>'+(r.district?'<span style="font-size:12px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+r.district+'</span>':'')+'</div>';
+          var displayText=(r.area?r.area+' - ':'')+r.pincode;
+          return'<div onmousedown="wiSelectPin(\''+r.pincode+'\',\''+safeArea+'\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-weight:600;color:#1a3fa8;">'+displayText+'</span>'+(r.district?'<span style="font-size:12px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+r.district+'</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
       }
@@ -1070,8 +1076,8 @@ function wiFilterPin(val){
   },200);
 }
 function wiSelectPin(pin,area){
-  document.getElementById('wi-pin').value=pin;
-  var areaEl=document.getElementById('inp-area');if(areaEl&&area&&!areaEl.value)areaEl.value=area;
+  var el=document.getElementById('wi-pin');if(el){el.value=pin;el.dataset.pin=pin;}
+  var areaEl=document.getElementById('inp-area');if(areaEl&&area)areaEl.value=area;
   var drop=document.getElementById('wi-pin-drop');if(drop)drop.style.display='none';
 }
 
