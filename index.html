@@ -8296,15 +8296,30 @@ async function doVisitStart(ticketId){
   const dateNow=now.toLocaleDateString('en-CA');
   const memberId=currentUser.eng_id||currentUser.user_id;
 
-  // Block if already an OPEN log exists
+  // Block if already an OPEN log exists (auto-close stale logs for already-closed tickets)
   try{
     const openLogs=await sb('work_logs','GET',null,
       '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN');
     if(openLogs&&openLogs.length){
       const ol=openLogs[0];
-      const isWork=ol.log_type==='work';
-      alert('⚠️ A '+(isWork?'Work':'Traveling')+' log is already OPEN!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting a new Visit.');
-      return;
+      // Check if the associated ticket is already closed — if so, auto-close the stale log
+      let ticketClosed=false;
+      if(ol.ticket_id){
+        try{
+          const olT=await sb('tickets','GET',null,'?id=eq.'+ol.ticket_id);
+          if(olT&&olT[0]&&['Closed','Customer Reject','Call Cancel','Delivered'].includes(olT[0].status)){
+            ticketClosed=true;
+          }
+        }catch(ex2){}
+      }
+      if(ticketClosed){
+        // Auto-close the stale open log
+        try{await sb('work_logs','PATCH',{to_time:timeNow,updated_at:now.toISOString()},'?id=eq.'+ol.id);}catch(ex3){}
+      }else{
+        const isWork=ol.log_type==='work';
+        alert('⚠️ A '+(isWork?'Work':'Traveling')+' log is already OPEN!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting a new Visit.');
+        return;
+      }
     }
   }catch(ex){}
 
@@ -8339,13 +8354,27 @@ async function doWorkStart(ticketId){
   const dateIn = now.toLocaleDateString('en-CA');
   const memberId=currentUser.eng_id||currentUser.user_id;
 
-  // Block if already a WORK OPEN log exists (not travel — travel should auto-close)
+  // Block if already a WORK OPEN log exists (auto-close stale logs for already-closed tickets)
   try{
     const openLogs=await sb('work_logs','GET',null,
       '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN&log_type=eq.work');
     if(openLogs&&openLogs.length){
-      alert('⚠️ A Work call is already in progress!\n\n"'+openLogs[0].task_description+'"\n\nPlease close that call first before starting this one.');
-      return;
+      const ol=openLogs[0];
+      let ticketClosed=false;
+      if(ol.ticket_id){
+        try{
+          const olT=await sb('tickets','GET',null,'?id=eq.'+ol.ticket_id);
+          if(olT&&olT[0]&&['Closed','Customer Reject','Call Cancel','Delivered'].includes(olT[0].status)){
+            ticketClosed=true;
+          }
+        }catch(ex2){}
+      }
+      if(ticketClosed){
+        try{await sb('work_logs','PATCH',{to_time:timeIn,updated_at:new Date().toISOString()},'?id=eq.'+ol.id);}catch(ex3){}
+      }else{
+        alert('⚠️ A Work call is already in progress!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting this one.');
+        return;
+      }
     }
   }catch(ex){}
 
