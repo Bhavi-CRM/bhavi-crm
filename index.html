@@ -2951,7 +2951,7 @@ async function renderDashboard(){
             <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">Unassigned</span>'}</td>
             <td>${statusBadge(t.status)}</td>
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td style="white-space:nowrap;">${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:t.status==='Repaired'?`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button> <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:t.status==='Sent to MSC'?`<button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;" onclick="openEngUpdate('${t.id}')">📬 Received?</button>`:t.status==='Pending for Delivery'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">🚚 Deliver</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
+            <td style="white-space:nowrap;">${currentUser.role==='engineer'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`:t.status==='Repaired'?`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?` <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:''}`:t.status==='Sent to MSC'?`<button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;" onclick="openEngUpdate('${t.id}')">📬 Received?</button>`:t.status==='Pending for Delivery'?`<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">🚚 Deliver</button>`:`<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`}</td>
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
@@ -3542,7 +3542,7 @@ function ticketRow(t){
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
       ${!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn-icon" onclick="openAdminEdit('${t.id}')">✏️</button>`:''}
-      <button class="btn-icon" onclick="viewTicket('${t.id}',true)">🖨️</button>
+      <button class="btn-icon" title="Job Sheets" onclick="openJobSheets('${t.id}')">🖨️</button>
       ${t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<button class="btn-icon" title="Mark Delivered" onclick="markDelivered('${t.id}')">✅</button>`:''}
     </td></tr>`;
 }
@@ -3654,7 +3654,7 @@ async function renderMyCalls(){
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'
             +statusBadge(t.status)
-            +(t.status==='Repaired'
+            +((t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller'))
               ?'<button onclick="markDelivered(\''+t.id+'\')" style="background:#059669;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Delivered</button>'
               :'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Update</button>')
             +'</div>'
@@ -3685,9 +3685,8 @@ async function renderMyCalls(){
             <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
             <td style="white-space:nowrap;">${['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?
               `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
-              t.status==='Repaired'?
-              `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button> <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:
-              `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
+              `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`
+              +((t.status==='Repaired'&&(currentUser.role==='admin'||currentUser.role_type==='work_controller'))?` <button class="btn btn-sm" style="background:#059669;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;" onclick="markDelivered('${t.id}')">✅ Delivered</button>`:'')}
             </td>
           </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>'}</tbody>
         </table></div>
@@ -4097,7 +4096,7 @@ async function viewTicket(id,autoPrint=false){
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
-      <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
+      <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button> <button class="btn btn-sm" onclick="openJobSheets('${t.id}')" style="background:#0891b2;color:#fff;border:none;">📋 Job Sheets</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
     </div>`;
   }
@@ -8153,6 +8152,116 @@ async function printJobSheet(){
     </div>
     <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
   </body></html>`);win.document.close();
+}
+
+// ─── INWARD + OUTWARD JOB SHEETS (single A4 page) ────────────────────────────
+async function openJobSheets(id){
+  let t;
+  try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
+  if(!t)return;
+  const sp=t.spares||[];
+  const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
+  const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
+  const other=parseFloat(t.other_charge)||0;
+  const grand=partsTotal+svc+other;
+  const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  const isOOC=t.warranty_coverage==='Out of Coverage';
+  const logoHtml=logoData?`<img src="${logoData}" style="max-height:44px;max-width:120px;object-fit:contain;">`:'';
+  const inDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'';
+  const closedAt=t.timeline?(t.timeline.filter(x=>x.action&&(x.action.includes('Delivered')||x.action.includes('Closed'))).slice(-1)[0]||null):null;
+  const outDate=closedAt?new Date(closedAt.at).toLocaleDateString('en-IN'):'___________';
+  const win=window.open('','_blank','width=820,height=1100');
+  const headerBlock=(title,date)=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px;">
+      <div>${logoHtml}<div style="font-size:14px;font-weight:900;margin-top:2px;">BHAVI ELECTRONICS &amp; AUTOMATION</div>
+        <div style="font-size:8px;color:#444;margin-top:1px;line-height:1.5;">101, Shivalik-10, Opp. SBI Zonal Office, S.M. Road, Ambawadi, Ahmedabad-380015<br>079-26306293/94 | +91 9574004969</div></div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:800;color:#1d4ed8;">${title}</div>
+        <div style="font-size:10px;margin-top:2px;">Ticket: <b>${t.id}</b> &nbsp;|&nbsp; JS: <b>${t.job_sheet||t.id}</b></div>
+        <div style="font-size:10px;">Date: <b>${date}</b></div>
+        ${t.se_call_id?`<div style="font-size:10px;">SE Call ID: <b>${t.se_call_id}</b></div>`:''}
+      </div>
+    </div>`;
+  const custBlock=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
+      <div>
+        <div class="field"><label>Customer Name</label><div class="val">${t.cname||''}</div></div>
+        <div class="field"><label>Mobile</label><div class="val">${t.mobile||''}${t.alt_mobile?' / '+t.alt_mobile:''}</div></div>
+        <div class="field"><label>Address</label><div class="val">${t.address||''}${t.area?', '+t.area:''}</div></div>
+      </div>
+      <div>
+        <div class="field"><label>Model</label><div class="val"><b>${t.model||''}</b></div></div>
+        <div class="field"><label>Serial No</label><div class="val">${t.serial||''}</div></div>
+        <div class="field"><label>Brand / Type</label><div class="val">${t.brand_name||''} &nbsp;|&nbsp; ${t.call_type||''} &nbsp;|&nbsp; ${t.service_type||''}</div></div>
+      </div>
+    </div>`;
+  const sigRow=(l1,l2,l3)=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
+      <div class="sig-box"><div class="sig-title">${l1}</div><div class="sig-line">Signature &amp; Date</div></div>
+      <div class="sig-box"><div class="sig-title">${l2}</div><div class="sig-line">Signature &amp; Date</div></div>
+      <div class="sig-box"><div class="sig-title">${l3}</div><div class="sig-line">Signature &amp; Date</div></div>
+    </div>`;
+  win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;font-size:10px;color:#000;padding:12px;}
+    .half{padding:10px 0;}.sec{border:1px solid #aaa;border-radius:3px;margin-bottom:6px;}
+    .sec-title{background:#e0e0e0;padding:3px 8px;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.4px;}
+    .sec-body{padding:5px 8px;}
+    .field{margin-bottom:3px;}.field label{font-size:7.5px;color:#555;text-transform:uppercase;display:block;letter-spacing:.3px;}
+    .field .val{font-size:10px;font-weight:700;border-bottom:1px solid #ccc;min-height:13px;padding-bottom:1px;}
+    table.sp{width:100%;border-collapse:collapse;font-size:9px;}table.sp th,table.sp td{border:1px solid #aaa;padding:3px 5px;}table.sp th{background:#e8e8e8;text-align:left;}
+    .sig-box{border:1px solid #999;border-radius:3px;padding:6px;text-align:center;min-height:70px;background:#fafafa;}
+    .sig-title{font-weight:800;font-size:9px;margin-bottom:2px;text-transform:uppercase;}
+    .sig-line{border-top:1px solid #333;margin-top:46px;font-size:7.5px;color:#555;padding-top:2px;}
+    .cut{border-top:1.5px dashed #aaa;text-align:center;color:#aaa;font-size:8px;letter-spacing:2px;padding:3px 0;margin:8px 0;}
+    .total-row{background:#f0fdf4;font-weight:700;}
+    @media print{body{padding:6px;}@page{margin:8mm;}}
+  </style></head><body>
+
+  <!-- ===== INWARD SECTION ===== -->
+  <div class="half">
+    ${headerBlock('📥 INWARD JOB SHEET',inDate)}
+    ${custBlock}
+    <div class="sec"><div class="sec-title">Problem / Complaint</div><div class="sec-body">
+      <div class="field"><label>Problem Reported by Customer</label><div class="val" style="min-height:16px;">${t.problem||''}</div></div>
+      ${t.description?`<div class="field"><label>Description</label><div class="val" style="min-height:14px;">${t.description}</div></div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;">
+        <div class="field"><label>Condition</label><div class="val">${t.condition||''}</div></div>
+        <div class="field"><label>Accessories</label><div class="val">${t.accessories||''}</div></div>
+        <div class="field"><label>Re-Repair</label><div class="val">${t.rerepair||'No'}</div></div>
+      </div>
+    </div></div>
+    ${isOOC?`<div style="background:#fee2e2;border:1.5px solid #f05252;padding:5px 8px;font-weight:700;color:#dc2626;margin-bottom:6px;border-radius:3px;font-size:9px;">⚠️ WARRANTY VOID — ${t.coverage_remark||''}</div>`:''}
+    ${sigRow('RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>','ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER<br><span style="font-size:8px;font-weight:400;">I confirm product submitted</span>')}
+  </div>
+
+  <!-- ===== CUT LINE ===== -->
+  <div class="cut">✂ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ✂</div>
+
+  <!-- ===== OUTWARD SECTION ===== -->
+  <div class="half">
+    ${headerBlock('📤 OUTWARD / DELIVERY SHEET',outDate)}
+    ${custBlock}
+    <div class="sec"><div class="sec-title">Work Done &amp; Parts Used</div><div class="sec-body">
+      <div class="field"><label>Action Taken / Work Done</label><div class="val" style="min-height:18px;">${t.work_done||''}</div></div>
+      ${t.fault_code?`<div class="field"><label>Fault Code</label><div class="val">${t.fault_code}</div></div>`:''}
+      <table class="sp" style="margin-top:6px;">
+        <thead><tr><th style="width:15%">Code</th><th>Part Description</th><th style="width:10%;text-align:center;">Qty</th><th style="width:15%;text-align:right;">Unit ₹</th><th style="width:15%;text-align:right;">Amount</th></tr></thead>
+        <tbody>
+          ${sp.length?sp.filter(s=>!s.requested).map(s=>`<tr><td>${s.code||'-'}</td><td>${s.name}</td><td style="text-align:center;">${s.qty}</td><td style="text-align:right;">₹${s.price||0}</td><td style="text-align:right;">₹${((s.qty||0)*(s.price||0)).toFixed(0)}</td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#999;padding:4px;">No parts replaced</td></tr>'}
+          ${(isOOC||!isW)&&(svc>0||partsTotal>0||other>0)?`
+          <tr><td colspan="4" style="text-align:right;font-size:9px;">Service Charges</td><td style="text-align:right;">₹${svc.toFixed(0)}</td></tr>
+          ${other>0?`<tr><td colspan="4" style="text-align:right;font-size:9px;">Other Charges</td><td style="text-align:right;">₹${other.toFixed(0)}</td></tr>`:''}
+          <tr class="total-row"><td colspan="4" style="text-align:right;font-size:10px;">GRAND TOTAL</td><td style="text-align:right;font-size:11px;color:#065f46;">₹${grand.toFixed(0)}</td></tr>`:''}
+        </tbody>
+      </table>
+    </div></div>
+    ${sigRow('RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>','ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER<br><span style="font-size:8px;font-weight:400;">I confirm satisfactory completion</span>')}
+  </div>
+
+  <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
+  </body></html>`);
+  win.document.close();
 }
 
 // ─── LABEL PRINT (1.5" × 3" — physical label printer) ────────────────────────
