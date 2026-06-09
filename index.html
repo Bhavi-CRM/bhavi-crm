@@ -2770,9 +2770,9 @@ async function renderDashboard(){
     if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc&limit=300';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}}
     try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=300');}
     const total=allTickets.length;
-    const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
+    const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)).length;
     const closed=allTickets.filter(t=>t.status==='Closed').length;
-    const unalloc=allTickets.filter(t=>t.status==='Pending Allocation').length;
+    const unalloc=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
     const pendingApproval=allTickets.filter(t=>t.status==='Pending Customer Approval').length;
 
     // Premium dashboard charts
@@ -2818,8 +2818,8 @@ async function renderDashboard(){
       const _ctMax=Math.max(warranty,nonWarranty,amc,1);
       const _ciW=Math.max(0,ciActive-ciPendParts-ciPendRep);
       const _osW=Math.max(0,osActive-osPendParts-osPendRep);
-      const _ciSeg=[{l:'Working',v:_ciW,c:'#1d4ed8'},{l:'Pend.Parts',v:ciPendParts,c:'#d97706'},{l:'Pend.Repair',v:ciPendRep,c:'#7c3aed'},{l:'Closed',v:ciClosed,c:'#0d9488'}].filter(function(s){return s.v>0;});
-      const _osSeg=[{l:'Working',v:_osW,c:'#0891b2'},{l:'Pend.Parts',v:osPendParts,c:'#d97706'},{l:'Pend.Repair',v:osPendRep,c:'#7c3aed'},{l:'Closed',v:osClosed,c:'#0d9488'}].filter(function(s){return s.v>0;});
+      const _ciSeg=[{l:'Working',v:_ciW,c:'#2563eb'},{l:'Pend.Parts',v:ciPendParts,c:'#f59e0b'},{l:'Pend.Repair',v:ciPendRep,c:'#ef4444'},{l:'Closed',v:ciClosed,c:'#22c55e'}].filter(function(s){return s.v>0;});
+      const _osSeg=[{l:'Working',v:_osW,c:'#2563eb'},{l:'Pend.Parts',v:osPendParts,c:'#f59e0b'},{l:'Pend.Repair',v:osPendRep,c:'#ef4444'},{l:'Closed',v:osClosed,c:'#22c55e'}].filter(function(s){return s.v>0;});
 
       chartHtml=`
       <!-- KPI Row 2: Status breakdown -->
@@ -2936,9 +2936,9 @@ async function renderDashboard(){
       </div>
       <div class="kpi-prem-grid">
         <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('All Tickets',allTickets)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">All time records</div></div>
-        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets',allTickets.filter(function(t){return !['Closed','Customer Reject','Call Cancel'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline now</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets',allTickets.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline now</div></div>
         <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets',allTickets.filter(function(t){return t.status==='Closed';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
-        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail(currentUser.role==='admin'?'Pending Allocation':'Pending Approval',allTickets.filter(function(t){return currentUser.role==='admin'?t.status==='Pending Allocation':t.status==='Pending Customer Approval';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">${currentUser.role==='admin'?'Pend. Allocation':'Pend. Approval'}</div><span class="kp-icon">⏳</span></div><div class="kp-val">${currentUser.role==='admin'?unalloc:pendingApproval}</div><div class="kp-sub">Needs attention</div></div>
+        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets',allTickets.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
       </div>
       ${engChartHtml}
       ${chartHtml}
@@ -7999,7 +7999,7 @@ function openSignature(id){
 }
 function initSig(){sigCanvas=document.getElementById('sig-canvas');sigCtx=sigCanvas.getContext('2d');sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.strokeStyle='#1d4ed8';sigCtx.lineWidth=2;sigCtx.lineCap='round';sigCanvas.onmousedown=e=>{sigDrawing=true;const r=sigCanvas.getBoundingClientRect();sigCtx.beginPath();sigCtx.moveTo(e.clientX-r.left,e.clientY-r.top);};sigCanvas.onmousemove=e=>{if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();sigCtx.lineTo(e.clientX-r.left,e.clientY-r.top);sigCtx.stroke();};sigCanvas.onmouseup=()=>sigDrawing=false;sigCanvas.ontouchstart=e=>{e.preventDefault();sigDrawing=true;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.beginPath();sigCtx.moveTo(t.clientX-r.left,t.clientY-r.top);};sigCanvas.ontouchmove=e=>{e.preventDefault();if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.lineTo(t.clientX-r.left,t.clientY-r.top);sigCtx.stroke();};sigCanvas.ontouchend=()=>sigDrawing=false;}
 function clearSig(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);}}
-async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');alert('Signature saved! ✅');}catch(e){alert(e.message);}}
+async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');if(t&&t.service_type==='On Site'&&t.status==='Closed'){showFeedbackSharePrompt(sigPendingId,t.cname||'Customer',t.mobile||'',currentUser.name||'');}else{alert('Signature saved! ✅');}}catch(e){alert(e.message);}}
 
 // JOB SHEET PRINT - Point 12: no meter photos, has signature
 async function printJobSheet(){
