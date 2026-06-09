@@ -8086,34 +8086,30 @@ async function printJobSheet(){
         <tr style="background:#e8e8e8;font-weight:700;font-size:11px;"><td colspan="4" style="text-align:right;">Grand Total</td><td style="text-align:right;">₹${grand.toFixed(2)}</td></tr>`:''}
       </tbody></table>
     </div></div>
-    <div class="section"><div class="sec-title">Feedback</div><div class="sec-body">
-      <div style="display:flex;gap:12px;align-items:center;font-size:9.5px;"><span>Rating:</span>
-        ${['Excellent','Good','Average','Poor'].map(r=>`<span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;border:1px solid #333;display:inline-block;"></span>${r}</span>`).join('')}
-        &nbsp;&nbsp;<span style="color:#555;">Remarks:</span>
-      </div>
-      <div class="val" style="min-height:14px;margin-top:2px;">${t.eng_remarks||t.remarks||''}</div>
-    </div></div>
     ${(()=>{
       const wct=(t.wc_type||'').toUpperCase();
       const items=(wct==='ICP')?[
-        'Only service/inspection charges communicated at this time. Parts estimated separately after diagnosis.',
-        'Repair carries 7-day warranty on same problem & replaced parts.',
-        'If estimate rejected: <b>Rs. 295 inspection charge payable</b>.'
+        'At this time, only the service/inspection charges have been communicated.',
+        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
+        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
+        'If the repair estimate is rejected, a <b>Rs. 295 inspection charge is compulsory and payable</b>.'
       ]:(wct==='CSP')?[
-        'Only service/inspection charges communicated at this time. Parts estimated separately after diagnosis.',
-        'Repair carries 7-day warranty on same problem & replaced parts.',
-        'If estimate rejected: <b>Rs. 413 inspection charges payable</b> (waived if repair completed).'
+        'At this time, only the service/inspection charges have been communicated.',
+        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
+        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
+        'If the repair estimate is rejected, <b>Rs. 413 inspection charges are payable</b> (waived if repair is completed).',
+        'If a higher estimate is declined, <b>Rs. 413</b> inspection charges are payable.'
       ]:null;
       if(!items)return '';
-      return `<div style="margin-top:5px;border:1px solid #374151;border-radius:3px;font-size:8px;color:#1f2937;overflow:hidden;">
-        <div style="background:#374151;color:#fff;padding:2px 8px;font-size:8px;font-weight:700;text-align:center;">Terms &amp; Conditions (${wct})</div>
-        <div style="padding:3px 8px;line-height:1.5;">${items.map((t,i)=>`${i+1}. ${t}`).join(' &nbsp;|&nbsp; ')}</div>
+      return `<div style="margin-top:5px;border:1.5px solid #374151;border-radius:3px;font-size:8.5px;color:#1f2937;overflow:hidden;">
+        <div style="background:#374151;color:#fff;padding:3px 10px;font-size:8.5px;font-weight:700;text-align:center;letter-spacing:0.5px;">★ ★ &nbsp; Terms &amp; Conditions (${wct}) &nbsp; ★ ★</div>
+        <div style="padding:5px 10px;line-height:1.7;">${items.map((txt,i)=>`<div style="display:flex;gap:5px;"><span style="min-width:14px;font-weight:700;">${i+1}.</span><span>${txt}</span></div>`).join('')}</div>
       </div>`;
     })()}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">RECEPTIONIST</div>
-        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.wc_name||'Reception'}</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">ENGINEER</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.assigned_name||''}</div>
         <div class="sig-line">Signature &amp; Date</div>
       </div>
       <div class="sig-box">
@@ -8124,8 +8120,8 @@ async function printJobSheet(){
         <div class="sig-line">I confirm product &amp; completion</div>
       </div>
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">ENGINEER</div>
-        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.assigned_name||''}</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">RECEPTIONIST</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.wc_name||'Reception'}</div>
         <div class="sig-line">Signature &amp; Date</div>
       </div>
     </div>
@@ -17397,6 +17393,7 @@ function pendingListRender(){
 
   var wcFilter=window._pendingWCFilter||'CSP';
   var brandFilter=window._pendingBrandFilter||'';
+  var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
   var searchQ=(window._pendingSearch||'').toLowerCase();
 
   // Split: Ready for Pickup (Repaired) vs actionable (all other statuses)
@@ -17410,6 +17407,7 @@ function pendingListRender(){
 
   var filtered=actionable.filter(function(t){
     if(wcFilter && t.wc_type!==wcFilter)return false;
+    if(serviceFilter && t.service_type!==serviceFilter)return false;
     if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
     if(searchQ){
       var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
@@ -17556,12 +17554,17 @@ function pendingListRender(){
     +'<option value="ICP"'+(wcFilter==='ICP'?' selected':'')+'>ICP</option>'
     +'<option value="CSP"'+(wcFilter==='CSP'?' selected':'')+'>CSP</option>'
     +'</select>'
+    +'<select onchange="window._pendingServiceFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<option value="">All Types</option>'
+    +'<option value="On Site"'+(serviceFilter==='On Site'?' selected':'')+'>On Site</option>'
+    +'<option value="Carry In"'+(serviceFilter==='Carry In'?' selected':'')+'>Carry In</option>'
+    +'</select>'
     +'<select onchange="window._pendingBrandFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
     +'<option value="">All Brands</option>'
     +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
     +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
     +'</select>'
-    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingBrandFilter=\'\';pendingListRender();" '
+    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
     +'<span style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
