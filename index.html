@@ -17180,22 +17180,22 @@ function pendingListRender(){
   // TAT badge
   function tatBadge(tat_date){
     if(!tat_date)return'<span style="color:#9ca3af;font-size:11px;">—</span>';
-    // Date-only TATs (midnight UTC) → treat deadline as end of that calendar day
     var isDO=/T00:00:00/.test(tat_date);
     var d=new Date(tat_date);
     var deadline=isDO?new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),23,59,59):d;
-    var timeStr=isDO?'End of Day':deadline.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-    var dateStr=deadline.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+    var tStr=isDO?'End of Day':deadline.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+    var dStr=deadline.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+    var label=dStr+' · '+tStr; // e.g. "09 Jun · 05:29 pm"
     var n=new Date();var diff=deadline-n;
-    if(diff<0)return'<span style="background:#fef2f2;color:#dc2626;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⚠️ Overdue</span><div style="font-size:10px;color:#dc2626;margin-top:2px;">'+timeStr+' · '+dateStr+'</div>';
+    if(diff<0)return'<span style="background:#fef2f2;color:#dc2626;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⚠️ '+label+'</span><div style="font-size:10px;color:#dc2626;margin-top:2px;">Overdue</div>';
     var hrs=Math.floor(diff/3600000);var mins=Math.round((diff%3600000)/60000);
-    var timeLeft=hrs>0?hrs+'h'+(mins?' '+mins+'m':''):mins+'m';
+    var timeLeft='⏰ '+( hrs>0?hrs+'h'+(mins?' '+mins+'m':''):mins+'m' )+' left';
     if(hrs<24){
       var bg=hrs<2?'#fee2e2':'#fef9c3';var col=hrs<2?'#dc2626':'#ca8a04';
-      return'<span style="background:'+bg+';color:'+col+';padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⏰ '+timeLeft+' left</span><div style="font-size:10px;color:'+col+';margin-top:2px;">'+timeStr+' · '+dateStr+'</div>';
+      return'<span style="background:'+bg+';color:'+col+';padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+label+'</span><div style="font-size:10px;color:'+col+';margin-top:2px;">'+timeLeft+'</div>';
     }
     var days=Math.floor(hrs/24);
-    return'<span style="background:#f0fdf4;color:#15803d;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">✅ '+days+'d left</span><div style="font-size:10px;color:#6b7280;margin-top:2px;">'+timeStr+' · '+dateStr+'</div>';
+    return'<span style="background:#f0fdf4;color:#15803d;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+label+'</span><div style="font-size:10px;color:#6b7280;margin-top:2px;">✅ '+days+'d left</div>';
   }
 
   // Status badge colors
