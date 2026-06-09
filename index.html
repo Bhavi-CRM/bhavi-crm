@@ -3579,13 +3579,31 @@ async function renderMyCalls(){
         </div>
         ${todayRoute.map((t,i)=>{
           var tatHtml='';
-          if(t.tat_date){var diff=new Date(t.tat_date)-new Date();var hrs=Math.round(diff/3600000);tatHtml=hrs<0?'<span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⚠️ Overdue</span>':hrs<4?'<span style="background:#fef9c3;color:#ca8a04;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⏰ '+hrs+'h left</span>':'<span style="background:#f0fdf4;color:#15803d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">✅ '+hrs+'h</span>';}
+          if(t.tat_date){
+            var isDO=/T00:00:00/.test(t.tat_date);
+            var td=new Date(t.tat_date);
+            var tdl=isDO?new Date(td.getUTCFullYear(),td.getUTCMonth(),td.getUTCDate(),23,59,59):td;
+            var ttStr=isDO?'End of Day':tdl.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+            var tdStr=tdl.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+            var tlabel=tdStr+' · '+ttStr;
+            var diff=tdl-new Date();
+            if(diff<0){
+              tatHtml='<span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;">⚠️ '+tlabel+'</span><div style="font-size:10px;color:#dc2626;">Overdue</div>';
+            }else{
+              var hrs=Math.floor(diff/3600000);var mins=Math.round((diff%3600000)/60000);
+              var tleft=(hrs>0?hrs+'h'+(mins?' '+mins+'m':''):mins+'m')+' left';
+              var tbg=hrs<2?'#fee2e2':hrs<24?'#fef9c3':'#f0fdf4';
+              var tcol=hrs<2?'#dc2626':hrs<24?'#ca8a04':'#15803d';
+              tatHtml='<span style="background:'+tbg+';color:'+tcol+';padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;">'+tlabel+'</span><div style="font-size:10px;color:'+tcol+';">⏰ '+tleft+'</div>';
+            }
+          }
           return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
             +'<div style="width:28px;height:28px;background:#1d4ed8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">'+(i+1)+'</div>'
             +'<div style="flex:1;min-width:0;">'
             +'<div style="font-weight:700;font-size:13px;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
             +'<div style="font-size:12px;color:var(--text-muted);">'+(t.cname||'-')+' &nbsp;·&nbsp; '+(t.area||t.city||'-')+'</div>'
-            +'<div style="font-size:11px;color:var(--text-muted);">'+(t.model||'-')+(tatHtml?' &nbsp;'+tatHtml:'')+'</div>'
+            +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'+(t.model||'-')+'</div>'
+            +(tatHtml?'<div style="margin-top:4px;">'+tatHtml+'</div>':'')
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;">'
             +statusBadge(t.status)
