@@ -3542,7 +3542,7 @@ function ticketRow(t){
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
       ${!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn-icon" onclick="openAdminEdit('${t.id}')">✏️</button>`:''}
-      <button class="btn-icon" title="Job Sheets" onclick="openJobSheets('${t.id}')">🖨️</button>
+      <button class="btn-icon" title="Print Job Sheet" onclick="viewingTicketId='${t.id}';printJobSheet()">🖨️</button>
     </td></tr>`;
 }
 function filterTickets(){
@@ -4092,7 +4092,7 @@ async function viewTicket(id,autoPrint=false){
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
-      <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button> <button class="btn btn-sm" onclick="openJobSheets('${t.id}')" style="background:#0891b2;color:#fff;border:none;">📋 Job Sheets</button>
+      <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
     </div>`;
   }
@@ -8095,54 +8095,38 @@ async function printJobSheet(){
     </div></div>
     ${(()=>{
       const wct=(t.wc_type||'').toUpperCase();
-      const noteStyle='margin-top:10px;border:1.5px solid #374151;border-radius:4px;font-size:8.5px;color:#1f2937;overflow:hidden;';
-      const titleStyle='background:#374151;color:#fff;padding:4px 10px;font-size:8.5px;font-weight:700;text-align:center;letter-spacing:0.5px;';
-      const bodyStyle='padding:7px 10px;line-height:1.0;';
-      const dot='<span style="color:#6b7280;margin:0 4px;">●</span>';
       const items=(wct==='ICP')?[
-        'At this time, only the service/inspection charges have been communicated.',
-        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
-        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
-        'If the repair estimate is rejected, a <b>Rs. 295 inspection charge is compulsory and payable</b>.'
+        'Only service/inspection charges communicated at this time. Parts estimated separately after diagnosis.',
+        'Repair carries 7-day warranty on same problem & replaced parts.',
+        'If estimate rejected: <b>Rs. 295 inspection charge payable</b>.'
       ]:(wct==='CSP')?[
-        'At this time, only the service/inspection charges have been communicated.',
-        'Additional parts may be required after engineer diagnosis and will be estimated separately.',
-        'Repair carries a <b>7-day testing warranty</b> on the same problem and replaced parts.',
-        'If the repair estimate is rejected, <b>Rs. 413 inspection charges are payable</b> (waived if repair is completed).',
-        'If a higher estimate is declined, <b>Rs. 413</b> inspection charges are payable.'
+        'Only service/inspection charges communicated at this time. Parts estimated separately after diagnosis.',
+        'Repair carries 7-day warranty on same problem & replaced parts.',
+        'If estimate rejected: <b>Rs. 413 inspection charges payable</b> (waived if repair completed).'
       ]:null;
       if(!items)return '';
-      const label=wct==='ICP'?'ICP':'CSP';
-      return `<div style="${noteStyle}">
-        <div style="${titleStyle}">★ ★ &nbsp; Terms &amp; Conditions (${label}) &nbsp; ★ ★</div>
-        <div style="${bodyStyle}">
-          ${items.map((txt,i)=>`<div style="display:flex;align-items:flex-start;gap:5px;margin-bottom:${i<items.length-1?'4':'0'}px;">${dot}<span>${txt}</span></div>`).join('')}
-        </div>
+      return `<div style="margin-top:5px;border:1px solid #374151;border-radius:3px;font-size:8px;color:#1f2937;overflow:hidden;">
+        <div style="background:#374151;color:#fff;padding:2px 8px;font-size:8px;font-weight:700;text-align:center;">Terms &amp; Conditions (${wct})</div>
+        <div style="padding:3px 8px;line-height:1.5;">${items.map((t,i)=>`${i+1}. ${t}`).join(' &nbsp;|&nbsp; ')}</div>
       </div>`;
     })()}
-    <div class="sig-row-4">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:3px;">RECEPTIONIST</div>
-        <div style="font-size:8px;color:#555;margin-bottom:2px;">${t.wc_name||'Reception'}</div>
-        <div class="sig-line">Signature & Date</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">RECEPTIONIST</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.wc_name||'Reception'}</div>
+        <div class="sig-line">Signature &amp; Date</div>
       </div>
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:3px;">CUSTOMER — INWARD</div>
-        <div style="font-size:8px;color:#555;margin-bottom:2px;">Product Received for Service</div>
-        ${t.customer_signature?`<img src="${t.customer_signature}" style="max-height:42px;margin-top:2px;">`:
-        '<div style="height:42px;"></div>'}
-        <div class="sig-line">I confirm product submitted</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">CUSTOMER</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">Product Received / Delivered</div>
+        ${t.customer_signature?`<img src="${t.customer_signature}" style="max-height:36px;margin-top:2px;">`:
+        '<div style="height:36px;"></div>'}
+        <div class="sig-line">I confirm product &amp; completion</div>
       </div>
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:3px;">CUSTOMER — DELIVERY</div>
-        <div style="font-size:8px;color:#555;margin-bottom:2px;">Product Delivered / Work Done</div>
-        <div style="height:42px;"></div>
-        <div class="sig-line">I confirm satisfactory completion</div>
-      </div>
-      <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:3px;">ENGINEER</div>
-        <div style="font-size:8px;color:#555;margin-bottom:2px;">${t.assigned_name||''}</div>
-        <div class="sig-line">Signature & Date</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">ENGINEER</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.assigned_name||''}</div>
+        <div class="sig-line">Signature &amp; Date</div>
       </div>
     </div>
     <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
@@ -17396,7 +17380,7 @@ async function renderPendingList(){
   pc.innerHTML='<div style="padding:20px;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
   try{
     var tickets=await sb('tickets','GET',null,
-      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered'
+      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired'
       +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
@@ -17416,7 +17400,12 @@ function pendingListRender(){
   var searchQ=(window._pendingSearch||'').toLowerCase();
 
   // Split: Ready for Pickup (Repaired) vs actionable (all other statuses)
-  var readyForPickup=all.filter(function(t){return t.status==='Repaired';});
+  var readyForPickup=all.filter(function(t){
+    if(t.status!=='Repaired')return false;
+    if(wcFilter && t.wc_type!==wcFilter)return false;
+    if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+    return true;
+  });
   var actionable=all.filter(function(t){return t.status!=='Repaired';});
 
   var filtered=actionable.filter(function(t){
