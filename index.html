@@ -17122,7 +17122,7 @@ async function renderPendingList(){
   try{
     var tickets=await sb('tickets','GET',null,
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
     if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
