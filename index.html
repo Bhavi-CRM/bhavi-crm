@@ -2265,7 +2265,7 @@ function filterPinList(val){
         drop.innerHTML=rows.map(function(r){
           var safePin=r.pincode;
           var safeArea=(r.area||'').replace(/'/g,'&#39;');
-          var displayText=r.pincode+(r.area?' - '+r.area:'');
+          var displayText=(r.area?r.area+' - ':'')+r.pincode;
           return'<div onmousedown="callPinSelect(\''+safePin+'\',\''+safeArea+'\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'"><span style="font-size:13px;font-weight:600;color:var(--primary)">'+displayText+'</span>'+(r.district?'<span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:8px;">'+escHtml(r.district)+'</span>':'')+'</div>';
         }).join('');
         drop.style.display='block'; return;
@@ -2334,28 +2334,6 @@ async function autoFillFromMobile(mobile, fields){
     if(fields.address){var ed=document.getElementById(fields.address);if(ed&&!ed.value)ed.value=c.address||'';}
     if(fields.city){var ec=document.getElementById(fields.city);if(ec&&!ec.value)ec.value=c.city||'';}
   }catch(e){}
-}
-
-function filterPinList(val){
-  var pinEl=document.getElementById('call-pin');
-  var drop=document.getElementById('call-pin-drop');
-  if(!pinEl||!drop)return;
-  var pins=pinEl._allPins||[];
-  if(!pins.length){drop.style.display='none';return;}
-  var q=(val||'').toLowerCase();
-  var filtered=q?pins.filter(function(p){return p.startsWith(q);}):pins;
-  if(!filtered.length){drop.style.display='none';return;}
-  drop.innerHTML=filtered.slice(0,60).map(function(p){
-    var area=_pincodeCache[p]||'';
-    var displayText=p+(area?' - '+area:'');
-    return'<div onmousedown="callPinSelect(\''+p+'\',\''+area.replace(/'/g,'&#39;')+'\',true)" style="padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;" onmouseenter="this.style.background=\'#eff6ff\'" onmouseleave="this.style.background=\'\'">'+displayText+'</div>';
-  }).join('');
-  drop.style.display='block';
-}
-function callPinSelect(pin,area){
-  var el=document.getElementById('call-pin');if(el)el.value=pin;
-  var areaEl=document.getElementById('call-area');if(areaEl&&area)areaEl.value=area;
-  var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 
 // LOGIN
@@ -17272,7 +17250,7 @@ function pendingListRender(){
   }else{
     filtered.forEach(function(t){
       var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
-      var areaDisplay=(t.pin||t.area)?(escHtml((t.pin||'')+(t.area?' - '+t.area:''))):'<span style="color:#9ca3af;">—</span>';
+      var areaDisplay=(t.pin||t.area)?(escHtml((t.area||'')+(t.pin?(t.area?' - ':'')+t.pin:''))):'<span style="color:#9ca3af;">—</span>';
       var rpCols='';
       if(window._routeMode){
         var curEngId=t.assigned_to||'';
