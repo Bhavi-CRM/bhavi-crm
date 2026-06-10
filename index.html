@@ -348,6 +348,7 @@ tr:hover td{background:#f8fafc;}
   <div class="nav-section" id="nav-ai-section">
     <div class="nav-section-title">AI Agent</div>
     <div class="nav-item hidden" onclick="navigate('ai-agent')" id="nav-ai-agent"><span class="icon">🤖</span><span>Virtual AI Agent</span></div>
+    <div class="nav-item hidden" onclick="navigate('ai-analysis')" id="nav-ai-analysis"><span class="icon">🤖</span><span>AI Analysis</span></div>
   </div>
   <div id="sidebar-user">
     <div class="user-name" id="sidebar-username">-</div>
@@ -2594,7 +2595,7 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
-      sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
+      sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-followup',true);sv('nav-profit',true);sv('nav-reorder',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
@@ -2654,9 +2655,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis}[page];
   if(renderFn)await renderFn();
 }
 
@@ -8237,6 +8238,310 @@ async function openJobSheets(id){
   <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
   </body></html>`);
   win.document.close();
+}
+
+// ─── AI ANALYSIS DASHBOARD ────────────────────────────────────────────────────
+async function renderAIAnalysis(){
+  const pc=document.getElementById('page-content');if(!pc)return;
+  pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading analytics...</div>';
+  try{
+    // Fetch last 90 days tickets
+    const d90=new Date();d90.setDate(d90.getDate()-90);
+    const since=d90.toISOString();
+    const [tickets,wlogs]=await Promise.all([
+      sb('tickets','GET',null,'?created_at=gte.'+since+'&order=created_at.desc&limit=2000'),
+      sb('work_logs','GET',null,'?log_date=gte.'+d90.toLocaleDateString('en-CA')+'&order=log_date.desc&limit=3000')
+    ]);
+    const T=tickets||[];const WL=wlogs||[];
+    const now=new Date();
+
+    // ── 1. Engineer Efficiency Score ──────────────────────────────────────────
+    const engMap={};
+    T.forEach(t=>{
+      const e=t.assigned_name||'Unassigned';
+      if(!engMap[e])engMap[e]={assigned:0,closed:0,totalDays:0,closedWithDays:0};
+      engMap[e].assigned++;
+      if(t.status==='Closed'&&t.created_at&&t.updated_at){
+        engMap[e].closed++;
+        const days=(new Date(t.updated_at)-new Date(t.created_at))/(1000*3600*24);
+        engMap[e].totalDays+=days;engMap[e].closedWithDays++;
+      }
+    });
+    const engScores=Object.entries(engMap).filter(([e])=>e!=='Unassigned').map(([e,d])=>{
+      const rate=d.assigned>0?d.closed/d.assigned:0;
+      const avgDays=d.closedWithDays>0?d.totalDays/d.closedWithDays:99;
+      const speedFactor=avgDays<=1?1.5:avgDays<=3?1.2:avgDays<=7?1.0:0.8;
+      const score=Math.round(rate*speedFactor*100);
+      return {e,score,rate:Math.round(rate*100),assigned:d.assigned,closed:d.closed,avgDays:avgDays.toFixed(1)};
+    }).sort((a,b)=>b.score-a.score);
+
+    // ── 2. Repeat Call Analysis (by serial no) ────────────────────────────────
+    const serialGroups={};
+    T.filter(t=>t.serial&&t.serial.trim()).forEach(t=>{
+      const k=t.serial.trim().toLowerCase();
+      if(!serialGroups[k])serialGroups[k]=[];
+      serialGroups[k].push(t);
+    });
+    const repeatCalls=[];
+    Object.entries(serialGroups).forEach(([serial,tickets])=>{
+      if(tickets.length<2)return;
+      const sorted=tickets.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+      for(let i=1;i<sorted.length;i++){
+        const diff=(new Date(sorted[i].created_at)-new Date(sorted[i-1].created_at))/(1000*3600*24);
+        if(diff<=30){
+          repeatCalls.push({serial,cname:sorted[i].cname,model:sorted[i].model||sorted[i-1].model,
+            id1:sorted[i-1].id,id2:sorted[i].id,days:Math.round(diff),
+            eng:sorted[i].assigned_name||'Unassigned'});
+        }
+      }
+    });
+
+    // ── 3. Territory Optimization ─────────────────────────────────────────────
+    const areaEng={};
+    T.filter(t=>t.status==='Closed'&&t.area&&t.assigned_name).forEach(t=>{
+      const k=t.area+'__'+t.assigned_name;
+      if(!areaEng[k])areaEng[k]={area:t.area,eng:t.assigned_name,total:0,totalDays:0};
+      areaEng[k].total++;
+      if(t.created_at&&t.updated_at)areaEng[k].totalDays+=(new Date(t.updated_at)-new Date(t.created_at))/(1000*3600*24);
+    });
+    const areaInsights=Object.values(areaEng).filter(x=>x.total>=2).map(x=>({...x,avgDays:(x.totalDays/x.total).toFixed(1)})).sort((a,b)=>a.avgDays-b.avgDays).slice(0,10);
+
+    // ── 4. Travel Time Loss ───────────────────────────────────────────────────
+    const travelByEng={};
+    WL.filter(w=>w.log_type==='travel'&&w.from_time&&w.to_time&&w.to_time!=='OPEN').forEach(w=>{
+      const e=w.eng_name||'Unknown';
+      if(!travelByEng[e])travelByEng[e]={eng:e,totalMins:0,days:new Set()};
+      const [fh,fm]=(w.from_time||'00:00').split(':').map(Number);
+      const [th,tm]=(w.to_time||'00:00').split(':').map(Number);
+      const mins=(th*60+tm)-(fh*60+fm);
+      if(mins>0&&mins<480){travelByEng[e].totalMins+=mins;travelByEng[e].days.add(w.log_date);}
+    });
+    const travelStats=Object.values(travelByEng).map(x=>({
+      eng:x.eng,totalMins:x.totalMins,days:x.days.size,
+      avgMinsPerDay:x.days.size>0?Math.round(x.totalMins/x.days.size):0
+    })).sort((a,b)=>b.avgMinsPerDay-a.avgMinsPerDay);
+
+    // ── 5. Spare Prediction ───────────────────────────────────────────────────
+    const spareCount={};
+    T.forEach(t=>{(t.spares||[]).filter(s=>!s.requested&&s.name).forEach(s=>{
+      const k=s.name;if(!spareCount[k])spareCount[k]={name:k,code:s.code||'',count:0};
+      spareCount[k].count+=parseInt(s.qty||1);
+    });});
+    const topSpares=Object.values(spareCount).sort((a,b)=>b.count-a.count).slice(0,10).map(s=>({
+      ...s,predicted:Math.ceil(s.count/3*1.2) // 90-day avg × 1.2 for next month
+    }));
+
+    // ── 6. Call Forecast ──────────────────────────────────────────────────────
+    const monthlyCount={};
+    T.forEach(t=>{if(!t.created_at)return;
+      const d=new Date(t.created_at);
+      const k=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+      if(!monthlyCount[k])monthlyCount[k]=0;monthlyCount[k]++;
+    });
+    const monthEntries=Object.entries(monthlyCount).sort(([a],[b])=>a.localeCompare(b));
+    const last3=monthEntries.slice(-3).map(([,v])=>v);
+    const forecast=last3.length>0?Math.round(last3.reduce((a,b)=>a+b,0)/last3.length*1.05):0;
+    const nextMonth=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+
+    // ── 7. AMC Opportunity ────────────────────────────────────────────────────
+    const amcOpps=[];const seenMob=new Set();
+    T.filter(t=>t.call_type&&t.call_type.includes('Non-Warranty')&&t.mobile&&t.status==='Closed').forEach(t=>{
+      if(!seenMob.has(t.mobile)){seenMob.add(t.mobile);
+        amcOpps.push({cname:t.cname,mobile:t.mobile,model:t.model,area:t.area||t.city,lastCall:t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):''});
+      }
+    });
+
+    // ── 8. Engineer Load Balancing ────────────────────────────────────────────
+    const loadMap={};
+    T.filter(t=>!['Closed','Delivered','Call Cancel','Customer Reject','Repaired'].includes(t.status)&&t.assigned_name).forEach(t=>{
+      const e=t.assigned_name;if(!loadMap[e])loadMap[e]={eng:e,active:0,inProgress:0,pending:0};
+      loadMap[e].active++;
+      if(t.status==='In Progress')loadMap[e].inProgress++;
+      else loadMap[e].pending++;
+    });
+    const loadStats=Object.values(loadMap).sort((a,b)=>b.active-a.active);
+    const avgLoad=loadStats.length?loadStats.reduce((a,b)=>a+b.active,0)/loadStats.length:0;
+
+    // ── 9. First Visit Resolution % ───────────────────────────────────────────
+    const fvrMap={};
+    T.filter(t=>t.assigned_name&&t.status==='Closed').forEach(t=>{
+      const e=t.assigned_name;if(!fvrMap[e])fvrMap[e]={eng:e,total:0,firstVisit:0};
+      fvrMap[e].total++;
+      const visits=(t.timeline||[]).filter(x=>x.action&&(x.action.includes('Visit')||x.action.includes('Work Start'))).length;
+      if(visits<=1)fvrMap[e].firstVisit++;
+    });
+    const fvrStats=Object.values(fvrMap).filter(x=>x.total>=3).map(x=>({...x,pct:Math.round(x.firstVisit/x.total*100)})).sort((a,b)=>b.pct-a.pct);
+
+    // ── 10. Engineer Ranking ──────────────────────────────────────────────────
+    const rankMap={};
+    engScores.forEach(x=>{rankMap[x.e]={eng:x.e,efficiency:x.score,closed:x.closed,assigned:x.assigned,fvr:0,travelAvg:0};});
+    fvrStats.forEach(x=>{if(rankMap[x.e])rankMap[x.e].fvr=x.pct;});
+    travelStats.forEach(x=>{if(rankMap[x.e])rankMap[x.e].travelAvg=x.avgMinsPerDay;});
+    const ranking=Object.values(rankMap).filter(x=>x.assigned>=3).map(x=>{
+      const effScore=Math.min(x.efficiency,100)*0.4;
+      const fvrScore=x.fvr*0.35;
+      const travelScore=Math.max(0,100-x.travelAvg/1.2)*0.25;
+      const total=Math.round(effScore+fvrScore+travelScore);
+      return {...x,total};
+    }).sort((a,b)=>b.total-a.total);
+
+    // ── RENDER ────────────────────────────────────────────────────────────────
+    const card=(title,icon,content,color)=>`<div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${color||'#e2e8f0'};">
+        <span style="font-size:20px;">${icon}</span>
+        <span style="font-size:15px;font-weight:800;color:#1e293b;">${title}</span>
+      </div>${content}</div>`;
+
+    const badge=(v,c)=>`<span style="background:${c||'#eff6ff'};color:#1d4ed8;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">${v}</span>`;
+
+    // Score bar
+    const bar=(pct,c)=>`<div style="flex:1;height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;"><div style="height:100%;width:${Math.min(pct,100)}%;background:${c||'#1d4ed8'};border-radius:5px;"></div></div>`;
+
+    let html=`<div style="padding:16px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+      <span style="font-size:24px;">🤖</span>
+      <div><div style="font-size:20px;font-weight:800;color:#1e293b;">AI Analysis Dashboard</div>
+      <div style="font-size:12px;color:#6b7280;">Last 90 days · ${T.length} tickets analysed · Updated ${now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      <button onclick="renderAIAnalysis()" style="margin-left:auto;padding:7px 14px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">🔄 Refresh</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">`;
+
+    // 1. Efficiency Score
+    html+=card('Engineer Efficiency Score','⚡',`
+      ${engScores.length?engScores.map((x,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:20px;text-align:center;font-size:11px;color:#6b7280;">${i+1}</div>
+          <div style="width:110px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.e.split(' ')[0]}</div>
+          ${bar(x.score,'#1d4ed8')}
+          <div style="width:36px;text-align:right;font-size:12px;font-weight:700;color:#1d4ed8;">${x.score}</div>
+          <div style="font-size:10px;color:#6b7280;width:60px;">${x.closed}/${x.assigned} · ${x.avgDays}d</div>
+        </div>`).join(''):'<div style="color:#9ca3af;font-size:13px;">No data</div>'}
+    `,'#1d4ed8');
+
+    // 2. Repeat Calls
+    html+=card('Repeat Call Analysis (Serial-based, 30d)','🔁',`
+      ${repeatCalls.length?`<div style="font-size:12px;color:#dc2626;font-weight:700;margin-bottom:8px;">⚠️ ${repeatCalls.length} repeat calls found</div>`
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+      +'<thead><tr style="background:#fef2f2;"><th style="padding:4px 6px;text-align:left;">Serial</th><th style="padding:4px 6px;text-align:left;">Customer</th><th style="padding:4px 6px;">Model</th><th style="padding:4px 6px;">Days</th><th style="padding:4px 6px;">Engineer</th></tr></thead><tbody>'
+      +repeatCalls.slice(0,8).map(r=>`<tr style="border-bottom:1px solid #fee2e2;"><td style="padding:4px 6px;font-weight:600;color:#dc2626;">${r.serial}</td><td style="padding:4px 6px;">${r.cname||'—'}</td><td style="padding:4px 6px;">${r.model||'—'}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:700;">${r.days}d</span></td><td style="padding:4px 6px;">${(r.eng||'').split(' ')[0]}</td></tr>`).join('')
+      +'</tbody></table></div>'
+      :'<div style="color:#059669;font-size:13px;">✅ No repeat calls in last 30 days</div>'}
+    `,'#dc2626');
+
+    // 3. Territory Optimization
+    html+=card('Territory Optimization','🗺️',`
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Best engineer per area (by avg close days)</div>
+      ${areaInsights.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+      +'<thead><tr style="background:#f0fdf4;"><th style="padding:4px 6px;text-align:left;">Area</th><th style="padding:4px 6px;text-align:left;">Best Engineer</th><th style="padding:4px 6px;">Calls</th><th style="padding:4px 6px;">Avg Days</th></tr></thead><tbody>'
+      +areaInsights.map(x=>`<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:4px 6px;font-weight:600;">${x.area}</td><td style="padding:4px 6px;">${x.eng.split(' ')[0]}</td><td style="padding:4px 6px;text-align:center;">${x.total}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#f0fdf4;color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">${x.avgDays}d</span></td></tr>`).join('')
+      +'</tbody></table></div>'
+      :'<div style="color:#9ca3af;font-size:13px;">Not enough closed tickets with area data</div>'}
+    `,'#059669');
+
+    // 4. Travel Time Loss
+    html+=card('Travel Time Loss','🚗',`
+      ${travelStats.length?travelStats.map(x=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:90px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.eng.split(' ')[0]}</div>
+          ${bar(x.avgMinsPerDay/120*100,'#f59e0b')}
+          <div style="width:70px;text-align:right;font-size:11px;color:#d97706;font-weight:700;">${x.avgMinsPerDay} min/day</div>
+        </div>`).join('')
+      :'<div style="color:#9ca3af;font-size:13px;">No travel logs found</div>'}
+      ${travelStats.length?`<div style="font-size:11px;color:#6b7280;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;">Total travel logged: <b>${Math.round(travelStats.reduce((a,b)=>a+b.totalMins,0)/60)}h</b> across ${travelStats.reduce((a,b)=>a+b.days,0)} days</div>`:''}
+    `,'#f59e0b');
+
+    // 5. Spare Prediction
+    html+=card('Spare Part Prediction (Next Month)','🔩',`
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Based on last 90-day usage trend (+20% buffer)</div>
+      ${topSpares.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+      +'<thead><tr style="background:#fdf4ff;"><th style="padding:4px 6px;text-align:left;">Part</th><th style="padding:4px 6px;text-align:left;">Code</th><th style="padding:4px 6px;">Used (90d)</th><th style="padding:4px 6px;">Predicted</th></tr></thead><tbody>'
+      +topSpares.map(s=>`<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:4px 6px;font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.name}">${s.name}</td><td style="padding:4px 6px;color:#6b7280;">${s.code||'—'}</td><td style="padding:4px 6px;text-align:center;">${s.count}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#fdf4ff;color:#7c3aed;padding:1px 6px;border-radius:4px;font-weight:700;">${s.predicted}</span></td></tr>`).join('')
+      +'</tbody></table></div>'
+      :'<div style="color:#9ca3af;font-size:13px;">No spare usage data</div>'}
+    `,'#7c3aed');
+
+    // 6. Call Forecast
+    html+=card('Call Forecast','📈',`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div style="background:#eff6ff;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:32px;font-weight:800;color:#1d4ed8;">${forecast}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;">Predicted for ${nextMonth}</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:32px;font-weight:800;color:#059669;">${last3.length?last3[last3.length-1]:0}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;">This month (so far)</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#6b7280;">Monthly trend: ${monthEntries.slice(-4).map(([k,v])=>`<b>${k.slice(5)}: ${v}</b>`).join(' → ')}</div>
+    `,'#1d4ed8');
+
+    // 7. AMC Opportunity
+    html+=card('AMC Opportunity','🤝',`
+      <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">💡 ${amcOpps.length} Non-Warranty customers to approach for AMC</div>
+      ${amcOpps.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+      +'<thead><tr style="background:#fff7ed;"><th style="padding:4px 6px;text-align:left;">Customer</th><th style="padding:4px 6px;text-align:left;">Mobile</th><th style="padding:4px 6px;text-align:left;">Model</th><th style="padding:4px 6px;text-align:left;">Area</th></tr></thead><tbody>'
+      +amcOpps.slice(0,8).map(a=>`<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">${a.cname||'—'}</td><td style="padding:4px 6px;color:#1d4ed8;">${a.mobile}</td><td style="padding:4px 6px;">${a.model||'—'}</td><td style="padding:4px 6px;">${a.area||'—'}</td></tr>`).join('')
+      +'</tbody></table></div>'
+      +'<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Showing top 8 · Total: '+amcOpps.length+'</div>'
+      :'<div style="color:#9ca3af;font-size:13px;">No non-warranty closed tickets found</div>'}
+    `,'#d97706');
+
+    // 8. Load Balancing
+    html+=card('Engineer Load Balancing','⚖️',`
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Active tickets per engineer right now · Avg: ${avgLoad.toFixed(1)}</div>
+      ${loadStats.length?loadStats.map(x=>{
+        const over=x.active>avgLoad*1.5;const free=x.active<avgLoad*0.5;
+        const clr=over?'#ef4444':free?'#22c55e':'#1d4ed8';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <div style="width:100px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.eng.split(' ')[0]}</div>
+          ${bar(x.active/(Math.max(...loadStats.map(l=>l.active),1))*100,clr)}
+          <div style="width:24px;text-align:right;font-size:12px;font-weight:700;color:${clr};">${x.active}</div>
+          <div style="width:60px;font-size:10px;color:${clr};">${over?'⚠️ High':free?'✅ Free':'Normal'}</div>
+        </div>`;}).join('')
+      :'<div style="color:#9ca3af;font-size:13px;">No active tickets</div>'}
+    `,'#0891b2');
+
+    html+='</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:0px;">';
+
+    // 9. First Visit Resolution
+    html+=card('First Visit Resolution %','🎯',`
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Calls closed in first visit (engineers with 3+ closed calls)</div>
+      ${fvrStats.length?fvrStats.map((x,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:20px;text-align:center;font-size:11px;color:#6b7280;">${i+1}</div>
+          <div style="width:100px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.eng.split(' ')[0]}</div>
+          ${bar(x.pct,x.pct>=80?'#22c55e':x.pct>=60?'#f59e0b':'#ef4444')}
+          <div style="width:36px;text-align:right;font-size:12px;font-weight:700;">${x.pct}%</div>
+          <div style="font-size:10px;color:#6b7280;width:55px;">${x.firstVisit}/${x.total}</div>
+        </div>`).join('')
+      :'<div style="color:#9ca3af;font-size:13px;">Not enough data yet</div>'}
+    `,'#22c55e');
+
+    // 10. Engineer Ranking
+    html+=card('🏆 Engineer Monthly Ranking','🥇',`
+      ${ranking.length?ranking.map((x,i)=>{
+        const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  ';
+        const clr=i===0?'#d97706':i===1?'#6b7280':i===2?'#b45309':'#1d4ed8';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;background:${i<3?'#fffbeb':'#f8fafc'};border-radius:8px;border:1px solid ${i<3?'#fde68a':'#e2e8f0'};">
+          <div style="font-size:18px;width:28px;text-align:center;">${medal}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:#1e293b;">${x.eng.split(' ')[0]}</div>
+            <div style="font-size:10px;color:#6b7280;">Eff: ${x.efficiency} · FVR: ${x.fvr}% · Travel: ${x.travelAvg}m</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:800;color:${clr};">${x.total}</div>
+            <div style="font-size:10px;color:#6b7280;">Score</div>
+          </div>
+        </div>`;}).join('')
+      :'<div style="color:#9ca3af;font-size:13px;">Need 3+ assigned calls per engineer</div>'}
+      <div style="font-size:10px;color:#9ca3af;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;">Score = Efficiency(40%) + First Visit %(35%) + Low Travel(25%)</div>
+    `,'#d97706');
+
+    html+='</div></div>';
+    pc.innerHTML=html;
+  }catch(e){
+    document.getElementById('page-content').innerHTML='<div style="padding:40px;text-align:center;color:#ef4444;">Error: '+e.message+'</div>';
+  }
 }
 
 // ─── LABEL PRINT (1.5" × 3" — physical label printer) ────────────────────────
