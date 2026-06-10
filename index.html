@@ -18878,60 +18878,49 @@ async function renderPartsCatalog(){
   const pc=document.getElementById('page-content');if(!pc)return;
   pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading parts catalog...</div>';
   try{
-    // Load parts_catalog + join inventory qty
-    const [catalog,inv]=await Promise.all([
-      sb('parts_catalog','GET',null,'?order=part_name&limit=1000'),
-      sb('inventory','GET',null,'?select=item_code,qty_in_stock&limit=1000')
-    ]);
-    _pcAll=catalog||[];
-    // Build inventory qty lookup by item_code
-    const invMap={};
-    (inv||[]).forEach(i=>{if(i.item_code)invMap[i.item_code.trim().toLowerCase()]=i.qty_in_stock||0;});
-    // Attach live qty to each catalog item
-    _pcAll.forEach(p=>{
-      const k=(p.item_code||'').trim().toLowerCase();
-      p._qty=invMap[k]!==undefined?invMap[k]:p.stock_qty||0;
-    });
-    _renderPCTable(_pcAll,invMap);
+    _pcAll=await sb('parts_catalog','GET',null,'?order=part_name&limit=1000')||[];
+    // Use stock_qty directly from parts_catalog (no inventory join)
+    _pcAll.forEach(p=>{ p._qty=p.stock_qty||0; });
+    _renderPCShell();
+    _pcUpdateRows();
   }catch(e){
     pc.innerHTML='<div style="padding:20px;color:#ef4444;">Error: '+escHtml(e.message)+'<br><br><b>SQL — Run this in Supabase:</b><pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;">CREATE TABLE IF NOT EXISTS parts_catalog (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  part_name text NOT NULL,\n  item_code text,\n  category text,\n  selling_price numeric DEFAULT 0,\n  stock_qty integer DEFAULT 0,\n  compatible_models text,\n  notes text,\n  created_at timestamptz DEFAULT now(),\n  updated_at timestamptz DEFAULT now()\n);</pre></div>';
   }
 }
 
-function _renderPCTable(rows,invMap){
+// Render page shell ONCE (search input stays, no re-render)
+function _renderPCShell(){
   const pc=document.getElementById('page-content');if(!pc)return;
   const isAdmin=currentUser&&currentUser.role==='admin';
-  const q=(_pcFilter||'').toLowerCase();
-  const filtered=q?rows.filter(r=>(r.part_name||'').toLowerCase().includes(q)||(r.item_code||'').toLowerCase().includes(q)||(r.category||'').toLowerCase().includes(q)||(r.compatible_models||'').toLowerCase().includes(q)):rows;
+  const totalParts=_pcAll.length;
+  const inStock=_pcAll.filter(r=>r._qty>0).length;
+  const outOfStock=_pcAll.filter(r=>r._qty<=0).length;
+  const cols=isAdmin?7:6;
 
-  const totalParts=rows.length;
-  const inStock=rows.filter(r=>r._qty>0).length;
-  const outOfStock=rows.filter(r=>r._qty<=0).length;
-
-  let html=`<div style="padding:16px;">
+  pc.innerHTML=`<div style="padding:16px;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
     <span style="font-size:22px;">🔩</span>
     <div><div style="font-size:20px;font-weight:800;">Parts Catalog</div>
-    <div style="font-size:12px;color:#6b7280;">Selling price + live inventory availability</div></div>
+    <div style="font-size:12px;color:#6b7280;">Selling price + stock availability</div></div>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
       ${isAdmin?`<button onclick="openAddPart()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Part</button>`:''}
       <button onclick="downloadPCTemplate()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📄 Template</button>
       ${isAdmin?`<button onclick="importPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📥 Import Excel</button>`:''}
-      ${isAdmin&&rows.length?`<button onclick="exportPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📤 Export</button>`:''}
+      ${isAdmin&&totalParts?`<button onclick="exportPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📤 Export</button>`:''}
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
-      <div style="font-size:28px;font-weight:800;color:#1d4ed8;">${totalParts}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Total Parts</div></div>
+      <div style="font-size:28px;font-weight:800;color:#1d4ed8;" id="pc-total">${totalParts}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Total Parts</div></div>
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #10b981;">
-      <div style="font-size:28px;font-weight:800;color:#10b981;">${inStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">In Stock</div></div>
+      <div style="font-size:28px;font-weight:800;color:#10b981;" id="pc-instock">${inStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">In Stock</div></div>
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #ef4444;">
-      <div style="font-size:28px;font-weight:800;color:#ef4444;">${outOfStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Out of Stock</div></div>
+      <div style="font-size:28px;font-weight:800;color:#ef4444;" id="pc-outstock">${outOfStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Out of Stock</div></div>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
     <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;gap:8px;align-items:center;">
-      <input type="text" id="pc-search" value="${escHtml(_pcFilter)}" placeholder="Search part name, code, model..." oninput="_pcFilter=this.value;_renderPCTable(_pcAll);" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
-      <span style="font-size:12px;color:#6b7280;">${filtered.length} results</span>
+      <input type="text" id="pc-search" value="" placeholder="Search part name, code, model..." oninput="_pcFilter=this.value;_pcUpdateRows();" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <span id="pc-count" style="font-size:12px;color:#6b7280;">${totalParts} results</span>
     </div>
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -18944,32 +18933,8 @@ function _renderPCTable(rows,invMap){
         <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Models</th>
         ${isAdmin?'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Actions</th>':''}
       </tr></thead>
-      <tbody>`;
-
-  if(!filtered.length){
-    html+=`<tr><td colspan="${isAdmin?7:6}" style="padding:30px;text-align:center;color:#9ca3af;">No parts found${q?' matching "'+escHtml(q)+'"':''}</td></tr>`;
-  } else {
-    filtered.forEach(p=>{
-      const qty=p._qty||0;
-      const stockClr=qty>5?'#059669':qty>0?'#d97706':'#dc2626';
-      const stockBg=qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
-      const stockLabel=qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
-      html+=`<tr style="border-top:1px solid #f1f5f9;cursor:default;">
-        <td style="padding:10px 12px;font-weight:600;color:#1e293b;">${escHtml(p.part_name||'')}</td>
-        <td style="padding:10px 12px;color:#6b7280;font-family:monospace;">${escHtml(p.item_code||'—')}</td>
-        <td style="padding:10px 12px;"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${escHtml(p.category||'General')}</span></td>
-        <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;">₹${parseFloat(p.selling_price||0).toLocaleString('en-IN')}</td>
-        <td style="padding:10px 12px;text-align:center;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
-        <td style="padding:10px 12px;font-size:12px;color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.compatible_models||'')}">${escHtml(p.compatible_models||'—')}</td>
-        ${isAdmin?`<td style="padding:10px 12px;text-align:center;white-space:nowrap;">
-          <button onclick="editPart('${p.id}')" style="padding:4px 10px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px;">✏️</button>
-          <button onclick="deletePart('${p.id}')" style="padding:4px 10px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
-        </td>`:''}
-      </tr>`;
-    });
-  }
-
-  html+=`</tbody></table></div></div></div>
+      <tbody id="pc-tbody"></tbody>
+    </table></div></div></div>
 
   <!-- Add/Edit Part Modal -->
   <div id="pc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
@@ -18988,8 +18953,8 @@ function _renderPCTable(rows,invMap){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Selling Price (₹) *</label>
             <input id="pc-price" type="number" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
-          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Manual Stock Qty</label>
-            <input id="pc-stock" type="number" min="0" placeholder="Leave 0 if using Inventory" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Stock Qty</label>
+            <input id="pc-stock" type="number" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
         </div>
         <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Compatible Models</label>
           <input id="pc-models" type="text" placeholder="e.g. G3010, G2010, G1010" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
@@ -19002,8 +18967,39 @@ function _renderPCTable(rows,invMap){
       </div>
     </div>
   </div>`;
+}
 
-  pc.innerHTML=html;
+// Only update tbody + count — search input stays focused
+function _pcUpdateRows(){
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  const q=(_pcFilter||'').toLowerCase();
+  const filtered=q?_pcAll.filter(r=>(r.part_name||'').toLowerCase().includes(q)||(r.item_code||'').toLowerCase().includes(q)||(r.category||'').toLowerCase().includes(q)||(r.compatible_models||'').toLowerCase().includes(q)):_pcAll;
+  const tbody=document.getElementById('pc-tbody');
+  const countEl=document.getElementById('pc-count');
+  if(countEl)countEl.textContent=filtered.length+' results';
+  if(!tbody)return;
+  if(!filtered.length){
+    tbody.innerHTML=`<tr><td colspan="${isAdmin?7:6}" style="padding:30px;text-align:center;color:#9ca3af;">No parts found${q?' matching "'+escHtml(q)+'"':''}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML=filtered.map(p=>{
+    const qty=p._qty||0;
+    const stockClr=qty>5?'#059669':qty>0?'#d97706':'#dc2626';
+    const stockBg=qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
+    const stockLabel=qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
+    return `<tr style="border-top:1px solid #f1f5f9;">
+      <td style="padding:10px 12px;font-weight:600;color:#1e293b;">${escHtml(p.part_name||'')}</td>
+      <td style="padding:10px 12px;color:#6b7280;font-family:monospace;">${escHtml(p.item_code||'—')}</td>
+      <td style="padding:10px 12px;"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${escHtml(p.category||'General')}</span></td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;">₹${parseFloat(p.selling_price||0).toLocaleString('en-IN')}</td>
+      <td style="padding:10px 12px;text-align:center;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
+      <td style="padding:10px 12px;font-size:12px;color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.compatible_models||'')}">${escHtml(p.compatible_models||'—')}</td>
+      ${isAdmin?`<td style="padding:10px 12px;text-align:center;white-space:nowrap;">
+        <button onclick="editPart('${p.id}')" style="padding:4px 10px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px;">✏️</button>
+        <button onclick="deletePart('${p.id}')" style="padding:4px 10px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
+      </td>`:''}
+    </tr>`;
+  }).join('');
 }
 
 function openAddPart(){
@@ -19056,8 +19052,15 @@ async function savePart(){
 
 async function deletePart(id){
   if(!confirm('Delete this part?'))return;
-  try{await sb('parts_catalog','DELETE',null,'?id=eq.'+id);await renderPartsCatalog();}
-  catch(e){alert('Error: '+e.message);}
+  try{
+    await sb('parts_catalog','DELETE',null,'?id=eq.'+id);
+    _pcAll=_pcAll.filter(x=>x.id!==id);
+    _pcUpdateRows();
+    const t=document.getElementById('pc-total');const i=document.getElementById('pc-instock');const o=document.getElementById('pc-outstock');
+    if(t)t.textContent=_pcAll.length;
+    if(i)i.textContent=_pcAll.filter(r=>r._qty>0).length;
+    if(o)o.textContent=_pcAll.filter(r=>r._qty<=0).length;
+  }catch(e){alert('Error: '+e.message);}
 }
 
 function downloadPCTemplate(){
@@ -19207,7 +19210,7 @@ function _renderFFPage(isAdmin,isEng){
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-top:16px;">
     <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-weight:700;font-size:14px;">📚 Knowledge Base (${_ffAll.length} entries)</div>
-      <input type="text" id="ff-kb-search" placeholder="Search..." oninput="_ffRenderKB(this.value)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none;width:180px;">
+      <input type="text" id="ff-kb-search" placeholder="Search..." oninput="_ffUpdateKB(this.value)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none;width:180px;">
     </div>
     <div id="ff-kb-list" style="overflow-x:auto;"></div>
   </div>`:''}
@@ -19310,6 +19313,8 @@ function searchFaults(){
       ${r.part_required?`<div style="font-size:12px;color:#7c3aed;font-weight:600;">🔩 Part Required: ${escHtml(r.part_required)}</div>`:''}
     </div>`).join('')+'</div>';
 }
+
+function _ffUpdateKB(q){_ffRenderKB(q);}
 
 function _ffRenderKB(q){
   const el=document.getElementById('ff-kb-list');if(!el)return;
