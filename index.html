@@ -331,6 +331,8 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit"><span class="icon">💰</span><span>Profit</span></div>
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
+    <div class="nav-item hidden" onclick="navigate('parts-catalog')" id="nav-parts-catalog"><span class="icon">🔩</span><span>Parts Catalog</span></div>
+    <div class="nav-item hidden" onclick="navigate('fault-finder')" id="nav-fault-finder"><span class="icon">🔍</span><span>Fault Finder</span></div>
     <div class="nav-item hidden" onclick="navigate('pending-list')" id="nav-pending-list"><span class="icon">📋</span><span>Pending List</span></div>
     <div class="nav-item hidden" onclick="navigate('route-planning')" id="nav-route-planning"><span class="icon">🗺️</span><span>Route Planning</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
@@ -2595,10 +2597,12 @@ function setupNav(){
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-profit',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
+      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
+      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
       var isAutoEng2=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-ai-agent',isAutoEng2);
     }
@@ -2653,9 +2657,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -18863,6 +18867,585 @@ function insertAIRemark(targetId) {
   if (overlay) overlay.remove();
 }
 // ===== END AI REMARK ASSISTANT =====
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: PARTS CATALOG (Selling Price + Availability)
+// ═══════════════════════════════════════════════════════════════
+var _pcAll=[], _pcFilter='';
+var _isAdminOrEng=function(){return currentUser&&(currentUser.role==='admin'||currentUser.role==='engineer');};
+
+async function renderPartsCatalog(){
+  const pc=document.getElementById('page-content');if(!pc)return;
+  pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading parts catalog...</div>';
+  try{
+    // Load parts_catalog + join inventory qty
+    const [catalog,inv]=await Promise.all([
+      sb('parts_catalog','GET',null,'?order=part_name&limit=1000'),
+      sb('inventory','GET',null,'?select=item_code,qty_in_stock&limit=1000')
+    ]);
+    _pcAll=catalog||[];
+    // Build inventory qty lookup by item_code
+    const invMap={};
+    (inv||[]).forEach(i=>{if(i.item_code)invMap[i.item_code.trim().toLowerCase()]=i.qty_in_stock||0;});
+    // Attach live qty to each catalog item
+    _pcAll.forEach(p=>{
+      const k=(p.item_code||'').trim().toLowerCase();
+      p._qty=invMap[k]!==undefined?invMap[k]:p.stock_qty||0;
+    });
+    _renderPCTable(_pcAll,invMap);
+  }catch(e){
+    pc.innerHTML='<div style="padding:20px;color:#ef4444;">Error: '+escHtml(e.message)+'<br><br><b>SQL — Run this in Supabase:</b><pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;">CREATE TABLE IF NOT EXISTS parts_catalog (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  part_name text NOT NULL,\n  item_code text,\n  category text,\n  selling_price numeric DEFAULT 0,\n  stock_qty integer DEFAULT 0,\n  compatible_models text,\n  notes text,\n  created_at timestamptz DEFAULT now(),\n  updated_at timestamptz DEFAULT now()\n);</pre></div>';
+  }
+}
+
+function _renderPCTable(rows,invMap){
+  const pc=document.getElementById('page-content');if(!pc)return;
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  const q=(_pcFilter||'').toLowerCase();
+  const filtered=q?rows.filter(r=>(r.part_name||'').toLowerCase().includes(q)||(r.item_code||'').toLowerCase().includes(q)||(r.category||'').toLowerCase().includes(q)||(r.compatible_models||'').toLowerCase().includes(q)):rows;
+
+  const totalParts=rows.length;
+  const inStock=rows.filter(r=>r._qty>0).length;
+  const outOfStock=rows.filter(r=>r._qty<=0).length;
+
+  let html=`<div style="padding:16px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+    <span style="font-size:22px;">🔩</span>
+    <div><div style="font-size:20px;font-weight:800;">Parts Catalog</div>
+    <div style="font-size:12px;color:#6b7280;">Selling price + live inventory availability</div></div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+      ${isAdmin?`<button onclick="openAddPart()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Part</button>`:''}
+      <button onclick="downloadPCTemplate()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📄 Template</button>
+      ${isAdmin?`<button onclick="importPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📥 Import Excel</button>`:''}
+      ${isAdmin&&rows.length?`<button onclick="exportPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📤 Export</button>`:''}
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
+      <div style="font-size:28px;font-weight:800;color:#1d4ed8;">${totalParts}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Total Parts</div></div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #10b981;">
+      <div style="font-size:28px;font-weight:800;color:#10b981;">${inStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">In Stock</div></div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #ef4444;">
+      <div style="font-size:28px;font-weight:800;color:#ef4444;">${outOfStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Out of Stock</div></div>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+    <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;gap:8px;align-items:center;">
+      <input type="text" id="pc-search" value="${escHtml(_pcFilter)}" placeholder="Search part name, code, model..." oninput="_pcFilter=this.value;_renderPCTable(_pcAll);" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <span style="font-size:12px;color:#6b7280;">${filtered.length} results</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;white-space:nowrap;">Part Name</th>
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Code</th>
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Category</th>
+        <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Selling Price</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Stock</th>
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Models</th>
+        ${isAdmin?'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Actions</th>':''}
+      </tr></thead>
+      <tbody>`;
+
+  if(!filtered.length){
+    html+=`<tr><td colspan="${isAdmin?7:6}" style="padding:30px;text-align:center;color:#9ca3af;">No parts found${q?' matching "'+escHtml(q)+'"':''}</td></tr>`;
+  } else {
+    filtered.forEach(p=>{
+      const qty=p._qty||0;
+      const stockClr=qty>5?'#059669':qty>0?'#d97706':'#dc2626';
+      const stockBg=qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
+      const stockLabel=qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
+      html+=`<tr style="border-top:1px solid #f1f5f9;cursor:default;">
+        <td style="padding:10px 12px;font-weight:600;color:#1e293b;">${escHtml(p.part_name||'')}</td>
+        <td style="padding:10px 12px;color:#6b7280;font-family:monospace;">${escHtml(p.item_code||'—')}</td>
+        <td style="padding:10px 12px;"><span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${escHtml(p.category||'General')}</span></td>
+        <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;">₹${parseFloat(p.selling_price||0).toLocaleString('en-IN')}</td>
+        <td style="padding:10px 12px;text-align:center;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
+        <td style="padding:10px 12px;font-size:12px;color:#6b7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.compatible_models||'')}">${escHtml(p.compatible_models||'—')}</td>
+        ${isAdmin?`<td style="padding:10px 12px;text-align:center;white-space:nowrap;">
+          <button onclick="editPart('${p.id}')" style="padding:4px 10px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px;">✏️</button>
+          <button onclick="deletePart('${p.id}')" style="padding:4px 10px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
+        </td>`:''}
+      </tr>`;
+    });
+  }
+
+  html+=`</tbody></table></div></div></div>
+
+  <!-- Add/Edit Part Modal -->
+  <div id="pc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+      <h3 id="pc-modal-title" style="margin:0 0 18px;font-size:17px;">Add Part</h3>
+      <input id="pc-edit-id" type="hidden">
+      <div style="display:grid;gap:12px;">
+        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Part Name *</label>
+          <input id="pc-name" type="text" placeholder="e.g. Canon Ink Tank 790" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Item Code</label>
+            <input id="pc-code" type="text" placeholder="e.g. CNX-790" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Category</label>
+            <input id="pc-category" type="text" placeholder="e.g. Ink, Roller" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Selling Price (₹) *</label>
+            <input id="pc-price" type="number" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Manual Stock Qty</label>
+            <input id="pc-stock" type="number" min="0" placeholder="Leave 0 if using Inventory" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+        </div>
+        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Compatible Models</label>
+          <input id="pc-models" type="text" placeholder="e.g. G3010, G2010, G1010" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Notes</label>
+          <textarea id="pc-notes" rows="2" placeholder="Optional notes..." style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;"></textarea></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button onclick="savePart()" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Save Part</button>
+        <button onclick="document.getElementById('pc-modal').style.display='none'" style="padding:10px 20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+
+  pc.innerHTML=html;
+}
+
+function openAddPart(){
+  document.getElementById('pc-edit-id').value='';
+  document.getElementById('pc-modal-title').textContent='Add New Part';
+  ['pc-name','pc-code','pc-category','pc-models','pc-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['pc-price','pc-stock'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0';});
+  document.getElementById('pc-modal').style.display='flex';
+}
+
+async function editPart(id){
+  const p=_pcAll.find(x=>x.id===id);if(!p)return;
+  document.getElementById('pc-edit-id').value=p.id;
+  document.getElementById('pc-modal-title').textContent='Edit Part';
+  document.getElementById('pc-name').value=p.part_name||'';
+  document.getElementById('pc-code').value=p.item_code||'';
+  document.getElementById('pc-category').value=p.category||'';
+  document.getElementById('pc-price').value=p.selling_price||0;
+  document.getElementById('pc-stock').value=p.stock_qty||0;
+  document.getElementById('pc-models').value=p.compatible_models||'';
+  document.getElementById('pc-notes').value=p.notes||'';
+  document.getElementById('pc-modal').style.display='flex';
+}
+
+async function savePart(){
+  const name=document.getElementById('pc-name').value.trim();
+  if(!name){alert('Part name required');return;}
+  const data={
+    part_name:name,
+    item_code:document.getElementById('pc-code').value.trim(),
+    category:document.getElementById('pc-category').value.trim()||'General',
+    selling_price:parseFloat(document.getElementById('pc-price').value)||0,
+    stock_qty:parseInt(document.getElementById('pc-stock').value)||0,
+    compatible_models:document.getElementById('pc-models').value.trim(),
+    notes:document.getElementById('pc-notes').value.trim(),
+    updated_at:new Date().toISOString()
+  };
+  const editId=document.getElementById('pc-edit-id').value;
+  try{
+    if(editId){
+      await sb('parts_catalog','PATCH',data,'?id=eq.'+editId);
+    } else {
+      data.created_at=new Date().toISOString();
+      await sb('parts_catalog','POST',data);
+    }
+    document.getElementById('pc-modal').style.display='none';
+    await renderPartsCatalog();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deletePart(id){
+  if(!confirm('Delete this part?'))return;
+  try{await sb('parts_catalog','DELETE',null,'?id=eq.'+id);await renderPartsCatalog();}
+  catch(e){alert('Error: '+e.message);}
+}
+
+function downloadPCTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['part_name','item_code','category','selling_price','stock_qty','compatible_models','notes'],
+    ['Canon Ink Tank 790','CNX-790','Ink',450,10,'G3010,G2010','Original ink tank'],
+    ['Epson Roller Kit','EPR-001','Roller',850,5,'L3110,L3150','Paper feed roller'],
+  ]);
+  ws['!cols']=[{wch:25},{wch:15},{wch:15},{wch:15},{wch:12},{wch:25},{wch:30}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Parts Catalog');
+  XLSX.writeFile(wb,'parts_catalog_template.xlsx');
+}
+
+function exportPC(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  const data=_pcAll.map(p=>({
+    part_name:p.part_name||'',item_code:p.item_code||'',category:p.category||'',
+    selling_price:p.selling_price||0,stock_qty:p._qty||0,
+    compatible_models:p.compatible_models||'',notes:p.notes||''
+  }));
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Parts Catalog');
+  XLSX.writeFile(wb,'parts_catalog_export.xlsx');
+}
+
+function importPC(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async function(e){
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){alert('File ma koi data nathi');return;}
+        let ok=0,fail=0;
+        for(const r of rows){
+          const name=(r.part_name||r['Part Name']||'').trim();
+          if(!name){fail++;continue;}
+          try{
+            await sb('parts_catalog','POST',{
+              part_name:name,
+              item_code:(r.item_code||r['Item Code']||'').trim(),
+              category:(r.category||r['Category']||'General').trim(),
+              selling_price:parseFloat(r.selling_price||r['Selling Price']||0)||0,
+              stock_qty:parseInt(r.stock_qty||r['Stock Qty']||0)||0,
+              compatible_models:(r.compatible_models||r['Compatible Models']||'').trim(),
+              notes:(r.notes||r['Notes']||'').trim(),
+              created_at:new Date().toISOString(),
+              updated_at:new Date().toISOString()
+            });
+            ok++;
+          }catch(ex){fail++;}
+        }
+        alert('✅ Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
+        await renderPartsCatalog();
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: FAULT FINDER (Knowledge Base)
+// ═══════════════════════════════════════════════════════════════
+var _ffModels=[], _ffFaults=[], _ffAll=[];
+
+async function renderFaultFinder(){
+  const pc=document.getElementById('page-content');if(!pc)return;
+  pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading fault finder...</div>';
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  const isEng=currentUser&&currentUser.role==='engineer';
+
+  try{
+    const [kb,tickets]=await Promise.all([
+      sb('fault_knowledge','GET',null,'?order=model_name&limit=2000'),
+      sb('tickets','GET',null,'?select=model&limit=2000')
+    ]);
+    _ffAll=kb||[];
+    // Build model list from both KB and tickets
+    const modSet=new Set();
+    _ffAll.forEach(r=>{if(r.model_name)modSet.add(r.model_name.trim());});
+    (tickets||[]).forEach(t=>{if(t.model&&t.model.trim())modSet.add(t.model.trim());});
+    _ffModels=[...modSet].sort();
+    // Build fault type list from KB
+    const ftSet=new Set();
+    _ffAll.forEach(r=>{if(r.fault_type)ftSet.add(r.fault_type.trim());});
+    _ffFaults=[...ftSet].sort();
+
+    _renderFFPage(isAdmin,isEng);
+  }catch(e){
+    pc.innerHTML='<div style="padding:20px;color:#ef4444;">Error: '+escHtml(e.message)+'<br><br><b>SQL — Run this in Supabase:</b><pre style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;">CREATE TABLE IF NOT EXISTS fault_knowledge (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  model_name text NOT NULL,\n  fault_type text NOT NULL,\n  description text,\n  solution text,\n  part_required text,\n  severity text DEFAULT \'Medium\',\n  created_by text,\n  created_at timestamptz DEFAULT now(),\n  updated_at timestamptz DEFAULT now()\n);</pre></div>';
+  }
+}
+
+function _renderFFPage(isAdmin,isEng){
+  const pc=document.getElementById('page-content');if(!pc)return;
+  const canManage=isAdmin||isEng;
+
+  pc.innerHTML=`<div style="padding:16px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+    <span style="font-size:22px;">🔍</span>
+    <div><div style="font-size:20px;font-weight:800;">Fault Finder</div>
+    <div style="font-size:12px;color:#6b7280;">Model select karo + fault type → known solutions</div></div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+      ${canManage?`<button onclick="openAddFault()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Fault Entry</button>`:''}
+      ${canManage?`<button onclick="downloadFFTemplate()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📄 Template</button>`:''}
+      ${isAdmin?`<button onclick="importFF()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📥 Import Excel</button>`:''}
+    </div>
+  </div>
+
+  <!-- Search Panel -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:16px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px;">🔎 Fault Search</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div>
+        <label style="font-size:12px;color:#6b7280;font-weight:600;display:block;margin-bottom:6px;">Model Select Karo</label>
+        <div style="position:relative;">
+          <input type="text" id="ff-model-input" placeholder="Type model name..." autocomplete="off"
+            oninput="_ffModelSuggest(this.value)"
+            style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;">
+          <div id="ff-model-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;color:#6b7280;font-weight:600;display:block;margin-bottom:6px;">Fault / Error Type</label>
+        <div style="position:relative;">
+          <input type="text" id="ff-fault-input" placeholder="Type fault or error..." autocomplete="off"
+            oninput="_ffFaultSuggest(this.value)"
+            style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;">
+          <div id="ff-fault-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+        </div>
+      </div>
+    </div>
+    <button onclick="searchFaults()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%;">🔍 Search Faults</button>
+  </div>
+
+  <!-- Results -->
+  <div id="ff-results"></div>
+
+  ${canManage?`
+  <!-- Knowledge Base Table -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-top:16px;">
+    <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-weight:700;font-size:14px;">📚 Knowledge Base (${_ffAll.length} entries)</div>
+      <input type="text" id="ff-kb-search" placeholder="Search..." oninput="_ffRenderKB(this.value)" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none;width:180px;">
+    </div>
+    <div id="ff-kb-list" style="overflow-x:auto;"></div>
+  </div>`:''}
+
+  <!-- Add/Edit Fault Modal -->
+  <div id="ff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
+      <h3 id="ff-modal-title" style="margin:0 0 18px;font-size:17px;">Add Fault Entry</h3>
+      <input id="ff-edit-id" type="hidden">
+      <div style="display:grid;gap:12px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Model Name *</label>
+            <input id="ff-model-name" type="text" placeholder="e.g. Canon G3010" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Fault Type *</label>
+            <input id="ff-fault-type" type="text" placeholder="e.g. Paper Jam, No Print" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+        </div>
+        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Fault Description</label>
+          <textarea id="ff-description" rows="2" placeholder="Describe the fault in detail..." style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;"></textarea></div>
+        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Solution / Fix *</label>
+          <textarea id="ff-solution" rows="3" placeholder="Step by step solution..." style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Part Required</label>
+            <input id="ff-part" type="text" placeholder="e.g. CNX-201 Roller" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
+          <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Severity</label>
+            <select id="ff-severity" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;">
+              <option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option>
+            </select></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button onclick="saveFault()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Save Entry</button>
+        <button onclick="document.getElementById('ff-modal').style.display='none'" style="padding:10px 20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  </div>`;
+
+  // Render KB list
+  if(canManage)_ffRenderKB('');
+
+  // Close dropdowns on outside click
+  document.addEventListener('click',function ffClose(e){
+    if(!e.target.closest('#ff-model-input')&&!e.target.closest('#ff-model-dropdown')){
+      const d=document.getElementById('ff-model-dropdown');if(d)d.style.display='none';
+    }
+    if(!e.target.closest('#ff-fault-input')&&!e.target.closest('#ff-fault-dropdown')){
+      const d=document.getElementById('ff-fault-dropdown');if(d)d.style.display='none';
+    }
+  },{once:false});
+}
+
+function _ffModelSuggest(q){
+  const d=document.getElementById('ff-model-dropdown');if(!d)return;
+  const matches=q?_ffModels.filter(m=>m.toLowerCase().includes(q.toLowerCase())).slice(0,10):_ffModels.slice(0,10);
+  if(!matches.length){d.style.display='none';return;}
+  d.innerHTML=matches.map(m=>`<div onclick="document.getElementById('ff-model-input').value='${m.replace(/'/g,"\\'")}';document.getElementById('ff-model-dropdown').style.display='none';" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''">${escHtml(m)}</div>`).join('');
+  d.style.display='block';
+}
+
+function _ffFaultSuggest(q){
+  const d=document.getElementById('ff-fault-dropdown');if(!d)return;
+  const matches=q?_ffFaults.filter(f=>f.toLowerCase().includes(q.toLowerCase())).slice(0,10):_ffFaults.slice(0,10);
+  if(!matches.length){d.style.display='none';return;}
+  d.innerHTML=matches.map(f=>`<div onclick="document.getElementById('ff-fault-input').value='${f.replace(/'/g,"\\'")}';document.getElementById('ff-fault-dropdown').style.display='none';" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''">${escHtml(f)}</div>`).join('');
+  d.style.display='block';
+}
+
+function searchFaults(){
+  const model=(document.getElementById('ff-model-input')?.value||'').trim().toLowerCase();
+  const fault=(document.getElementById('ff-fault-input')?.value||'').trim().toLowerCase();
+  const res=document.getElementById('ff-results');if(!res)return;
+
+  const matches=_ffAll.filter(r=>{
+    const mMatch=!model||(r.model_name||'').toLowerCase().includes(model);
+    const fMatch=!fault||(r.fault_type||'').toLowerCase().includes(fault)||(r.description||'').toLowerCase().includes(fault);
+    return mMatch&&fMatch;
+  });
+
+  if(!model&&!fault){res.innerHTML='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;font-size:13px;color:#1e40af;">Model ya fault type enter karo ne Search karo.</div>';return;}
+  if(!matches.length){res.innerHTML='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px;font-size:13px;color:#991b1b;">⚠️ No known faults found for this combination. Admin/Engineer ne report karva "Add Fault Entry" use karo.</div>';return;}
+
+  const sevClr={Low:'#059669',Medium:'#d97706',High:'#dc2626',Critical:'#7c3aed'};
+  const sevBg={Low:'#f0fdf4',Medium:'#fffbeb',High:'#fef2f2',Critical:'#fdf4ff'};
+
+  res.innerHTML='<div style="display:grid;gap:12px;margin-bottom:16px;">'
+    +matches.map(r=>`
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;border-left:4px solid ${sevClr[r.severity||'Medium']||'#d97706'};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#1e293b;">📱 ${escHtml(r.model_name)}</div>
+          <div style="font-size:13px;font-weight:600;color:#7c3aed;margin-top:2px;">🔧 ${escHtml(r.fault_type)}</div>
+        </div>
+        <span style="background:${sevBg[r.severity||'Medium']||'#fffbeb'};color:${sevClr[r.severity||'Medium']||'#d97706'};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">${r.severity||'Medium'}</span>
+      </div>
+      ${r.description?`<div style="font-size:12px;color:#6b7280;margin-bottom:10px;padding:8px 10px;background:#f8fafc;border-radius:6px;">${escHtml(r.description)}</div>`:''}
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">✅ Solution</div>
+        <div style="font-size:13px;color:#1e293b;white-space:pre-wrap;">${escHtml(r.solution||'No solution recorded yet')}</div>
+      </div>
+      ${r.part_required?`<div style="font-size:12px;color:#7c3aed;font-weight:600;">🔩 Part Required: ${escHtml(r.part_required)}</div>`:''}
+    </div>`).join('')+'</div>';
+}
+
+function _ffRenderKB(q){
+  const el=document.getElementById('ff-kb-list');if(!el)return;
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  const qL=(q||'').toLowerCase();
+  const rows=qL?_ffAll.filter(r=>(r.model_name||'').toLowerCase().includes(qL)||(r.fault_type||'').toLowerCase().includes(qL)):_ffAll;
+  if(!rows.length){el.innerHTML='<div style="padding:20px;text-align:center;color:#9ca3af;font-size:13px;">No entries yet. "Add Fault Entry" button thi add karo.</div>';return;}
+  const sevClr={Low:'#059669',Medium:'#d97706',High:'#dc2626',Critical:'#7c3aed'};
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    +'<thead><tr style="background:#f8fafc;">'
+    +'<th style="padding:8px 12px;text-align:left;font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase;">Model</th>'
+    +'<th style="padding:8px 12px;text-align:left;font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase;">Fault Type</th>'
+    +'<th style="padding:8px 12px;text-align:left;font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase;">Solution (short)</th>'
+    +'<th style="padding:8px 12px;text-align:center;font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase;">Severity</th>'
+    +(isAdmin?'<th style="padding:8px 12px;"></th>':'')
+    +'</tr></thead><tbody>'
+    +rows.map(r=>`<tr style="border-top:1px solid #f1f5f9;">
+      <td style="padding:8px 12px;font-weight:600;">${escHtml(r.model_name||'')}</td>
+      <td style="padding:8px 12px;color:#7c3aed;">${escHtml(r.fault_type||'')}</td>
+      <td style="padding:8px 12px;color:#6b7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(r.solution||'')}">${escHtml((r.solution||'').slice(0,60))}${(r.solution||'').length>60?'...':''}</td>
+      <td style="padding:8px 12px;text-align:center;"><span style="color:${sevClr[r.severity||'Medium']||'#d97706'};font-weight:700;font-size:11px;">${r.severity||'Medium'}</span></td>
+      ${isAdmin?`<td style="padding:8px 12px;white-space:nowrap;">
+        <button onclick="editFault('${r.id}')" style="padding:3px 8px;border:1px solid #7c3aed;color:#7c3aed;background:#fff;border-radius:5px;font-size:11px;cursor:pointer;margin-right:4px;">✏️</button>
+        <button onclick="deleteFault('${r.id}')" style="padding:3px 8px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:5px;font-size:11px;cursor:pointer;">🗑️</button>
+      </td>`:''}
+    </tr>`).join('')
+    +'</tbody></table>';
+}
+
+function openAddFault(){
+  document.getElementById('ff-edit-id').value='';
+  document.getElementById('ff-modal-title').textContent='Add Fault Entry';
+  ['ff-model-name','ff-fault-type','ff-description','ff-solution','ff-part'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('ff-severity').value='Medium';
+  document.getElementById('ff-modal').style.display='flex';
+}
+
+async function editFault(id){
+  const r=_ffAll.find(x=>x.id===id);if(!r)return;
+  document.getElementById('ff-edit-id').value=r.id;
+  document.getElementById('ff-modal-title').textContent='Edit Fault Entry';
+  document.getElementById('ff-model-name').value=r.model_name||'';
+  document.getElementById('ff-fault-type').value=r.fault_type||'';
+  document.getElementById('ff-description').value=r.description||'';
+  document.getElementById('ff-solution').value=r.solution||'';
+  document.getElementById('ff-part').value=r.part_required||'';
+  document.getElementById('ff-severity').value=r.severity||'Medium';
+  document.getElementById('ff-modal').style.display='flex';
+}
+
+async function saveFault(){
+  const model=document.getElementById('ff-model-name').value.trim();
+  const fault=document.getElementById('ff-fault-type').value.trim();
+  const solution=document.getElementById('ff-solution').value.trim();
+  if(!model||!fault){alert('Model and fault type required');return;}
+  const data={
+    model_name:model,fault_type:fault,
+    description:document.getElementById('ff-description').value.trim(),
+    solution,
+    part_required:document.getElementById('ff-part').value.trim(),
+    severity:document.getElementById('ff-severity').value,
+    created_by:currentUser?.name||'',
+    updated_at:new Date().toISOString()
+  };
+  const editId=document.getElementById('ff-edit-id').value;
+  try{
+    if(editId){
+      await sb('fault_knowledge','PATCH',data,'?id=eq.'+editId);
+    }else{
+      data.created_at=new Date().toISOString();
+      await sb('fault_knowledge','POST',data);
+    }
+    document.getElementById('ff-modal').style.display='none';
+    await renderFaultFinder();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteFault(id){
+  if(!confirm('Delete this fault entry?'))return;
+  try{await sb('fault_knowledge','DELETE',null,'?id=eq.'+id);await renderFaultFinder();}
+  catch(e){alert('Error: '+e.message);}
+}
+
+function downloadFFTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['model_name','fault_type','description','solution','part_required','severity'],
+    ['Canon G3010','Paper Jam','Paper gets stuck in paper feed path','1. Open back cover\n2. Remove jammed paper\n3. Check roller for wear\n4. Clean roller with damp cloth','CNX-Roller-Kit','Medium'],
+    ['Canon G3010','No Print / Blank Page','Printer prints but page comes out blank','1. Check ink tanks - refill if empty\n2. Run head cleaning 2-3 times\n3. Print nozzle check pattern','','Low'],
+    ['Epson L3110','Ink Not Recognized','Ink tank shows error even after refilling','1. Remove and reinsert ink tanks\n2. Check ink tube for air bubbles\n3. Run ink charge cycle','','High'],
+  ]);
+  ws['!cols']=[{wch:18},{wch:20},{wch:30},{wch:50},{wch:20},{wch:12}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fault Knowledge');
+  XLSX.writeFile(wb,'fault_knowledge_template.xlsx');
+}
+
+function importFF(){
+  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async function(e){
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){alert('File ma koi data nathi');return;}
+        let ok=0,fail=0;
+        for(const r of rows){
+          const model=(r.model_name||r['Model Name']||'').trim();
+          const fault=(r.fault_type||r['Fault Type']||'').trim();
+          if(!model||!fault){fail++;continue;}
+          try{
+            await sb('fault_knowledge','POST',{
+              model_name:model,fault_type:fault,
+              description:(r.description||r['Description']||'').trim(),
+              solution:(r.solution||r['Solution']||'').trim(),
+              part_required:(r.part_required||r['Part Required']||'').trim(),
+              severity:(r.severity||r['Severity']||'Medium').trim(),
+              created_by:currentUser?.name||'Import',
+              created_at:new Date().toISOString(),
+              updated_at:new Date().toISOString()
+            });
+            ok++;
+          }catch(ex){fail++;}
+        }
+        alert('✅ Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
+        await renderFaultFinder();
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+// ===== END PARTS CATALOG + FAULT FINDER =====
 </script>
 </body>
 </html>
