@@ -8406,14 +8406,21 @@ async function renderAIAnalysis(){
 
     // 1. Efficiency Score
     html+=card('Engineer Efficiency Score','⚡',`
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#1e40af;line-height:1.6;">
+        <b>Score kevi rite calculate thay chhe?</b><br>
+        Score = (Closed ÷ Assigned) × Speed Factor × 100<br>
+        Speed Factor: ≤1 day = 1.5×, ≤3 days = 1.2×, ≤7 days = 1.0×, &gt;7 days = 0.8×<br>
+        <span style="color:#6b7280;">Example: 3/3 calls closed in avg 1 day → Score = 150 (max capped at 100 for ranking)</span>
+      </div>
       ${engScores.length?engScores.map((x,i)=>`
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;" title="Closed: ${x.closed} | Assigned: ${x.assigned} | Avg close time: ${x.avgDays} days | Closure rate: ${x.rate}%">
           <div style="width:20px;text-align:center;font-size:11px;color:#6b7280;">${i+1}</div>
           <div style="width:110px;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.e.split(' ')[0]}</div>
           ${bar(x.score,'#1d4ed8')}
           <div style="width:36px;text-align:right;font-size:12px;font-weight:700;color:#1d4ed8;">${x.score}</div>
           <div style="font-size:10px;color:#6b7280;width:60px;">${x.closed}/${x.assigned} · ${x.avgDays}d</div>
         </div>`).join(''):'<div style="color:#9ca3af;font-size:13px;">No data</div>'}
+      <div style="font-size:10px;color:#9ca3af;margin-top:6px;">Score &gt;100 possible when calls are closed very fast. Hover over each row to see details.</div>
     `,'#1d4ed8');
 
     // 2. Repeat Calls
@@ -8421,7 +8428,7 @@ async function renderAIAnalysis(){
       ${repeatCalls.length?`<div style="font-size:12px;color:#dc2626;font-weight:700;margin-bottom:8px;">⚠️ ${repeatCalls.length} repeat calls found</div>`
       +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
       +'<thead><tr style="background:#fef2f2;"><th style="padding:4px 6px;text-align:left;">Serial</th><th style="padding:4px 6px;text-align:left;">Customer</th><th style="padding:4px 6px;">Model</th><th style="padding:4px 6px;">Days</th><th style="padding:4px 6px;">Engineer</th></tr></thead><tbody>'
-      +repeatCalls.slice(0,8).map(r=>`<tr style="border-bottom:1px solid #fee2e2;"><td style="padding:4px 6px;font-weight:600;color:#dc2626;">${r.serial}</td><td style="padding:4px 6px;">${r.cname||'—'}</td><td style="padding:4px 6px;">${r.model||'—'}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:700;">${r.days}d</span></td><td style="padding:4px 6px;">${(r.eng||'').split(' ')[0]}</td></tr>`).join('')
+      +repeatCalls.slice(0,8).map(r=>`<tr style="border-bottom:1px solid #fee2e2;cursor:pointer;" onclick="navigate('tickets');setTimeout(()=>{const el=document.querySelector('[data-id=\\'${r.id2}\\']');if(el){el.scrollIntoView({behavior:'smooth'});el.style.outline='3px solid #dc2626';}},800);" title="Click to open latest ticket"><td style="padding:4px 6px;font-weight:600;color:#dc2626;">${r.serial}</td><td style="padding:4px 6px;">${r.cname||'—'}</td><td style="padding:4px 6px;">${r.model||'—'}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:700;">${r.days}d</span></td><td style="padding:4px 6px;">${(r.eng||'').split(' ')[0]}</td></tr>`).join('')
       +'</tbody></table></div>'
       :'<div style="color:#059669;font-size:13px;">✅ No repeat calls in last 30 days</div>'}
     `,'#dc2626');
@@ -8431,7 +8438,7 @@ async function renderAIAnalysis(){
       <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Best engineer per area (by avg close days)</div>
       ${areaInsights.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
       +'<thead><tr style="background:#f0fdf4;"><th style="padding:4px 6px;text-align:left;">Area</th><th style="padding:4px 6px;text-align:left;">Best Engineer</th><th style="padding:4px 6px;">Calls</th><th style="padding:4px 6px;">Avg Days</th></tr></thead><tbody>'
-      +areaInsights.map(x=>`<tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:4px 6px;font-weight:600;">${x.area}</td><td style="padding:4px 6px;">${x.eng.split(' ')[0]}</td><td style="padding:4px 6px;text-align:center;">${x.total}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#f0fdf4;color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">${x.avgDays}d</span></td></tr>`).join('')
+      +areaInsights.map(x=>`<tr style="border-bottom:1px solid #e2e8f0;cursor:pointer;" onclick="navigate('tickets');setTimeout(()=>{const s=document.getElementById('search-input')||document.querySelector('input[placeholder*=earch]');if(s){s.value='${(x.area||'').replace(/'/g,"\\'")}';s.dispatchEvent(new Event('input'));}},800);" title="Click to filter tickets by this area"><td style="padding:4px 6px;font-weight:600;">${x.area}</td><td style="padding:4px 6px;">${x.eng.split(' ')[0]}</td><td style="padding:4px 6px;text-align:center;">${x.total}</td><td style="padding:4px 6px;text-align:center;"><span style="background:#f0fdf4;color:#059669;padding:1px 6px;border-radius:4px;font-weight:700;">${x.avgDays}d</span></td></tr>`).join('')
       +'</tbody></table></div>'
       :'<div style="color:#9ca3af;font-size:13px;">Not enough closed tickets with area data</div>'}
     `,'#059669');
@@ -8478,7 +8485,7 @@ async function renderAIAnalysis(){
       <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">💡 ${amcOpps.length} Non-Warranty customers to approach for AMC</div>
       ${amcOpps.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
       +'<thead><tr style="background:#fff7ed;"><th style="padding:4px 6px;text-align:left;">Customer</th><th style="padding:4px 6px;text-align:left;">Mobile</th><th style="padding:4px 6px;text-align:left;">Model</th><th style="padding:4px 6px;text-align:left;">Area</th></tr></thead><tbody>'
-      +amcOpps.slice(0,8).map(a=>`<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">${a.cname||'—'}</td><td style="padding:4px 6px;color:#1d4ed8;">${a.mobile}</td><td style="padding:4px 6px;">${a.model||'—'}</td><td style="padding:4px 6px;">${a.area||'—'}</td></tr>`).join('')
+      +amcOpps.slice(0,8).map(a=>`<tr style="border-bottom:1px solid #fef3c7;cursor:pointer;" onclick="navigate('amc');setTimeout(()=>{const s=document.getElementById('amc-search');if(s){s.value='${(a.mobile||'').replace(/'/g,"\\'")}';amcSearch();}},800);" title="Click to open AMC page for this customer"><td style="padding:4px 6px;font-weight:600;">${a.cname||'—'}</td><td style="padding:4px 6px;color:#1d4ed8;">${a.mobile}</td><td style="padding:4px 6px;">${a.model||'—'}</td><td style="padding:4px 6px;">${a.area||'—'}</td></tr>`).join('')
       +'</tbody></table></div>'
       +'<div style="font-size:11px;color:#9ca3af;margin-top:6px;">Showing top 8 · Total: '+amcOpps.length+'</div>'
       :'<div style="color:#9ca3af;font-size:13px;">No non-warranty closed tickets found</div>'}
@@ -8517,22 +8524,32 @@ async function renderAIAnalysis(){
 
     // 10. Engineer Ranking
     html+=card('🏆 Engineer Monthly Ranking','🥇',`
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.7;">
+        <b>Score kevi rite calculate thay?</b><br>
+        <span style="color:#6b7280;">Final Score (max 100) = Eff×40% + FVR×35% + Travel×25%</span><br>
+        • <b>Eff (Efficiency)</b>: Closed/Assigned × Speed (fast close = higher score, can exceed 100)<br>
+        • <b>FVR (First Visit Resolution %)</b>: Ek j visit ma call close karela tickets nu %<br>
+        • <b>Travel</b>: Ochi travel time = vadhu score (100 − avgMins/1.2) × 0.25
+      </div>
       ${ranking.length?ranking.map((x,i)=>{
         const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'  ';
         const clr=i===0?'#d97706':i===1?'#6b7280':i===2?'#b45309':'#1d4ed8';
+        const effContrib=Math.round(Math.min(x.efficiency,100)*0.4);
+        const fvrContrib=Math.round(x.fvr*0.35);
+        const trvContrib=Math.round(Math.max(0,100-x.travelAvg/1.2)*0.25);
         return `<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;background:${i<3?'#fffbeb':'#f8fafc'};border-radius:8px;border:1px solid ${i<3?'#fde68a':'#e2e8f0'};">
           <div style="font-size:18px;width:28px;text-align:center;">${medal}</div>
           <div style="flex:1;">
             <div style="font-size:13px;font-weight:700;color:#1e293b;">${x.eng.split(' ')[0]}</div>
-            <div style="font-size:10px;color:#6b7280;">Eff: ${x.efficiency} · FVR: ${x.fvr}% · Travel: ${x.travelAvg}m</div>
+            <div style="font-size:10px;color:#6b7280;">Eff: ${x.efficiency} · FVR: ${x.fvr}% · Travel: ${x.travelAvg}m/day</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:1px;">Breakdown: Eff(${effContrib}) + FVR(${fvrContrib}) + Travel(${trvContrib}) = ${x.total}</div>
           </div>
           <div style="text-align:right;">
             <div style="font-size:20px;font-weight:800;color:${clr};">${x.total}</div>
-            <div style="font-size:10px;color:#6b7280;">Score</div>
+            <div style="font-size:10px;color:#6b7280;">/ 100</div>
           </div>
         </div>`;}).join('')
       :'<div style="color:#9ca3af;font-size:13px;">Need 3+ assigned calls per engineer</div>'}
-      <div style="font-size:10px;color:#9ca3af;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;">Score = Efficiency(40%) + First Visit %(35%) + Low Travel(25%)</div>
     `,'#d97706');
 
     html+='</div></div>';
