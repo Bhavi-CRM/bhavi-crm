@@ -16079,18 +16079,83 @@ function skipDCSig(id,btn){
 }
 
 // ── INQUIRIES MODULE ──
+// ─── INQUIRY HELPERS ────────────────────────────────────────────────────────
+function _inqEngOptions(selectedId){
+  var engs=window.allEngineers||[];
+  // fallback: try _allUsers filtered by engineer role
+  if(!engs.length&&window._allUsers){engs=window._allUsers.filter(function(u){return u.role==='engineer';});}
+  return engs.map(function(e){
+    var id=e.user_id||e.eng_id||e.id||'';
+    var name=e.name||e.eng_name||id;
+    return '<option value="'+id+'"'+(selectedId&&String(selectedId)===String(id)?' selected':'')+'>'+name+'</option>';
+  }).join('');
+}
+
+async function showInqReport(){
+  var inqs=window._inqCache||[];
+  if(!inqs.length){alert('No inquiry data loaded');return;}
+  var engMap={};
+  inqs.forEach(function(inq){
+    var key=inq.assigned_name||inq.created_by_name||inq.created_by||'Unassigned';
+    if(!engMap[key])engMap[key]={name:key,total:0,open:0,inProgress:0,converted:0,lost:0};
+    engMap[key].total++;
+    if(inq.status==='Open')engMap[key].open++;
+    else if(inq.status==='In Progress')engMap[key].inProgress++;
+    else if(inq.status==='Converted')engMap[key].converted++;
+    else if(inq.status==='Lost')engMap[key].lost++;
+  });
+  var rows=Object.values(engMap).sort(function(a,b){return b.converted-a.converted;});
+  var existing=document.getElementById('modal-inq-report');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-inq-report';modal.className='modal-overlay';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  var tRows=rows.map(function(r,i){
+    var convRate=r.total>0?Math.round(r.converted/r.total*100):0;
+    return '<tr>'
+      +'<td style="padding:10px 12px;font-weight:600;">'+(i+1)+'</td>'
+      +'<td style="padding:10px 12px;font-weight:700;">'+escHtml(r.name)+'</td>'
+      +'<td style="padding:10px 12px;text-align:center;font-weight:700;">'+r.total+'</td>'
+      +'<td style="padding:10px 12px;text-align:center;"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;">'+r.open+'</span></td>'
+      +'<td style="padding:10px 12px;text-align:center;"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;">'+r.inProgress+'</span></td>'
+      +'<td style="padding:10px 12px;text-align:center;"><span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;">'+r.converted+'</span></td>'
+      +'<td style="padding:10px 12px;text-align:center;"><span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600;">'+r.lost+'</span></td>'
+      +'<td style="padding:10px 12px;text-align:center;"><b style="color:'+(convRate>=50?'#059669':convRate>=25?'#d97706':'#dc2626')+';">'+convRate+'%</b></td>'
+      +'</tr>';
+  }).join('');
+  modal.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:700px;">'
+    +'<div class="modal-header"><h2>📊 Inquiry Report — Engineer Wise</h2><button class="close-btn" onclick="document.getElementById(\'modal-inq-report\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="overflow-x:auto;">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#1e293b;color:#fff;">'
+    +'<th style="padding:10px 12px;">#</th><th style="padding:10px 12px;text-align:left;">Engineer</th>'
+    +'<th style="padding:10px 12px;">Total</th><th style="padding:10px 12px;">Open</th>'
+    +'<th style="padding:10px 12px;">In Progress</th><th style="padding:10px 12px;">Converted ✅</th>'
+    +'<th style="padding:10px 12px;">Lost ❌</th><th style="padding:10px 12px;">Conv. %</th>'
+    +'</tr></thead><tbody>'+tRows+'</tbody></table>'
+    +'</div>'
+    +'<div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-inq-report\').remove()">Close</button></div>'
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
 async function renderInquiries(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
+    var isAdm=currentUser&&currentUser.role==='admin';
+    var isEng=currentUser&&currentUser.role==='engineer';
+    var myId=currentUser?.user_id||currentUser?.eng_id||'';
     var today=new Date().toLocaleDateString('en-CA');
-    var inqs=await sb('auto_inquiries','GET',null,'?order=created_at.desc');
+    var inqQ=isAdm?'?order=created_at.desc':'?order=created_at.desc&or=(created_by.eq.'+encodeURIComponent(myId)+',assigned_to.eq.'+encodeURIComponent(myId)+')';
+    var inqs=await sb('auto_inquiries','GET',null,inqQ);
     window._inqCache=inqs;
     var followupToday=inqs.filter(function(i){return i.followup_date===today&&i.status!=='Converted'&&i.status!=='Lost';});
     var html='<div class="section-header">'
       +'<h2>🔍 Inquiries ('+inqs.length+')</h2>'
+      +'<div style="display:flex;gap:8px;">'
+      +(isAdm?'<button class="btn btn-outline btn-sm" onclick="showInqReport()" id="btn-inq-report">📊 Report</button>':'')
       +'<button class="btn btn-primary" onclick="openAddInquiryModal()">+ New Inquiry</button>'
-      +'</div>';
+      +'</div></div>';
     if(followupToday.length){
       html+='<div style="background:#fff7ed;border:2px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
         +'<span style="font-size:20px;">🔔</span><div>'
@@ -16122,9 +16187,10 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
+          +(inq.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(inq.assigned_name)+'</span>':'')
           +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
-          +'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>'
-          +'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>'
+          +(isAdm?'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>':'')
+          +(isAdm?'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>':'')
           +'</div>'
           +'</div>'
           +(inq.notes?(function(){var lines=(inq.notes||'').split('\n');var last=lines[lines.length-1];return'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">💬 '+escQ(last)+(lines.length>1?' <span style="color:#94a3b8;">(+'+( lines.length-1)+' more)</span>':'')+'</div>';}())  :'')
@@ -16205,6 +16271,7 @@ function openAddInquiryModal(){
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'inq-desc\')">✨ AI Remark</button></div>'
+    +(isAdm?'<div class="form-group" style="margin-bottom:10px;"><label>👷 Assign to Engineer <small style="color:var(--text-muted);">(optional)</small></label><select id="inq-assign" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Unassigned --</option>'+_inqEngOptions()+'</select></div>':'')
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-add-inquiry\').remove()">Cancel</button>'
@@ -16222,7 +16289,11 @@ async function saveNewInquiry(){
   var followup=document.getElementById('inq-followup')?.value||null;
   if(!name||!mobile){alert('Name and Mobile are required!');return;}
   try{
-    await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',updated_at:new Date().toISOString()});
+    var assignSel=document.getElementById('inq-assign');
+    var assignVal=assignSel?assignSel.value:'';
+    var assignName=assignSel?assignSel.options[assignSel.selectedIndex]?.text||'':'';
+    if(assignName==='-- Unassigned --')assignName='';
+    await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
@@ -16249,6 +16320,7 @@ function openEditInquiryModal(id){
     +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
     +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'einq-desc\')">✨ AI Remark</button></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>👷 Assign to Engineer <small style="color:var(--text-muted);">(optional)</small></label><select id="einq-assign" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Unassigned --</option>'+_inqEngOptions(inq.assigned_to)+'</select></div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">Cancel</button>'
@@ -16262,13 +16334,18 @@ async function saveEditInquiry(id){
   var mobile=(document.getElementById('einq-mobile')?.value||'').trim();
   if(!name||!mobile){alert('Name and Mobile are required!');return;}
   try{
-    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),updated_at:new Date().toISOString()},'?id=eq.'+id);
+    var asgSel2=document.getElementById('einq-assign');
+    var asgVal2=asgSel2?asgSel2.value:'';
+    var asgName2=asgSel2?(asgSel2.options[asgSel2.selectedIndex]?.text||''):'';
+    if(asgName2==='-- Unassigned --'||asgName2==='-- Keep Current --')asgName2=asgVal2?asgName2:'';
+    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),assigned_to:asgVal2||null,assigned_name:(asgName2&&asgName2!=='-- Unassigned --')?asgName2:null,updated_at:new Date().toISOString()},'?id=eq.'+id);
     document.getElementById('modal-edit-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
 }
 
 async function deleteInquiry(id){
+  if(!currentUser||currentUser.role!=='admin'){alert('Only admin can delete inquiries.');return;}
   var inqData=null;
   try{var r=await sb('auto_inquiries','GET',null,'?id=eq.'+id);inqData=r&&r[0];}catch(e){}
   var label=inqData?(inqData.customer_name||'Inquiry'):'Inquiry';
