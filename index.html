@@ -8109,18 +8109,24 @@ async function printJobSheet(){
         <div style="padding:5px 10px;line-height:1.7;">${items.map((txt,i)=>`<div style="display:flex;gap:5px;"><span style="min-width:14px;font-weight:700;">${i+1}.</span><span>${txt}</span></div>`).join('')}</div>
       </div>`;
     })()}
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:8px;">
       <div class="sig-box">
         <div style="font-weight:700;font-size:9px;margin-bottom:2px;">ENGINEER</div>
         <div style="font-size:8px;color:#555;margin-bottom:1px;">${t.assigned_name||''}</div>
         <div class="sig-line">Signature &amp; Date</div>
       </div>
       <div class="sig-box">
-        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">CUSTOMER</div>
-        <div style="font-size:8px;color:#555;margin-bottom:1px;">Product Received / Delivered</div>
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">CUSTOMER INWARD</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">Signature at time of product submission</div>
+        <div style="height:36px;"></div>
+        <div class="sig-line">Signature &amp; Date</div>
+      </div>
+      <div class="sig-box">
+        <div style="font-weight:700;font-size:9px;margin-bottom:2px;">CUSTOMER OUTWARD</div>
+        <div style="font-size:8px;color:#555;margin-bottom:1px;">Signature at time of product delivery</div>
         ${t.customer_signature?`<img src="${t.customer_signature}" style="max-height:36px;margin-top:2px;">`:
         '<div style="height:36px;"></div>'}
-        <div class="sig-line">I confirm product &amp; completion</div>
+        <div class="sig-line">I confirm satisfactory completion</div>
       </div>
       <div class="sig-box">
         <div style="font-weight:700;font-size:9px;margin-bottom:2px;">RECEPTIONIST</div>
@@ -8173,11 +8179,12 @@ async function openJobSheets(id){
         <div class="field"><label>Brand / Type</label><div class="val">${t.brand_name||''} &nbsp;|&nbsp; ${t.call_type||''} &nbsp;|&nbsp; ${t.service_type||''}</div></div>
       </div>
     </div>`;
-  const sigRow=(l1,l2,l3)=>`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
+  const sigRow=(l1,l2,l3,l4)=>`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;">
       <div class="sig-box"><div class="sig-title">${l1}</div><div class="sig-line">Signature &amp; Date</div></div>
       <div class="sig-box"><div class="sig-title">${l2}</div><div class="sig-line">Signature &amp; Date</div></div>
       <div class="sig-box"><div class="sig-title">${l3}</div><div class="sig-line">Signature &amp; Date</div></div>
+      <div class="sig-box"><div class="sig-title">${l4}</div><div class="sig-line">Signature &amp; Date</div></div>
     </div>`;
   win.document.write(`<!DOCTYPE html><html><head><title>JS-${t.id}</title><style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -8210,7 +8217,7 @@ async function openJobSheets(id){
       </div>
     </div></div>
     ${isOOC?`<div style="background:#fee2e2;border:1.5px solid #f05252;padding:5px 8px;font-weight:700;color:#dc2626;margin-bottom:6px;border-radius:3px;font-size:9px;">⚠️ WARRANTY VOID — ${t.coverage_remark||''}</div>`:''}
-    ${sigRow('RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>','ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER<br><span style="font-size:8px;font-weight:400;">I confirm product submitted</span>')}
+    ${sigRow('ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER INWARD<br><span style="font-size:8px;font-weight:400;">Signature at time of product submission</span>','CUSTOMER OUTWARD<br><span style="font-size:8px;font-weight:400;">Signature at time of product delivery</span>','RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>')}
   </div>
 
   <!-- ===== CUT LINE ===== -->
@@ -8234,7 +8241,7 @@ async function openJobSheets(id){
         </tbody>
       </table>
     </div></div>
-    ${sigRow('RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>','ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER<br><span style="font-size:8px;font-weight:400;">I confirm satisfactory completion</span>')}
+    ${sigRow('ENGINEER<br><span style="font-size:8px;font-weight:400;">'+(t.assigned_name||'&nbsp;')+'</span>','CUSTOMER INWARD<br><span style="font-size:8px;font-weight:400;">Signature at time of product submission</span>','CUSTOMER OUTWARD<br><span style="font-size:8px;font-weight:400;">Signature at time of product delivery</span>','RECEPTIONIST<br><span style="font-size:8px;font-weight:400;">'+(t.wc_name||'Reception')+'</span>')}
   </div>
 
   <script>window.onload=()=>setTimeout(()=>window.print(),400);<\/script>
@@ -12800,7 +12807,7 @@ async function printDCNow(id,dcNo){
     +'<div class="hrow"><div><b style="font-size:16px;">DELIVERY CHALLAN</b><br><span style="font-size:11px;color:#555;">Bhavi Electronics &amp; Automation</span></div>'
     +'<div class="meta"><b style="font-size:14px;">DC NO:- '+dcNo+'</b><br>DATE:- '+dateStr+'<br><span style="font-size:10px;color:#777;">AWB: '+e.awb_no+' | '+e.agency+'</span></div></div>'
     +'<div class="to"><b>TO,</b><br><b style="font-size:14px;">'+name.toUpperCase()+'</b><br>'
-    +(addr?addr.toUpperCase()+'<br>':'')+city.toUpperCase()+(state?' - '+state.toUpperCase():'')+( pin?' :- '+pin:'')+'<br>'+(phone?'PH NO:- '+phone:'')+'</div>'
+    +(addr?addr.replace(/\n/g,'<br>').toUpperCase()+'<br>':'')+city.toUpperCase()+(state?' - '+state.toUpperCase():'')+( pin?' :- '+pin:'')+'<br>'+(phone?'PH NO:- '+phone:'')+'</div>'
     +'<div style="margin-bottom:12px;font-size:13px;line-height:1.7;">THIS IS TO CERTIFY THAT HERE WE ARE SENDING <b>('+products.length+')</b> '+desc.toUpperCase()+' TO THE ABOVE ADDRESS</div>'
     +'<table><thead><tr><th style="width:20%;">TICKET / CALL ID</th><th style="width:26%;">MODEL NAME</th><th style="width:20%;">SERIAL NUMBER</th><th style="width:10%;">SERVICE TYPE</th><th style="width:24%;">ACCESSORIES</th></tr></thead><tbody>'+prodRows+'</tbody></table>'
     +'<div style="font-size:13px;margin:12px 0;line-height:1.8;">THE APPROXIMATE VALUE OF THE CONSIGNMENT IS OF<br><b style="font-size:15px;">RS. '+(amount?amount+'.00':'_______________')+'</b></div>'
@@ -18878,9 +18885,28 @@ async function renderPartsCatalog(){
   const pc=document.getElementById('page-content');if(!pc)return;
   pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading parts catalog...</div>';
   try{
-    _pcAll=await sb('parts_catalog','GET',null,'?order=part_name&limit=1000')||[];
-    // Use stock_qty directly from parts_catalog (no inventory join)
-    _pcAll.forEach(p=>{ p._qty=p.stock_qty||0; });
+    const [catalog,inv]=await Promise.all([
+      sb('parts_catalog','GET',null,'?order=part_name&limit=1000'),
+      sb('inventory','GET',null,'?select=item_name,item_code,qty_in_stock&limit=2000')
+    ]);
+    _pcAll=catalog||[];
+    // Build inventory lookup — match by item_code (primary) or item_name (fallback)
+    const invByCode={}, invByName={};
+    (inv||[]).forEach(i=>{
+      if(i.item_code)invByCode[i.item_code.trim().toLowerCase()]=i.qty_in_stock||0;
+      if(i.item_name)invByName[i.item_name.trim().toLowerCase()]=i.qty_in_stock||0;
+    });
+    _pcAll.forEach(p=>{
+      const codeKey=(p.item_code||'').trim().toLowerCase();
+      const nameKey=(p.part_name||'').trim().toLowerCase();
+      if(codeKey&&invByCode[codeKey]!==undefined){
+        p._qty=invByCode[codeKey]; p._qtySource='inventory';
+      } else if(nameKey&&invByName[nameKey]!==undefined){
+        p._qty=invByName[nameKey]; p._qtySource='inventory';
+      } else {
+        p._qty=p.stock_qty||0; p._qtySource='manual';
+      }
+    });
     _renderPCShell();
     _pcUpdateRows();
   }catch(e){
@@ -19425,16 +19451,16 @@ function importFF(){
         if(!rows.length){alert('File ma koi data nathi');return;}
         let ok=0,fail=0;
         for(const r of rows){
-          const model=(r.model_name||r['Model Name']||'').trim();
-          const fault=(r.fault_type||r['Fault Type']||'').trim();
+          const model=String(r.model_name||r['Model Name']||'').trim();
+          const fault=String(r.fault_type||r['Fault Type']||'').trim();
           if(!model||!fault){fail++;continue;}
           try{
             await sb('fault_knowledge','POST',{
               model_name:model,fault_type:fault,
-              description:(r.description||r['Description']||'').trim(),
-              solution:(r.solution||r['Solution']||'').trim(),
-              part_required:(r.part_required||r['Part Required']||'').trim(),
-              severity:(r.severity||r['Severity']||'Medium').trim(),
+              description:String(r.description||r['Description']||'').trim(),
+              solution:String(r.solution||r['Solution']||'').trim(),
+              part_required:String(r.part_required||r['Part Required']||'').trim(),
+              severity:String(r.severity||r['Severity']||'Medium').trim(),
               created_by:currentUser?.name||'Import',
               created_at:new Date().toISOString(),
               updated_at:new Date().toISOString()
