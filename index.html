@@ -333,6 +333,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
     <div class="nav-item hidden" onclick="navigate('parts-catalog')" id="nav-parts-catalog"><span class="icon">🔩</span><span>Parts Catalog</span></div>
     <div class="nav-item hidden" onclick="navigate('fault-finder')" id="nav-fault-finder"><span class="icon">🔍</span><span>Fault Finder</span></div>
+    <div class="nav-item hidden" onclick="navigate('model-guide')" id="nav-model-guide"><span class="icon">📖</span><span>Model Guide</span></div>
     <div class="nav-item hidden" onclick="navigate('pending-list')" id="nav-pending-list"><span class="icon">📋</span><span>Pending List</span></div>
     <div class="nav-item hidden" onclick="navigate('route-planning')" id="nav-route-planning"><span class="icon">🗺️</span><span>Route Planning</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
@@ -2597,12 +2598,12 @@ function setupNav(){
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-profit',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
-      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
+      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-model-guide',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
-      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
+      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-model-guide',true);
       var isAutoEng2=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-ai-agent',isAutoEng2);
     }
@@ -2657,9 +2658,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder','model-guide':'📖 Model Guide'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder,'model-guide':renderModelGuide}[page];
   if(renderFn)await renderFn();
 }
 
@@ -11954,7 +11955,7 @@ async function renderCourier(){
           <div class="form-group"><label>Name <span class="req">*</span></label>
             <input type="text" id="recv-new-name" placeholder="e.g. BOSS COLOR LAB" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
           <div class="form-group"><label>Address</label>
-            <input type="text" id="recv-new-addr" placeholder="Street address" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+            <textarea id="recv-new-addr" placeholder="Street address (multiple lines allowed)" rows="3" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:vertical;"></textarea></div>
           <div class="form-group"><label>City <span class="req">*</span></label>
             <input type="text" id="recv-new-city" placeholder="e.g. Rajkot" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
           <div class="form-group"><label>State</label>
@@ -12801,7 +12802,7 @@ async function printDCNow(id,dcNo){
   }).join('');
 
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DC-'+dcNo+'</title>'
-    +'<style>@page{size:A4;margin:8mm 10mm 8mm 10mm;}*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:10px;color:#000;margin:0;padding:0;}.page{width:100%;}.banner{width:100%;display:block;margin-bottom:6px;}.hrow{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;border-bottom:2px solid #000;padding-bottom:5px;}.meta{text-align:right;font-size:10px;}.to{margin-bottom:6px;line-height:1.6;font-size:10px;}table{width:100%;border-collapse:collapse;margin-bottom:6px;}th{background:#1a1a1a;color:#fff;padding:4px 6px;border:1px solid #000;font-size:9px;text-align:center;text-transform:uppercase;}td{padding:4px 6px;border:1px solid #000;font-size:10px;vertical-align:middle;}.footer{margin-top:6px;border-top:2px solid #000;padding-top:6px;display:flex;justify-content:space-between;align-items:center;}.sig{margin-top:8px;border-top:1px solid #000;padding-top:4px;text-align:right;font-size:10px;}.bottom-banner{margin-top:6px;border-top:2px solid #cc0000;padding-top:4px;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>'
+    +'<style>@page{size:A4;margin:8mm 10mm 8mm 10mm;}*{box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:10px;color:#000;margin:0;padding:0;}.page{width:100%;}.banner{width:100%;display:block;margin-bottom:6px;}.hrow{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;border-bottom:2px solid #000;padding-bottom:5px;}.meta{text-align:right;font-size:10px;}.to{margin-bottom:6px;line-height:1.6;font-size:10px;word-break:break-word;overflow-wrap:break-word;}table{width:100%;border-collapse:collapse;margin-bottom:6px;}th{background:#1a1a1a;color:#fff;padding:4px 6px;border:1px solid #000;font-size:9px;text-align:center;text-transform:uppercase;}td{padding:4px 6px;border:1px solid #000;font-size:10px;vertical-align:middle;}.footer{margin-top:6px;border-top:2px solid #000;padding-top:6px;display:flex;justify-content:space-between;align-items:center;}.sig{margin-top:8px;border-top:1px solid #000;padding-top:4px;text-align:right;font-size:10px;}.bottom-banner{margin-top:6px;border-top:2px solid #cc0000;padding-top:4px;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>'
     +'<div class="page">'
     +'<div style="margin-bottom:14px;border-bottom:2px solid #cc0000;padding-bottom:10px;"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCADqBLADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwCr45J/4TXXOT/yEJ//AEM1jZPrWz46/wCR21z/ALCE/wD6Gaxq+UqfHL1Z/RWA/wB0pf4V+SDJ9aMn1ooqDrDJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKAPbP2UD/wATbX+f+WEP/oT19BV8+/sof8hbxB/17wf+hPX0EDmvosB/AifiHF//ACN6vy/JBXgP7aX/ACKWg/8AYRf/ANFGvfq8B/bR/wCRS0H/ALCL/wDoo17OW/71D1Pl57Hy1RRRX3BzBRRRQIKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAqew/wCQha/9d4//AEIVBU1h/wAf9t/12T/0IVE/hY1ufo4velpFpa/PTrEPQ18Pa4T/AG7qPJ/4+pf/AEM19wnpXw9rn/Ic1D/r7m/9DNeTmnwxP0Tw9/jV/RfqU8n1oyfWiivHP1EMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1r3/wDZPz/Zev5/5+If/QDXgFe//snf8gvX/wDr4i/9ANduX/x18z5XjNf8JE/WP5o9vooo6V9Cfih81ft2/wDIE8Kf9fdx/wCixXypX1X+3Z/yBPCn/X3cf+ixXypX6Rw7/uEPV/mcFf4wooor3DEKKKKQBRRRTAKKKKQBRRRTAKKKKACiiikAUUUUwCiiikAUUUUwNPwp/wAjVo//AGELf/0atfpZ3Nfmn4U/5GrR/wDsIW//AKNWv0s7mviOLP4lP0f6HZhtmKKhv/8Ajyn/AOubfyNTVDf/APHlP/1zb+Rr5HodcfiR8MOTvbn+I/zpMn1pX+83+8f50lfJtan9IU/gQZPrRk+tFFIsMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooAMn1oyfWiigAyfWjJ9aKKADJ9aMn1oooA+jv2V/8AkTdS/wCv8/8AoC17AK8f/ZX48G6l/wBhA/8AoC17AK+lwn8GPofgvEn/ACNa/wDiA18p/t2f8hjwp/173X/oUdfVh6V8p/t2f8hjwp/173X/AKFHX0fD/wDv8Pn+TPn63wHzXRRRX6UeeFFFFFguFFFFFguFFFFFguFFFFFguFFFFFguFFFFFguFFFFFguFFFFFguFFFFFguFdP8Jv8AkqPhb/sL23/owVzFdP8ACf8A5Kj4V/7C9t/6MFc2M/gT9H+Q47o+l/EfwP8AEWpeINQ1GLV9MWO6upJlVlfIDMSM+9Uf+FBeJv8AoM6T+Un+FfSGBRgV+MPAUZO7R91T4vzSlBQjNWXkj5v/AOFBeJv+gzpP5Sf4Uf8ACgvE3/QZ0n8pP8K+kKKX9n0Oxp/rnm3/AD8X3I+b/wDhQXib/oM6T+Un+FH/AAoLxN/0GdJ/KT/CvpCij+z6HYP9c82/5+L7kfN//CgvE3/QZ0n/AL5k/wAKP+FBeJv+gzpX/fMn+FfSFFH9n0Owf655t/z8X3I+b/8AhQXib/oM6T/3zJ/hR/woLxN/0GdJ/KT/AAr6Qoo/s+h2D/XPNv8An4vuR83/APCgvE3/AEGdJ/KT/Cj/AIUF4m/6DOk/98yf4V9IUUf2fQ7B/rnm3/Pxfcj5v/4UF4m/6DOk/lJ/hR/woLxN/wBBnSfyk/wr6Qoo/s+h2D/XPNv+fi+5Hzf/AMKC8Tf9BnSf++ZP8KP+FBeJv+gzpP8A3zJ/hX0hRR/Z9DsH+uebf8/F9yPm/wD4UF4m/wCgzpP5Sf4Uf8KC8Tf9BnSfyk/wr6Qoo/s+h2D/AFzzb/n4vuR83/8ACgvE3/QZ0n8pP8KP+FBeJv8AoM6V/wB8yf4V9IUUf2fQ7B/rnm3/AD8X3I+b/wDhQXib/oM6T+Un+FH/AAoLxN/0GdJ/KT/CvpCij+z6HYP9c82/5+L7keX/AAV+HmqeCL7U59RvbS4W7jjRBAGypUsTnP1r09aXA9KK6qdONOPLHY+fx2NrY6u69Z3kwrzb47/Dy/8AiLo2nWFjqVtYvaXTTM08bMGBQrgYPvXpNGBW1KpKlNTi9UcjVz5Y/wCGYfEX/Q1aT/4DSf40f8Mw+Iv+hq0n/wABpP8AGvqeiu/+18X/ADfgieSJ8sf8Mw+Iv+hq0n/wGk/xo/4Zh8Rf9DVpP/gNJ/jX1PRR/a+L/m/BByRPlj/hmHxF/wBDVpP/AIDSf40f8Mw+Iv8AoatJ/wDAaT/Gvqeij+18X/N+CHyRPlj/AIZh8Rf9DVpP/gNJ/jR/wzD4i/6GrSf/AAGk/wAa+p6KP7Xxf834IXJE+WP+GYfEX/Q1aT/4DSf40f8ADMPiL/oatJ/8BpP8a+p6KP7Xxf8AN+CDkifLH/DMPiL/AKGrSf8AwGk/xo/4Zh8Rf9DVpP8A4DSf419T0Uf2vi/5vwQ+SJ8sf8Mw+Iv+hq0n/wABpP8AGj/hmHxF/wBDVpP/AIDSf419T0Uf2vi/5vwQuSJ8sf8ADMPiL/oatJ/8BpP8aP8AhmHxF/0NWk/+A0n+NfU9FH9r4v8Am/BD5Inyx/wzD4i/6GrSf/AaT/Gj/hmHxF/0NWk/+A0n+NfU9FH9r4v+b8ELkifLH/DMPiL/AKGrSf8AwGk/xo/4Zh8Rf9DVpP8A4DSf419T0Uf2vi/5vwQ+SJ8sf8Mw+Iv+hq0n/wABpP8AGpLf9mXxDFcRSnxTpRCSKxAtpOcEH1r6jowKHm2Kas5fghckRFpaKK80sae9fP2ofAbWrrULq5XX9PVZp3kAML5AZicdfevoOjArGrQhWSU0enlub4vLZSlhpW5t9Ez52/4Z/wBc/wChh03/AL8v/jSf8M/67/0MGm/9+X/xr6KorD6hQ7Hq/wCuWbf8/F/4Cv8AI+df+Gf9d/6GDTf+/L/40v8Awz/rv/Qwab/35f8Axr6Jop/UKHYP9cs2/wCfi/8AAV/kfO3/AAz/AK5/0MOm/wDfl/8AGk/4Z/13/oYNN/78v/jX0VRS+oUOwf645t/z8X/gK/yPnX/hn/Xf+hg03/vy/wDjS/8ADP8Arn/Qwab/AN+X/wAa+iaKf1Ch2D/XLNv+fi/8BX+R87f8M/65/wBDDpv/AH5f/Gk/4Z/13/oYNN/78v8A419FUUvqFDsH+uObf8/F/wCAr/I+df8Ahn/Xf+hg03/vy/8AjS/8M/65/wBDDpv/AH5f/Gvomij6hQ7B/rlm3/Pxf+Ar/I+dv+Gf9c/6GHTf+/L/AONJ/wAM/wCu/wDQwab/AN+X/wAa+iqKf1Ch2D/XLNv+fi/8BX+R86/8M/67/wBDBpv/AH5f/Gj/AIZ/13/oYNN/78v/AI19FUUvqFDsH+uWbf8APxf+Ar/I+dv+Gf8AXP8AoYdN/wC/L/40n/DP+u/9DBpv/fl/8a+iqKPqFDsH+uWbf8/F/wCAr/I+dv8Ahn/XP+hh03/vy/8AjSf8M/67/wBDBpv/AH4f/Gvoqij6hQ7B/rlm3/Pxf+Ar/I+df+Gf9c/6GDTv+/L/AONek/BnwJe+B7XUYL2/t7s3cqOphRlC7VxzmvQcCjA9K0pYSlSlzRWpx47iPMMdRdCvO8XbougUhpaK6TwzyX9oz4Yav8TNP0W20rUbGyawnlkkNyGIYMoAxt+leNf8MqeMv+hk0D/viX/Cvr/FGK9TC5xi8LTVOm7JeSM5Uoyd2fIH/DKnjL/oZNA/74l/wo/4ZU8Zf9DJoH/fEv8AhX1/ijFdH+sWP/mX3In2ED5A/wCGVPGX/QyaB/3xL/hR/wAMqeMv+hk0D/viX/Cvr/FFH+sWP/mX3IPYQPkD/hlTxl/0Mmgf98S/4Uf8MqeMv+hk0D/viX/Cvr+jFH+sWP8A5l9yD2ED5A/4ZU8Zf9DJoH/fEv8AhR/wyp4y/wChk0D/AL4l/wAK+v8AFGKP9Ysf/MvuQewgfIH/AAyp4y/6GTQP++Jf8KP+GVPGX/QyaB/3xL/hX1/ijFH+sWP/AJl9yD2ED5A/4ZU8Zf8AQyaB/wB8S/4Uf8MqeMv+hk0D/viX/Cvr+jFH+sWP/mX3IPYQPkD/AIZU8Zf9DJoH/fEv+FH/AAyp4y/6GTQP++Jf8K+v8UYo/wBYsf8AzL7kHsIHyB/wyp4y/wChk0D/AL4l/wAKP+GVPGX/AEMmgf8AfEv+FfX+KMUf6xY/+Zfcg9hA+QP+GVPGX/QyaB/3xL/hR/wyp4y/6GTQP++Jf8K+v6MUf6xY/wDmX3IPYQPkD/hlTxl/0Mmgf98S/wCFH/DKnjL/AKGTQP8AviX/AAr6/wAUYo/1ix/8y+5B7CB8l6N+y/4vsdZsb6TxFobJbXUUzKqS5IVwxA49q+shTsUV5+Nx9fGtOs72LhBQ2AVHdIZLeSMHBZSufTIqSg81xFp2PnVvgBrhJP8AwkGm8kn/AFL/AONH/DP+u/8AQwab/wB+X/xr6KwPSiuR4Cg3ex9OuMM2St7Rfcv8j51/4Z/13/oYNN/78v8A40v/AAz/AK5/0MOm/wDfl/8AGvomil9Qodh/645t/wA/F/4Cv8j52/4Z/wBc/wChh03/AL8v/jSf8M/67/0MGm/9+X/xr6Kop/UKHYP9cs2/5+L/AMBX+R86/wDDP+u/9DBpv/fl/wDGl/4Z/wBc/wChh03/AL8v/jX0TRS+oUOwf65Zt/z8X/gK/wAj51/4Z/13/oYNN/78v/jS/wDDP+uf9DDpv/fl/wDGvomij6hQ7B/rlm3/AD8X/gK/yPnX/hn/AF3/AKGDTf8Avy/+NL/wz/rn/Qw6b/35f/Gvomij6hQ7B/rlm3/Pxf8AgK/yPnX/AIZ/13/oYNN/78v/AI0v/DP+uf8AQw6b/wB+X/xr6Jop/UKHYP8AXLNv+fi/8BX+R86/8M/67/0MGm/9+X/xpf8Ahn/XP+hh03/vy/8AjX0TRS+oUOwf65Zt/wA/F/4Cv8j51/4Z/wBd/wChh03/AL8v/jS/8M/65/0MOm/9+X/xr6Joo+oUOwf645t/z8X/AICv8j51/wCGf9d/6GDTf+/L/wCNL/wz/rn/AEMOm/8Afl/8a+iaKPqFDsH+uWbf8/F/4Cv8j51/4Z/13/oYNN/78v8A40f8M/67/wBDDpv/AH4f/Gvoqjij6hQ7B/rlm/8Az8X3L/I4b4PeDbvwToV1p95eQXbzXJmDxKVAG0DHP0ruR0o4pM11QioRUUfPYrE1MVWlWqu8pasU9K8c/aG+EeqfE6+0a407WLPTxp8UyOLiJ337ypGNv+7XsdGBXThsRUw1RVKbs0c8oqSsz5I/4ZS8S/8AQ26P/wCAsv8AjR/wyl4l/wCht0f/AMBZf8a+t8CivV/1hx/8/wCCM/YQPkj/AIZS8S/9Dbo//gLL/jR/wyl4l/6G3R//AAFl/wAa+t8UYo/1hx/8/wCCD2MD5I/4ZS8S/wDQ26P/AOAsv+NH/DKXiX/obdH/APAWX/GvrfFGKP8AWHH/AM/4IPYwPkj/AIZS8S/9Dbo//gLL/jR/wyl4l/6G3R//AAFl/wAa+t8UUf6w4/8An/BB7GB8kf8ADKXiX/obdH/8BZf8aP8AhlLxL/0Nuj/+Asv+NfW+KMUf6w4/+f8ABB7GB8kf8MpeJf8AobdH/wDAWX/Gj/hlLxL/ANDbo/8A4Cy/419b0Yo/1hx/8/4IPYwPkj/hlLxL/wBDbo//AICy/wCNH/DKXiX/AKG3R/8AwFl/xr63xRR/rDj/AOf8EHsYHyR/wyl4l/6G3R//AAFl/wAaP+GUvEv/AENuj/8AgLL/AI19b4oxR/rDj/5/wQexgfJH/DKXiX/obdH/APAWX/Gj/hlLxL/0Nuj/APgLL/jX1vRij/WHH/z/AIIPYwPkj/hlLxL/ANDbo/8A4Cy/40f8MpeJf+ht0f8A8BZf8a+t8UUf6w4/+f8ABB7GB8kf8MpeJf8AobdH/wDAWX/GtXwb+zP4g0LxbpGtzeKNKmisL2K5eNLaQM4RgcAk9a+osUYFTPP8dOLi5aPyQexhuFBOKKramxSwndTgrGxB9MA14xqUrzxHpFpdi1luh5hbbgKTz6e/4ZxWlDPFPEssLiSNhlWU5Br5l1LW9MGv3EeoX1lCttqEyajBc6eZ5bu2AAijgfB8ojDdCvzHdk17N8Gb2e+8FWk9xI0jvGj7mOWJK85Pc8cnucmojUhJ2TT/AE9T1MZldXC01UnFpabrR3V9DuM0Ug60tWeWFFFFABRRRQAUZGM0U3GaAMXUfF/hfTrySzv9f062uYyA8Us6qy5GeRVf/hPPBmM/8JRpP/gSv+NeSftLeEdKsIU8U25nF9fXixzhnyhHlnGB2+6K574N/DfS/G2lX93f313bNbXAiUQ7cEFc5OQeea8+WJrKr7NRR9jh8iy6eXLHVKslHZ6Lc+idL8T+HdUm8jTtb0+7lPSOK4VmP4ZzVrVdV03SbQ3mp3sFnbghfMmcKuT0GT3r5V+LPgqPwHr9lDYajJcR3EZlidhsliKtjqv4YIxXtWg6anxG+DulJ4kluS7KJmkjYK0jRlgrE47jmrpYmcnKEo2kjmx+R4XD0qOLp1XKjN2elpL5ddjd0n4leD9W8Qw6Fpmp/a7ubcE8uJihwCT82MdAa6/Ir5I+CssNp8VNMlmlSKGJ5gzyNgKAjDkmvoRPih4EbUBYr4jtfMZtobDeXn/fxt/Wqw2J9pHmnoTnuQ/UsQqeFUpLlTbtfv2Wh2eRS1FG6ugdGDKRkEHgisDxN438LeHJRDrGsW9tMRnyslnx/urkiupySV2z52lRqVpclOLb7JXOjzS5rlvDnj/wl4huRa6VrVvLcHpC+Y3P0DAZ/CrniPxT4e8OvCmt6tb2DTgmISk/OB1xikpxavfQuWExEans3B83azubmRRkVyVv8SPA9zcRW0HiWyeWV1jRQTlmJwB09TRc/EjwRbXMtvP4ksklicxyIScqwOCOnrS9pDuX9QxV7eylf0Z0up39npmn3GoX9wlva20bSzSucKiAZJNcz4D+JHhHxtc3Nt4f1M3E9uoeSJ4mjbaTjcAw5Ge4qp401Pwf4r+G+ppc6/DFpF6htHvEPCP2xkckEDivNf2d/CnhXwv4unuk8cafrOqXMLW9rBbIyDZncxO7q3yj2Az1rppvDulJzl73RdzP6ridX7N2W7s9D6DBBpaQdaWsTEKKKKACiiigAooooAKKKKACiiigApCQKWq97cQWltLdXMqQwxKXkdjgKoGSTQCTbsifcPegsBXmPh/x14h8b6tdJ4QsbK10i0fa+oagrMZD2CopHbnk9K2pdd8Uad4g0fSNU0yymgv7hojqFszBBhGbaUblWOODkis41YyV0dtbAVqMnCdlJK9r6rr/AEtztAQRS1Gp4zg/hS7vWtDhuPyKM1Hn+fSlB5oAfmjNMzzRnnigLj6CQKRSDXDy317/AML6g0z7XN9hPheWc2+792ZBdIofH97BIz6UDO4yKXNcD8Xvibpfw1ttOn1PTr29F/I8aC2KAqVAJzuI9e1eexftS+EWlVJPD+toM8nMRI/ANXVSwOIrQ54QbRy1MZQpS5Zysz6AzRmub8A+NNA8caGNX8PXnnwBtkiOu2SJ+u1l7Hn6HtXRbh2rmnGUJcslZnRCSmuaLuh2aKaGGcEijdzUlDs0ZppPODikBFFwH0UwsKUNzxQA6imlgaN2BmmK44nFGaZuBHavO/jL8UU+HA0zf4fvNX+3+Zj7O4Xy9mOvB65q6dOVSXLFakzqRpx5pbHo+aM1leE9YXXfDGma2Ld7UX1rHcCGQ5aPeoO0+4zWnuqWmnZjUk1dCkgClrk/jFd3Vh8J/Fl9Y3EltdW+jXUkM0bbXjcRMQwPYg1vaA7y6HYySOzu9tGzMxySSgyTSKL1FR3U8VtbSXE7hIokLux7KBkn8hXiukftOfDvWp54dDsfFertBzJ9h0SWbaCcAnb0BwcZoA9uorzLWvjb4S0T4fp421mx8Q6dpr332ER3WlvFceZjOfLbB24B5rprXxzoVx8Nh8QI3uBon9nHUtzRYk8kKWJ2euAeKAOnoNcZ8JfiV4a+J2gXGt+F3u2tLe5NtIbmAxNvCq3AycjDCs7xn8YvBvhT4h6V4D1aW+Gs6p5X2dYrYvH+8cou5s8cg0Aeh7hmlrkPEnxB8O+H/FFl4b1F7kX97s8kRwll+dtoy3bmsX4t/GrwP8L9QsNP8UXF8t1fRGWGO1tTKdgbbk8jHPFK6extUw9WlGMpxaUldea8j0mivMfC3xq8PeItfstGtPD3jK3mvJPLjlu9CmhhU4JyznhRx1qz4L+Mvgvxb8RdT8B6PLfPrGmCY3Aktikf7pwj4bPPLDHHNMxPRaK868L/ABl8F+JPiZqXw90ya+fWtOMwnD2xWIeUwV8Pnnk+nNafxY+JPhr4Y+HoNc8UyXUdpPcrbR/Z4DKxcqWHGRxhTzQB2VFcl4X+InhjxF8OP+E/sbuRNCW3muHlmj2NGkW7fuXsRtNcj8Mf2hPh58RPFkXhnw5Lqj38sUkq+fZmNNqDJ+bJ7UAet0ZoHIrhvi5fXthH4TNldzW/2jxRYQTeW23zI2ZtyH1B7igDuc0ZFNP1qjq2radpMUcuo3kNskjiNGkbALHoKmU4xV5Ow4xcnZK5oZopFIZQwPBppYD0/OncQ+kyKBTSetADtwpc1xXhvxLd6t8Q9c0llWOz06MIi92fdyxP6AV2eRWVCvCtFyjtdr7javQnQkoz3sn96uOopoYZpc461qYi0gINGciuG8E399cfE/4gWc93NLbWlxYC3iZsrEGtFZgo7ZPJ96YHdUZprMB14rzzVfjd8LdMvJLS68Y2BmjYq4hWSYAjqNyKR+tXTpVKukE36IiVSMPidj0XNFed6P8AGz4Xarex2Vn4xsPPlYKizK8IYnoMuoH6138k6RRPLIVSNFLMxPAAGc050p03acWvUIzjNXi7kuRRmvPrD40fDC/v4LG08ZabLcXEqxRIN43OTgDJXHJxXbanf2emWE9/qN1DaWkCF5ZpnCoijuSeBSlSqQaUk1canFq6ZbzRXl9z8fPhNDJsbxhbuRxmK3mYfmErb8G/FLwF4v1Ead4e8S2l5elSy25DRyMB1wrgZx7VcsNXiuZwdvQhVqbdlJHa5ozXI6V8SPBWq+LpfCWn69Bca3E8iPaKjhgY/vjJXHH1qr4r+LHw98Lak+ma54psLa9j4kgBaR0PowQHafY0lQquXKou/oU6kUrtncZorzK2+PPwmmlEa+MbRGY4BkhlRfzKYFei2F5a39lFe2VxFc20yh4pYnDI6noQRwRSqUalL44teqCNSM/hdyxRRRWZYUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUHgUVDd3ENtbS3FxKkUMSl5JHYKqKOSST0A9aNWBFql/Z6dYT39/cR21rbxmSaaU7VRQMkk1478Pv2g/Dnirx/deHJbc6fayyBNKvJWwLk9w4P3Cx5Ud+h5ryH42/ErWfi14rg8D+CYp5tJacJEifK19ID/AKxvSNeSM8cZPpV34g/s23+geA7fWdBv59U1m0j8zUbZRgOOpMGBnK+hySORzxX0VDK8NSpqOMlyznsu3mznlUk37q0R9eAinV88/syfGkeIIoPB3iu6xrEahbK7kb/j8UD7jE/8tBj/AIF9a7P4sfGvQvh34kttD1LStSvJri3W4V7cptCsxXB3EHPGa8urluIp13Q5by8uq7mqmmrnqdFR28gmhWQAgMoYA+4zUlcJYUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFVtU/5Btz/ANcX/kas1W1T/kG3P/XF/wCRoA+M/G3/ACOWsdv9Nk/nX0r8Cf8AkQrH/rjF/wCg180+OP8AkctY/wCvyT+ddP4D+OP/AAi0cOiXukv9mtgsRmgcOWAHDMjY5/3W7V5+VYepWxFRU1f/AIc/TeMmllOG+X/pJ9XiiuT8JeO/D/iPSU1KyvUeJjgsm5gD6HjKt6qwBH61sf2/pP8Az+L/AN8N/hXpShKLtJan5ktdjUorMGvaUel2P++G/wAKns9TsLuQx29yjv128gn6A9amwWLlFFFABSUtNPSgR5F+1P8A8iTp3/YQX/0B68y+Fdl8RrvTb0+CbxYLYTjzwZUTL7Rj7wPau0/aY8TaRe2EXhy3uGfUbS8WSePyyAg2H+Lp/EOlYPwO+IGgeDtJ1K01kXm+4uFljMMO8Y2gHvxzXj1nCWK1dtOh+m5bDFUeHr06XPLmuk1dWb3sct4tstf0rxXBN8RbS/vi4yc3IzMgPRXGQB6gY6ivpzwbquj6z4Otb3QVEdgYCkcW3aYtowUI7EGvnf41ePrPxtfWEenWs0NpZh9rzAB5GbGeB0AA+vNemfC2WHwB8IxfeJ5JLNLy5aRUMbMybxhAQOQSFz+NVhZKNWSi7x7/APBMOIMNUr5bh6laPLWvZQW1vKPfY8Q8E6CnifxrbaHJcm2S5mk3yBdxCruJ4/Cul+NvgbSvBdzpUelTXUiXcb+YJ3DfMpHIwB1z0rE+F+s2Gh/EPT9X1GRo7OKSQu4UsVDKwBwPqK7L9pbXdN1TXdNsbKYyz2COLgbCApcKyjJ68fzrkjGn9XlJ73Po69fGxzuhSjf2fLr22d7+jses/BO4mufhToryyl5BAyBm5wAzAfkAK8c03wVb6b44ubv4l6pp8NmrvIwe9BkvGJO3hTuA7nOPSu2+Efim2f4TT6Po8rPrmmadPMYRGeDltpB6HkjpXjfgS48Oz+Kxd+OJLmeydXaVxuYvKem8j5sdelddapBxpp6/l8z53LMFiKeIx0otxSb0SvNpt25draC+O5fD9r42kufBkpXT42ilt2QsNjjG7bu5HNfQ/wAT/Bdr4z8KLcsr/wBrW1oXtJA5A3EBipHQgkV85fEC80C+8Tz3HhiyNppWxFij2bclR8zYyep/GvqvwD4l0jxPoiz6RcGZLcLFLmMqVfaDjmjB8s5Tg7Wf9aBxLPEYajg8VS5lKK1b36aN9+580/Bi10e6+Iun2euQOyu58gbymydSGXOOvIIx61p/E3w/pl78XR4d8MwuktxMq3RMhcec7F3PPTAOT2pvxp0Obwj8SjqOngww3UgvrVl6LIGyw/765+hrr/2cNFuNW17VvHGpAySmVo4WI6yP80jD6AgfifSsKdO7+rtap/gerjMb7On/AGzCo+Vwso3+03+n6HY+L/BegaL8HtX0i1tna2treS7TfIxbzlXIfOfUZx0ry39mWxtbzx9NcXEW+S0szLAckbGJ2k+/BIr3b4nf8k58Q8f8w6b/ANBNeJfss/8AI66h/wBg/wD9nFddaCWIp2R87lWIq1MjxkpSbbf57/efSIpaQUtekfDBRRRQAUUUUAFFFFABRRRQAUUUUAFeeftDS3MXwt1L7OWAeSJJSP7hcZ/DoPxr0OqOu6ZaazpN1pd/F5ttcxmORemQf61FSLlBxXU6sDXjh8TTrSV1Fp29GcB+zckK/DKBowN7XUxkP+1ux/ICvRpoYpDGZI1fy33pkZ2sOhHoa8v8E+F/GPw9uruy02CDX9DuJPNjU3Agnibpn5htOR157V2+mjxHeahHdahHDplnGDi0ik86SViMZd8AADsF79TWdC6pqMlqjszfkq4ypWpzTjJ3T669Lb3PKPFN/wCIrfRPE8viq/uLLWEfzdIisr5hsiB6+XGcBAP4nHOT6UuteJdeu/2etP8AEDardw6olysZuYZCjOA7J82OuQPzp2nfDzx+IfF9ldnSpRrKnN7NKWlkwSVVcfdB469OwNWP+ED8ZT/BmLwg9jYR3aXnmAm74Cbi2SQMZycAD0zmuV+0d7J7M+ijPAw9mpTi7VIvTbl5dbLor7ruc94s1XxFofh/wR4lh8TapNd3yL50ckv7ojCkDaOvXknJPWuu8R+I9Q1z4y6f4KS6ntNKhj8y7WCQxvOxj37Sw5Cjjge9UvGXw+8W6z4P8J6Rb2dkk+kR4nL3XysRgDb8vfGa6HXfBeqQfEDS/HejwxzXEcQiv7FpQhcbNu5GPBIB6HGcDmmo1E/LT/gmE8TgXTi5OPPaolto7+7f5Xt2MTw74i1G0+IfibwJc393cWKQyyWMrykzQYQNtD9SOTjJyMVyHhi/8R6x8J/Emt3firWvO02VWtwlxjLYXO5upGD049a9G8P+B9WTxV4g8aalDAuo38UkdnYpNkRBlC/O+MbjtHTpk9awPC3w88XaV8NfEnhma0sWutTdDDIt18g6Bs/Lnjb+OaUoVb/+Bf8AANaeKwEYvlcb/ur7dPja/Xud78GdWvtb+HWl6hqMxnuWV0eQ9X2uVBPuQKzpf+Tjbb/sUZv/AEsjrT+EOh6n4b8EWujatFFHcW7yf6qXepVmLA5wPXH4VmS/8nG2/wD2KM3/AKWR13Ur8ivufK5g6bxVR0/h5na21r6HmH7cf/II8LH/AKerj/0Ba8it/HvhKL4OnwbceD7e41vY6rqb+WpRmk3Bgcb8gcY/pX0H+1N4D8UeOdP0GHw1p6Xj2c8zzBp0j2hlUD7xGeh6Vv8AwM8Cnw98N9L07xJoWnpq8DSmUmOOVhlyV+cA54xX0tDG0aOBhzayTvZOzPlq2Fq1cXPl0TW9rnz98LLDx7oHwx1jWtH1nTfDFtqt5FGL3Vbj7OWjjViWi3KeSWAzjscetYviHxh4l0GKwutK+MV9reqSEm7gtpJTFARyPncBZATx0r3H9qj4b+KfGcOjX3hqJbwaesscln5gRvm24dM8EjbgjrjpXnOt/Cv4o6/4K0rT4fAugaMmnOB5dvKiXN2xXBlkYnHbpnJJz2rpw+JoVWq1Vx956rTT1vqznrYerT/d009Fo9f+GRQ+I3xY8di78J6lY69eWjXei21zcW0LbYpZvMdWJX/a2jj3qP4j6/8AGT4d+KrHUtd8WTSXN7H9rSGGffbbQfmiMZAAAzjgdOlX/E3wX+JGoQ+Flt9Ajzp2lw2twGvYhtdZpGOPm5GGFd7+1D8NvGPjfVNDn8N6XHdx2lnJFOWuEj2sWBA+YjPQ9KmNbCRnThaPK+a+3yG6WJlCctbq1v1KXxr8R+MbzUNMktviDofhDQ7izgnEQvil2+9QzuUVS5AzgAEA4rznwx8SfEvh74n6fZaZ4/vvFGiyXkMMslwH8udXYK4CvkqRk4I9K2/Gnwf+Idr4/ttftfDtt4jtXFtI0EsyFAUiRWhkBIO0FSARkYxUmufCL4n6j4+0/wASzeF9Ht4hLbTPaabcRxx26RuP3YBIywAySOCT1p0fqsKajKUWmn23/O4VfrEpuSTTv5/8MZfj34jeKr74r6ppHiHxfrXhXSrW6mhjj0+ElolU4jJQEF93BLZPXiu08A/ETxH4b+HviXW77xvo/jK2srdfsaCSQ3UM7uEQSB1VthznnPIwDzUvjvwz8XR4su5NR8M6J4/0R2kFqtzbwI6IxyuWAV1ZRxwSPz4xPhn+z34kubXXJfFXk6Ml7Yvb2tvHL5rJIzq6s2CRtUqMAkk1nKWFlQXO0krbWd+/nfuXGOIVV8qbbv3/AOGMfw9J8YfG3hDXPiBB46vbePTGdhbxytGJdih3CKvyqADxnOafN8ZvGWr/AAZuT/a9xa63pmqW0bX1thHngkV8BgBjdleemeDVrS/BHx38J+H9X8E6To9rcaZqrMJJ45Y2UBhtYozMCu5QM5FX7j4CeK9O+EEum2kNvf8AiDUNTt7m4hSdVjghjVwEDtgMQXyf06ZrWU8Jze+425ly2toutzOMcTb3VK9ne/fyOY1HWPjJqHwstfHkvi66i0azk+zAQ3JjnkPmbTK+B83zHHJ6DgUeKfix46u/hj4X1CLxFe2l+t1eWl1PAwU3AjEZRm4wSA+K9TX4c+L/APhlxvA502P+3vPL/Z/tCYx9p3/fzt+7z1rzjUPgj8SZvh7o+kx6FCby31G8nlT7bFhUkSIKc7sHJVvyopV8JN+/ypKTt6WYqlHEwS5bu8dfUt+Ovit421BPCngrw7q81reXOnWX2y9DATT3E6KQC+PlUZBJHJz7Vvx+HPj74O8SRw22p3vi3SJUX7Tm5AVlJw6jzG3I45IYe3uKq+Ofgh4zNr4Z8TeGUh/tux0+0jvLMzKrJPAoAdGPyt0AIJ7cVctPDXx+8ceLLa78Q6hc+FtNQIk4tLvylKKcnbGjEl255JAFYOVD2a9m42s733v5fobRjW5/3ilfS1treZ6/8Y4hB8D/ABbCGkYJ4fulBkOWOIW6n1rqfDf/ACL+nf8AXrF/6AK5r42KE+C/jJRnC6Ddjk5PELV0vhv/AJF/T/8Ar1i/9AFfNnvrYZ4s/wCRX1X/AK8pv/RbV8K/sM+KPEPhufxWdB8C6r4qM62vmixuIovs+DLjd5hGd2T06Y96+7/ENvLd6DqFrAu6Wa2ljRc4yxQgD8zXzn+xB8KvHHw4m8UyeMdITThfrbLbAXMcpfZ5m77hOMbh19aBmZ+2jrOq69+zfY6hrPhq98OXZ16NDZXcqSSKAsmGyhIwa7PRP+TF89/+EIl/9J2rof2rPh1q3xM+FE2haC8I1O3uo7y3jlbYsxTIKbv4SQxwTxkDNeW2es/Ey0/Z8PwsPwa8TtrQ0htIF0GiNntKlPM37s9DnHr3oAu/8E5efg/rOf8AoOP/AOiYq4r9pf8A5PZ8A/TTv/Sh69L+BXhzxL8B/gxFb6p4V1nxFq+pak9xc2OiLHM9oGQBQxLAHAQZIJ5b8a5dPAPjz4s/tI6T8R9c8JXfhHw9oog8qPUJF+03HlMzgbFJwSzc9gB1JoA7L4pDw1cftEaFBrninT9KljitjBayMTNcyGVtiIMcAkAZNeDft0azean8aPD0Z8P6naJZQLDbtcoE+3fvyS0Yznbn5QTjPpivVfjr8LPHfif9p/wj4w0fRPtGh2DWJurn7RGgTy5i7/KW3HA9BTf2u/hT478efFHwlq/hbRPt1jYQKlzL9ojjEZ88t0ZgTxzxUqKTZ2YrHVsVCnCo9ILlXoet+D/iD4u1rxHa6ZqXwn8TaHazFvMv7u4gaKHCkjcFYnkgDj1r5v8A2WP+T0/HY/2dT/8ASqOvtjHt3r5b+AHwt8deGv2oPF3jDW9Ce00S+W+FtcmeNvM8y4Rk+UEnlQT0qjjOM/Z6/wCT7fHH/XXVP/R617P+1xp1rrFj8PtIvIxJbX3jK0tpVIyCrxyqf515hoPgH4rfD79pzxP8QNP8Ay+I9M1Ce8MP2fUYIS0cz71PzngjABBHrXp3jm08d/EHTPBF9c+BbvQbrSvGdrd3VpNfQzMtrGrZm3KQMZbG3rxQB8/+F/El94d/ZR+IHw7cMdWtfEf9iQoDgkXD4YD6+VL+dX/2f9EtvDf7b994ftEVYdOtJ7YBRgZW3QMfxOTXYeIfgd4vvf2sP7bgsGPge61a31q7lMyBDNGhbaUzuJ8zI6dGNbPgT4X+ONO/bJ17x/eaN5Xhy5NyYbv7RGd++NVX5Q27kj0oA+mh0rz742f6rwZ/2N2nf+hNXoI6V598a/8AVeDP+xu07/0JqAO6vZ47a1luJnEcUSF3Y9gBkmvEpLyPxZe3XjPxS7ReHtPcx2dp3mbPCAdyeM+vToK9q1W0S/024spMhJ4mjYjqAwIz+teKWF9deENIuvCHinwxNqdgZC8EkS5Vuc8HHrz1yK8HOJPngpu0Ne9ubpe3Q+iyOK5Kjp61NFuk+V/Fy36/ob/gf4my3baomtWy26QW73lqI1x+6Ufc9+2D35qjo9v8QPG9s2ux6+dItpGP2aCPIBAPt2z3NHhjwxqfi3U9V17VrE6Va3Nk1nZQlcbVKgA464AHXuSaZ4c8Wa34G07/AIRzWvDd5cPbFhbSQj5XBJPXGCM9x+VedSqVZRh9blLk1s1dX10vbVabHqVaVGM6n1GEfae7dOzS01tfR67mn4Z8d6npdlruneKUEuo6NGXDrgeeM4APbqV59DVHStM+I3ivTxr/APwkn9nCfL21smVUjPHA6D65Jo0LwhrPieDxFrmtQfYbnVofLtYmBBXBBBI6gfKo55603QvHGteFNJj8Pav4Zvpb20Xy4GQHa47ZIByPcdaITm1BYtyVOztvd66Xtre2wp0oXn9SjB1bxutGlpry30tzbmJ4M8QXvh7UvFur6snm6jFEqOjcb5jJtGcdu/Hat+x0P4la1pqa8fE5tbidRLBaAlV2nkDjhc++feodK8CazrnhnX9R1SMW2qas6zQRPxt2tuAb0znHt1qXTfiJrej6TFouoeF7+TVbZBChCHa+BhSQB9OnWscPD2UIxxTkoNNq192+tutrG+Jqe3nKWDUJVE0pXtZJRS92+lr3u0UbbxZ42utMk1qzuWebSZRDqdh5YKuB/wAtAAMjPIYA8dRWnqXxB1XxRNp+jeC4pLe8uFD3M7qD5A7j0wO5/AVh6fD4v0nTbrTrHTLs6zr0wkuZhEQlshzhd2MBjkk/3R71ePhPxF8PLux1vQzLqqMgj1C3RMlu5wByV9D1BHvRCrjOVay5dOfutdLfLew50cBzPSHPryLo9Nebpa9+W+/oeuaPbXNnp8FvdXkt7Oi4knkABc9zgcD6VxXgH/krfxJ/6+tO/wDSJa7TSL5dS0+C9jhmhEq5McyFHQ9wQehri/AH/JW/iT/186d/6RLX2cLcqsfCTvzPm3ND423U1j8I/Fd3bSGOaPSpyjA4IOwj+tfN/wCyL8NPBnjPQ9c1DxPpP9oyWt1HbwI8rqiL5YYnCkZJJ7+lfV3irRrbxF4c1HQr3eLa/tpLeQr1CspGR718w6P8C/jX4IvLpfBHjCwitrhhvaO4aEyAfdLoyMN2PQmvcy6tFYapS9pySbTv/wAMediYS9rGfLzLsdl8R/2d/hhc/ZZbbUh4RHzI2ydSk/THErcEc9PXmrP7R3itPBHwJs9CsdVN7e6pbpp0F3uBaWFUHmS5HHKjGR3euD1f4D/GXxzf2o8eeLrCa1tyQrPM0xiDY3FECKuSAOpHSuo+InwE8Q+LPGOgxf2np9v4Q0a1t7GGASP9p8hAPMIAXaHYjrnjA9K2UqXPTVevzqN33+V+tzNqfJL2dO19DxzxP4D0HTP2fdB8SWWqaf8A8JMlwLq9jiukMwglOEXaDnMeEPsWavavEOo6v8YP2Umm0SJ7vWgsKXltGfnllgkUyKB3LAbgO+QK15v2Yvhc0TiKx1KOQqQr/bWO09j05rD+FvwP8aeHfDXirwpqviGyj0vW7ceRPYSSedb3Cn5ZACBwRjcAewFa1sfQrQU1P34yurro+i9CYYepCXLy6NW0PJPh/qFh4V8O/wBleKPgNd67fJM7PeT2kiyMp6KQyHGOnHH610vwi1D4U6r8btNlh8K+IfCWtfad9nbfaU+yLMEPyGPaGUEZOO5roNF+Gv7R3hWGWw0Dxxp01o8hcGa5Mhye/wC9jYr9AcfzrQ+HvwO8dN8VbT4gfEHxDYXl1bTC4KWxLPLIq7UBO1VVQPQHOAK1rV8PKNSUqi1T2k9X6bEU6VROKUdn1S/M4j4Qk/8ADZWrH0vNSP6GsX9nXwnofxD+MWvx+LbZtQhSO5uzGZWUSSGfblipBOMnjNeweAPg74s0P9oS+8e3s+mNpU9zeSIkczGbbKPlyCoH15rmtZ/Z8+IHh/xxe+Ifht4qtbKO4kkaPzJXhmjV23NGSFZWXP06Dim8bRlKUY1FFuEUn2a3EqE0k3G6TbsX/wBpP4QfD7w18KNR17w9oSabqFnLCUkinkO4NIqkEMSDwfzxXWfsZXM1x8E7eOV2ZbbULmGIE52oGBAHsCTXnuv/AAg/aB8XWY0zxP4z0+ewLq7RS3jMhIPBKpGM4681758HvA9v8PfAll4ahuTdvEzyzzldvmSucsQOw7Ae1cOMrRWCVGVRTlzX6uyt5nRQg3X51HlVjsR0ooHSivCPRCiiigAooooAKKKKACiiigAooooAKKKaxA5JAoAbLII1Z3cKijJJ4AHc5r5E/aD+K9/8QNbXwB4GE1zpsk4hdrf7+oy5+6v/AEzB/PqeBV/9pP4wz+I75vAHgeSSe2kkEF5c2+S125OPJjx1XPUj7x46Zz6V+zl8HoPAemLretxRzeJLqPDHgrZof+WaH1/vN+A4Fe/haFPL6SxWIV5v4Y/qzCUnUfLE0P2fvhLY/DvRvtd6sdz4iu4x9ruAMiEdfKj/ANkdz/EfbFeqYHoa87/aOlEPwj1WQ65Nog8yAfbIUkZk/erxiMhuenHrXivhy+RvHnwwUfEjUZy9pB/o7W9zi+/fTfMxJwM/d+bP3R2rj9hVxqeInPV3/BX/AOAXzKHupFz9pz4Mvazz+PvBdu8ZR/P1G0t/laNhz9oix055YD6jvXhvj7xtqvjrUNIv9a2Pe2VnHZyTrx9o2uWDkdmO7nHBxnvX6JkbkwehFfIv7TfwXbw/PP408J2p/smRvMvrSNf+PRyc+Yo/55k8kfwn2PHsZJmkJyjRxG6uov16P9DGtTa1ifWmmf8AHhb/APXJP/QRVmvGP2bvi9a+OdITQtYkig8R2cQDL0W7jUYEie443L+I4r2YHivm8VQqYeq6dRWZ0RkpK6Ib2V4bOeZMFkjZlz6gE18ZN+058SskBNBGDjP2Nv8A4uvsrVf+QZdf9cH/APQTX5zfD+K1n8f6DBepFJbSapAsyS42MhkUMGzxjHrXvcP4ahWhVlWhzctn+ZjXlKLSR6fD+0/8R1cF4dAlA7G0cZ/J69P+D/7R8HibXrXw/wCKdMh0y7u3EdvdW7loHkPRGDcoT0ByRn0ru9c8I/BptJnGoaP4RgtNhLyqIYyo9QykEH6V8U+HtIm1j4iWmj+GlluTLqQWyIGW8tZchz6AKMk+1dlCjl+Y0p8tL2bityJOcGtbn398SNZu/D3gHXNcsBG11Y2Ms8QkXKllXIyO4r5/+Cfx48ceMPiXpHh3V49IFnd+YJDBbMr/ACxlhglz3Fe2/GvI+EHioEkkaTPk+vy18cfs2XdrY/Gnw/dXtzDa26GXfLNIERf3TdSeBXBlWEpVsFXnON5LZ/IurJqasffakkDNeS/tL/EPX/h54b0rUNAWyaa7vTBJ9piMg2hC3ABHORXfL4v8J7R/xU+i/wDgfF/8VXgf7aet6Nqvg7QotM1ewvnTUmZlt7lJCo8puSFJwK87K8O6uLhCpHRvU0qS912Z2H7MXxO8SfEaPXj4gSwU2DwiH7LEU++GJzljnoK9o5r5h/YS/wBV4t/37X/0F6+nT0xTzijCjjJwgrJW/JBSblBNnk37SnxQvfhxoOnjRltZNWv7giNbhC6JEoy7EAjuVA5714bZftQfECO7ie7s9Dlt1cGVEtnVmTPzAHfwcZrmv2nfFh8VfFnUTDL5llpX+gW+DkHYT5hH1fP5Co/jB8NJvA3hjwfqrI2/U7H/AE7P8Fz9/Ht8jAY9UNfTYDLcHToU4YiPvz/yuc06k3JuOyPurSdQg1TSrXUrOQSW91Ck0TDurDI/nXzX8avjZ8SPAnxF1Hw/Db6KbNSs1m8lq5Z4XHyknfyQcg9ORXX/ALHPiwa38NW0G4l3Xehy+SATyYGy0Z/D5l/AVi/tseEft3hnTvGNtHmbTZPs10QOTDIflP8AwF8f99V4eCw9KhmLw+IjdXtr+BtOTlT5onpfwF8eyfEL4f2+tXawx6jFK9vexxDCCRTwQCSQCpU/nXfnOOtfH37FXir+zfHGoeGLiTEGrwebAD/z2i7fihP/AHyK+uNUvbfTtNub+7cJb20LTSseyqCSfyFcubYP6ri5U4rTp6MulPmgmfP37RHxz1/wV45j8O+F006QQWyyXjXMJkIkfkKMMMYXB/Gu0/Zu8beL/Hvhi+13xLDYQ2/2nyLL7NCyF9o+djljxkgD6GvjHxNql/4z8b32qBGkvNXvi0UY55dsIv4DaK/QP4deG4PCPgfSPDkAGLG3WN2H8UnV2/FiTXqZthMPgsHTpqK9o9318/xMqUpTm30PmG6/aQ+IMXi2bTFg0M26akbYZtX3bBLs67+uK+vkbI/Cvzc1H/kf7j/sMt/6UV+kSfdH0FZ5/haOHVJ042utfwHQlKV7j6rap/yDbn/ri/8AI1Zqtqn/ACDbn/ri/wDI186dB8ZeN/8AkctY/wCvyT+dUdf+Guvf8I/H4osNmoWk0InmhiVhLCMZPB++ABk7TkDtir3jf/kctY/6/JP519H/AAWtorv4dWcEo+VoIuR1U7eCPQiuLJcVPDYqc4+f5n6ZxmlLKcN8v/ST5B8D+KLvwxqbTx757C5XytQtA5VbmE9Rx0YdVbqCB9K7TxFZ3unX6ixvr680+5iS5srkO/72FxlSccBhyCOxBrM+PfhiPwx8QJ0tolit71PtCIgwqPuKuFHpkbgOwbHavR/gT450vRPheX8Q3MaWunai9nH5hfGJVEiAbAe4fr619PneAhj6MK9PR/5nxWQZ9UyirL3VKL6Pv36nnXm6qD/rdR/76krvfgk3iN/FyeU181oFPmmUsVD/AMGN38WfTtnPGa7n/hc/w3/5+bY/8CuP/iK9B8A6/wCHPElkuoaG0EikEB0cv04IBPIPTIOD09RXzccpq4eSqTbse/j+Mo43DToKglzLe97fgdDqGoWOnQfaNQvLazhLBRJPKqKSe2SQKz/+Es8Lf9DJo/8A4HRf/FVR+KHhvR/E/g2+sdatPtMEMb3Ea7yu2RUba2R6Zr5I+B3h/wAEa5JrkvjaVIreys1ngH2sW5dsnIHI3HAHFexhcJCtTlNt+75dz4Zyadj7LsfEOg39yLax1rTbqcgkRw3UbsQOvAOazfEXjvwd4fkMeseI9OtJlbYYmmDSBvQquSPyr5+8E+ApXv8Awh8Sfhlp16tpJeMt3p97dIXhjDFHbzO6ldwxyQcVQ/av8PaTovj/AEy+0228m41VZLm8feT5knmIM89OOwrWngqUqypqXR/egcmlc+itV+H/AIM1zUZdV1HRILq5uMM8rO4LcAA8EdsVW/4VT8P/APoWrb/v5J/8VV3xh4x0LwT4Zj1bXboxRbVSONF3STPtztVe5/Qd687sv2iNDM9rJq3hjXtK0u7JEGoTRBo3AOC3HUDvtzivPhgZVU5RhdHdHMsVTSjGrJJeb/zPRdI8BeD9IuFuNP8AD1hDMhysnl7mHuC2a0/EWg6T4g0/7BrNkl3a7xJ5bkgbh0PBHrVTxP4s0Hw34abxFql/HHp21WSRfmMu4ZUIB94ntivKB+0noAlSaTwrryaa8hRbwqmDjrxnBPtnNVRwVSrF+zhoYzxdaU1UlNuS63d/vO+Pwq+H/wD0LVt/38f/AOKqzqXw88E6tfS397oVtcXMpHmSeY/OAAOjY6AVx/xa+LljpXw5tNY8NxvqJ1uKWO0uFUiO3IGGaTuCCfu+orz79nP4oad4d8PWfhS80vWLu5u9TYLcxIGiHmsoG4k546mrhlkpUXU5epo80xfMn7WV/wDEz33w34M8NeG7qa60TSorOaZPLkZGYllznHJPes7UPhl4Hv8AUn1C50C3aZ23OVZkVj6lVIFcz46+O/hTwt4guNBaz1K8v7W4WG42xhI484JO4nkAHPAqz8P/AI1eGvGni+58P6daXkIjheaG6m2hJlTG44ByowcjPWoeAqez5nD3dwjmGJjNzVV8z0bu7nWav4H8J6rpkGm3mhWZtrcHyFjTZ5eeu0rgjNW/CvhnRfDNi9nodktrC773AcsWbGMkkmvL/EH7Q/hi01aWx0PR9U18Qk757VQIyB1K55ZffGK7D4YfE/w18QIpU0mSa3voFDTWdwoEiqTjcMEhlzxkfjTngalNc8oWM3jKs4eyc249r6G94n8L6F4ligj1zTYb1YGLRbyRtJGDjBFW9A0fTdC0yPTdKtEtbSMkrGmcAk5PWvKLv9orwRDriWC22ptbq7pPdvCESPbnoudzcjHApmg/tF+F9S8R2+lT6PqmnwXMixw3U4XbljhSyg5Ckkc81X1Ct8XJ0/Al4mo6apuT5V0vp9x6P8T/APknXiH/ALB83/oJrxH9ln/kddQ/7B//ALOK9t+Jxz8OfEOf+gfN/wCgmvEv2Wf+R11H/sH/APs4rxq/+80z7HJ/+RDjPVH0iKWvNviX8YvDPgjUF0mWK71TVSATaWaglAem5jwCew5NUPAvx08OeJPECaBfadqGg6jK/lxR3qja7/3Nw+6x7AjmvZWErOHOo6HxPMj1iivL/HHxm0nw/wCJ38M6Zomq+ItWhGbiDT4w3lcZIJ7kDBIA4zzVj4a/GDQvHPiKXQrPT9RsL2K2M7Jdqq8hgGQYOcjIpPDVVDn5dB8yvY9IooorAYUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABWA/hqJviBH4v+1P5qaU+m+RtG0q0qyb89c/LjFb/NFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAZHjTQ4/E3hHV/Dstw9tHqdlLaNMigtGJEKlgDwSM1oadbCzsLe0Vi4hiWMMRjO0AZ/Sp6KACiiigApCo9BS0UAJigAClooAKKKKACiiigAooooAKKKKACsHxh4bj8RrpCy3T2/wDZuq2+pLtUHzGiJIQ56A561vUlACY6UjLn0P1pxNJkUBfqAHFNZFY5IBp4ziilZMNhAMDFIy5b/Gn0mM85osAgGKQrkg0/FFADQKXGaXFFADccYrD0Lw3FpXirxDryXUkr63JbyPEVAEXlQiIAHvkDPNb1FMAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigANeR/taatqOj/By7k0y8ltJLm6htpXiOGMbk7lz2yBg+1euV4v+2QjSfBwxxqzs+qWqqqjJJLHAA7mu3LlF4umpbXRE/hZyf7GngHRj4fPj26jFzqT3EtvahlG21VDgsv+03r2HTvX0lkV4L8Ndesvgj8ELCHx0fsup3E09xBpsZDXEm9shdvYgYyTwvQnNeX6/wDG34p/ELVn0rwTY3OnRN9230yLzbjb6vKR8v4bRXpV8FiMxxNSqn7ie72suxnGcacUup9beKNM0PWdIl03xDbWlzp8pUyQ3JGxsHIzn0IBrn7Dwj8N11DTbqy0rQvtemKqWLxspaAKSQF54wWJ/Gvmaz/Z8+LPiNhda/qFtbPJyTqOoPPJ+IXd/Orc/wCyz42hTzLXxDoMsg52gyxn89tOOAwtNcjxaXonYOeT+yfYQOAKbcRxzQvFLGskbqVdWGQwI5BHcV8U3Gj/AB7+FIa7hm1cWEXLPbz/AG21x/tIc7R+Ar0/4SftK6drE8Ok+N7eDSrqQhI9QhJ+zO3QBweYz78j6VzVsmqxh7ShJVI+W/3FRrJuzVjyuXSLHw1+1rZ6TokRtLO31+3EMasfkVwpKj2+YjHpxX28Bha+RfiB4e1bTf2sdD1u6tSNN1fWbWaxukO6OUAKCAR3GOnpg19dDpWmdVFUjQknf3V94qKs2irqv/IMu/8Arg//AKCa/NbRNNn1jXLPSbUxie9uUt4y5woZ2CjJ7DJr9KtV/wCQZd/9cH/9BNfm34W1NdF8U6ZrLQmZbC9juTGDguEcMRk9M4616fDDkoVuTeyt+JnibXVz1t/2X/iGsZYXPh9yOii5cZ/NMVzfgfxf4p+Cvjm8sLzTLQyQSiPULWSJGdl4PySgbhxyMHae4r19/wBrHTvLOzwTe+Z2DXyAZ9ztr548b+IdV8feO7zXJbQfbtTnVYraHJ7BUjX1OABn616WCWNxCnTx0F7O39bGU3CNnB6n298UtRttY+BOv6tYvvtr3Q5J4m9VaPI/nXwr4R8O6n4s8QWugaPDFNfXWREkrhFbapY5J4HAr7X8TaNN4d/ZjvdDuCGnsfDbQyn/AGxH8365r5d/Ze5+Onhz6zf+imrgySp7DCYicPs7fJM0rJSlG5oD9nD4o4/5Aumf+B8dcx8QfhZ4u8A6fbX3iOwtLaC6lMMbQ3KyEsBu6Dpxmv0LXoK+d/25/wDkSvD/AP2E2/8ARTVnl2fYrEYqFKdrN9h1KEYxbRk/sJf6vxb/AL9r/J69v+MvipfBfw31jXwwFxFAY7Ud2mf5UA/E5/CvEP2EifK8W/79r/J6o/tveLvtGqaT4Ltpfktl+3Xig9XbKxqfoNx/GsMVhfrWcun0ur+iSHGXLRueSfA3wy3jH4raNpc4aaAT/a7xjzmOP5mz/vHA/wCBV9e/tI+Fv+Er+Eer28MO+8sU+3Wwxzuj5IH1XcPyryP9kvw3JZeAvF3jY+dDcT201pYywpukVY0LM6Dud5AA7la6r4Q65r2oeL/C9rqOu+Lb63uNAmknh1DThHDM/muN8rZO2TGAF9MetXm2IlUxntKb0pW/DV/5BSSULPqeHfsveLR4W+LNgs0uyx1YfYLgk8ZY5jY/RwP++jX2v4w0O08TeF9S0C+UGC/tngfP8ORwfqDg/hXwJ8XfDcvgv4m6xosW6JLe5860YHGI3w8ZB9sj/vmvuT4QeKY/Gfw50bX94M89uEuQP4Zl+Vx+YJ/GjiGmm6eMpbSS+/df15BQejgz4M0y61PwH4/huZFMeoaHqP7xe5aNsOPxAP519Y/tTeOLa0+CsI024BbxKI4oCp5MDKHcj/gOB/wKvJP2yvCf9jfEK38SW8W211qLMhUcC4jADfmu0/ga8k17xLqetaNoelX02620W2e3tRn+FnLEn36D6AV7CwsM09hi+2/y/wCCY83s7xPTP2RPCX/CQ/FFNXuId9locf2kkjgzH5Yh+B3N/wABr7ZHSvJf2U/CX/CM/Ci0uriLZfaw326bIwQrDEan6Jg/ia9az/Ovk87xn1rFya2Wi+R1UYcsEfm5qX/I/XP/AGGD/wClFfpGn3R9K/NzUv8Akfrn/sMN/wClFfpFH90fSvV4m2o+n+Rlh95Hz78cPjJq3hjxLHo+lWyu4j812lkdVVSSAAEILMdpJJOBkDHU16N8JPGSeO/Bi3bHZM6NHKhO5kYfKyk98HGD3BBPOa8k/a18Hz+bB4ntYiUgBjuNoziJmyrfRXJB9nWuD+AnxEHgjXHttQcrpd0wZm5IgkxjJA5KkYBxyMA9iK4lgqdfBqdJe8tzTmalZnoXjb4T+I7rxVc3NgsJhupfMYyb/wB2x64wDuHcY57EV7h8PtC/4R7w1bacxZmjRVJbqQAACewzyeOmat6X4l0bULGO7gvYjFIAVbcCpz6MOCPoa574h/EPQ/C2jy3Nze7GYEJtHzufSNTyzen8I6k+vz9HBctR8kXdnt47O8VjqFOhWl7sNv8Agnz/APtb3kE/jPTreM5eKCZ2Ps0mB/6A1Y3w+8Ia54q+E2q2eixRSTya7BIBLJsBWKFtxHB6eYtcT4q1q/8AFnimfU5IGa4u5Fjgt48ttX7qRr6noM9ySa9i0TxhL8ONMtPC2l26z3FlEft9wlxtVrlyGkUfKQQpCpuH9019NjsVHLcJCM3711/mcWW5ZiczrOnh43aV+xyB+BnxDHWxsv8AwJP/AMTXvX7Onw/1TwTpFydVlQ3F1KZHRM7FOAMDIB6LycDOeOma4P8A4Xfr/wDz6H/wKH/xuuq+Gvxavdb8QLpt9bMm9Cy5kDghfvAHaCGxz3Bx2614dbP/AK2vZOW/keriOE8ywlOVapT0Wr1T/U9b8VOkfhrU2d1UfZJeScfwGvj/APZ68KeF/Ftxr1p4kEAaKyRrKSW4MXlyEkbhyM449a+kPjxbaBeeDIrbxJb6rcWcl9EqR6c4WVpDkKOeoPPFeBtoXwcNq102i+NjAknltKZ49iuR90nHB9q3w2Pw+GpyhObTl+h5+HynGYuKqUabktvmdqfGZ+FHw70TwRomo6T4g8VG5KBLcmSBFklJ+bBBBOQAM579qwv2wXkbxR4VFw0XnrZN5wjOVDeYmfwznFQ6HB8JvCniCw1mPQPF6XNnN5sC3UkezevqOM4JB+uKi8T3Hwh8ReIL7W9R07xcbq9lMsoS5jCAnsAeg9qdPNMDTrKpzd7u27Z0LhzNZxuqLLv7YyXj3Xha5G59PNlIiFTlPNypI+pXH5Vbv/Btnrvw3sdQ1v40PL4fhhjmjgltoisLKmAgUMDuUErirNt4z+FsfgOPwVc6Brl/pMZZ0F0ytIrFi24OGBBGeCO1cno2lfBlNYikXQ/F2psXBjtJZI2Vj6ELhm+madLOMKqcYc9nFu2id/v2CXDWaq8nQdif492bWnwn+H0Wlau+saJDFKkd7s2CRyB5ZYfwkLuGPYivVvDv/CvPE/wC0/TdUvrK30iKxjFzidYpLaZB8x9VfcCenOe+ao+KPiT4IuNDbw1r3gzVY9PkiVVtZbdI1VR0KYbjHYjpXlVvp3wVh1AXUmleLbiENn7PLcR7D7EjDY/HNZ/2phJ0lCpPlcW3p1v9wR4czOa5o0W0z0/xTF4Ti/ZV1dPBE8k+jiAlJJGJkL+cu/fnB3ZznipP2TdU061+FM6XN/awNDqU5kEkqrtB24Jye9Ml+LPgA+HP7BfwtqC6RJAbcWogQRGPoVHzdB615na2fwWg1NL0aR4skRJBItu9yhTIOQP7xA+tZxzLCSozpzna7uupX+rea3uqDNr9sxLdfE3h4xpErPbSmQqBljvXrj+tet+PPC+kWHwu8R3vhfRLC01GfR3j820gVZHQJyuR14zXjXiq7+EfiTxDe65qen+LftV5J5kojuY1QHAGAD0HFdn4I+KvgXwj4cg0DS9M19rOBnZDcMkj/MSSCc+p/KnUzXDexpwjP4fxGuGs1u26DMn9jK50eLTvESyS28WoebE2XYBjAFOME/whs5/CuZ+Evl3X7UtzP4c2nTftt6+6L/V+Rhh242liMfhV3VtH+Fvii/n1XTPCnjC13ufOXTQnlbjyRtOdufQYHtXQ+AfG/wAMvAEM1vonhvW4biQhbie4CtO+DwrEngA/wgAcdK3q5vhFz1FLWatZ7Iyjw9mUpciou69Dmvinbae37VGk2pgtjaPPYiSLavltnOQR0Pvmpv2sxDH8UfDKwiNAtnECFwMAXBx9OKzrrSfhFcNNfTaT44xMWlaQXKYwWwWz6Bjj9Kta3/wqbxJrc+pXOk+MZbqVQziK4TAVEC5xzgBVyfxNXHN8HGVN870jb7w/1czRpv2LPor4mMr/AA48QMhDA6fNgg5H3TXif7LWP+E11DPT+z//AGcVS1r4haTB8NV8EeEbDU47JYzHJcX8gd1jLZIyOuScZPaua+Gfim48F+IY9b+xvPaSo1vMoONw4J2k8ZHBxXy2IxFJ4mEou6R9vlOSYyGS4ijONpz2XXQd4LvLbSP2oLm68XukTDUroGW4wFSVgfKYk8AYK4PbIr2fx1pXwol+Jmg63r2pImvzTRx20UNxlJnU5jaUKDjBwASRngc1wfj7xD8LviDewzaj4b19dUYCJLiy2LK/ohGSH9sjNO8Dn4c+Ab9dUg8F+KJb8BvKub+NHaPAJYoMgDjOTjOO9fR1M0wtWKqKbTStZbfefEPh/Mqb5XRafyMnxv4ei1r4y63cfDvxY2n+JYpi09ndFrVnlwA4glPDdASpHfIyOml8I/F3iDTfjPH4c8c+HbFtfu0+ztqIgRbtMIWXc6fK6lR1HPTJOKo+MtV+EfirXrzXdR0bxNFfXSpukt5kTYyjAcDOAxGOTmtz4KzfDbTPGlodJ0rxBc6xfM0MF/qciybBtO7BBwOBgnBPbir/ALWwk6PI5XdrLTW/r28gqcPZnRTnOi0lqz6KBpaaKcK888wKKKp65qNrpGkXWp3smy3tozJIe+B2HuelAFyivMNa1fxCvh5/FXiPxKnhHSPlaO3t7QTzKrHCeYxB+Y5HCjitAav4g8MNaXes6jBrvh66ZE+3rCIp7Yv9xnA+VkJI5GCM0+V2uTzK9up39FcXrWoa7q/i+fw3oeow6TDZW0c93dmESysZCdqoDwBheSfWqusWnjPw3ps+sW3iY65FaIZZ7K7tETzI15ba6YKtjOOopFHfUVyWi+IbnUfHDWMbAac+jQX0SFAGDSORknr0xxXW9qACivJ/EnjTxJZaXdXNjsnng8TSWKRLEMyQIpby/qcHnrXpWhalaavpNtqdjJ5lvcxiRG9j2PuOhoAvUVzvxA15vD3h6W6t4/Ov5mEFlDjJkmbhRj0HU/Sl+HGo3mr+CNI1K/kEt1cW4aVwoXc2SM4H0oA6Bs8Y9a4f4LeIdV8SeGNQvtYuFnnh1vULSNhGqYiiuHRBhRzhQBnvXcmvMf2cP+RK1X/sZdW/9K5KAPTqqvfWaXi2bXcC3LDcIjIA5H0qwSK8Q1i/WT43KkcgcDUII8g5xgKCP51x4zESoKLSvdpGFesqSTfV2PXrXXtGudXn0i31Szl1C3G6a2SZTIg91HIrSHSvlX4d29zYftPid3/0O5vL4by3RmVjtP1IGK+qAa9CpDkdjnwGNWLg5dm0Pori/it43HgnStOmh0xtTv8AVNQj0+xtvPWFGlcEjfI3CLgHn6VG/wARNK0DSrGT4iXGm+EtUu9+LGa+WY4VsbgyjkdDnHGazO87iiuU0r4keA9Vvbuy07xbpF1cWcDXE6RXKnZEoyz56FQOpHSo7L4nfD+80q+1S38XaU9np+w3cpn2iIOcKTnnDHgHv2pXA6+ivPND+LngvWvHtv4T0rVIbma5sRdQXKOPLlYtgRKDyX2jd9K3D4qhi8dnwxPaNEj20ckN3vGx5W3nySOobahYeuCO3LA6eiubh8YaTFbzy6nPHY7L6e0jViWaXyjhmAAzjHJ9O9Hinxfo2j6JLfDUbV5Xs5Lq0QNvEyquQ3y5+TOPm6c0AdJRXPWfivR8WNvfahbQX9xDCzRZOEaRQVUnopJPAJBPFdCCD0oA4T49a5qvhz4WavrGi3ZtL6BrcRShQ23dcRo3B45DEfjXd15p+0//AMkQ17/ftP8A0qir0ugAoqnrWpWWj6Tc6pqVwltZ2sbSzSt0VQMk1yC/EeJEju77wj4qsdMlK7b6WwDIA3AZ0RjIgOepXjvigDu6KgvLu2srKa9vJ47e3hQySyyNtVFAySSegAril+Iy3EH2/T/B3iu+0rG5b6GyULIv99I2cSMuOcheewNAHeUVmeHda0vxDo0GraPdpd2c4JSReOQcFSDyGByCDyDWd4a8ZaHr2v61oNlNIuo6NceTdQyrtYjj505+ZM8Z7Hg9qAOkoyKyNQ1yzs/EemaFKspudSimlgKqCgEQUtuPb7wxxWoxUKWJAA5yaBXH0Vi+FvEWneIbe4msDIBBMY2Ei7SR1DAf3SOQe4pnjnxNpvhDw7ca/qyXDWduyCTyE3uNzBQcdxk1UouL5XuTCpGpHmi7o3aKr6fe2mo2EF9Y3Edxa3EayQyocq6kZBBqj4U1yz8RaQNUsVmWAzSwgSrht0cjRtxk8ZU49qks1qK4/U/Hlmmq3Wl6Ho2r+Irqzby7v+zolMVu+PuNI7Ku/wBVBJHfFXfCfi3T/EM13aR21/p+o2QU3Njf25imiDZ2tjlWU4OGUkcGgVzo6K4aT4hI2p6lY6f4S8Tan/Z101pPPa20bR+YoBIBMgJ4Ydq3/C2uTa0tw02gaxpHklQBqESIZM912s2cd+lAzargPgnrOqa3pXiKXVb2S6ktfFGqWkLPj5IYrhljQY7KMCu/rzH9nf8A5Aniz/sctZ/9KmoA9OopG4BNeSaz8abez8T654bsPB+vavqWlyeWsdkgcTerEj7gHHJ9aqEJT+FETqRh8TPXKyfEviLRfDVgt/r2p2+n2rSCNZZmwpYgkL9eDXG+LfiHr+i3EsWn/DbxBqscMKTS3CMiRDKBiATkkrkg8dQa8y+O/jOw8efADTdfsbea2RtZSKWGXBZHVXBGRweo5rWnh5Skr7Mxq4mMIu26Pe/EGvW2l6b9oTbdTyA/Z7dJAGnYKX2rnjO0E8+lZ1x4i1B7yxFpZxfZbmZhGzygtPH5BkUryNh3Db82elebyeMbaDxZZ6RpCS3euXkRl1EW6/Z47eBQArz+bnbIqfxDqAB0IrPh8f3eomWfwZ8NdT8QaDaSujXu4RiVACNqrj5guTjrxW8cMlujkeJlN6O3oev6V4nS41BrG9gSxcbI18ydW8ybYXkiXHBKDGSOOvpXRIysAysGUjII715J4W13RfFfhaO/s7qeDSXl8vUoJSqTLNyZEPcDnkjlgABxmu78D37XWnram1aMWqrGssdo0FvIvO0RBjnAAArGtS5dUdGHruT5Zam9cErA7KcEKSD+FcR+z7rGp+IPgz4X1nWbyS81C7sFknnkxukbc3Jxx2rtrv8A49Zf9xv5V51+y7/yQDwb/wBgxP8A0Jq5zsPSqKKCQBk0AFGR614d8fPixqtlfy/Dv4YwLqXjWe3eW4lBHlaVAFy0sjHgPjoD0yCeoBg/ZZ+IUl/8HfC9x4y8QzXuta3qV1Z2jXL75rhkdjgeyqDk9Bx6igD3iiuB1L4naLpnxI1PwhqkTWUWl6ENbudSllUQpDv2kEdciuatvjrYW2qW/wDwk3gzxN4b0K+mWKw1y+t1+yTbvuM5U5iDAgjd684oA9jormtV8ceFdL1TUdPv9Yt4J9M0/wDtK+LN8ttbk4DOe2ecDqQK83vvj5JpU0N/r3w08W6V4ZmuI4k1uaOMxBZGAjkZAdwVsg+vPTNAHttFY/i3xHo3hbw7d6/rt9HZ6fapvklbv6Ko6sxPAA5JOK8z0L43Sa/8K9S8f6H4G1m+t9N1CW1ubFZUW6WOMAtKFxzjIynUYPXFAHslcx8QvHfhfwFpEWp+KdUWyhmmEECBGklmkPRURQWY/QcVyusfG/wFY/CyD4gwal9tsbseXZWsP/HzcXGP+PcJ1Dg9ew6+mfNNO0fxPFcw/G34oaUt/rbSomk6MW/0fQrdjkEr3mPr2J556Z1asaUHOWyNKNKVaahDdn0TpGt6dqUnk29wPtAhSZ7eQbJYlcZXeh5U+x5FadeLeOmg8PeMNA+IOjkiz1RlW7C9JAwHJHuvP1WvZ4yCuRyDyKxw+I9rKUWtV+T2Z04rCexhCad1Jfc1o18jnvidfXem/DjxPqNhO8F3a6RdTQSr1R1hYqw+hANT+Abu5v8AwNoF9eStNcXOmW000jdXdolLE/Uk1R+MH/JJfGH/AGAr3/0Q9WPhj/yTfwx/2B7T/wBEpXUcR0VFBOOtfOnx7+Nvim18exfCv4SaWmqeLJQBc3DqHS0JG7aAfl3BSGZm+VQR1NAH0XkUV8mXPgX9rrSLQ6/b/ESy1S8jHmPpiyqwbuVCtGEJ9hj2NfQ3wk1Pxdq3gLTdQ8c6Pb6Prk0ebi1hY4X0JU52MRyVycdM0AdbRXN33j7wRY6v/ZF74u0K31DdtNtLfxrID6EE8H2roFkVhuU7gRkEHOaAJKK5XQPFkd3Bqt5qtrFolnp0/ltLdXsRO3+9IAf3Xb5Wwea6HTb+x1KyivtOvLe8tZRmOaCQOjjpww4NCdypxcHZlmis/S9c0XVZ7iDTNWsL2W2bbOlvcLI0RyRhgpO05BHPpWbrXjnwZouprpmr+KtEsL1jgQXF9HG/4gnI/Ggk6KimQTRTwpNBIksbqGR0bKsD0II4Ip9ABRRRQAGszxFa/aNOaWPT7e/u7XNxZwznCGdQdhz/AA89+2c1p0U07O4Hxb4Q+HPjj4u/E7VL7xw15p8VnPs1KWRNrIR0t4QeAMdxkAc8k17T4u8e/Dj4HaUnhzRdNjl1AIG/s+zx5h44eeQ9CffJPYV6r4lh1abQdQi0K4t7bU5IHFrNOhZEkxhSwHXFfL/we+Amr6/4j1DW/ibDdJFBdsrW8kh8y+lz8zs458v3H3vYV9BDF0sbeWJly04WtBdTDlcPh3Zj3v7QPxa8T3jxeGNOhtEzgRWFgbl19izA8/gPpUT/ABK/aI0dftV9b6yIRyftOiAp+if1r1/xj8b/AIdfDcN4c8NaYt/PaHY9vpqpFbxMOCrSdCfXAPvXM6R+1fp0l4qar4Qu7e2JwZba7WRlHrtIGfzrtpqc4c1LBrl892ZtK+s9Sp8P/wBqNmuEs/HGjRxxE7WvdPB+T/fiOT9cH8K6H4ufBrwv8RNA/wCEv+Hr2UeozR+an2YgW9+PQgcK/vxzw3tr+I/BPwz+OHhd9c8Oy20OokEJf20eyWOTGdk6d/cHnuDXN/speE/iR4U8Ra5p2sQC18PQyNFJHMSRLcAjEkH+yR1PQgjuOOSVWjTi6+Gbp1I7xfX+uxVpP3Zaop/sn33iTWoLrwl4n0Se90fQ51mtLu6UhrC6jcYhBPOQckAfd5B4IFfTK9KZbwxw7/LjRN7F22qBlj1J9z61LXi4zErE1nUUeW/RG8I8qsR3EazQSRODsdSpx6EYrwP/AIUJ8GZPETeHV1TUP7XWHz2sxqYM3l/39u3OK9+b7uTXz3B4P+JSeKYfiI+k2H286+buSyVz9tFkw8gw7s+XtEQD49fetcBVqU+bkqcvz3fQU0n0uKvwK+Ci6Y2qnW9RawjuTatMdTGwTb/LMedv3t/y49a3fh5pXwH8I+I47bw9f6PJrpm+zRtPdme4Emdu1d33TnjjFZlx4T8YnRLr4eJ4bla0n8SnUl1n7TGLcWzXInJK537xyu3Hvmu2uPC19cfFvWtVS0W3sLrw3HZwXaqvy3HmykkAc7gGU5/Wuqriak4uNSs2n5+n/B+4lRS2Ro6vr/gTxeNR8DP4l0+4ubuKS1ntbe7US4xhlX/aHoMkVwPgT4d/Bvwrq8/jLRPEMjP4ekdLuaXUg8VsxBUiTjg81V0nwn4qm8NeEvA8vgiLS59B1G2uLjXFniMJWF9zSw7T5hklAwQQMbjmsWL4aeMftN5ZjSDHpmv6heTawpkTISG4kmtjjPPmBgv0HOKVGMacZQjVcU/Na/0gbd72PeLzxd4ZstGstZu9esINOvmRLS5kmAjmLfdCnvnFcN8a/wDhVPiUw+HfHPim3sJrCX7QIVvRDIpZOM5B42nNcTP8OPHXiPQ/C/h2702ws7DRvDhhl/tFi6NeTqUYoIznfGoBDHjJPWuqsdA8V6qvwyu9d0Pbf6TdTJrLsY2+VYHiSQnPzBjtI789qxp0qdGSnGeqvs1pvb+vMd29GjQ+Gnh/4afDXT9dvtC15Y7TdENRmu74MsJCbkBJAwSrg++RXL+J/h/8FPGMmq/EHUfFU08Ek4+2XceqKsULcKqkbfk7AA1Pr/gjxO+va3rMGhpqMMHi231aHT5JkUX8CWojO3PyhlY5AbglfpVLxb4N8UeKU8U63F4SbS01RNNtY9Lkli826ENyHknlCnauEJUDJJAPtXRTqNVPa+1abtd3V+mncT2tY9X8EWvhXwrpOk+D9CvYRGto09nC0weWaHdky5/iGWHPuKtR+MPC8nidvDCa/YNrSZzZCYeZkDJGP7wHOOuOa838D+CfE3h34w28b2xm8LaXpt1Bpd4ZAWSOaRHW3YE5+QhgD024qtH4N8Wx/FmW5sNIlsNKn1Se8uZpLqG4tGR4Snnwqw82K4JwCB8vB5xXJKhTlN80+l73/r7iuZpbFjx74Y+DnxL8dRW+qeIYpNfhjNoILO/CM+0k7cYIZhk8DkV0Xw30zwF8PPB+pS6HrznRIr1hdTXV15iQTgiN1zgYO7AI9a4vTfB3i+Xwl4c+H83hGCwOjajbzy6+t1EYmSGXeZo1H7wyyAYII4LHJpW8L+NL7wN4w8DHwxPbNqGo3l/Z6hLdRfZ33TiWNCAxcbsYzjjvW87ypqk6vup7XW19/wDgC2d7Ha/GWx+HviLRxofjjVI7WO3VdSUrP5ckaBvL8wHB+XLbT9a8t0r4Wfs8aiWex8UXF0scsUbgankbpH2Ip+X+JuK9J8J6d4k1v4mL4s13w02g2lpon9mpb3FzHNJPI0odmGwkBBtwCeTnpXP2ngfxHD8JdJ0f+yVXUoPFEV9NEJEyLdb4y7s5wfk5xn2p0K8qMPZxqtbbPTW9xNX1aPRZvG3gnSdYi8NTeItKtL9NkKWjTgFDgBUPYHGMA81fi8T+H5dT1LTI9Ys2vdLjE19AJPnt0xncw7DFeQar4R8Xp4Y8U+A4fB1vqH9t6jc3EOutdRrEqTSbxJKD+8EkYOAADnaMVBr3w28XR6x4s8S6LbB9ZE0UViZJVUalaNaLDPE3Py5Ybxnoy1gsLRd7z/FeWvluVzNdCtqPwv8AgPDrWn3154nnhudXkW+sw2qBVnDvuVh8vCknjPXpX0Mg4x7V86614A8axWfh1NH8PyrqKaDp9hcT/bIHtXaEgtFdwSA5VeSrRknr7V9ExKVQAgZAA46UsbUlOMeafN+gQ9CnrmlW2r6dLZ3aI8bqVwyBhyMEEHqCCQR3FfKHxT+B+taHeS3nhu3a8sWO5bUNmSL2Qn76+g4Ydwep+v8AtTJI45EKSKrqeCGGQfwrPCY2phZXhsOUVLc/PFLnXvD8r26XGq6TJn54w8kGT7rx/KptM0bxJ4nvt1nY6jqk78GZgzj8ZG4A+pr75n0LSZv9ZZoRnOMnA+gzgVLbaXYW5zFaoCOmfmx9M9K9V55ZXjTVzP2XmeB/CH4H3GmWz6vq8yjVpIitu8TYW03DBZCVO6THG7AA/hz1rePwF0skn+0b3J7mcH/2SvagBnNLXhYuf1ufPVVz1MDmWKwMXHDzcb72PFP+FCaX/wBBG8/7/j/4iug8D/CbSPDWpnUBJLPLt2gyPuIGeQOABnjJxnjHGTXpdB6Vzxw9KLuonRXz3MK9N06lVuL3R5b+0nPJa+ArW5hJWSHU4JEIPO5ckfyryl7rQ5NT/sH+0IF0u/RtQlk3jZHM0iyhT/tKimP/AIFX0xrujaZrlkLLVrGC9tw4cRyrkbh0NYf/AArjwN/0K+m/9+qxrUJznzRaPQyzOcNhcMqNWMrq+qt1tb7j54i1yz1T+zU1BbB4ryfUJLnz0UvEHOYxuPKc4xjHIpZF8ODSLbZBaNAYbTy5GkiD+cWTzcgDzCfvhg2Fx0xxX0Mfhx4G/wChX0z/AL9Ug+HPgbn/AIpfTOev7qsvqlR7tHoviXBK3s4zSXmu/r8jwCwm0K6ur5xZ6WJE1Jo/LUQRxizH3SPM7E5yy/N09q57w7PaR6pq9vbzx2hurWaCymklwsZLDaC/GMqCu7jr719Qf8K58Ckf8itpmB/0ypf+Fc+Bv+hX03/v1UvBVG07rQ2p8VYSEZx5JtSt1WlvnqfNOnWAiCabqmpWUskltdfZrQ3CukEpQbGLg7VZiOBntk4zWlpNrpEEsNs6aXLOLK2E8qyQuUfc/mcP8jDoGwQwwMGvoP8A4Vx4Fxt/4RbTMenlcUv/AArjwKRg+FtM/wC/NNYKS7EVeKqFVNNSV+1l+v4Hz15ljNpNlbxS6PcTWsF5HZ+YEVDN54K5DeseSu/gnHemvNoloYyINGku5LuyjvBsSSNco3n7B0C/dyRwDnGK+h/+FceBj18LaZ/36o/4Vx4GH/Mr6b0/55U/qc/IlcTYXrGdtey3+Z882Enh65lV7iHTknjmvorVIljRWC7PJ3bvlPBbaW6nrmq2tT6TaWeoPaWem/bGS1jIYRylWYSeaVCjYrY2Z25ANfR5+HPgY8f8Ivpp/wC2VH/CuPA3/QraaP8AtlSeDqNWdhw4nwkanNadu119258x6ZBJfeCDZ2t3ax3KaoZmSW8WE7PJA3fMRkZroIptDvLu5lLWt7fxvawzSyPEFmRIgsjgy8EFwQWHzYAIr3v/AIVx4F7+FtMP1io/4Vz4FI58LaYef+eNEMHUit0ViOKcJWk3yyWra262vfXVHzyknh2aK2t5TEbSNGVIlcu6ob4HavcnyyenJFXrNoLCFdRu4dDR/Pv4Ymtgmx4/sx2I23ryeAeeea96T4d+CEkWSPwzpyOpDBljwQR0Oc1b1Twd4X1NkOoaFZXHl52B4+Bk5J+p9etV9Un1auc0uJMPe0Yy5Xe92uvY+Y1vbaTw7fCD+zIrq80iFpkVI0BkSc7to6BtgBwOvB61B4XGl/2dZ+fBZzXJlugVkkRHHyR7CN4KFs7sBuDg96+lv+Fc+Bj/AMyvpv8A36/+vQfhz4G5z4X005/6Zf8A16j6lUvdtHV/rXhPZygoS1d912tbc+a7c6fY/E/T5o7m1Nol3BI8kaqkacAsDglQQcg7TjOcVUtrzSrvU7kmxjtI1tLsjfdPKHk2HZjceDnpivp//hXPgb/oV9MA9PK60f8ACufA3/Qr6b/37/8Ar1P1GonujR8W4OaXNCV1FRvddL6/ifP1vPo82v39tFZaQLaFYEt5IkgDBSFLtiT5ZATndyCBnFavgGWFvGngy2tbiwnhtdRvYt0ACnksVOPvbSvIz+ea9sPw48Cnj/hFtNx/1yqzpfgfwjpt/Df2Hh+wt7qE7o5o48Mpxjg/jWsMLNSTbRw1+IsLUhKMYy1Vtbb2avv5nRr0pRQBiivQPjQrjfjKjHwDdyYZooZoJZwO8ayqW/SuyqK6hiubaS3uI0khkUo6MMhlIwQaAOO+MMqSfDa+lhvoLdJFjKyvD5qMpYEce/rR8TJ4R8KtTE8iTedYiKMqu3zZGACbV92IIFQL4V8S6NCbHw7rVlc6T/yysdWgaUQDPCq68lR2B6VasPCmp32qW2qeLdXj1FrR/MtbK2h8q2ifs5B5dh2z0pW1vcOaT93S3pr832IH0XTtf1FvsmqahpfiDSYIba5urQ7SQyBwrBgVdeT24OaL23+IGiWst1FrGm6/bwKXaC6tfImdQMkB0OM49RV/X/DN++ttr/hzVl03UZI1iuUli82C5Vc7d69QwycMOao3ei+PdXt30/VPEGk2VnKNkzadbP5zoeqhnOFyOM0wKvhTUoNW+JQ1W3Uxw33hq3mhVuCF81sj8OlehZ9q5PWfB0bRaZNoF82kahpUPkWsyoJFMXGY5FP3lOM1Wk034j3Uf2abxBodnGeGuLWydpceoDHaDQI5GI7r2B15VvHzkH1+U11XhX/ilvGd34Vf5dO1DffaSeyHP76EfQncB6E1b/4Qm1t9O0GwsLho49K1Bb53kG57hsNuLH1JbOauePPDh8R6PHDb3hsNQtpRNZ3ijLQuOCfoQSDQMwrMnxX4yvdcJ3aVoSyWlh/dluCP3so/3RhQfrWn8Hv+SZ6D/wBeo/ma2NC0W10bw9b6LZDbDDF5YJHLHHLH3JJJqPwZo7eH/C+n6K9wLhrSIRmQLt3cnnH40AbJrzH9nD/kSdV/7GXVv/SuSvTjXmP7OP8AyJOq/wDYy6t/6VyUAYX7S+p/EeBNO0nwVZ3/ANkvlZbm5sYi0u/OBHuH3ARznj6iuM8B2mifDm4srnxXqQvdYt13LptmwmeKQ5y8rk4DAk8Zz9a+jPEljPqeg6hp9rdvZz3VtJDHcJ1iZlIDD6ZrxX4e/AD7DcG58W6ol5hvltrNmVX93c4b8B+ddOGw2EqN1MVJ6bJdTxMfh8RKqpUVd+eyMfxbomm+OL2bW/B979m1OdvMk0y6YRPI/wDeifOCT1xn8q734AXvjyey1Gz8X2l4lvalEtJryMrKx53LnqwHHJ/M1wvxF/Zqa/1Rb/wdr7WodwXttQldxD/tRuPm49D+Br6B0KzmsNFsrG4u5Lya2t0ikuJPvSsqgFj9etbYupRcV7J3T6PdDwWVuhV9s5Wl1S0T+Ry/xksl1HwgbCXwK3jSCeZVmsVuEhaMAEiVWbGGBwBtIPPWvLvh98O/Hdpq3hq58R2TXEVpouq2zCe6W4e1WaQG3t2cnMhCcbunvXvWp2T3ioEm8nbn5gORnuOev+NQDTbzp/aMnJznByBk+9cB7R4Lovw8+IOk+F/h6dH0m1tNd0PQNUt5XleNlguZVHkhufmBOfUA9eKxdW+HfxA16PXLt9A1w3Nzpum2rNq19bySzTRXqyy7Nh2rGFyQOO9fS9vYXMc4kmv5ZRj7pGATjH/16ZbaZcW8iOt9KUDFmQk4Y/U0WA4e50LXLH9oS18SWuhi60W70L+zprqOVE+ySLKZNzKeSCMAbfWt7U/DUura5rv2nfbwXVpaC0ukI3xTxNIwdR2Kkqffp0zW1aWN7FNEz3jMg++uTjpwB+P6ChNMmEUga6LyuUw7ZONvtnnqeKAOG8MWHifRdRTXdW0KW6nlN7FPDZSIxjZ51kWRAzD5JNvrlflz0OItO8Oa7ouiaxG+ktdS6lowgjS1kQm3l3THyBuI+QecDuHHDe2e8Ol3R2hdTmGDlickk9+/H0qR9OnKKiXjKACC3Jb724dT+FAHAWXhe+gku9J1m0128sr2eGZUs54hbkeVErLJ0YbWj9cEYx6D1Jax5dMvhGxi1CRnYjIPyjrkn/PoBWwKAPNf2n/+SIa9/v2n/pVFXpdeaftP/wDJENe/37T/ANKoq9LoAyPGeg23ifwvf6Ddyyww3kWwyRffjOQVYe4IBweDiuOv9b8f+D9Nk1HxBZaR4h0qzQvc3enO1vdLGo+aUwvlWIGSQrDvj0rt/Emj2evaNPpV+ZxBOBloZmikUggqyspBBBAI+lcjdeANU1C1Ola1481zUdFf5ZbN4oEedM/ckmRAxU9DjBI6mncTIvjRcQXPgrS5XcNo11q+n/b2PCtatKpO7/ZJ2A+x5r0AhQMDAA/Sq2oaVp2o6PNpF7Zwz2E8Jgkt2X5GQjG3HpiuOg8Ca3Z2403TviJ4gttKUbEgaKGWaNP7qzspcADgE5I9aLhYZ8OUjj8f/ECKx4077fbthfuC6aAGfHbP3Cfc1z2j+HLnVX8UazocyWviPSvFF5Jp87/ckBSLfby+sT9D6HDDkV6b4Y0HTPDmjRaVpUJit4yzEs5d5HY5Z3Y8szEkkmo/DWgW+iNqrQzSy/2lqMl/IHx8juFBUY7fL39aLhY4Kz8R23ib4jeCb+KGS1uIrfVLe9s5uJLWdVh3xOPUdj0IwRwa6j4m67pOl6KNO1HV202XU90MTRW8k0jKOZNqoCfunr0GRUs/gnR2+Ilt44iEkGpRWsltKExsnVgAGcf3lAwCO3B6Vei8P2//AAmT+J5biaa4+xCygjbGyBN+5yvfLnbkn+6KadndEyipJp9TitM8YeB7fxRZT6fq89lFPDHp7QTabcRRyNuAh+dkCqRkrz1zWr8cc/8ACB5/6ilh/wClcddN4t0Oz8SeHL7Qr/eLe9hMbMhwyHqrr/tKQCPcCqfiDw3FrvhiDRL+/uX8qS2ka4AUSSNC6uCRjHzFeeO5oc3JpsUKcaaaijmYyfhx4jERO3wdq91+7P8ADpV3I33f9mCRjx2VzjowxJ8IDcr8LZTaDNyLzUvKB/v/AGmbb+uK7nVtPstU0240/ULaO5tLiNo5opBlXUjBBrK8BeGLLwf4YtvD+n3FzPbWzSNG87bn+eRnwT3xuxmlcsxPgUtn/wAKn0B7Q7mktt9yx+81wWPnFv8Aa8zdnPNdswGCQOSMZxXG3fgSW11W71Hwp4l1Dw617KZru2iijntpJD1kEcgOxj3KkZ9K0vCnhWPRLm7v7nVdR1fVLwKtxeXkoJKr91ERQERRknAHfk0gOF8Ft42GueNB4cg8OyWn/CSXGTfzTLJv8uLPCKRt6frXpPhk6+bJ/wDhIo9Lju/MO0ae8jR7MDGS4B3df0rmB4D1S21TVbzRvHGsaXFqd697LbxW1u6LIwUHBdCcYUd66HwrpGq6Wtx/afiW+1sylTGbmGKPysZzjy1Gc+/pTYI268w/Z3/5Aniz/sctZ/8ASpq9PrzD9nf/AJAniz/sctZ/9KmpDPTWzg14X8H2H/DRvxLG7oUyAf8Abr3XAqrDp9hb3U13BZW8VxN/rZUiUPJ/vMBk/jVwnypruZTp8zi+x856/wCL59T+K3i3SPFfjzU/DGnaZmLTrO0k8n7TxgDIBZiRg477uOlcDKyD9ldGLAj/AISxsnP/AEzNfYkui6PNqa6pLpdjJfou1bloFMoHpuxmkbQ9FNl9iOkWH2Xf5nk/Zk2b/wC9txjPvXVDFxhay7fgck8HKd7vv+J8vaBFN4Qv9Z8H6tdRSDxhpgl0rV5Yj5k7tHtSNyxynJ289DjsRXf/AAf+KHgrw98ObLQPEV/HoWq6LEba8s7hGV96scsoA+bJ/HNdT4i8PWmmsIpbGC+jk/fR3t1btPJbBATLJLIcg/LgKoA5HfFV9Q03RtSlubifRtG1Gaztk8q5mgTzG+QyqV3cs20LkHHX0rapOFZanNSU6D03RyXwh8y9/wCEt8Vrbf2dZeItU83TIpocM8YJBdTkbSc+vbivVvBqXh1jVpZ3spB5ixzPEkysZkUDo527duMFawJZXvpPLs47a8S5RYjCIJHgs5ZUDxsyDqhXGSPunnIzXbeHdMXSbBbNLi4nQMWHnSFygP8ACpPO0dgc1z153Rvh4NzXZdS9d/8AHrL/ALjfyrzr9l3/AJIB4N/7Bif+hNXot3/x6y/7jfyrzr9l3/kgHg3/ALBif+hNXIekelGvFvjb8UNWTXYvhh8MYU1Lxxfr+9m6w6RCes0p6BgDkA9OCQcgH17WY7ubR72HT5hDePbyLbyHokhUhW/A4NcP8EPhfpPw40CSNZm1LXtQIn1fVpuZbuY8k5PIQEnA/E5NAHmlp8P/AB98MfDl7p3gPQdB1qe+tZJtf17Wr5xc30zKS2xVGQq5OATyT65J8r+GaXvhz4W/CDx9eaVqEmkeG9d1T+1Tb2zPLbxznashUDO0Ec/h7V9w7R6UmxcYwMelAHxz8TL8fEGX4p/EHw5ZX8vhxfB8OkW93NavELqcXKSHy1YAlQOpxXd/FrxbZ6p8J4PhFomj3+teLdY0Wzt0tUs38m2DxoRNJKRsUL97rkEV9FLFGqhVRQo7AcflTto9BQB8cfE/Sbyw1T4w6dIJbmSDwPpVuZQjHzXTywSPXpmrvx8ii1Ow8K6BpniHxPfeIZbbR2i8LJbO+nTqCpLy4UAdCSd38I4719c7F54HNLtGc9/WgDwbxPYeMtW8TJ418ReDL/X7bS9QePw34YtJ40RNjFft9yzkKXOMovO0Ed8mua+B3xB0v4d/Brxb4l8W291Y3E/i7UPI01vmuZ52KEQp/ebJwWHHGa+jvEV9LpWh3moW2l3eqTwRl47O1CmWduyruIAJPckAV498Mfh14i8S+Ml+KPxbt4xrEZI0TQgweDSI88E9Q0p67vx64AAPHbD4beO/Cmrw/Hy68HaZOzXsl9d+EreE+ZYWzgfvohyPPUZYjGR19QPYdU1nRn+A8t1pepXmrQa3dM0ElzEyyxs7hmSQHoy4IPqenWvcQoxUN1a21xD5VxDHLGGDbXUEZByDj1BrDEUfbQceu33nThcQ6FRS6Jp29Dxf4nW8tj8L/CPhuUH+0JJYgE/iBC4P6sBXtdpGYraOMnJVAufoK4Gbwfquq/FP/hINZnhl0yxQHT4U/vehHqDkk9+K9CXpXLg6MoTlJqy0S9F1+Z14/ERqU6cIu71k/WTvb5HLfGD/AJJL4w/7AV7/AOiHqx8Mf+Sb+GP+wPaf+iUqv8YP+STeMP8AsBXv/oh6sfDH/km/hj/sD2n/AKJSvRPLOhPavk39kAQP+0H8XJNWx/bwvZAm/wC+IvtMnmbfbIiz+FfWZGa+bvjt8GPGEPxFj+LXwfv47TxIBm+sWYIt1gAbl3fKdwADI2A2AQQaAPpE9K8L/bR8dav4K+Egi0CeS11LWrxbBLmM7WhQqWcqezEDAPbJPWvP7r4pftT6taHQbH4Tx6bqTjy21A2zqqdt43v5Y9c5Ir0Lxf8ACnxZ8Rv2d7bwj491axl8X24W4hvoVPliZM7BIcfNlSVZlAHOQOOQDmPDX7IXw8fwVDBrs+qXevTwB7jUY7naElYZOxMEFQT/ABZJxyead+xlrviDTde8Z/CLX79tRHhS522VwzEkR72QoM87chWA7biOlYvhn4h/tM+E7Wy8Ial8KTr9zZlIF1FdxE0SkDJdW2E7R98kdiRXRfs8+G/EunftIfFDX9X8P6jpthqb77Wa4hKpJmXdhW6NgehxQI579jLRrTxZ8OPifomrgzW+qazNBcF/mJ3x43c9wTnPrXO/A/4nXXws+D3xJ8F65KI9Z8ITSjTkY43tK5jAUdwJSH+j16X+xJ4Y8Q+GfD3jCDxDot9pUl1rjTQrdQmMyIUA3DPUVw37TPwG1vxX+0Bomq6Fp076P4gMSazcRL8lq0ZAkd/TdGARnqQaBlfwU+p/Bn9jHUfG1qGj8TeJplmW5ZfniErbI2OepCbnGf4nroPhP+yx4I1n4fWOt+OJ9T1bXtYtkvJ7lbxl8kyAOAp53EA8s2cmvcfir8PtK8cfC2/8Cvts7eW2SO0dVz9nePBiYDuAVAI7jNfPHhbxT+0t8LtFh8CyfDZPFMVkog07UYw8ieUOFBZCNygdN20gcGgRsfstXWt/D/43eLPghf6pLqek2MJvNMkk6xD5DgD+EMsgyo4DKcda+pq+YvhzonjKX9r/AFnxpqvhHU9KtL3QYwzyx7okmMUAaMSD5WIIYcHtX04DQMWiiigAooooAMVieOdHvdd8Iapo2narLpV3eW7RRXca5aInv+PTjnnitukbkU4ycXzITVz5m+D37PWm6Rb3mt/E2G3ma2kcRWpm/wBGSJM/vXYEbgcZAOAB15PHYW/hP4D/ABLs7vTPD9voclzbpzJpa+RPD2DjAG4Z7kEV6N8SvDjeK/Aes+G4rr7JJqFs0KS9QrHkZ9sjn2zXiv7OvwT8T+CvHMviPxHdWUSQ28kEENrMZPOL4BZuBhQBwOucele0sY8RTnXqVnGa+FIycFF8qWjJv2evhB4v8C/EXV9QvdUWHRot1tGiYP8AaSnBRyufk2+vXOQOK+h8UgA4p1eZisVUxdT2lTc0jFRVkAooornKEIPrRt+lLRSsA0r9KXbS0U7AJt96Tb706ilYBNuOlJs5zTqKYCbec0m2nUUrAJto29+9LRTsAmKNvNLRQAgGKNtLRQAm2jFLRSsAgUD0paKKYBSCsrxZrln4b8PXetX+/wCz2qbmVBlmJOAB7kkVyHwz+Kmm+M9Wn0tdPuLG5SMyxrI6uHQEA8joRkcVDqRUlFvVnXSwGJq0ZV4QbhHd9j0WikzXml18XtOs7rVpLrw3r6aPpOoSWF7qyRI9vC6MFZmAbeEGQSccA1vClOp8KONtI9MorJ8TeIdM8P8Ahi98RahK39n2dubiR413EqBkbfUnjFcm/wAS/snhTVvEWs+EPEGlW2nW8dyPtCRHz43IA8tlcgkZBKnkURpTkrpBdHoVFcv458YW/hXQbPVZdOvL43l3BaQW1tt8xpJjhR8xA68daXwP4wtfFA1KAaffaZqGl3Atr2zvFUSROyB15UlSCpBBBo9lPl57aBdXsdPxRXC+DfiVpPibxTc6FZ2F/C0aTvDPKE2zLDKIpDtDFk+c4G8DI5FWtV8faTpvxL0vwJdRXK32p2jXNvNgeUcFvkJzncdpxxTdCpzcttbX+QXR2HHtRxXm5+LGlXEniuHStPmu5fDV1DbXHmXEUEczSPsJSRjjCnPXGSMCusufF3ha2vLizufEWlxXNsrtPC90geIIAXLDOQACCc9M0SoVI7r+v6YXTNyjiueuvHPg21sVvrjxTosVq87W6zNexhGlXG5Ac4JGRkds1Zv/ABN4dsru3tbzXNNt7i5VGgjkuUVpQ7bUKjPzZPAx1NT7OXYLo2OPaiuL8O/ETw/feCdP8Vavd2ug2t68iRre3KL8yuykZ4z93PHatq78WeGbS9srK61/TILm/CtaRPdIGnDfdKDPIPb1odKadrBdG1RxWTYeJvD1/rNxo1lrWn3OpWwJntIrhWljxgHcoORjIz9a5jxH8SbfTtd1DStL8N67r76UqvqkmnQoyWu5dwX5mBd9vO1cnBFONKcnZILo72isNfF3hr+0bPTJdasbfUr2NJILKeZY7hgwyB5ZO4H2IzUc3jbwhDfPYzeJ9HjuU8zfE94gdfL+/kE8be9L2c+zGdBRWFL4x8KQ6DFr0viLSk0qZtsV4bpPKc5xhWzgng8e1PuvFvhi1+y/afEGlw/a0WS233SDzlZgqlOfmBJAGO5o9nPsBtUEe1ZGkeJ/Dur6jc6bpeuadfXlr/r4Le5R3j5x8wB454+taxIqWmnZiuH5UuB6V5n4w+Mfh/w74ll0SWzvrlrdgtzNCF2xnAOACctjPOK9Gs7mG7tIbqB98UyLIjDupGQfyNZRqQk2k9jrr4HEYeEalWDSlqn3JsCjiuZ+IPi2HwjYafO+mXupzahfx2Ntb2mze8rhiPvkDHynvVPQPiP4cv8ATru61Kc+H5bK8ayurfVXSF4plTzCudxU/IdwIPSulUajjzJaHJdHZHFFcpp3jbSp7vVPtlzY2NjZ3EMMF5JfxMlz5sYkUjBynB4DckcjiotX+JvgbTNN0/U5/ElhJZahd/ZIJ4ZldC/8RLA4Cr/ET0yKSo1G7JMLo7CisWXxZ4Yi1O00yXX9MS+vEV7a3a5QSTKwypVc5IPb1qax8R6DfarLpVnrNhcahFvMlrFcK0qbGCtlQcjDEA+9TyStewXRqUVwtp8StJuviG3g5LC/EouZbRbohPLaeOISuu3dvChGHzldpPGateNvHEXh3V7DRLXRdS1vVr+GW4is7IIGEUeN7kuyj+IDAyTV+wqcyjbV6hdHYcUVzs3jLQLDSdPv9fv4fD5v0Bit9UlSCUEjlCpP3hnn0q0/inw2muRaE2vaYNUlUNHZ/ak81gRkYXOeRzU+zn2Hc2KKxLbxf4WudWj0m38Q6XNqEjOqWyXSGVihIYBc5yCCCPY0ad4v8LajqaaZYeIdLur50Z0t4bpGkZVJDEKDngg5+lHs5roxXNuisO28X+Frma/gt/EOlyy6ejSXiJdITbqv3mcA8Adz2q7o+taTrMMs2kalaahFFJ5cj20yyKr4B2kg8HBBx70nGS3Qy/RXK+PfHugeDI7c6s9w8tznyoYI97kDqeoAFafhHxHpfijRItX0mVpLaQlcMu1lYdVI7EVmpxcuW+p0SwleNFV3B8j0T6GvRxRmuT0rx74fu11WS7u4tLi03VpdLd72VI1kljUMdpJ6YOeeeDWii5bI57nVmsbwf4a03wtps9hpYn8me8nvH82TefMmkMj4PpuJwO1QzeNvCEOiQ63L4m0hNMncpFdtdoInYdQGzgkVWg+IPhCbxdJ4Wj1u1OppbpcBPMXa6sCwCtnDNtG4gdAQe9UqU3qkxXR1OB6UECsC08a+ELyyur208TaRPbWjqlzNHdoyRMxwoYg4GTwPWtGPV9MlF95V/bv9gYpd7JAfIYLuIfHQ7SDg9jUuEluh3L2B7UcV5/4Y+JkGvX9h9n8LeIotI1J2Wx1aS2X7PNgE7iAxZEIBwzAA/jXRWPjLwnfR30ln4k0m5TT1L3jRXaMIFHUuQeBwefaqlRnB2aFdM3qK5o+PvBAVm/4S7Q9qzi3Y/bo8CQ9E69TV698T+HbHWLfRrzXNOt9SuceTayXKLLJnphScnPb1pOnNdGF0a9GBWHJ4w8Kxz3UEniPSUltEd7lGu0DQqjBXLAn5QCQDnuauaFrWk67YLf6LqVrqNozFRNbSiRNw6jI7+1JwkldoZoUlUPEWr2ehaHd6vfuyW1rGZJCq5OPQD1Ncb8PPipovjHWJdKgs7uyughkjWfaRIo64I785xWMqkIyUW9WdVLA4itRlWpwbjHd9EehcUce1NJGCe1cIvxO0Zvh7aeNPsd79jubtbRYcL5oZp/JBIzjG7n6VvGnKfwo5G0tzvaKyJvE/h2HXk0CbXNOj1aT7lk1ygmb0wmc1Xn8beEIL57GbxPo8d0nmb4WvEDr5f38gnjb39KFTm+jC6J/GPh3TPFfh+50HWIpJbG5KGVY5CjHY6uORyOVFbH1rCm8Y+FIdBi16XxFpaaVMdsd4bpBE56YDZwT7Uuua8bTw+usaRptz4gSTa0UenyRsZEb+NSzBSuOetL2cuwXNzigY7V5bp/xftrzw7YeIJPDOq2Gl3+oW1nBc3ksKIwldlMgIY8IVJOcV2sfi/wALNoDa8niHS20lGKNeC6Qwhgcbd2cZ9utXOhUhugTTN2isC88aeEbLTLTU7vxNpEFlef8AHtPJeIEm/wB055/Cq48feE/+E0HhD+2Lb+1mgSZYi4w277qg55cj5to7c0lSm/ssLo6eisO18YeFbs3wtfEWlT/2epa88u7RvIUEgl8HgZBGavaRrGlaxbyXOk6ja38EchieS3mWRQ4xlcjjIyOPepcJLdBcu/lSjFeb+PPi3oXhPxB/Y09neXc0YVp2h2gRAjIHJ5OOcCu80jUbXVdMttRs3L29zEssTEYypGRWUakZNxT1R11sFiKFKFWpBqMtn3Lhx3o4rA8deJ7PwnoX9r31vPPD9pht9sIG7dLIIwee2W5qTXtcbS9Z0TThaLMNUuXgMhuY4/K2xs+QrHMnTGFyR16VrySaT7nKbdGBXF+IviV4W07TNZlsNSttXvdJsZ7yaztJg77YR8wLDIQ5IHPfOM4NLcfEvwZa+F7zX5tcsmgsIo3vIoJlmkhZwNsZVTksTwB3Iq1QqtaRYro7PijiuRt/HWj3WqQLbXFnLpMulyaidTF9F5aqkgRgVzuwM8t0BGOtamn+LPDOoLeGx8QaZdCxXfdmK6RhAuM5fB+UY7mpdKa3QXRtUcVjeHfFPh/xH9pOg6pb6klqVWaS3O+NSwyBu6E47A8cZ6isTQ/iLourfEXU/BNvDdreWCM3nuo8mdk2+YiHOSyb1yPemqU3fTbcLo7Ssnw54f0rw9DeQaTbmCO8vZ76cby26aZ98jc9Msc4HApP+En8PfZbe6/tvT/IuGkWGT7Qu2QxgmQKc87QrZ9MGsnw98SPBWueGpPEVp4gsY9OhbbNJcSrF5JJIUOCflzjIz1FJU5tXSYXR1tFYc3i/wAKw6XbapL4i0qOwugxguWukEcu0EttbODgAk+lGn+MPCuo3sdlYeItKu7mWD7SkMN0ju0X98AHp70ezna9gublHFcpqHxG8E2mg6prQ8R6ddWmlrm6NrOszITwq4U8sTwB3NJpXjbTNW1vT7bS3trzT7ywlvFvo72LavluqlNmdxxnkjhSMGn7Gdr2C6OswPSomtrdmDNBEWVtwJQZBxjP1xxWPY+MvCd/ZXl7ZeJNJubax/4+5YrtGWD3cg8fjVnRPEOha3Jcx6PrFhqD2r7JxbTrIYm9GweKlwmt0GjNFESNQqIqKBgADAApw61yvxG8baX4K0yG7v4p55LiQxwQwgbnIGScngAU74c+NNM8baTJfafHNC8EnlzQy43I2MjkcEEd6y9pHm5L6nX9RxCw/wBZ5HyXtfpc6aUbkKkHBGD9KzvCmg6X4Y8O2WgaLbfZtOsYhFbxFy21QTxkkk9e9WdX1Cz0rTLnUr+dYLS1iaaeVuiIoySfwFcb4Z+JEWr3UBufC/iDR9Ou7d7q01G+gRYJIkXcWcqxMWV5G/GRW0acppyS0RyXO9orKfxHoCRh31mwVDZm+BM64NsOs3X7nI+bpWFqHxQ8B2Wqafp0vifTWlvpXijeOdXjRkUEh2BwucgDPUkCiNKctkwujsqKxYfFPh251i40W01vTrjVLdWaWzS5QzJjrlc5GO/p3rJ0n4g+Hn8N2Ora5qWmaG93bmfyLjUIn2oH2ZDqdrDOBkeuKPZz7BdHYUVSutUsLfRpdXe5jNjFbtctOrAoYwu4sCOowM1zHgT4j6B4p8KXHiMmXSLW2uPIuE1ErE8THaVLc4AYOhHruFCpyknJLRBdHaUVzXi7x34W8LWF1eaxq1vELSSGOaJGDSq0p+QFQc8jJ+gJ7VLceNvCFtHYy3HifR4k1AZs2e8QCcZxlCT8wzxkUKnNpOzC6OgowPSsTUfF3hfTdQGnah4h0u0vC6Ri3mukSTc4yo2k55HSmR+M/CUmlXOrR+JNJawtZfJnuRdp5cb/AN0tnAPtR7Odr2C6N7FHFchq3xL8EaW+ji68Q2PlawziznSZWiYKDli+cBcjbn+8cVLZeM9MEGsXmsTWekWWmX7WZuZ76IpJgKQxIPyE5+63zU3RqaPlYXR1WB6UViT+LvC1vpttqc/iHSorG6Rnt7h7pBHKFGWKtnBwPStDTNSsNUsIb/TbyC8tJ13RTwSB0ceoI4NS4SSu0Gg3W9NtNX0i90m/jMtnewPb3Ee4jfG6lWGRyMgkU7SbG30zTbXTbOMx2tpCkEKZJ2oihVGTyeAK4vX/AIt+ENF8Rvol3NdNNE4jmljh3RxN6E5zx3wDiu8jkSRFdGDKwBBHQg1lGpGV0nsdNbCV6EYyqwaUtVfqPo4NcZ4s8fQ6R4hHh3TNB1fxBqy2wu57fT0T9xCSQGdnZQCSDhepwavf8Jx4bttH07UtY1CLQhqKBobfVWFtPnuCjHOR3rf2M7J23Oa6OlwKMCuZg8eeFZvGk3g9NWg/tiGJZDCWA3bgTtU55YAZIHQYNaGh+JfD2uy3EWi61p+oyWxxOttcLIYznHODx0NJ05pXaC6NbiiuL1f4iaLpvxI0/wADzRXTXl5GrfaFUGGJ3DmONznIZhG2B7V0MniDQ4Rcebq9in2a4S1n3TqPKmfG2NueGO5cDqciiVKcbXW4XRp0YFcroPxC8H63d6va2GuWjS6RI6XYeRV2hMbpASeUBON3TIIq7Z+MfCl5pLata+I9Jm09ZRC1yl2hjVycBS2cAn0odKa3TC6N3A9KOK56z8c+Db2a0gtPFGjTy3kjRWyR3iFpnXqqjPJHpT28ZeFBfXth/wAJHpRu7GN5bqFbpC8KL94sAcjHf0o9nO9rMLo3uMUVw2k/EnQ9et9Du/Drxalbapem0dvtMcT2p2M/zRsdxbC/dHODnpW/YeKfDd7q1zpNnrumXGoWwJntorpGljA67lByMd/SiVKcd0F0bVFYuj+LfDGsX5sNJ8QaZfXQiE3k29ykj+WejYB6Vd1rVLLR9JudU1CYQ2ttGZJHxnAH86mScfi0KjFyaUdWy7RXF+BfiX4a8X6jLp2mNdRXUaGQR3EWwug6lcE9MjjrXaZqIzjNXi7m2Iw1bDT9nWi4y7MKOK5Txv40tfDl/p+kwaZqGs6xqIdrWwsVUyMiY3uxYhVUZHJPU1R0n4hQX+s+HtMbQtUsZ9Ya7jaO9jEUls9uoLBl53A54ZTg9a2VCbXMloc90dzRgelYth4t8L3017BZ+IdLnlsFLXax3SEwAcEvzwAepPFMsvGPhS90uTVbTxHpU9hHKsL3KXSGNXYgKpbOASSMeuan2cuwXNzilrk77xxo7adaahoVzY63DPqcOnu1tfRKsbO2CdxOCR12Dk9q0IPF3hefV00iHxDpcmoSO6JardIZWZCQ4C5zkEHI9qfs5roF0blFYVr4x8MXfiD/AIR+01uzutUy4a2gk8x02DLb9uduMjrjnjrXLeK/irZeH9c1uxl8O61d2uhRQzanfWyxmO3SRdwYguGOBknAPQ1UaFSb5UtQukejUcetYk/izwzDqVrpU+vabDqF2ivb2slyqyyBhlSFJzz2rH0T4i+Hr3xHqmg3l5aabfWWptp8MNxdIJLtgiPuReuPnxj2pKjUaukF0dnRWO3ijw4uvf2A2u6aurbd32I3KedjGfuZz05qn4N8c+GPF8t9FoGqwXcljO8MyKw3fKcbwOpQno3Q4NL2c7XtoF0dIaSsXxr4l0/wp4en1nUvMMMRVQkYyzsTgKKw/hr8RtJ8bvdQWltc2l1bKHeGbByhONwI4PPWsHUgpcjep1wwOInQliIwfIt30O3opMivMh8YdMSS7ubvw3r9totpqD6fPq5iR7aORX2EttbeF3EDdjvXRTozqX5Fscl7Hp1Fcxb+MNPjudeOqva6ZZaRPHC13NexFJA6K4YgHMf3gAG5PUdapyfEPQpbuwexuba60q4W7abURcokcX2dQzEBsGRecbkyBjk0vZTfQLo7OjIrkNG+JfgfU/DEXiOPxJp9vp7sIzJczrEUcjIRgTw2Ocdcc1Yi8X2c/jex8NWsX2lb3Sn1OK8ilUxFFkVABjrndnNN0Zq91sF0dPRXnviH4mxaV4o1XRYPCviDVRo8UU19cWEUbrEkibwdpYM3APAHat7/AITvwemiaZrNx4j020sdVjWSylubhYhMGGRgMR68+lN0KiSdtwujpKKx9Y8U+G9GmtYdW17TLCS7/wCPdbi6RDL/ALuTz1p03iPQItYTRpdZsI9SkZVS0a4USsWUsAFzk5UE/QVHJK17DNaisDTvE9ne+NNW8LxwTrdaZbwXEsjAeWwl3bQvOcjbzmp28UeHF18eH21zThq5GRZfaU84jGfuZz05p8kr2t5hc2KOvQ1zuo+M/Ddtc3+nxaxp9xqtlbyTyael0nn4RSxG3ORwPwpfBPirTfE2kafeQSRQ3d5p8N+1kZVaWGOQZUsB27Z74pOnJK7Qrov+ItHsde0S60jUovNtblNkgBwfUEHsQea5n4f/AAz0DwbfzahYSXVxdSoYxLcOCUUnJAAAHPc125xSD1rJ04uSk1qjpp4yvSpSowm1GW66MUDFeH33gv4hT6d4z8J2umaPDpniXV7q4OqTXxZobeYjOIQuS+0HGTj1r3D8KT8DXRSrSpbI5WkzhtV8A2ENpe3+i2cV1rL6f9kjTUrqZ7SUeWE2yRBtuCqgHC15qPhf4um8N+L7HT9HsvD1nqWlxWtro0ervcwtcrKHaYMwxENo24H1xX0HgelGB6VcMVUh5g4o8k8W6B4z8b+F7DRtZ8N2GmLZ6vYTsI9W8zzoI2PmnKqpUgYwAcnPXit34ceENS8KJ4o0eBo4tOuL5rnSbkyeZMFkjGRIT8zFHBALEkjFd9gelGB6USxM3Dk6dgSV7nz54A+HnxI8N+LdPvPItobNrmJ9eli1Xc+qSLvH2gZXcoO8F4ycMQMYrqfip4D8Sa94wn8RaD9kS8stJt/7KlllxtvYboygMMfcKEgn/ar1rA9KMD0rSWOqyqKpZX2/r+ttCeRJWPBW+EniK18NeKNLtI7OR9Ss9JWJ3nx5s0MnmXDNxxlixB71t6v8ONVutC+KUcdlp51HxJNKdOmLjcY2hRArNjKfMDxXr/4UcelJ42r/AF8v8h8sTyTxP4G1ix1vSdW8O+HdE1WGDQZdJk064kWBIHcqfOQ7SCDtwwxkinfDz4a32geKPD91qi2OoQaT4XTTVnOGZbkT7yUDDIUKcA9eK9Z/CjA9Kh4qo4cocqufPcPwx8a2ekeGiLOG4n0JdQsmtoNUWEzxTyb0nR2jYKcfKyEZx3q+/wANvFWl3/h4+GdOtNOmtbOytZ7z+1PPiCRSF3jkhkiJkCgkIylTk84xXuuB6UYHpVvHVXv/AFrf9Q5UeTfD3wh4p0L4hXN2lnb6Z4eZrt5IPtq3SyySyb1aEGMSQ55LKWIJ6dqnudD8eeGPFfia98IabpGq2viKZLtHu7wwNY3AjWMll2nzE+UNgEHqK9SGB0FH4GpeKm5XaW1h2Vjw3xt4G+Ier+JjemHS71Le806/geK4W1SVoNhlVk2F2ckNtZmKqpAxVpfhhqj3UE9xp2mSN/wnUmtzMzKxa0IO3nHLdPlr2jA9KBgdqaxtVRSVkLlR4Je/C/xZbpY39lBDJLYa7ql4tlb3y25eG6PyOkhRlVx3BXoTzW94I+Gt3pPibwze3Wl6elppeg3FsUa4+0mC6kuRKNpZQWABb5sDHQV67+FHHpRLGVZK39df8w5Ynifw68EeOtK+IOk+INcs7Fkgtruyungu0VMSOHSSKFI1CpxjaSWyck17YRkcijA9KO2MGsq1aVWSk+g0klY828XfB3w74j8Sya3PdXtu1wwa4hhI2ynoTkjKkjrivRrS3itLWK2gUJFCioijsoGAKk/A0Z9jXPGnGLbS3OuvjsRiIRp1ZtqOy7HDfGDwne+LrPw9Z2hKxWmuQXd2yXBhkWFVcMUYchvmGMVka78LtPjn8K2uiabDLYWevnVNU+2TGV5yYXTexfJkbJXr2FeofgaT8K6o4mpGKinor/iclkeNeIfhtrWoa5rEwtLCSyvPFWl6kkbyDDWsEarICuOvBAXuKh1r4c+I0GsXenabplxIPGUOu2Vo8wjSeBYkRkJ2kIWIPBBBxXtePY0YHpVLGVExcsTwrV/hr4lvfG2oXs+mx3Onaze2V9Lt1cQiyMSpmNlEZaTaU+QqQOgIFd/8MPCkvh6fxLeX1naJd6nr15epNHhneCRgUDNjI4H3e1dtgelGBjpSniqk48r8vwGkkz54/wCFc/E3T/GNzrGnLbPcz3rNqWpJqeyXUrT7QskcaqUzDIijZkHaV45r0D4x+GdR8RS6f9n8IaN4jtYY5ARPfvZ3dvK2NrxSqOFx1HXp6V6OQD2ox7GrljJylGTSuhKKWh4dZ+AvHej/ANkajPZaL4xvx4eOj3Uep3JCQv5rOHDMpMiYYI3RiFFHiPwN49vvGcOpix0qW2sNXsdQtlgult4jHEiq8ewR7jIDuw7sRtAAFe44HpSbQeooWNqXvZX1DkR43pXw11i0XR5TZaet1beNp9ZuJlcbjauZdp3YyWwy/LUXhn4Y61p9l4ND2thb3Wm6xqF3fzwuN/lzrMqFWxlj86ZHt7V7Vx6UYHpR9dqtW/rr/mHJE+evDXwm8U2WhXOlXlhCbiy0C/02xvTq25JpJ0KjbCIxsVuC29mIPTNe1eB9Fi0DwnpelJaW9q9vaRRzJAgC+YqAMeBzyOvetvA9KOPSs62JqVn7wKKWxwfxV+HFn44NncNfSWN3aqyLIEDqyE5KkfWtr4feFbTwd4bj0e0mkuMO0sssgAaR26nA6dOldFx6UcelcipQU+e2p3zzDEzw8cLKfuJ3SAcivGn+HGuzamJLm2sZbb/hPX1xleUMDaGIKDjH3tw+7Xs34UnHpXTSqypN8pwtJnhOsfDbxNHZXradpFu95/wkOo39hLbakttJbRToiqQrRtG6nBDow6YxWxb+EPG1h4rTVVstDv7i/wDDMOm3l0SsaW13Gr/vBFt+dGLAYGOB6cV69gelGB6Vr9bqWsLlR8+6X8PPH8NvrUl3o2l3E+seHo9KkW5v0ZI5VcgvsSNVEeGLKij5doHeu9+Gngi+0DwNrfgzVZEngmmuEh1FXzNeRTJzJKO0gyV75CjFei4HpRx6UVMXUqR5Xt/kCikeV+CdP+J+kaVo/hOWx8PQafpcP2eXU/tDS/bIkRljVYcAoxOzcSSBg4zmuLg+GfxBms9VN9Y2ButQ8K3OjSEX6bFnLbkZESNVSInICjlepJr6IwPSjA9KFi5q7SWu+gcqPD/E3wp1S9h8UJZaZpStf+E7TS7LJVdtxGW35+X5Ryvze1R638MPEVz401G4e0TUNM1e6sbmSUar9n+zGBUUqyeWzPtKbk2sBzzXumB6UYHpTWNqr+vT/IOVHkLeA/Edn4S8ZrpdlpC65q+vS3tvLKsbmS3MiMAWZSFbapxkEKcGtj4L+GvEHhlvEces20cUeo6gL+3cXn2h/njVWRztX5gU6gYOeOlejYHpRx6GoniZzi4vqNRSZQ8QaTZ67ot3pGoIXtbqMxyAHBwe4PqK5D4e/CzRPB2ry6rbXd3e3LIY42n2gRqeuAB1OOtd/wDhSYHpXI6UZS5mtUdlLHYilRlQhNqMt10Y1hlDgdRXgcHwRaP4a2ES6Lpw8XRanHcTXIuDjyxdeYfm6Z8vtj2r3/8ACk49K6qOIqUfgfb8DjaT3PEda+HPii51rVtMi0/SXsNU8TRa2NcafFzborIxiEe3cWGzapDAbWNWD8MdTlvIrifTdMkb/hPZdcmZmVi1mwbbkkctyPkr2bj0o4z0rT67VtYXKjwW/wDhh4rt0sb6yt4JJdP8QarepZ298tuzw3TDYyOUZVdQOVK9GIzXqPw18PyeG/AGnaE9vHbSwxPuhS5M6RszMxUOVBIBb0HtXU4HpRx2FRVxVSqrS/rf/MaikePWnw71w/CPwZ4WvLaylutK1e1ur6JpQ0ZiSZ3bBxhuCOO9ZviL4X+JpptSvdNitl8vxYdZtbSK6EPnwm3EZw2xljkDZIypHWvc8D0owPSqjjKsXdW/4cXKjwW9+GvjE+G7DSbHT7S3t7mPUPt0P9pK8sM1wwKuZzFlo8D50jC5b2rT0DwR4ssdb0a6m0uwVJ/C0Wh38sd4vmWMke4CdPl/eZGMAYI6dq9n49KMD0pvGVLNWX/DhyI+d9D+EviqHwvqWlXWnWwvLfw5c6RY3P8Aa2+OZpMY2xiMeWh2gneWIPT1r3TwppUGjeHbHTYLWC2EFvGjJCgChggBPA55HXvWpx6Uv4VnWxNSt8Q1FLY868dfCXQfFevnWp7y8s55AqziAjEu0YB56HHGRXdaTp9tpem22nWcYitrWJYolznCgYFW/wAKPwrljTjFuSWrOutjcRWpwpVJtxjsuxxHxq8P6v4k8DSadocME18t5a3CJNL5SsIplcjdg44X0rE1qz8X63q3hnxBrfh+00uPQNSuLq4ihvvtTPAbSRMrhQS25sbRzXqPHpRgeldUa8oxUbbX/Hc5GkfJnw7gbXNJvvDVjbfadU1Xwve2mmPDqETwWMTNvEUyKgeIlmADSlmBBFeleI/hZq1+NZtrC1020gvfBsOkxEEAC6RywyAOg7N717LHBBGzNHBGjOcsVUAk++OtSceldFTHzc+aCsSoKx4zrPgrxbrqz3kujadplxN4Nu9H+zR3iuq3Dygp8wUDaQMk44JrG+JXhCXw94b1TU59Osk07/hC7fRZFiJA+1eevzNsGQgyCXPAxzxmvf8Aj0pGVWGGXIPBB71EcbUTV1oh8iPHfgFqQm/4SuKC3lu9WSSG4uL0X0M9tdSmLaio8SKilQiggDuCTWd4a+F3jTRJ/C3iE64l5qlpqcl5qFiyRpEq3RP2oJKBuc9MBuDtFe4wwwwxiOGJI0HRUUAfkKfgelKWMnzScFa+/wB1gUVZJniHhLwD4zsdX8K2F/p+ljSvD+r39y10t3ue5juBIVIj2/Ljfggnn6VBpXw98Y2PhLQtNfQ9GuJvC+tm9hiN4PL1aI+by3yfu3XzAV3Z5HavdiAeoowPSh42o90v6v8A5sFFHi2gfDTXF1Pw/f6nYaUkaeJr3WryxjcPFaJNblEjTK4chsMSABkkio/DXwx8QaRa+Emt7PSYLvTLrWZbp8hlxcrKIMgAbx8yAjsBXtuB6UYHpSeMqvf+t/8AMOWJ896f8L/HF3a6zFqtrYxS6t4VbSXka9R1juVYsrKiRqqxEn5VUZTHJJNb1/4D8VeIjA95Y2OgM/hO80aQQ3QlEU0kibGG1RlWCknHTPevZsD0owPSqeOqvsHIjwO++G/jDWdI1hptE0XRZ/8AhFRoNta2t0GW7cOreazBQFUBcKDkjJzXe+EfCF3o3xIvtZjtLO202bQrOyQQkAmWJ3LZUDoARg13/HpRx6VM8XUmuV7f8N/kNRSOX+IvgnS/G2lxWeoyTwvA5eGaEjchIwRg8EEdqf8ADzwZpngrSZLHTnmmaaTzJppSNztjA6cAAdq6b8KPwri9lHm5ranX9dxHsPq/O+S97dLmJ470FPE/g7V/D0kxgXUbSS380c7CwwDjvg4rhtP074naloQ8L6tp+g6ZYR6VNY3N3FdNO145hMcbRptHlLn5juyewr1Pj0owPSuinWlCPLbz9GcrVzwSHwB49v8ATZIdQ0vSrN4fA8/h63WO/wDM8yY7Qrk7QFVse+O9dPrvgfVLH/hAr/w/oOk3Unh/cl3ZM6wK4ktxGzK20glWy3I5r1TA9KOPStZYypLf+ri5UeI2Pgfx5/wsjTvEF/a6fLBY6reOTFdpEjW9wjKHjiWMYZcjcXYsxPWjwb8L9bsf+EeGr2OmzLp/he706QGQOFuJZiy7cjptJBPua9uwOmKOPSm8ZUasrf1f/MSikeU3ngrxTL8AdJ8AwPbQahJa21hqEomysMGR5zIcfMdoIA75rB1r4V+MI7bxZptjq8Gr22u6fauJrtY7crd20ibEKxrja0SBd3YgZzXumB6UYHpRHGVY7W3vt10f6A4o8Q1rwH408R2Pjm9v9M0qyvtbTTZLK2+1+aqtbEFkZ9owTgjcBj5vajxZ4I8Yape6zfweGNBlbxJoUWmTQXN6CNIdC4JUhMSIQ+7C4O5R9a9vOPSjj0oWNqLZL+rf5IOVHh3iP4Ua1eaX4wtUhsb6fUNN0izsbmdxvc2wAlLEglM4z71d8S+BfFcGseJr3w7ZaakGoalpk8MStHG7QwRFZRGWRlikyRhiDxmvZBgdqMDpil9cqPf+tv8AIORHgukfDrxlo+n6HOmjaXqFzoviK8vlt5L8EXFvcow/1jJwys/II5xkVfv/AIe+J01CfWoLHTr+S38Xza1Dp01wFS6hkgEYy20hZFOSMj+de14HpRgelN42q3dpByo8W8N/DPXINX8NajqdlpaxQa/qOrXllE4eKzFxHiOOPKjeQeScAZJIrt/g94cv/C/g06VqMcEUy395MiQsGURyTu6YxwPlYcdq7Lj0pfwrOpialRcr2/4f/MaSR5L4p+Cel634suNZ/te4t7e7l825thErEk/e2t2B+hxXqtvDHb28cES4jjUIo9ABgVJgelBwe1ckKMINuK3O7E5hicVCEK07qCsvI8q8b+D/ABG3jvU9X0jT7XVdN1/T7eyvoX1KSyltnhdikiyIMlcMcgYPHvXKX/w4+I134K0nw9dvZ3Z/si8s7yZr4CRZ5JWaNnlZGd4tmBsUg5xnNfQGB6UYHpXfDGVIpKy0/TQ4HBM8WsvAniwaxJLJpthDFrHhaHSLy4W7Bk0+eOORN6/LmUHcvQg/lV34MeBNc8PazHe65pqWsljpK6ZFMuqfaFlAcE7IxGoSPjI3EsCcV65x6UYHpSli6kouL6goo8K8Q/C7xtrDeIfEa64lrrFzrEeo2GnhY2hP2YhbYNMRuU7QcgcfMfepPEfgXxxeajr9paaZpjWGsa/p+tG5e+2vGIjD5kWzbywMZIbOCPrXuPHpRx6U1javZfd6f5Byo8T134c+J7228e6Jb2OmLaa1qC6pZXrTgeYwMJNrKgXIQ+Wctkjkcdar6v8ADjxV4gi1/UbrRdJ0qXVr7SiNLiuRJGIrWTdJI7BQpZgSAAOgxXuhxjpRwKFjaq7f1b/JByo8W1P4Y6tLfa5c2un6ajXfi2x1S3dXVWFtD5e/t8rcNge9Q6Z4F8cf8LF03XtUs9Omgs9RvxK0d0iRtb3KsqvHCsYwVBG7exZz3xXt60HHpQsbVS6f0rByo8V8H+AvFllpHgjSb7S9Ntl8Ma00stxDdh/tUHkzKJQNoIbMijaeepqv4O+G/imxvfDGn3mm6PbWnhqa8m/tSCfdNqXnLIqqybQVzv3OWJyVGM17nj2pAoHQUPG1Ndtf+D/mx8iPH/h98OdX0C4+HMs1nYQvoem3lvqbRONxklC7cED5+Qc16Z4q0S08ReHrzRb4uILqMozJwy9wR7ggGtXFJjjpWFao6zvP+tb/AKl026clKOjR5t8MfhRZeDtbk1d9Ul1C58tood0QRUU9TwTk8Yr0vFJijmsKdONNcsVZHTjMbXxtX2teXNLuef8Aj3QPEUfjrSPG/hi0s9SubOzm0+6sLm48jzYpGVgySYIDBl6EYINZGoeHPH2sa34W1zWItLW5tpb+G6htJyv2O3uY9kZVmH71kxk4xnPHrXq+KTHtXVHEzilZLTT+vvOPlR8++Fvhd4y0rRpbUWNgmpadodxp2n3lxqInt53kK/8ALv5QCoduSHLYbHXmlHwx8YXWneIra70202azc6TdEXGorMy/Z5V85JMRqpygJG0bcYWvoLHtQRWzx9W7en9O4uRHjmr/AA61yXxTq19ZWtjHZXPinSNThVZAn7m2UCUlQOG44Heo7X4cavaRWFybGwW6t/HE2tzyo4Lm0Z5CMEDJbawG2vZ8UhX2qFjKiVv67D5UfNPwL1SzPxB0lWtpZ/tP9pLpyW15Gw06KSUzP58IQSoSQo/escMcDrx1nj34Vap4g8S+NNeijtxfXMdjJobtcsEaWBfmSaP7pRiAPmDcHjFezpbwxyNIkMau/wB5goBb6nvT9o9KueNl7T2kFbS343EoaWZ4Z4q+Hfi3U73xHZQ6XpDQeJr2zvm1SW5/f6YYljDRqu3LlSh2FSB83NM8Q/DjxbqGqeJ7GHRtF+x694ig1CPVnuf9ItIovKJOzbkt8jBcHgk5617vj2pNo9KSx1Vdv6t/kg5EeJS/DjxQ2uy6athpX9nyeKx4hGuGf/SlQOH8nZt3b+Nm7djbXXfCzw9rfhrWPEtle6ZYpp93qk9/Z30Ew3yLK+7y2j25Xb9celegYpMe1ZzxU5x5WNRVzG8Z+G9P8VeH59G1LzPJkIYPGcMjKchhWJ8N/h1o/ghrqeyuLm7ublQjTTYyEBztAHAGea7WjHtXH7OLkpNanZDG4iFB4eM2oPddBAP514W/gb4g3PhrxF4G/s3R7TStb1e5updUe+LutvLMHKrCF+/gY5bHNe680hHtXTSrSpX5f6scbjc+efirol74bi1i7m+zQjVfE+nXGlXLzhFh8i3VS8jspRD8hA8wEEnpnFW/hZor+IZfDmpabYvDp+j3OsW1/Lc3STi4muFX97EyqFkjLE/dAAxgV7zJFHKhSSNXU9VYZB/CljjREVERUVRgBRgAV0PGydPltr/wLC5Fc8L0rwT8QLLwR4c8OLo+lxJpFzJBcvb3say3cTIQsySNExi5PzKPnI6EVo/DDwL4s8N6z4Pnv7KyaDTdFudHvGiu87P33mRyqMfMGAxt6rXsmOc4pce1TLGVJRastf8Ag/5j5EeT6tovj/TviH4s1fw7oukXttrttaww3F3qBiFu0URQlkCEsMtnAI6ViP8AC/xF4ch0yPR9P0rxMieGm0OZL+byRDIzs7TLlWBQljlRzhRXueKTHtSjjJxSSS/z0sLkR4NqHwv8V6bYy6fY2OkeIxf+FrbQZLi+uPLNk8QZTIoKksh37sDBygrs/h/4EudC8barq+ox2t2raXptlZXjYaYtBEySnkZTJ2nrz+Fej49qTb7UTxlWcXF9f+B/kNQSPML/AEvxvo3xV1zxJofh6w1ex1OytIB5upi3aMxbt3Gw5zu/Suff4deKW1qXTv7P0r7BN4qTxCdbNx/pKIGD+Ts25L8bA2du017fj2o20Rxc47JbJfdsDjc8c8O+CvFWkLf6E3h/w9c2r3Go3EeuST5uZPtKybVC7crJlwrMWI2itD4B+CPEHgO2n07VI7W5hurS2ma8Eu6eOdYwj27cfNGuMoRjAJGK9Tx7ULj0qZ4qpOMovZ2uHKkeP618c9N0vWbzTn8P30jWs7wsyzIAxUkZAP0qr/w0HpX/AELWof8Af+OvF/Hf/I765/2EJ/8A0M1i18xPH1oyav8AgfseD4Pyurh4TlB3aT3fVH0F/wANB6V/0LWof9/46P8AhoPSv+hav/8Av/HXj2l6fpOkaAfGHjAumkKxSzs0bbNqco/5Zp6J3Z+wqj4f+Ifh3xbfPofijQtG8NpOdunalp8TItq/8KTAk74zwC3UHn6ezg8vzPF4eWIpr3V5b+h81mK4awOLWGlCT7tSdke3/wDDQelf9C1qH/f+Oj/hoPSv+ha1D/v/AB14Z4g0e/0LVZdN1KHyp4+nOVdT0ZT/ABKR0NUK8WWOxEXZ/kfVUuEMmrQVSnFtPb3mfQX/AA0HpX/Qtah/3/jo/wCGg9K/6FrUP+/8dfPtFL+0K/f8DT/UvKf5H/4Ez6C/4aD0r/oWtQ/7/wAdH/DQelf9C1qH/f8Ajr59oo/tCt3/AAD/AFLyn+R/+BM+gv8AhoPSv+ha1D/v/HR/w0HpX/Qtah/3/jr59oo/tCt3/AP9S8p/kf8A4Ez6C/4aD0r/AKFrUP8Av/HR/wANB6V/0LWof9/46+faKP7Qr9/wD/UvKf5H/wCBM+gv+Gg9K/6FrUP+/wDHR/w0HpX/AELWof8Af+Ovn2ij+0K3f8A/1Lyn+R/+BM+gv+Gg9K/6FrUP+/8AHR/w0HpX/Qtah/3/AI6+faKP7Qr9/wAA/wBS8p/kf/gTPoL/AIaD0r/oWtQ/7/x0f8NB6V/0LWof9/46+faKP7Qr9/wD/UvKf5H/AOBM+gv+Gg9K/wCha1D/AL/x0f8ADQelf9C1qH/f+Ovn2ij+0K3f8A/1Lyn+R/8AgTPoL/hoPSv+ha1D/v8Ax0f8NB6V/wBC1qH/AH/jr59oo/tCv3/AP9S8p/kf/gTPoL/hoPSv+ha1D/v/AB0f8NB6V/0LWof9/wCOvn2ij+0K/f8AAP8AUvKf5H/4Ez6C/wCGg9K/6FrUP+/8dH/DQelf9C1qH/f+Ovn2ij+0K3f8A/1Lyn+R/wDgTPoL/hoPSv8AoWtQ/wC/8dH/AA0HpX/Qtah/3/jr59oo/tCt3/AP9S8p/kf/AIEz6C/4aD0r/oWtQ/7/AMdH/DQelf8AQtah/wB/46+faKP7Qr9/wD/UvKf5H/4Ez6C/4aD0r/oWtQ/7/wAdH/DQelf9C1qH/f8Ajr59oo/tCv3/AAD/AFLyn+R/+BM+gX/aD0rBJ8NahwM/6+OvXvtq/wBj/wBo+WwX7P5+3PONu7FfDz/cb6V9qt/yJZ/7B3/tKu/BYmpW5ufofG8WZHg8tdH6umuZu+re1v8AM8uH7Qelkf8AItX/AP4ER0f8NB6X/wBCzqH/AIER18+L9wfSlrgeYV+/4H2EeDMpaTcH/wCBM+gv+Gg9L/6FnUP/AAIjo/4aD0v/AKFrUP8AwIjrwCBBLMkZkjiDMFLyHCrnuT2FdD4u8Gar4XtLW51O404i7G6BILje0i4+8BjpyOferjjMRJNrp5GFXhbI6VSNKaalLbV6nr3/AA0Hpf8A0LOof+BEdH/DQel/9Czf/wDgRHXj134P1iy8RWmg3xtbS7vIklhMs2EYP90bscEnjHrUv/CJpDNrdtfeIdItbrSo8+V5u/z35zGp4+YEYI9SKpYnFf0kYPh/h5JPV31VnJ6Xtf7z1z/hoPS/+hav/wDwIjo/4aD0v/oWdQ/8CI6+fMjGcjGO5pcjHUY+tY/2hX7o7/8AUzKP5H/4E/8AM+gv+Gg9L/6FnUP/AAIjo/4aD0v/AKFnUP8AwIjr59yM9R0z1pCQOpA+vFP6/X7/AIB/qZlH8r+9/wCZ9B/8NB6X/wBCzqH/AIER0f8ADQel/wDQs3//AIER18+/iPzpMj1FH9oV+/4B/qXlP8j+9n0H/wANB6X/ANCzqH/gRHR/w0Hpf/Qs6h/4ER18+npk8CptPtZr69t7O2XfNcSLFEM9WY4FCx9duyf4Cnwdk8E24uy/vPY98/4aD0v/AKFq/wD/AAIjo/4aD0v/AKFnUP8AwIjrynxj4OtvDcV1FJ4isrnUbOaOG4s1jZGy6hsoT94AEZOBVfRPBmq6ppdvqf2jT7G1urj7Navd3Hl+fL02qMHPPGela/WcUpcr/Q4IZBw9Kj7fXlva7clrv+R69/w0Hpf/AELOof8AgRHR/wANB6X/ANCzqH/gRHXjDeFPEA8SyeHBpkzalE+x4l5Cj+8W6Bcc5NReLPD+oeGNbk0jUxF9pjRXYRvuGGGRzUvF4lK7/I3p8MZDUmqcNW1dLme3f0PbP+Gg9L/6FnUP/AiOj/hoPS/+ha1D/wACI68g8HeDdX8WLcDRpLKSa3Xc8Ek+yTb6gY5BPGaq+H/Dl5rMt5DFc2NrLZo0k0d3P5TBV++QMHhe/pTWKxTSfcifDnD8JTjLeNr6vS+x7T/w0Hpf/Qs6h/4ER0f8NB6X/wBCzqH/AIER18/SAI7LvQ4JAYHhvcH0qbT7O61C9hsbKB7i5mbbHGg5Y9cfoaj6/iP6R1Pg7J4xcnF2/wATPe/+Gg9L/wChZ1D/AMCI6P8AhoPS/wDoWdQ/8CI68V8M6Jb6vd3kF3rNjpJtoGk3XRwJGU42D3rGyMZyAKbxuISTfXyRnT4TyWpOUIxd1vrLrtqfQf8Aw0Hpf/Qs6h/4ER0f8NB6X/0LOof+BEdfPtGRnqDU/X6/f8Db/UvKP5H97/zPoL/hoPS/+hZ1D/wIjo/4aD0v/oWdQ/8AAiOvn0kDGSBn3rpvh34T/wCEy1iTSotUisboRGWNZIWcSAfe5HTGRVQxuIm1GL/AwxPCmSYak61WLUVu7s9c/wCGg9L/AOhav/8AwIjo/wCGg9K/6Fq//wDAiOvAJ4zFPJCTkxuyE+uDiuk0fwPrWp6dY3scthbLqTslhFcXGyS6ZeoQYPp3NOOMxM3ZfkTX4XyLDwU6qaT/ALz9T1v/AIaD0v8A6Fm//wDAiOj/AIaD0v8A6FnUP/AiOvn+aOSGaSGVCkkbFHU9VYHBH55rofB/g3VPFUV0+lXGnBrVS80c9xsdU/v4wfl96UcbiJu0d/QqvwrkeHp+1qJqPfmdtT1//hoPS/8AoWtQ/wDAiOj/AIaD0v8A6FnUP/AiOvGtc8KatpOkW+syfZbrS7htkd5aTiWIt/dJ4wevX0rCJHrRLG4iLs/yHQ4UyPER5qSuv8T+7c+gv+Gg9L/6Fm//APAiOj/hoPS/+hZ1D/wIjr58yM4yM+lBIHUjHrmp/tCv3/A3/wBS8o/kf/gTPoP/AIaD0v8A6FnUP/AiOj/hoPS/+hZ1D/wIjrwXT7C81Gd4LG2e4kSJpmVB0RRlm+gHNX9F0e11DRtT1GXW7Czksow8VtMf3lyT2T37VUcbiJbfkc9XhXI6KvNPS3V9dFoj2v8A4aD0v/oWr/8A8CI6P+Gg9L/6FnUP/AiOvnzIHU1seHdHttVt9Rkn1qx042duZkS4PM55+Vffj9RSjjsRJ2TX4FV+E8loQ55xaXqz2v8A4aD0v/oWr/8A8CI6P+Gg9L/6FnUP/AiOvnwkAAnAz6mjP+TS+v1+/wCBr/qXlP8AI/8AwJn0H/w0Hpf/AELWof8AgRHR/wANB6X/ANCzqH/gRHXz7x60hIHUgH0zR/aFbv8AgP8A1Lyj+R/+BM+g/wDhoPS/+ha1D/wIjo/4aD0v/oWb/wD8CI6+fa3tJ8I61qnhjUfEVnDG1jp+fOLPhzgAnauOcA0447ETdo/kYV+E8kw8VKpFpN21k92eyf8ADQel/wDQs6h/4ER0f8NB6X/0LOof+BEdfPpIHeil/aFfv+Bv/qXlP8j/APAmfQX/AA0Hpf8A0LOof+BEdH/DQel/9CzqH/gRHXz5njPFGQRkMCPXPFH9oVl1/AX+peUfyP8A8CZ9B/8ADQel/wDQtah/4ER0f8NB6X/0LV//AOBEdfPmRxz14rW8I6RFr/iG20d9QjsXum2RO8ZcFz0BA5GfWnHHYiT5U1czrcI5LRpurOLsld6s9t/4aD0v/oWb/wD8CI6P+Gg9L/6FnUP/AAIjrxDxVo8mgeIr7RZp0nks5fKaRQQGOAe/1qS90e2t/C9jrKa1Yzz3UjI9ih/fQYzy3+e4p/XMRdq+3oZf6rZG4U5qLtPbWWt1f5fM9r/4aD0v/oWb/wD8CI6P+Gg9L/6FnUP/AAIjr58yOuRS8+lT/aFbv+B0rgzKHtB/+BM+gv8AhoPS/wDoWdQ/8CI6P+Gg9L/6Fq//APAiOvK5/AOp2+h2mt3Gq6DDp12cQXD32Fc85A+XrwfyrC8R6PdaDqZ0+9kt3l8tJQ0Eu9GV13KQe/FaSxWKirv9Diw/DvD+IlyU7t66cz6b/ce4/wDDQel/9CzqH/gRHR/w0Hpf/Qs6h/4ER18+ZB7j86MjOMjNZ/2hX7/gd3+peU/yP/wJn0H/AMNB6X/0LOof+BEdH/DQel/9C1f/APgRHXz4SB1IH1OK6r4feEP+Evubu0g1aGzubeEziOSFmDoOpBHQ5I4qqeNxFR2iznxPCuSYWk6tWLUV5yPWf+Gg9K/6Fq//APAiOj/hoPS/+hZ1D/wIjryXS/B51HwLqfii31WL/iWEC4tTC2/JIxhuhyDmuW4BxkD8acsZiYWv18icPwvkeJclSi3yuz1loz6D/wCGg9L/AOhZ1D/wIjo/4aD0v/oWdQ/8CI6+ffxoGD0INZ/2hW7o6v8AUvKf5H/4E/8AM+gv+Gg9L/6FrUP/AAIjo/4aD0v/AKFrUP8AwIjrwW8sbuzjtpLq3eFbqETwFv8AlpGTgMPbg1b0DQr/AFv7U9r5MVvZx+bdXM8myKFM4yze56AVaxuIb5evoYT4UyOFN1Wvd78zPb/+Gg9L/wCha1D/AMCI6P8AhoPS/wDoWdQ/8CI68X8SeGdR0K2sby4e2ubK/Qva3VtLvjkA6jPBBHoRWKCD0OT7c0pY7EQdpMdDhLJK8FUpptf4n06H0F/w0Hpf/Qs6h/4ER0f8NB6X/wBCzqH/AIER18+8YzkfnRxnGRS/tCv3Rr/qZlH8j/8AAn/mfQX/AA0Hpf8A0LWof+BEdH/DQel/9Czf/wDgRHXhvhvT4NW1q20641K106OYkNczt8icE8/y/Gq2oQR2l9cWyXEVwkMrIs0Z+RwDjcPY0/r2ItzXVvkZLhLJXVdLlfMlfd/nse9/8NB6X/0LOof+BEdH/DQel/8AQs6h/wCBEdfPvXGOc0gIPQ59aX9oVu/4G3+pWU/yP73/AJn0Gf2g9L/6Fq//APAiOkb9oPSwpP8AwjOocDP/AB8R18/Uj/cb/dP8qFmFfv8AgJ8F5Tb4H/4Ez7bstVjufDkWteU6RSWoudhwWCld2PrXmq/HvwqVB/s3V+R/zyT/AOKrtdG/5Jda/wDYGH/omvjhPuL9BXfi8VUpKLj1PjuGcgwmZTrqvf3GkrP1/wAj6T/4X34U/wCgbq//AH7T/wCKo/4X34U/6Bur/wDftP8A4qvm6iuH+0a3kfW/6j5X2l959I/8L78Kf9A3V/8Av2n/AMVR/wAL78Kf9A3V/wDv2n/xVfN1FH9o1vIP9R8r7S+8+kf+F9+FP+gbq/8A37T/AOKo/wCF9+FP+gbq/wD37T/4qvm6ij+0a3kH+o+V9pfefSP/AAvvwp/0DdX/AO/af/FUf8L78Kf9A3V/+/af/FV83UUf2jW8g/1HyvtL7z6R/wCF9+FP+gbq/wD37T/4qj/hffhT/oG6v/37T/4qvm6ij+0a3kH+o+V9pfefSP8Awvvwp/0DdX/79p/8VR/wvvwp/wBA3V/+/af/ABVfN1FH9o1vIP8AUfK+0vvPpH/hffhT/oG6v/37T/4qj/hffhT/AKBur/8AftP/AIqvm6ij+0a3kH+o+V9pfefSP/C+/Cn/AEDdX/79p/8AFUf8L78Kf9A3V/8Av2n/AMVXzdRR/aNbyD/UfK+0vvPpH/hffhT/AKBur/8AftP/AIqj/hffhT/oG6v/AN+0/wDiq+bqKP7RreQf6j5X2l959I/8L78Kf9A3V/8Av2n/AMVR/wAL78Kf9A3V/wDv2n/xVfN1FH9o1vIP9R8r7S+8+kf+F9+FP+gbq/8A37T/AOKo/wCF9+FP+gbq/wD37T/4qvm6ij+0a3kH+o+V9pfefSP/AAvvwp/0DdX/AO/af/FUf8L78Kf9A3V/+/af/FV83UUf2jW8g/1HyvtL7z6R/wCF9+FP+gbq/wD37T/4qj/hffhT/oG6v/37T/4qvm6ij+0a3kH+o+V9pfefSP8Awvvwp/0DdX/79p/8VR/wvvwp/wBA3V/+/af/ABVfN1FH9o1vIP8AUfK+0vvPpH/hffhT/oG6v/37T/4qj/hffhT/AKBur/8AftP/AIqvm6ruh6VqGtarBpml2zXN1O2ERenuSeyjuaccfXk7L8iKvBeUUouc7pLu9j6E/wCF9+Fcf8g3WP8Av2n/AMVR/wAL78Kf9A3WP+/af/FV4P4j8aeDfBl+mg6b4f07xdNEduq6jcyssZf+KO229NvPznOTVnXtH0240aHxb4TnkvPD1y21g/8ArrGXvDMOxHZu/Fevi8HmWEoRr1Y2i/L8z5jLsNw5j8U8NDmT6NvR+h7f/wAL78Kf9A3V/wDv2n/xVaPhn4xeHfEGv2ejWdhqUc93JsjaSNQoOCecH2r5drrvgx/yVHQP+vo/+gNXl0sfWlNRZ72YcG5bQwtSrBO8U2teyMHxhf2tz4+8Q28UuZodSnV0IwRiQ5I9RWnpWnaTo2gHxj4y3ppCsUs7JDibU5h/yzTPRB/E3TFZMWjaSfiX4/8AGPiQ3D6N4d1SSSW1tziS8mlmZYoc/wAKkg7j6V5/4/8AF2reNNebVdVdFVU8q1tYeIbWEfdjjXsPfqTya+0wvCNKti1NSvTsm/V62Pkq/HOJ/s5YaEUp7cy7L8mHj3xdq3jPXm1XVGRFVfKtbWLiG1hH3Y4x2A9ep6mue7UtFfo1OnClBQpqyWyPz+UnJ3buz1b4beNtP1XS4PBPje58u3j+TSNXf5msGPSOQ9WhJ/75+nS54g0fUNB1SXTdTh8qePkYOVdT0ZT/ABKR0NeOV7D8I/FMfiiCy+HHihnkaR/K0LUgN0lnIekL92iYjA9D7dPheKOGVWTxeGVpLVrufb8KcVzy2osPXd6T/wDJfP07lKiugl8EeL45XjPhvVGKMVJW3Yg4OOD3FN/4Qvxd/wBCzq3/AIDNX5j7GfY/ZVmWEav7WP3r/MwaK3v+EL8Xf9Czq3/gM1H/AAhfi7/oWdW/8Bmpeyqfyj/tHCf8/Y/ev8zBore/4Qvxd/0LOrf+AzUf8IX4u/6FnVv/AAGaj2VT+UX9o4T/AJ+x+9f5mDRW9/whfi7/AKFnVv8AwGaj/hC/F3/Qs6t/4DNR7Kp/KP8AtHCf8/Y/ev8AMwaK3v8AhC/F3/Qs6t/4DNR/whfi7/oWdW/8Bmo9lU/lF/aOE/5+x+9f5mDRW9/whfi7/oWdW/8AAZqP+EL8Xf8AQs6t/wCAzUeyqfyj/tHCf8/Y/ev8zBore/4Qvxd/0LOrf+AzUf8ACF+Lv+hZ1b/wGaj2VT+UX9o4T/n7H71/mYNFb3/CF+Lv+hZ1b/wGaj/hC/F3/Qs6t/4DNR7Kp/KP+0cJ/wA/Y/ev8zBore/4Qvxd/wBCzq3/AIDNR/whfi7/AKFnVv8AwGaj2VT+UP7Rwn/P2P3r/MwaK3v+EL8Xf9Czq3/gM1H/AAhfi7/oWdW/8Bmo9lU/lF/aOE/5+x+9f5mDRW9/whfi7/oWdW/8Bmo/4Qvxd/0LOrf+AzUeyqfyj/tHCf8AP2P3r/MwaK3v+EL8Xf8AQs6t/wCAzUf8IX4u/wChZ1b/AMBmo9lU/lF/aOE/5+x+9f5mDRW9/wAIX4u/6FnVv/AZqP8AhC/F3/Qs6t/4DNR7Kp/KP+0cJ/z9j96/zMGit7/hC/F3/Qs6t/4DNR/whfi7/oWdW/8AAZqPZVP5Q/tHCf8AP2P3r/M59/uN9K+1T/yJf/cO/wDaVfJL+DPF2xv+KZ1bof8Al2avriRWj8HNG6lWXTyrA9QRFzXqZdCUVK6Pz/jnE0qzw/s5J2b2+R8Ur9wfSlpF+6PpS15DP0qHwoPY817W1kvi/wCHfgLUJPn/ALPvTa3rekaAls/hGPzrxSuz8LePLjQvAmseF47Pzf7QLGKfzMeRuXa3GOcj3HWunC1IwbUtmjws/wAFXxEKc8MvfjL8Gmn917nomrSx+KX8FePZI0WO3junu8DAXyA0ig/iuPxrlfhdHaa14R8ayanp1ldTW9k11DNLArSxyOHJIbr1Ax6Vh6N46n034baj4OSz3i7kZo7nzMeUrY3LjHOcHv3p/gHxjpvhnRNX0+40a5vX1aHyJ3S7EYWPBwFG08/Mea6Pb05Ti77p39bHhLJ8XQw1WnCLdpJQs9eVS5r7+dvkdDpkthafAy38SNoWk3GqW2pi3imltVORnGXx984J61p+LNK0ix+M/hhbXSrFbTVoIWubVoA0RLkhiFPAPA5FcXL4v0g/DVvBkWjXqr5/2hblrtSfNzkZXb09q0tV+Iml6j4p0HX59AuxPo8SxhFvQFlK/dJ+TjnJ96r21PlS5l0/4PQiWX432s5qnKzdTqtmvd69zrzYaHqGtfEHw3/YGmwWum25ntZIoAJUkwSW3fXoOwFYvhrRbTSfhZouvW8ehf2hqd8DPPqhTaIFJBjTeCASF7c81l2XxIsLbxT4h1kaDcGLXbYQzwm8GUJzuZW29wehHFZeleL9NPg0+Ede0i4vtNguDPZSQXIimgJz8uSpBHJ7dzTlWpN3vrqZwyzMVT5OWXLeDaunf3bS699bX1O98J6T4Qu/izrGlabb6ZqOhXOmm6QBFkEMnGRG3Vep4968z8VeIdO1XR7DT7Tw/ZadLZSSA3EAwZI84RT3JAwST1PPFa3gjxvpHhjxLeaxbeHJCJYBbW8CXeFjTAyWJUl3OBk8da4y/e1kvZXsoZobdmzHHLIHZR6FgBn8qxr14yhaLW7PXyzLKsMY51lJqMY8rb6pWd7PzO/8K6fZ6V8IdV8YiztbjVTerZ2zXMSyrAuVyQrcEnJ5PtW9dWdlYeIvh94o07T7KCXXBGLqAQgxiTKnzFXorc9R0rhPDPiuGx8L6j4W1axlvdJvnWX9zKI5oZFxhlJBHOBkH0960bzx3aXfiPQ7uXR510rQY1Sxso7kBiVIIZ3K85wMgCqhWpqC1tt99zkxeX46WIqPlbTctbqzi42UbX7knx4v5Lj4iapZPb2iJbTDbJFAFkfMa/ffq3tnpVDwCt9qt5ZW9/fvF4f0SYX9w8h/d265BIH+05AAHc1S+IGv2PibxFNrdrp1xZTXJDTpJOJFJAABXCjHT3rV0Lxd4atPCEHh/VfCUmoKkzTzSpfNCJnPAZgBzgcDPTtUc8ZV5SctDu+r16GVUqNOk+dKz2vHSzau7X7a9SDxF4uvte8fXeqWstxZ22o3EMbQq5XzIVZQgcDr0z+Naf7RH/JVL4f9MIf/AECsfWfEehal4otNS/sGe1sLS3ihgsre6ClfLORlyp4P0z70fErxRYeL9cOswaXc2N3IqpKGuRIjBRgYG0EGic06couV3cWEwc6eMoVI0XGKg4vbR6Wu762SJ/hpq15odn4j1awk2XNrZwyIT0OLhMg+xGQfrXc+IdKtb64u/HuiR/8AEu1rQ7s3CqP9TcBBuB9M4P4g+teZ+HNY0rTdG1WxvdOvLmTUYhCZIrkRiNQwYYBU5ORV7wn43utC8K654ce3N1Z6nCyoPM2+Q5GCwGOQRjI45FOlXgoqMnp+TMMxyzE1cRUxFCNndLylGyv16NXOk+G9pdJoOjOfDujw2t3qipNqOoNGWvIiceSivzn/AHfSuj8EWFjov7Q2raRYWVslqsMkkamIFovkU4QnlRljwK4ex8f2sfhfQNMvdFa5u9BuRPaTC42xtyfvrjJ69j6VNH8R4YPikfG1to0iiaIx3Nq9wG3ZUKSrY46DjHXPrWsK1KKi77W/I4MRluY1p1703aUZLfRu+nXttt2Nn4WyWviLxT4jt9W0fR5o47KaVFWxRdjoxAI44PPPqeay9Gs7TQfgvJ4tisrS51a71AW0ctzCsohQHnCtxk4P51F4W8c+HfDeu6pqWneG9QZb6FofLl1AHYrElj9zqSePQCszSvFlhF4YvfCepabdXOiTXP2m2EdyFnt2z03EbWB78UlVp2WuuuvqbywOMc5OFOShem7XWqS95b/8Od5c6JpFv8RfBN7b6TYC18R2itd2bwhogxUElVP3eo6elSNY6Jqlt8RtG/sHTbeDRg0tlLDDiVGAYklup5HTpjiuQf4iQz+NtK1650aT7Ho8Ah06yiuQuzAwC7FTu75wPT0qWw+Imm22r+Kbv+wbprfxFFsmi+2DdESCGKtt6fNwMcVft6W111/L/M5JZXmWknGV1FW1W6ne2+6jp+Be+G1pdLoeiO/hzSIbS71VUuNRv2jJvI2ODFGrZP4r6Vv+BtMstG/aT1LTtOhEFrFBKY4l6JuRGwPbJNcVZ+P7WPw1oGm3OiPcXWgXXnWUv2jahGeBIoHJA9OMjNXrD4l6Za/Ee88aL4fu2ubmHyxCb0bFOAGP3OcgLx25pQq0Uo+9s1+WvQvEYHMak8Q/Zu04zW+7urPWXb0ttY87vgW1K5VVLMbhwAOp+Y17xotithpekeE72S0uPGeiWr6hpEbZWEM4OImOfnYDnsOnoa8K1Se3m1Se6sYpreF5TJGkkgdk5zywAzz7V22rePtL1fUNP1/UdAuDr9jGirNBe+XBKycqzKBuGD1AIz06VhhqsKcpNs9XPMDisXSowhF2Sb0tdStZXu9t07MyPiFpFjot5BavPfza1NCl1qHnBAkckg3MmBzuBOfxrrf2cV8zVPEqblQNpDAsxwF+Y8muV8f+K7Hxa8OozaL9i1nYqXNxDMPKnx3KYyD6HP51P8NfGVh4QTUXk0i4vri9gNu7LciNVj9htPzc9c46UozgsQpX0HiMPi62TOhKDdR20uu621tbTQ2P+Ei0rQfhlY+EbO+stZ1CXUUup2SMyW0a71O3LD5s4HQdzWv8V7/w74T8RahpVr4S02WO/wBLVt3lhTFKwIUr/dUAZIHJODmvKoJtNi1mOf7LdNp8cqt5JnHmlQQcb8Yz74roPid4ssfGWqRapFpVxYXKxLC4a5EiMi5xgbQQeeuav6z7j1V9Lehh/YjWKp6ScZczk7295tNaJrax6S+haD4bl8LaXdx+HV0q5svO1Z79kFxOzr95SecA9NtYvg3QtKvLHW7HwneaNPr0GqN9nF+iyi4sx91ULAjnoSB27da5y+8a6Rrei6VbeJ9AuL690qLyYLi3uxEJox0WQYJ7Dp/Ws3Tte0P+zxa6loUqyxXz3kE+nziF13Y/dkkH5RjA7itHXpOS2t/wDhhlOPVKfPzc99drP3m72vdrvt+B6R8N3ktNa8fxS+HrLSZbeyaUWrRBzESD8u7uhxnHTniue8C/Zdd+Hvja7v8ASdKa4tLYTW8kdmiGJmU5CkdBwMDtVTSviZJH4v1zWtS0r7TbazbC1mt4ptrIgGFwxHJx1Jqv4d8aeHdC0PXNJt/DuoyWurL5b7tQXckYXAAOzk9Tn3oVaDtrpr+OxUstxsFUfsnzP2b0d7ctuZau/fvc67wbpdj/AGV4JOmaPYX+n3rS/wBvTzWySbWAzh2b7m3t0pvhW4sfEuoeOVvrPTNQt7CykNhcGzQOAu5VYMB6Afzplwvh/SdF8M+HNb8LX2uyy2wliuLGR4kImfO0hT+8YcZJ9O1Zza14e+HPijxPollpt1qcF0v2YuLwKI4yuSg+U5YFjz/hWzcYJduv3eh50KVTEuoqalKbu47apTu3e+jtpstCrbW9r4X+DemeJbawsrnVdUvSjzXUCyhIl3fIA3Azt5Pua6uHw5odl8aNBtodKsm07W9NNxNaSwh0jcISdgP3ecHj3rzrTfFmnHwl/wAIprWl3d5pcF39ps2huQk0XJJQkqQwOT2HWrV18R76b4i2Hi1bGONLBBDBZhyQsIUqV3Y6kE8+tYRrUUlr2/4J6lXLMwqzqaO79prfe9uRb9PwOh06w02bwV8SPM0qwMmmXUgs5RbqJIgWPAbrjjj0q54e0aC78I6VqHhTTtE1uGG0dda02ZE+1SSkHLByMjHYDHTvmsF/iHoa2PiPTbfwvcxWmvEvORfDzVkOckHaQF6YAHrzzVDRPGmkaXe6ZrNvoM8WsafafZlMN0Et5yAQHkXbuJ5yRnk1Sq0la7X9P0MJZfmE4T/dyWqaTas/dS1179U9NzhnG1mBUqQTlT1Ht+Fe+fDfTbzTtT0zw7ci1GmXOiPFdqbmMObic+Ycx7t2cEL0rxGxu7Ya0l7qlvJeQmYyzRRuIzISc4yQcAn9K3X8Uac3xHXxcNNvFUXAuvIFyu7zB0G/bwvQYxnHeubD1IU25N9fwPczzB4jGwVGMbJRbvv71rJLVeep0fwgsbO2+ImoeEda06xuywmhjNzbq5SaPO0gnsQDx3p0HhiOf4c3N9HbWzeJINUju5E8gYWF5DEq7emw4LbelYet+NbW6+Itr4z03SZbK4SdJp4WuA6yMBjjCjbkcHr1+tXdP+Js9n4w13Xl0tGi1S3EKWvmDEO3HlnOMHacnt1Nbwq0VdN9Xb5nmYnA5lUmq9KLTcYtq/2lo479b3+RoWhOo/EDxBJo/hPSry30+3eCFikcNvaMvHnvu+VvmDcHtUvxHsLOw0nwR4gitNLOoXgxdtbxI1vcEY52gbT1PauV8CeL4tAstb07UbCW/stYt/KnEUwjkVufmBIP949qua1420vV9B8P6TdaDPFFosmYzBeAB4/7pypOcAZb1z60lVpum1fX/g/5BPLsbTxcXGm+SKtdPdcrWvvfzdLeZ1XxavvDvhLxLqmjWvhLTZY77TEbfsCmKU5Csv8AdUAZwOSTnNaLQab4X8W+APD1npNi0dxHHcXNw0IMzyno4fqMHJ/HFec/E/xXY+M9Yj1WLS7ixuBEIZA1yJEZRnGBtBB5Na6/Ee1l/wCEe1G90FrjW9DQRRXH2nbFIg7smMlsZxzjJz7VaxNP2ktVa6t+phLJ8UsJRShJyakpLm+1ytRe9rIxfi9z8TvEA9bs/wDoK10XiiOzHwZ8M+II9M06LUXvSkk0dqq+aE34DAD5vujOetcf471u08ReJ7rWrSxlsjdsHlikm8zD4AyCAOOBxW3qPjHRL3wFpvhN9Dv0hsZRKs4vV3MxzvyNnfJx6cVhCcead3vt956tbC4hYbCRjB3g1zK60VrO+p6beW2hWnxK8KaNF4Z0b7PrGnbrzNqOTtJG3svOc+vHpXh3iuzh07xRqthbrtht7yWOMHsoYgD8uK7fU/iXYXXi/wAP+IodAuIZNHjMPlG8DCWPaQBnbwQT171xHirUbbV/EV9qlray2sd3MZjFJIJCrNywzgZGc08VUhONovqZcP4LF4aqnWi0nDW7v7yk/N9Gj0vW49Lf4A+Ev7Vury3j+1SbDbQrIxbMnUMRgYzzXHeB/EFjY+L4f7VsY9d0yV0tmW8txJKsY+VCo52kZHyjqOK0dQ8a+H77wXpfhW48P6l9l05y8ciaigdmOc5+TGPmPFQ2ni/w3bava30fhm8H2GxFrZqL1Q0bfNmYnZ8z/NkHsRVSqRcotSWlv+CY0MJiIUKtOdGT5nNrVK13dW1vd6XNv4vWkfhSOfR49P0yZ9VuJLqG8WxRfItzhREhx97PU9hjHWrvjCfQfAeraRoUnh2y1DTX0nzLwPAhluJnyA/mHkYI7etctdeNNJvPh5b+FL7Rb25ktCz21694C8Tknp8v3ecY/Wn6t420fXrTTJfEXh+a81TTrcW6SxXflxTqOnmLgnrzwefxqpVYNvle9rfqY0MuxajThWpyai5c1nZy25Zb6dvLc6XQdGsdI+Gug61bxaCt1ql6XupdUZcfZ1Y/uk38fdHOOa1fh9baDa/GXXk8NTwS6W+kvJF5L7kQkruUH0B7ds157pvi/T5vBkfhXxJo817Z205ns5bW4EMkBJJK8ggryaseCPHGkeGPEF/qsHhuQi4gFtDbx3e1Y48AHJKks5xktwOaca9O8Wmun5GdfK8fKFfmjKUndLVWack116Ly0NTwFx8DvHh64kj4/wC+a37LRNJ8PeH/AAcZY/Dwg1JftGsTakU8yWMgfLHu5AAb+HHQVxmieMtC0vwjrXhtNBv5INWctJIb5dyAY2gfJ2wPrUX/AAmOl6n4U03Q/E+i3N82l5Fpc2t0IX2H+B8qeMY5HbHeiNamklfVL9bjrZdjqk5tQkoSnd7Xa5LX36P/ADOw8Hab4Xa98fWkNhp2raVp8BubGRow7AEE7RJ1xwB+FZPjZLK7+E3hfxcmk6bbak108MogtgsUgG7AZOhHyjrWV4Q8b6ToMWuo/h2R/wC2FMTJBd7Egh5AVQVJzyeSap6j4us7z4Z2fg5tLnV7KdpoLoXAxkljhl288MR1680nWpuFrrr99/Tsa08txkMWp8srKUdW1tyWl177nWftF3rLqGjadHaWaQtpsUgYW6iRcMflVuoX/ZHFc78LfEmjaVFq+i+JLWeXRtXiSO4lhBLQsCdrcc4+ncVH4+8Zaf4tsNPkuNHnt9XtLdLczrc5hZAcn5MZyee/FUPCviOx03QtU0LVtKa+sNRKOzQyiOaJ0+6ysQQfpWcqqdfnUtDtw2XVI5OsNUpPmT1SaT3vzJ36bq9tjs7z4fRN4j8KW9rr0mseFNTuWS2bfzEMF3TjgFgDyMHr3q/4psvDbQ+LtM1OTwzZLZ5/sRLV0W4jZAcq2Bkk4GQ2etcPP42ltYtDs9AtXsrPRbhrqATy+bJLMxO5nIAGDkjA7Gl8XeJvDet3V9qsPhma31W+U+a8l5vgjc4BkRNoO444ycDrWntqUU7f1ocP9m5jUqU3Vbsuqte/Ne71Su1u1fr3O01O90PQvAvgnxTP4Y0q7vLvctyv2dVV0A+Y46b+BgnplvWqOiS6d4i+GHi2ez0LSrbU9PczwhLVS62zEnaDjOQNw3delc94o8ZaVrHgnS/DcOi3lv8A2WD9lmN2rZJ4O9doyPp0qj8N/Fv/AAiOs3F3JY/2ha3Vq9vPbGTaJFPTnB/yaTxEfaKLfu2/QuGT13g51FF+1UrpN7pSulvbZ2O18MyWcvxJ8N+GbrRtFmj+xRpqANjHmSZojISTjggbB+BpuhaLpdq3xE8RNp9rNJo0skdhDJGGjhYlsNs6HHGK5Dwv4uh0vx7J4sv9PmvZvNkmiijnEYVmyOSQcgKcY9q0dO8fWlprXiCRtGlm0fX1P2yze5+dWOcsjhfc8EU41qb3fV/loTXyzGwk40ouzjG+u75ryW/bT8Da8BxaB4+8faRFc6Fb2wstPeXUVjVUS8lXABKrwBk/jVfxemi3vgS9uL+48OR69bX2bRNLdMvblgNhC4zjnrzxXPaN4ts/Dniax1Xw1pD28NqjxypdXHmSXQfG4OwAA4AxgcYqp4k1Xw1dxXH9i+H7iznupRJJJcXYl8rkkrEABgEnknPFT7aHs2m1f8zdZbifrkJxUo01a2qdrN3T97Z+V9NOhztI/wBxv90/ypaR/wDVt/un+VecfZPZn2No3/JLrX/sDD/0VXxxH/q1+gr7I0NWb4YWiqpZjo6gADJJ8qvkhNC1zYo/sXU+g/5dJP8ACvWzBNxhbsfnXBNWFOpied295fqUKK0P7C1z/oC6n/4CSf4Uf2Frn/QF1P8A8BJP8K8zkl2PvvrVD+dfejPorQ/sLXP+gLqf/gJJ/hR/YWuf9AXU/wDwEk/wo5Jdg+tUP5196M+itD+wtc/6Aup/+Akn+FH9ha5/0BdT/wDAST/Cjkl2D61Q/nX3oz6K0P7C1z/oC6n/AOAkn+FH9ha5/wBAXU//AAEk/wAKOSXYPrVD+dfejPorQ/sLXP8AoC6n/wCAkn+FH9ha5/0BdT/8BJP8KOSXYPrVD+dfejPorQ/sLXP+gLqf/gJJ/hR/YWuf9AXU/wDwEk/wo9nLsH1qh/OvvRn0Vof2Frn/AEBdT/8AAST/AAo/sLXP+gLqf/gJJ/hRyS7B9aofzr70Z9FaH9ha5/0BdT/8BJP8KP7C1z/oC6n/AOAkn+FHJLsH1qh/OvvRn0Vof2Frn/QF1P8A8BJP8KP7C1z/AKAup/8AgJJ/hRyS7B9aofzr70Z9FaH9ha5/0BdT/wDAST/Cj+wtc/6Aup/+Akn+FHJLsH1qh/OvvRn0Vof2Frn/AEBdT/8AAST/AAo/sLXP+gLqf/gJJ/hRyS7B9aofzr70Z9FaH9ha5/0BdT/8BJP8KP7C1z/oC6n/AOAkn+FHJLsH1qh/OvvRn0Vof2Frn/QF1P8A8BJP8KP7C1z/AKAup/8AgJJ/hRyS7B9aofzr70Z9FaH9ha5/0BdT/wDAST/Cnw+HtellSJNF1LdIwVc2rjknHXHFHs5vRITxdBJtzX3oh0PSr/W9Uh0zTLdri6mOEQdvUk9gOpJ4o+IfjOw8L6XdeCvBV4txdTAxa1rcRwZfW3gPaMHgsOpz71J8TvFUPgu1vfAPhaVhqJHk69qwGHdu9tCeqoM4Y9SeK8br9N4X4YVJLFYlXb2X+Z+NcW8WSzGbw2H0pL8X/XQQYAwAAPSuo+HPjXUvBWsPc2saXlhdL5WoafN/qbyLurejejdR9M1zFJX3lWjCtTdOorxfQ+FhJxkpRdmj3bX9J0250eHxZ4Tne88PXLbSr/66wl7wzDsR2bofyzP8ILq3h+LHhuGSVVlluiEQ9W+Rq8p+HXjTU/BesPd2qR3djcr5V/YTf6m7izyrehHUN1B9q9R8HaFYWvx08A+KdAu57nQPEFzJNZicfvbZo1ZZLd/XYTwe4NfmuL4ShhsU583uWbXqtbH6DT44rVMteFqxvUfu38n+py974tXwz8XPGltqenJqug6rqVxbarp7cedGJSQyH+GRTyp9c+tYXxF8FpoCWuuaFenV/CupknT9QA5U94Zh/DKvcHrjI7iqfxZ/5Kh4pHb+17n/ANGGrHw68aP4ae60zU7Mav4a1MBNT0yQ8SL/AM9Iz/DKvUMPQZ7V9xTpTp04VqO/Krrvp+a/HY+Bum3FnIUtdj8RPBiaClrrmhXh1bwrqRJsL8D5lbvDMP4JV7g9eo7iuPjR5HVI1Z3YhVVRksTwAAO9ejSrwqw54vT8vXz7kOLTsEaPLIkcaM7uwVVUElieAAByT2r2nRvD9/8ACbSYNak0G71Xx5eRb7G3WzeaDSI2H+skwCGmI6L/AAirfgrQbT4VxW+t61aW9/40lVZbaxl+aLS4z/HJjrMR0H8OfWvqL4d+MtM8Y6IL6xby548Lc2rN88L/ANQex718bmnElGdf6vS1it9d/wDgHs/2LiqeFWLnBqD2Z8rD4zfHoDAhusf9i+f/AIml/wCFz/Hv/njdf+E+f/ia+0RzS4964v7Ww/8A0DR/r5HH7J/zHxb/AMLn+Pf/ADxuv/CfP/xNH/C5/j3/AM8br/wnz/8AE19o4PrRg+tH9rYf/oGj/XyD2T/mPi7/AIXP8e/+eN1/4T5/+Jo/4XP8e/8Anjdf+E+f/ia+0sH1pMH1o/tbD/8AQNH+vkHsn/MfF3/C5/j3/wA8br/wnz/8TR/wuf49/wDPG6/8J8//ABNfaOD60uD60f2th/8AoGj/AF8g9k/5j4t/4XP8e/8Anjdf+E+f/iaP+Fz/AB7/AOeN1/4T5/8Aia+0cH1owfWj+1sP/wBA0f6+Qeyf8x8Xf8Ln+Pf/ADxuv/CfP/xNH/C5/j3/AM8br/wnz/8AE19pYPrRg+tH9rYf/oGj/XyD2T/mPi3/AIXP8e/+eN1/4T5/+Jo/4XP8e/8Anjdf+E+f/ia+0cH1owfWj+1sP/0DR/r5B7J/zHxd/wALn+Pf/PG6/wDCfP8A8TR/wuf49/8APG6/8J8//E19o4PrRg+tH9rYf/oGj/XyD2T/AJj4u/4XP8e/+eN1/wCE+f8A4mj/AIXP8e/+eN1/4T5/+Jr7SwfWjB9aP7Ww/wD0DR/r5B7J/wAx8W/8Ln+Pf/PG6/8ACfP/AMTR/wALn+Pf/PG6/wDCfP8A8TX2lg+tJg+tH9rYf/oGj/XyD2T/AJj4u/4XP8e/+eN1/wCE+f8A4mj/AIXP8e/+eN1/4T5/+Jr7SwfWkwfWj+1sP/0DR/r5B7J/zHxd/wALn+Pf/PG6/wDCfP8A8TR/wuf49/8APG6/8J8//E19pYPrSYPrR/a2H/6Bo/18g9k/5j4u/wCFz/Hv/njdf+E+f/iaP+Fz/Hv/AJ43X/hPn/4mvtLB9aTB9aP7Ww//AEDR/r5B7J/zHxd/wuf49/8APG6/8J8//E0f8Ln+Pf8Azxuv/CfP/wATX2lg+tJg+tH9rYf/AKBo/wBfIPZP+Y+LH+M/x7CkiG5yBx/xT5/+Jr68lee48JNLMCZ5LAs424O4x5PHbntWuQT3pNvPWuDG4unibclJQt26mlNODve58OLpupbR/wAS69/8B3/wpf7N1L/oHXv/AIDv/hX3HtFG0V87/Za/mP0VeINZK3sF97/yPhz+zdS/6B17/wCA7/4Uf2bqX/QOvf8AwHf/AAr7j2ijaKX9lr+Yf/EQq3/Phfe/8j4c/s3Uv+gde/8AgO/+FH9m6l/0Dr3/AMB3/wAK+49oo2ij+y1/MH/EQq3/AD4X3v8AyPhz+zdS/wCgde/+A7/4Uf2bqX/QOvf/AAHf/CvuPaKNoo/stfzB/wARCrf8+F97/wAj4c/s3Uv+gde/+A7/AOFH9m6l/wBA69/8B3/wr7j2ijaKP7LX8wf8RCrf8+F97/yPhz+zdS/6B17/AOA7/wCFH9m6l/0Dr3/wHf8Awr7j2ijaKP7LX8wf8RCrf8+F97/yPhz+zdS/6B17/wCA7/4Uf2bqX/QOvf8AwHf/AAr7j2ijaKP7LX8wf8RCrf8APhfe/wDI+HP7N1L/AKB17/4Dv/hR/Zupf9A69/8AAd/8K+49oo2ij+y1/MH/ABEKt/z4X3v/ACPhz+zdS/6B17/4Dv8A4Uf2bqX/AEDr3/wHf/CvuPaKNoo/stfzB/xEKt/z4X3v/I+HP7N1L/oHXv8A4Dv/AIUf2bqX/QOvf/Ad/wDCvuPaKNoo/stfzB/xEKt/z4X3v/I+HP7N1L/oHXv/AIDv/hR/Zupf9A69/wDAd/8ACvuPaKNoo/stfzB/xEKt/wA+F97/AMj4c/s3Uv8AoHXv/gO/+FH9m6l/0Dr3/wAB3/wr7j2ijaKP7LX8wf8AEQq3/Phfe/8AI+HP7N1L/oHXv/gO/wDhR/Zupf8AQOvf/Ad/8K+49oo2ij+y1/MH/EQq3/Phfe/8j4c/s3Uv+gde/wDgO/8AhR/Zupf9A69/8B3/AMK+49oo2ij+y1/MH/EQq3/Phfe/8j4c/s3Uv+gde/8AgO/+FH9m6l/0Dr3/AMB3/wAK+49oo2ij+y1/MH/EQq3/AD4X3v8AyPhz+zdS/wCgde/+A7/4Uf2bqX/QOvf/AAHf/CvuPaKNoo/stfzB/wARCrf8+F97/wAj4c/s3Uv+gde/+A7/AOFH9m6l/wBA69/8B3/wr7j2ijaKP7LX8wf8RCrf8+F97/yPhz+zdS/6B17/AOA7/wCFH9m6l/0Dr3/wHf8Awr7j2ijaKP7LX8wf8RCrf8+F97/yPhz+zdS/6B17/wCA7/4Uf2bqX/QOvf8AwHf/AAr7j2ijGOlH9lx/mD/iIVb/AJ8L73/kfF1pe+LrSzFnaXGvQW4BAijMyoB7Af0xWadO1NiWbT74knJJgckn8q+49oo2im8tv9tmcOPJQbccPFN9n/wD4c/s3Uv+gde/+A7/AOFH9m6l/wBA69/8B3/wr7j2ijaKX9lr+Y0/4iFW/wCfC+9/5Hw5/Zupf9A69/8AAd/8KP7N1L/oHXv/AIDv/hX3HtFG0Uf2Wv5g/wCIhVv+fC+9/wCR8Of2bqX/AEDr3/wHf/Cj+zdS/wCgde/+A7/4V9x7RRtFH9lr+YP+IhVv+fC+9/5Hw5/Zupf9A69/8B3/AMKP7N1L/oHXv/gO/wDhX3HtFG0Uf2Wv5g/4iFW/58L73/kfDn9m6l/0Dr3/AMB3/wAKP7N1L/oHXv8A4Dv/AIV9x7RRtFH9lr+YP+IhVv8Anwvvf+R8Of2bqX/QOvf/AAHf/Cj+zdS/6B17/wCA7/4V9x7RRtFH9lr+YP8AiIVb/nwvvf8AkfDn9m6l/wBA69/8B3/wo/s3Uv8AoHXv/gO/+Ffce0UbRR/Za/mD/iIVb/nwvvf+R8Of2bqX/QOvf/Ad/wDCj+zdS/6B17/4Dv8A4V9x7RRtFH9lr+YP+IhVv+fC+9/5Hw5/Zupf9A69/wDAd/8ACj+zdS/6B17/AOA7/wCFfce0UbRR/Za/mD/iIVb/AJ8L73/kfDn9m6l/0Dr3/wAB3/wo/s3Uv+gde/8AgO/+Ffce0UbRR/Za/mD/AIiFW/58L73/AJHw5/Zupf8AQOvf/Ad/8KP7N1L/AKB17/4Dv/hX3HtFG0Uf2Wv5g/4iFW/58L73/kfDn9m6l/0Dr3/wHf8Awo/s3Uv+gde/+A7/AOFfce0UbRR/Za/mD/iIVb/nwvvf+R8Of2bqX/QOvf8AwHf/AAo/s3Uv+gde/wDgO/8AhX3HtFG0Uf2Wv5g/4iFW/wCfC+9/5Hw5/Zupf9A69/8AAd/8KP7N1L/oHXv/AIDv/hX3HtFG0Uf2Wv5g/wCIhVv+fC+9/wCR8Of2bqX/AEDr3/wHf/Cj+zdS/wCgde/+A7/4V9x7RRtFH9lr+YP+IhVv+fC+9/5Hw5/Zupf9A69/8B3/AMKP7N1L/oHXv/gO/wDhX3HtFG0Uf2Wv5g/4iFW/58L73/kfDn9m6l/0Dr3/AMB3/wAKP7N1L/oHXv8A4Dv/AIV9x7RRtFH9lr+YP+IhVv8Anwvvf+R8Of2bqX/QOvf/AAHf/Cj+zdS/6B17/wCA7/4V9x7RRtFH9lr+YP8AiIVb/nwvvf8AkfDn9m6l/wBA69/8B3/wpH03Utjf8S696H/l3f0+lfcm0UhUGj+y1f4gfiFW/wCfC+9/5HNaHNPZfDaznjQrPb6SrqHXoyxZGR9R0r5TT9pD4rFFJtdMyQM/8S1//iq+0ttG0eg/KvosDiaWHTVSkp7bn53Xcqs3JO13c+Lv+Gj/AIrf8+2mf+C1/wD4qj/hpD4rf8+umf8Aguf/AOKr7R2j0H5UbR6D8q9D+1cL/wBA0fv/AOAY+zl/MfF3/DSHxW/59dM/8Fr/APxVH/DR/wAVf+fXTP8AwXP/APFV9o7R6D8qNo9B+VL+1cL/ANA0fv8A+AHs5fzHxd/w0h8Vv+fXTP8AwWv/APFUf8NIfFb/AJ9dM/8ABa//AMVX2jtHoPyo2j0H5U/7Vwv/AEDR+/8A4Aezl/MfF/8Aw0h8Vv8An10z/wAFz/8AxVH/AA0h8Vv+fXTP/Bc//wAVX2htHoPyo2j0H5Uf2rhf+gaP3/8AAD2c/wCY+Lv+GkPit/z66Z/4Ln/+Ko/4aQ+K3/Prpn/gtf8A+Kr7R2j0H5UbR6D8qP7Vwv8A0DR+/wD4Aezl/MfF3/DR/wAVf+fXTP8AwXP/APFUf8NH/FX/AJ9dM/8ABa//AMVX2jtHoPyo2j0H5Uv7Uwv/AEDR+/8A4Aezn/MfF3/DR/xW/wCfbTP/AAWv/wDFUf8ADR/xW/59tM/8Fr//ABVfaO0eg/KjaPQflT/tXC/9A0fv/wCAHs5fzHxf/wANIfFX/n10z/wXP/8AFUf8NIfFb/n10z/wXP8A/FV9obR6D8qNo9B+VH9q4X/oGj9//AD2cv5j4u/4aP8Ait/z7aZ/4LX/APiqP+Gj/it/z7aZ/wCC1/8A4qvtHaPQflRtHoPyo/tXC/8AQNH7/wDgB7OX8x8Xf8NIfFb/AJ9dM/8ABa//AMVS/wDDSHxV/wCfXTP/AAXP/wDFV9obR6D8qNo9B+VH9q4X/oGj9/8AwA9nP+Y+Lv8AhpD4rf8APrpn/gtf/wCKpf8AhpD4rf8APrpn/guf/wCKr7Q2j0H5UbR6D8qP7Vwv/QNH7/8AgB7OX8x8Xf8ADR/xW/59tM/8Fr//ABVL/wANIfFb/n10z/wXP/8AFV9obR6D8qNo9B+VL+1cL/0DR+//AIAezn/MfF3/AA0h8Vv+fXTP/Ba//wAVR/w0f8Vf+fXTP/Bc/wD8VX2jtHoPyo2j0H5Uf2phf+gaP3/8APZy/mPi7/ho/wCK3/Prpf8A4LX/APiqD+0f8Vsf8eul/wDgtf8A+Kr7QKgdhRgego/tTC/9A0fv/wCAL2cv5j4c8Q6XH8V9OuvFeh6e1l4wt083WdJWNgl8oxm5twf4v7yfiPfyP6giv0e8deKdK8IaNJqepPzysEK43zP2Vf6nsK+T/H/hiw+I0F54p8J6fHY+JIt02p6ND927TqZ4PVwPvL35I56+llXEdFVfq1XRP4etvL07HS8pxVTDPFQg3Bbs8RooIIOOcj8K634c+CpfFM11f394mk+G9NAk1TVJR8sS/wBxB/FI3ZR9T2z9dWrQowc5PQ8lLm0QfDnwXL4pnur+/vE0nw5pqiTVNUlHyQp1CJ/ekbso/Gu/+H/iu01/47+BdN0LT203w5o9w9vplsx3SFWRy8sh7u55Pp0rh/iN41i1yG28PeHbNtJ8JaaT9hsc/PK3e4mI+9I3J56Zq5+zl/yW/wAK/wDX43/op68rE0qlWhOvV0tF2XbTr5/l0NYtRkooxfi1/wAlS8Vf9he5/wDQzXM10/xb/wCSpeKf+wvc/wDoZrmK9PCfwIei/JGc/iZ1vw88ZyeGnutN1GyGreG9SATU9MkPyyjtIh/glXqG9ua6Ox8RfDvwQ0+seCRq+s6+4I0+XV7VI4tMz1faCfNlA4B6DrXl9SW0EtzOsEKF5HOAB3rDEYOi26k3aPXWyfr/AF5GlJ1JyUYK76Hoek6zLrkUl9cu73TSE3DO2Szn+LPvXReE/EWqeGNbh1bSZzHOnDKeUlTPKMO4/l1FczoOmrplj5O7fIx3yMOhPt7V6V8Jvh5e+NNR86bzLfRoGxcXAGC5/uJ7+p7fWvxHGqlPHz+p/DfQ/oKlWWGyiLzO3w2kv0t3PprwNr8PijwrY65DC0K3UeTG3VGBIYe/INbVVdI0+z0rTLfTtPt1t7W3QJFGvRQKtV7Mb8qvufiFZwdSTpq0bu3p0CiiiqMwooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigBDWN4z1+18M+HLzWrxXeK2TOxBy7E4VR9SQK2jWdr+l2Wt6Rc6VqMImtLlNkieo9vQjqDUyvbTc0o+zVSPtPhur+h8e+NfE+q+Ldck1PVJSWPywwqfkhTsqj+Z7mudu9en8ONFqtnNJDeRODbtGcEP1zn09a7f4n+BNR8E6rskDT6ZMx+y3WPvf7DejD9e1eeeItMOpWIiRtssbbo89CcYx+PrXjYGNL6/D64/dvr/XY/bq1SNXJ5PLEn7vur/gdzU1G9+GvjySLX/EGq3Hg/XCc6rBZ6e08F83Uyw4/1cjdweM8+5574i+NY9ct7Xw94fsm0jwnpp/0GwBy0jd55iPvyN+meK4+aKSCVoZUaN1OGU8YplfttDBUk4zUnJLa7ul6fofz9Uc4ycZKz6iV6D+zl/wAlv8Kf9fjf+inrz+vQP2cv+S3+FP8Ar8b/ANFPWuP/AN1qf4X+RFP40Y/xcH/F1PFX/YXuP/QzXL11Pxd/5Kt4q/7C9x/6GaxvDmiap4j1u20XRbOS8vrp9kUSd/Uk9lHcngCnhpRhhoSk7JRX5CavJlO1gmubhIIELu5wAK7zQdJi0yAnh7hx88mP0HtX0BpX7Oum6Z4CFvDdiTxSR5kt4SfKdsf6kDsg6A9c8n0rnvAvwg8R6rr3k6/ZTaVp0DZnkcjdLj+FMHv/AHvT3r824nznEY6f1bDq1Pv3/wCAfpXBscqwNGWNxM17SPR9F5d2zN+E3w7vvGmpedMJLbR4H/f3AGC5H8Ce/qe31r6o0nTbPStOh07T7eO2tYECRxxjAUf4+9Gj6dZaTp8Gnadbpb2sCbI40GAB/j71crx8Nho0Y+Z4me57WzatzS0gtl/XUB0ooorpPDCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigBDntSYp1FAGZ4h0XT9e0qfTNUtlubWdcMjdvQj0I7GvlT4neBNQ8Fav5b7rjTZm/0W6x1HXY3ow/XqK+vazvEWjafrukz6ZqlutxbTLh1I/Ig9iOxrlxOFjXj59z38g4grZTV0d4PdfqvM+DPEOjJqUPmR4S6QfKx6N/sn/GuFnjkhlaKVCjocMp6g19H+OPhX4l0PXTaabp13q1lM3+jTwx7jg/wv/dPueD1re1v9nFdU8BtL9sWLxaB5sbbv3GMf6hvX/f7H2r2+F88rYOX1bE/w+j7f8A9fjOhlmKoxx2FmvaS6Lr5vs0fKFegfs5f8lv8Kf8AX43/AKKeuJ1fTb/SNUudL1S0ltL22kMc0Mq4ZGHb/A+nNdt+zl/yW/wp/wBfjf8Aop6/RMbJSwlRrVcr/I/N4aTRD460TVfEXxx8QaLo1nJeX91rNwsUSd/n5JPZR1JPSvrz4FfCjSvhxohLeXea5dIPtt7t/wDIcfog/Xqe2Mv4LafYR/Ebx7ex2Nsl0b8KZ1iUSEFmJG7GcEjNevL3r4nNsyqzjHDLSKS+eh2UqaV5C4HpSbR6UtFeAbAAB0ooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAMCjFFFABgelJtHYUtFAHkn7QHwgsfiJpbahp6xWfiS1jxb3BGFuFH/LKQ+no38P0yK+Y/gTpt/pH7Qfh3TNTtJbS9ttQeOaGUYZGEb8H/AB7197HrXhHxTtraL9pf4aXMdvEk8wmEsioAzhVbaCepx2z0r38rzCr7GphZax5ZW8tDCpTXMpH/2Q==" style="width:100%;height:auto;display:block;" alt="Bhavi Electronics"></div>'
     +'<div class="hrow"><div><b style="font-size:16px;">DELIVERY CHALLAN</b><br><span style="font-size:11px;color:#555;">Bhavi Electronics &amp; Automation</span></div>'
@@ -19477,6 +19478,1030 @@ function importFF(){
   inp.click();
 }
 // ===== END PARTS CATALOG + FAULT FINDER =====
+// ===== MODEL GUIDE MODULE =====
+
+// --- State ---
+var _mgBrand='Canon', _mgModel='G3010', _mgTab='parts';
+var _mgParts=[], _mgErrors=[], _mgPanel=[];
+var _mgPartFilter='', _mgPartCat='all', _mgErrFilter='', _mgPanelFilter='';
+var _mgEditPart=null, _mgEditErr=null, _mgEditPanel=null;
+var _mgAllModels=[];
+
+// --- Seed Data: Parts ---
+var _MG_SEED_PARTS=[
+  // Canon G3010
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5414',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board WiFi controller G3010/G3012 common. Board dead hone pe replace karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5413',part_name:'Power Supply Unit (PSU)',category:'PCB & Electronics',notes:'AC to DC power converter. No power aane pe check karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM7-XXXX',part_name:'Panel PCB / Control Board',category:'PCB & Electronics',notes:'LCD aur buttons ki PCB. Button response nahi ho toh check karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5415',part_name:'Carriage PCB / Head Board',category:'PCB & Electronics',notes:'Print head ko signal deti hai. Head communication errors mein relevant.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QY6-8019',part_name:'Print Head (FINE Cartridge)',category:'Print Head & Ink',notes:'Black + Color combined FINE head. E04/E05/E14/E15/P08 errors pe replace karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QY6-8019-000',part_name:'Print Head Assembly',category:'Print Head & Ink',notes:'Complete head assembly. Clogging ya damage pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'GI-790 BK',part_name:'Ink Bottle Black 135ml',category:'Print Head & Ink',notes:'Canon original GI-790 Black ink. Refillable tank system.'},
+  {brand:'Canon',model_name:'G3010',part_no:'GI-790 C/M/Y',part_name:'Ink Bottle Color 70ml each',category:'Print Head & Ink',notes:'Cyan Magenta Yellow 70ml each. E60 error pe refill karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5416',part_name:'Ink Tank Unit (4-color)',category:'Print Head & Ink',notes:'Complete ink reservoir assembly.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5399',part_name:'ASF / Pickup Assembly',category:'Paper Feed',notes:'Auto Sheet Feeder roller unit. G1010/G2010/G3010 common. Paper feed na ho ya E03 frequent aaye toh replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5449',part_name:'Pickup Roller Assembly Alt',category:'Paper Feed',notes:'Alternate pickup assembly, same function.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-4427-000',part_name:'Pickup Unit Original',category:'Paper Feed',notes:'OEM original pickup unit. G2000/G2010/G3010 compatible.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5401',part_name:'Paper Feed Roller',category:'Paper Feed',notes:'Main paper feed roller. Wear hone pe paper slip ya jam hota hai.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai. Misfeeding pe check/replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5403',part_name:'Pinch Roller',category:'Paper Feed',notes:'Paper ko grip karta hai. Squeaking sound aaye toh check.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5404',part_name:'Paper Output Tray',category:'Paper Feed',notes:'Output mein paper receive karta hai. Broken hone pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5405',part_name:'Cassette / Paper Tray',category:'Paper Feed',notes:'Input paper tray. Broken clip ya tray damaged hone pe.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5406',part_name:'Carriage Unit',category:'Carriage & Motor',notes:'Print head ko left-right move karta hai. P02/5100 error mein check karo.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5407',part_name:'Carriage Motor',category:'Carriage & Motor',notes:'Carriage movement motor. Grinding sound ya movement stop pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5408',part_name:'Paper Feed Motor (LF Motor)',category:'Carriage & Motor',notes:'Paper line feed karta hai. Paper movement irregular ho toh check.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5409',part_name:'Timing Belt (Carriage Belt)',category:'Carriage & Motor',notes:'Carriage ko move karne wali belt. Slipping ya noise aaye toh replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5410',part_name:'Carriage Shaft / Guide Rail',category:'Carriage & Motor',notes:'Carriage jis pe slide karta hai. Lubrication zaroori. Binding hone pe clean/lubricate.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5418',part_name:'Purge Unit / Pump Motor',category:'Carriage & Motor',notes:'Ink suction pump. Head cleaning ke time ink absorb karta hai.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5417',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor. Scan quality kharab ho ya E57 aaye toh check/replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5419',part_name:'Scanner Cover / Document Cover',category:'Scanner',notes:'Document cover assembly. Hinge ya cover damage pe.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5420',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface. Scratch ya crack pe replace. Clean regularly.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5421',part_name:'ADF Unit',category:'Scanner',notes:'G3010 mein ADF nahi hai. Flatbed only model.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5422',part_name:'Upper Cover / Top Cover',category:'Frame & Cover',notes:'Printer ka top casing. Physical damage pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5423',part_name:'Lower Case / Bottom Frame',category:'Frame & Cover',notes:'Printer ka base frame. Internal part mount karta hai.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5424',part_name:'Front Cover',category:'Frame & Cover',notes:'Front access cover. Paper input ke saamne.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5425',part_name:'Rear Cover / Access Cover',category:'Frame & Cover',notes:'Paper jam clear karne ke liye rear panel.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5426',part_name:'Inner Cover Assembly',category:'Frame & Cover',notes:'Internal cover jab printer open karte hain.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5411',part_name:'Waste Ink Absorber Main Pad',category:'Maintenance',notes:'Waste ink collect karta hai. P07/5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5412',part_name:'Waste Ink Absorber Sub Pad',category:'Maintenance',notes:'Secondary absorber pad. Main ke saath replace karna better.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5427',part_name:'Cap Unit / Head Cap',category:'Maintenance',notes:'Print head ko cap karta hai jab print nahi ho raha. Drying se bachata hai.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5428',part_name:'Wiper Blade',category:'Maintenance',notes:'Print head surface wipe karta hai cleaning mein. Ink smear hone pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5429',part_name:'Carriage FFC / Flexible Cable',category:'Cables & Sensors',notes:'Print head aur main board ke beech signal cable. Bending se damage hoti hai.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5430',part_name:'Paper End Sensor',category:'Cables & Sensors',notes:'Paper khatam hone pe detect karta hai. E02 false trigger pe check.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5431',part_name:'PE Sensor / Paper Sensor',category:'Cables & Sensors',notes:'Paper entry/exit sensor. Paper detection fail pe replace.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5432',part_name:'Encoder Strip Linear Scale',category:'Cables & Sensors',notes:'Carriage exact position track karta hai. Print alignment kharab ho toh check.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5433',part_name:'Home Position Sensor',category:'Cables & Sensors',notes:'Carriage home position detect karta hai. P02 error mein relevant.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5434',part_name:'Power Cable / AC Cord',category:'Cables & Sensors',notes:'AC power input cable.'},
+  {brand:'Canon',model_name:'G3010',part_no:'QM4-5435',part_name:'USB Cable Assembly',category:'Cables & Sensors',notes:'USB connection cable. Connection issue pe replace.'},
+  // Canon G1010
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5360',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board. No WiFi model. Board dead hone pe replace karo.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5361',part_name:'Power Supply Unit (PSU)',category:'PCB & Electronics',notes:'AC to DC power converter. No power aane pe check karo.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QY6-8019',part_name:'Print Head (FINE Cartridge)',category:'Print Head & Ink',notes:'Black + Color combined FINE head. E04/E05/E14/E15/P08 errors pe replace karo.'},
+  {brand:'Canon',model_name:'G1010',part_no:'GI-790 BK',part_name:'Ink Bottle Black 135ml',category:'Print Head & Ink',notes:'Canon original GI-790 Black ink. Refillable tank system.'},
+  {brand:'Canon',model_name:'G1010',part_no:'GI-790 C/M/Y',part_name:'Ink Bottle Color 70ml each',category:'Print Head & Ink',notes:'Cyan Magenta Yellow 70ml each. E60 error pe refill karo.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5399',part_name:'ASF / Pickup Assembly',category:'Paper Feed',notes:'Auto Sheet Feeder roller unit. G1010/G2010/G3010 common. Paper feed na ho ya E03 aaye toh replace.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5401',part_name:'Paper Feed Roller',category:'Paper Feed',notes:'Main paper feed roller. Wear hone pe paper slip ya jam hota hai.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai. Misfeeding pe check/replace.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5403',part_name:'Pinch Roller',category:'Paper Feed',notes:'Paper ko grip karta hai. Squeaking sound aaye toh check.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5404',part_name:'Paper Output Tray',category:'Paper Feed',notes:'Output mein paper receive karta hai. Broken hone pe replace.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5405',part_name:'Cassette / Paper Tray',category:'Paper Feed',notes:'Input paper tray. Broken clip ya tray damaged hone pe.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5385',part_name:'Timing Belt (Carriage Belt)',category:'Carriage & Motor',notes:'Carriage ko move karne wali belt. Slipping ya noise aaye toh replace.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5380',part_name:'Waste Ink Absorber Main Pad',category:'Maintenance',notes:'Waste ink collect karta hai. P07/5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5429',part_name:'Carriage FFC / Flexible Cable',category:'Cables & Sensors',notes:'Print head aur main board ke beech signal cable.'},
+  {brand:'Canon',model_name:'G1010',part_no:'QM4-5430',part_name:'Paper End Sensor',category:'Cables & Sensors',notes:'Paper khatam hone pe detect karta hai. E02 false trigger pe check.'},
+  // Canon G2010
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5370',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board. G2010 model. No WiFi. Board dead hone pe replace karo.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5413',part_name:'Power Supply Unit (PSU)',category:'PCB & Electronics',notes:'AC to DC power converter. No power aane pe check karo.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QY6-8019',part_name:'Print Head (FINE Cartridge)',category:'Print Head & Ink',notes:'Black + Color combined FINE head. E04/E05/E14/E15/P08 errors pe replace karo.'},
+  {brand:'Canon',model_name:'G2010',part_no:'GI-790 BK',part_name:'Ink Bottle Black 135ml',category:'Print Head & Ink',notes:'Canon original GI-790 Black ink. Refillable tank system.'},
+  {brand:'Canon',model_name:'G2010',part_no:'GI-790 C/M/Y',part_name:'Ink Bottle Color 70ml each',category:'Print Head & Ink',notes:'Cyan Magenta Yellow 70ml each. E60 error pe refill karo.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5399',part_name:'ASF / Pickup Assembly',category:'Paper Feed',notes:'Auto Sheet Feeder roller unit. G1010/G2010/G3010 common.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5401',part_name:'Paper Feed Roller',category:'Paper Feed',notes:'Main paper feed roller.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5403',part_name:'Pinch Roller',category:'Paper Feed',notes:'Paper ko grip karta hai.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5375',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor. Scan quality kharab ho ya E57 aaye toh check/replace.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5376',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface. Scratch ya crack pe replace.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5411',part_name:'Waste Ink Absorber Main Pad',category:'Maintenance',notes:'Waste ink collect karta hai. P07/5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5412',part_name:'Waste Ink Absorber Sub Pad',category:'Maintenance',notes:'Secondary absorber pad. Main ke saath replace karna better.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5409',part_name:'Timing Belt (Carriage Belt)',category:'Carriage & Motor',notes:'Carriage ko move karne wali belt.'},
+  {brand:'Canon',model_name:'G2010',part_no:'QM4-5429',part_name:'Carriage FFC / Flexible Cable',category:'Cables & Sensors',notes:'Print head aur main board ke beech signal cable.'},
+  // Canon G4010
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5390',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board. WiFi+ADF model. G4010 specific board.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5413',part_name:'Power Supply Unit (PSU)',category:'PCB & Electronics',notes:'AC to DC power converter.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QY6-8019',part_name:'Print Head (FINE Cartridge)',category:'Print Head & Ink',notes:'Black + Color combined FINE head. E04/E05/E14/E15/P08 errors pe replace karo.'},
+  {brand:'Canon',model_name:'G4010',part_no:'GI-790 BK',part_name:'Ink Bottle Black 135ml',category:'Print Head & Ink',notes:'Canon original GI-790 Black ink.'},
+  {brand:'Canon',model_name:'G4010',part_no:'GI-790 C/M/Y',part_name:'Ink Bottle Color 70ml each',category:'Print Head & Ink',notes:'Cyan Magenta Yellow 70ml each.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5399',part_name:'ASF / Pickup Assembly',category:'Paper Feed',notes:'Auto Sheet Feeder roller unit.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5401',part_name:'Paper Feed Roller',category:'Paper Feed',notes:'Main paper feed roller.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5395',part_name:'ADF Unit',category:'Scanner',notes:'Automatic Document Feeder. G4010 has ADF for multi-page scan/copy.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5396',part_name:'ADF Roller',category:'Scanner',notes:'ADF paper feed roller. ADF misfeed ya jam pe check/replace.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5417',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor flatbed. Scan quality kharab ho toh check.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5420',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface. Scratch ya crack pe replace.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5411',part_name:'Waste Ink Absorber Main Pad',category:'Maintenance',notes:'P07/5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5412',part_name:'Waste Ink Absorber Sub Pad',category:'Maintenance',notes:'Secondary absorber pad.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5409',part_name:'Timing Belt (Carriage Belt)',category:'Carriage & Motor',notes:'Carriage ko move karne wali belt.'},
+  {brand:'Canon',model_name:'G4010',part_no:'QM4-5429',part_name:'Carriage FFC / Flexible Cable',category:'Cables & Sensors',notes:'Print head aur main board ke beech signal cable.'},
+  // Canon G4011
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5391',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board. WiFi+ADF model. G4011 specific board.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5413',part_name:'Power Supply Unit (PSU)',category:'PCB & Electronics',notes:'AC to DC power converter.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QY6-8019',part_name:'Print Head (FINE Cartridge)',category:'Print Head & Ink',notes:'Black + Color combined FINE head.'},
+  {brand:'Canon',model_name:'G4011',part_no:'GI-790 BK',part_name:'Ink Bottle Black 135ml',category:'Print Head & Ink',notes:'Canon original GI-790 Black ink.'},
+  {brand:'Canon',model_name:'G4011',part_no:'GI-790 C/M/Y',part_name:'Ink Bottle Color 70ml each',category:'Print Head & Ink',notes:'Cyan Magenta Yellow 70ml each.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5399',part_name:'ASF / Pickup Assembly',category:'Paper Feed',notes:'Auto Sheet Feeder roller unit.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5401',part_name:'Paper Feed Roller',category:'Paper Feed',notes:'Main paper feed roller.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5395',part_name:'ADF Unit',category:'Scanner',notes:'Automatic Document Feeder. G4011 has ADF for multi-page scan/copy.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5396',part_name:'ADF Roller',category:'Scanner',notes:'ADF paper feed roller. ADF misfeed ya jam pe check/replace.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5417',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor flatbed.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5420',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5411',part_name:'Waste Ink Absorber Main Pad',category:'Maintenance',notes:'P07/5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5412',part_name:'Waste Ink Absorber Sub Pad',category:'Maintenance',notes:'Secondary absorber pad.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5409',part_name:'Timing Belt (Carriage Belt)',category:'Carriage & Motor',notes:'Carriage ko move karne wali belt.'},
+  {brand:'Canon',model_name:'G4011',part_no:'QM4-5429',part_name:'Carriage FFC / Flexible Cable',category:'Cables & Sensors',notes:'Print head aur main board ke beech signal cable.'},
+  // Canon MG2577S
+  {brand:'Canon',model_name:'MG2577S',part_no:'PG-745',part_name:'Ink Cartridge Black (PG-745)',category:'Print Head & Ink',notes:'Canon PG-745 Black cartridge. Standard yield. Replace when ink out.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'CL-746',part_name:'Ink Cartridge Color (CL-746)',category:'Print Head & Ink',notes:'Canon CL-746 Color (Tri-color) cartridge. Replace when ink out.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'PG-745XL',part_name:'Ink Cartridge Black XL (PG-745XL)',category:'Print Head & Ink',notes:'Canon PG-745XL High yield Black cartridge.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'CL-746XL',part_name:'Ink Cartridge Color XL (CL-746XL)',category:'Print Head & Ink',notes:'Canon CL-746XL High yield Color cartridge.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QK1-4027',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board for MG2577S. Board dead hone pe replace karo.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QC1-4839',part_name:'Pickup Roller Assembly',category:'Paper Feed',notes:'Paper pickup roller. Paper feed na ho ya frequent jam aaye toh replace.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai. Misfeeding pe check/replace.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QM4-5380',part_name:'Waste Ink Absorber Pad',category:'Maintenance',notes:'Waste ink collect karta hai. 5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QM4-5417',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor. Scan quality kharab ho toh check/replace.'},
+  {brand:'Canon',model_name:'MG2577S',part_no:'QM4-5420',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface. Scratch ya crack pe replace.'},
+  // Canon E410
+  {brand:'Canon',model_name:'E410',part_no:'PG-745S',part_name:'Ink Cartridge Black (PG-745S)',category:'Print Head & Ink',notes:'Canon PG-745S Black cartridge for E series. Replace when ink out.'},
+  {brand:'Canon',model_name:'E410',part_no:'CL-746S',part_name:'Ink Cartridge Color (CL-746S)',category:'Print Head & Ink',notes:'Canon CL-746S Color cartridge for E series. Replace when ink out.'},
+  {brand:'Canon',model_name:'E410',part_no:'E410-MB',part_name:'Main Board / Formatter PCB',category:'PCB & Electronics',notes:'Primary logic board for E410. Board dead hone pe replace karo.'},
+  {brand:'Canon',model_name:'E410',part_no:'QC1-4839',part_name:'Pickup Roller Assembly',category:'Paper Feed',notes:'Paper pickup roller. Paper feed na ho ya frequent jam aaye toh replace.'},
+  {brand:'Canon',model_name:'E410',part_no:'QM4-5402',part_name:'Separation Roller/Pad',category:'Paper Feed',notes:'Multiple sheets aane se rokta hai.'},
+  {brand:'Canon',model_name:'E410',part_no:'QM4-5380',part_name:'Waste Ink Absorber Pad',category:'Maintenance',notes:'Waste ink collect karta hai. 5B00 error pe replace + counter reset zaroori.'},
+  {brand:'Canon',model_name:'E410',part_no:'E410-CIS',part_name:'CIS Unit (Scanner Element)',category:'Scanner',notes:'Contact Image Sensor. Scan quality kharab ho toh check/replace.'},
+  {brand:'Canon',model_name:'E410',part_no:'QM4-5420',part_name:'Scanner Glass / Platen Glass',category:'Scanner',notes:'Scanning surface.'}
+];
+
+// --- Seed Data: Errors ---
+var _MG_SEED_ERRORS=[
+  // Canon G3010 E-series
+  {brand:'Canon',model_name:'G3010',error_code:'E02',support_code:'1000,3442-3445',series:'E',cause:'Paper out / no paper loaded',remedy:'Load paper in tray, align paper guides properly, check paper size setting.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E03',support_code:'1300',series:'E',cause:'Paper jam detected',remedy:'Open rear cover, gently remove jammed paper, check for torn pieces, close cover and retry.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E04',support_code:'1470',series:'E',cause:'Print head not installed or not seated',remedy:'Open top cover, reinstall print head firmly until it clicks into place.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E05',support_code:'1403,1430,1471,1476',series:'E',cause:'Print head not recognized / contact issue',remedy:'Clean print head contacts with IPA-dampened lint-free cloth, reinstall. If persists replace print head.',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'E07',support_code:'1474,1475',series:'E',cause:'Wrong print head installed',remedy:'Remove print head and install correct Canon G3010-compatible FINE head (QY6-8019).',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'E08',support_code:'1700,1701',series:'E',cause:'Waste ink absorber almost full (warning)',remedy:'Use Canon Service Tool V4720 to reset waste ink counter. Replace waste ink absorber pad (QM4-5411).',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'E09',support_code:'1890',series:'E',cause:'Protective tape/film not removed from cartridge',remedy:'Open cover, remove all orange protective tape and film from the print head/cartridge holder area.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E11',support_code:'4103',series:'E',cause:'Cannot print with current paper/media settings',remedy:'Change paper size or media type settings in driver. Reset printer driver settings.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E14',support_code:'1473',series:'E',cause:'Print head not recognized',remedy:'Clean print head electrical contacts with IPA, reinstall firmly. If persists replace print head QY6-8019.',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'E15',support_code:'1472',series:'E',cause:'Print head not recognized / contact fault',remedy:'Check and clean electrical contacts on head and carriage. Replace print head if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'E23',support_code:'3446',series:'E',cause:'IP address / subnet conflict on network',remedy:'Check router settings, assign manual IP or enable DHCP. Reset network settings on printer.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E31',support_code:'—',series:'E',cause:'Wireless setup failed',remedy:'Press Black or Color button to clear. Check WiFi security settings (WPA2 recommended). Try different setup method (WPS or manual).',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E32',support_code:'—',series:'E',cause:'Wireless router not found during setup',remedy:'Press Black or Color button to clear. Ensure router is ON. Move printer closer to router. Redo WiFi setup.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E33',support_code:'—',series:'E',cause:'Multiple access points detected during easy setup',remedy:'Press Black or Color button to clear. Wait 2 minutes and redo setup. Select router manually if needed.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E34',support_code:'3440',series:'E',cause:'Easy wireless connect failed',remedy:'Restart router. Redo easy wireless connect procedure. Try manual wireless setup if easy connect fails.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E37',support_code:'—',series:'E',cause:'WiFi setup failed (WPS or security mismatch)',remedy:'Restart router. Check SSID and password. Verify security settings. Move printer closer to router and retry.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E38',support_code:'—',series:'E',cause:'WiFi setup failed (connection timeout)',remedy:'Restart router. Check SSID and password. Verify security settings. Retry setup.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E57',support_code:'2900',series:'E',cause:'Scan alignment sheet reading failed',remedy:'Place alignment sheet correctly on flatbed glass, clean glass surface, redo alignment scan.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E60',support_code:'1640',series:'E',cause:'Ink level low / ink tank empty',remedy:'Refill ink tank with Canon GI-790 ink (BK/C/M/Y as required). Check all four tanks.',severity:'User'},
+  {brand:'Canon',model_name:'G3010',error_code:'E62',support_code:'—',series:'E',cause:'Scan error / unexpected scanner fault',remedy:'Press Black or Color button to clear. Change scan settings and retry. Reinstall scanner driver if persists.',severity:'User'},
+  // Canon G3010 P-series
+  {brand:'Canon',model_name:'G3010',error_code:'P02',support_code:'5100',series:'P',cause:'Carriage blocked or motor fault',remedy:'Power off. Check for foreign objects in carriage path. Move carriage manually to center. Check timing belt (QM4-5409) and carriage motor (QM4-5407). Power on.',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'P07',support_code:'5B00,5B01',series:'P',cause:'Waste ink absorber full',remedy:'Reset counter with Canon Service Tool V4720. Replace waste ink absorber pads (QM4-5411, QM4-5412). Service mode reset: Power off, then hold Power + press Stop 5 times.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P08',support_code:'5200,5205,5206',series:'P',cause:'Print head overheated',remedy:'Power off, wait 30 minutes to cool down, restart. If error persists replace print head QY6-8019. Visit Canon ASC if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G3010',error_code:'P03',support_code:'5011,5012',series:'P',cause:'Internal hardware error (paper feed motor)',remedy:'Power off, unplug for 5 minutes, restart. If unresolved visit Canon Authorized Service Center.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P05',support_code:'5050',series:'P',cause:'Internal hardware error (carriage system)',remedy:'Power off, unplug for 5 minutes, restart. Check for obstructions. Visit Canon ASC if unresolved.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P06',support_code:'5400',series:'P',cause:'Internal hardware error (EEPROM/logic)',remedy:'Power off, unplug for 5 minutes, restart. Visit Canon ASC if unresolved.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P09',support_code:'5700',series:'P',cause:'Internal hardware error',remedy:'Power off, unplug for 5 minutes, restart. Visit Canon ASC if unresolved.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P10',support_code:'B202,B203,B204,B205',series:'P',cause:'Fatal error / logic board failure',remedy:'Power off immediately. Visit Canon ASC. Main board QM4-5414 may need replacement.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P22',support_code:'6000',series:'P',cause:'Internal hardware error (paper output)',remedy:'Power off, unplug for 5 minutes, restart. Visit Canon ASC if unresolved.',severity:'Critical'},
+  {brand:'Canon',model_name:'G3010',error_code:'P29',support_code:'6800,6900-6946',series:'P',cause:'Internal hardware error (system fault)',remedy:'Power off, unplug for 5 minutes, restart. Visit Canon ASC if unresolved.',severity:'Critical'},
+  // Canon G1010 errors (no WiFi errors E31-E38)
+  {brand:'Canon',model_name:'G1010',error_code:'E02',support_code:'1000,3442-3445',series:'E',cause:'Paper out / no paper loaded',remedy:'Load paper in tray, align paper guides properly.',severity:'User'},
+  {brand:'Canon',model_name:'G1010',error_code:'E03',support_code:'1300',series:'E',cause:'Paper jam detected',remedy:'Open rear cover, gently remove jammed paper, check for torn pieces, close cover and retry.',severity:'User'},
+  {brand:'Canon',model_name:'G1010',error_code:'E04',support_code:'1470',series:'E',cause:'Print head not installed or not seated',remedy:'Open top cover, reinstall print head firmly until it clicks.',severity:'User'},
+  {brand:'Canon',model_name:'G1010',error_code:'E05',support_code:'1403,1430,1471,1476',series:'E',cause:'Print head not recognized / contact issue',remedy:'Clean print head contacts with IPA, reinstall. If persists replace print head.',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'E07',support_code:'1474,1475',series:'E',cause:'Wrong print head installed',remedy:'Install correct Canon G1010-compatible FINE head (QY6-8019).',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'E08',support_code:'1700,1701',series:'E',cause:'Waste ink absorber almost full',remedy:'Use Canon Service Tool V4720 to reset waste ink counter. Replace pad (QM4-5380).',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'E09',support_code:'1890',series:'E',cause:'Protective tape not removed',remedy:'Remove all orange protective tape and film from print head/cartridge area.',severity:'User'},
+  {brand:'Canon',model_name:'G1010',error_code:'E14',support_code:'1473',series:'E',cause:'Print head not recognized',remedy:'Clean contacts, reinstall. Replace print head QY6-8019 if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'E15',support_code:'1472',series:'E',cause:'Print head not recognized / contact fault',remedy:'Check and clean electrical contacts. Replace print head if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'E60',support_code:'1640',series:'E',cause:'Ink level low / ink tank empty',remedy:'Refill ink tank with Canon GI-790 ink.',severity:'User'},
+  {brand:'Canon',model_name:'G1010',error_code:'P02',support_code:'5100',series:'P',cause:'Carriage blocked or motor fault',remedy:'Power off. Check for obstructions. Move carriage manually. Check belt and motor. Power on.',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'P07',support_code:'5B00,5B01',series:'P',cause:'Waste ink absorber full',remedy:'Reset counter with Canon Service Tool V4720. Replace pads. Service reset: Power off, hold Power + press Stop 5 times.',severity:'Critical'},
+  {brand:'Canon',model_name:'G1010',error_code:'P08',support_code:'5200,5205,5206',series:'P',cause:'Print head overheated',remedy:'Power off, wait 30 min, restart. Replace print head if persists.',severity:'Service'},
+  {brand:'Canon',model_name:'G1010',error_code:'P10',support_code:'B202,B203,B204,B205',series:'P',cause:'Fatal error / logic board failure',remedy:'Power off immediately. Visit Canon ASC. Main board QM4-5360 may need replacement.',severity:'Critical'},
+  // Canon G2010 errors (no WiFi errors)
+  {brand:'Canon',model_name:'G2010',error_code:'E02',support_code:'1000,3442-3445',series:'E',cause:'Paper out / no paper loaded',remedy:'Load paper in tray, align paper guides properly.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'E03',support_code:'1300',series:'E',cause:'Paper jam detected',remedy:'Open rear cover, gently remove jammed paper, close cover and retry.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'E04',support_code:'1470',series:'E',cause:'Print head not installed or not seated',remedy:'Open top cover, reinstall print head firmly until it clicks.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'E05',support_code:'1403,1430,1471,1476',series:'E',cause:'Print head not recognized / contact issue',remedy:'Clean print head contacts with IPA, reinstall. If persists replace print head.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'E07',support_code:'1474,1475',series:'E',cause:'Wrong print head installed',remedy:'Install correct Canon G2010-compatible FINE head (QY6-8019).',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'E08',support_code:'1700,1701',series:'E',cause:'Waste ink absorber almost full',remedy:'Use Canon Service Tool V4720 to reset waste ink counter. Replace pads.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'E09',support_code:'1890',series:'E',cause:'Protective tape not removed',remedy:'Remove all orange protective tape and film from print head area.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'E14',support_code:'1473',series:'E',cause:'Print head not recognized',remedy:'Clean contacts, reinstall. Replace print head if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'E15',support_code:'1472',series:'E',cause:'Print head not recognized / contact fault',remedy:'Check and clean electrical contacts. Replace print head if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'E57',support_code:'2900',series:'E',cause:'Scan alignment sheet reading failed',remedy:'Place alignment sheet correctly on flatbed glass, clean glass, redo alignment scan.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'E60',support_code:'1640',series:'E',cause:'Ink level low / ink tank empty',remedy:'Refill ink tank with Canon GI-790 ink.',severity:'User'},
+  {brand:'Canon',model_name:'G2010',error_code:'P02',support_code:'5100',series:'P',cause:'Carriage blocked or motor fault',remedy:'Power off. Check for obstructions. Move carriage manually. Check belt and motor. Power on.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'P07',support_code:'5B00,5B01',series:'P',cause:'Waste ink absorber full',remedy:'Reset counter with Canon Service Tool V4720. Replace pads. Service reset: Power off, hold Power + press Stop 5 times.',severity:'Critical'},
+  {brand:'Canon',model_name:'G2010',error_code:'P08',support_code:'5200,5205,5206',series:'P',cause:'Print head overheated',remedy:'Power off, wait 30 min, restart. Replace print head if persists.',severity:'Service'},
+  {brand:'Canon',model_name:'G2010',error_code:'P10',support_code:'B202,B203,B204,B205',series:'P',cause:'Fatal error / logic board failure',remedy:'Power off immediately. Visit Canon ASC. Main board QM4-5370 may need replacement.',severity:'Critical'},
+  // Canon G4010 errors (has WiFi + ADF)
+  {brand:'Canon',model_name:'G4010',error_code:'E02',support_code:'1000,3442-3445',series:'E',cause:'Paper out / no paper loaded',remedy:'Load paper in tray, align paper guides properly.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E03',support_code:'1300',series:'E',cause:'Paper jam detected',remedy:'Open rear cover, gently remove jammed paper, close cover and retry.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E04',support_code:'1470',series:'E',cause:'Print head not installed or not seated',remedy:'Open top cover, reinstall print head firmly until it clicks.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E05',support_code:'1403,1430,1471,1476',series:'E',cause:'Print head not recognized / contact issue',remedy:'Clean print head contacts with IPA, reinstall. If persists replace print head.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'E07',support_code:'1474,1475',series:'E',cause:'Wrong print head installed',remedy:'Install correct Canon G4010-compatible FINE head (QY6-8019).',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'E08',support_code:'1700,1701',series:'E',cause:'Waste ink absorber almost full',remedy:'Use Canon Service Tool V4720 to reset waste ink counter. Replace pads.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'E09',support_code:'1890',series:'E',cause:'Protective tape not removed',remedy:'Remove all orange protective tape and film from print head area.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E14',support_code:'1473',series:'E',cause:'Print head not recognized',remedy:'Clean contacts, reinstall. Replace print head QY6-8019 if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'E15',support_code:'1472',series:'E',cause:'Print head not recognized / contact fault',remedy:'Check and clean electrical contacts. Replace print head if needed.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'E23',support_code:'3446',series:'E',cause:'IP address / subnet conflict on network',remedy:'Check router settings, assign manual IP or enable DHCP. Reset network settings.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E31',support_code:'—',series:'E',cause:'Wireless setup failed',remedy:'Press Black or Color button to clear. Check WiFi security settings. Try different setup method.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E32',support_code:'—',series:'E',cause:'Wireless router not found during setup',remedy:'Ensure router is ON. Move printer closer. Redo WiFi setup.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E33',support_code:'—',series:'E',cause:'Multiple access points detected',remedy:'Wait 2 minutes and redo setup. Select router manually.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E34',support_code:'3440',series:'E',cause:'Easy wireless connect failed',remedy:'Restart router. Redo easy wireless connect. Try manual setup.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E37',support_code:'—',series:'E',cause:'WiFi setup failed (WPS or security mismatch)',remedy:'Restart router. Check SSID and password. Verify security settings.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E38',support_code:'—',series:'E',cause:'WiFi setup failed (connection timeout)',remedy:'Restart router. Check SSID and password. Retry setup.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E57',support_code:'2900',series:'E',cause:'Scan alignment sheet reading failed',remedy:'Place alignment sheet correctly on flatbed glass, clean glass, redo alignment scan.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'E60',support_code:'1640',series:'E',cause:'Ink level low / ink tank empty',remedy:'Refill ink tank with Canon GI-790 ink.',severity:'User'},
+  {brand:'Canon',model_name:'G4010',error_code:'P02',support_code:'5100',series:'P',cause:'Carriage blocked or motor fault',remedy:'Power off. Check for obstructions. Move carriage manually. Check belt and motor. Power on.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'P07',support_code:'5B00,5B01',series:'P',cause:'Waste ink absorber full',remedy:'Reset counter with Canon Service Tool V4720. Replace pads. Service reset: Power off, hold Power + press Stop 5 times.',severity:'Critical'},
+  {brand:'Canon',model_name:'G4010',error_code:'P08',support_code:'5200,5205,5206',series:'P',cause:'Print head overheated',remedy:'Power off, wait 30 min, restart. Replace print head if persists.',severity:'Service'},
+  {brand:'Canon',model_name:'G4010',error_code:'P10',support_code:'B202,B203,B204,B205',series:'P',cause:'Fatal error / logic board failure',remedy:'Power off immediately. Visit Canon ASC. Main board QM4-5390 may need replacement.',severity:'Critical'}
+];
+
+// --- Seed Data: Panel / Operational Notes ---
+var _MG_SEED_PANEL=[
+  // Canon G3010 Operation Panel
+  {brand:'Canon',model_name:'G3010',component:'ON Button',description:'Power on/off button',notes:'Press to turn printer on or off. Hold 3 seconds to force off.'},
+  {brand:'Canon',model_name:'G3010',component:'ON Lamp (LED)',description:'Power indicator lamp',notes:'Lit white when ON. Flashing during operation or error. Off when powered down.'},
+  {brand:'Canon',model_name:'G3010',component:'Network Button',description:'WiFi / network settings button',notes:'Press to initiate wireless LAN connection. Hold 3 seconds to print network info. Long press + Color to reset network settings.'},
+  {brand:'Canon',model_name:'G3010',component:'Direct Button',description:'Wireless Direct mode button',notes:'Press to enable/disable Wireless Direct (printer acts as access point). Direct LED indicates status.'},
+  {brand:'Canon',model_name:'G3010',component:'Information Button',description:'Print network/status information button',notes:'Press to print network status info page. Press during error to print error details.'},
+  {brand:'Canon',model_name:'G3010',component:'Setup Button',description:'Settings and maintenance menu button',notes:'Press to enter setup/maintenance menu on LCD. Navigate with +/- and confirm with OK/Black/Color.'},
+  {brand:'Canon',model_name:'G3010',component:'Alarm Lamp (LED)',description:'Error/alarm indicator',notes:'Lit orange when error occurs. Blink count indicates error code (e.g., 2 blinks = E02). Count blinks to diagnose.'},
+  {brand:'Canon',model_name:'G3010',component:'LCD Display',description:'Liquid crystal display for status and menus',notes:'Shows print count, ink levels, error codes, menu options. Monochrome segment LCD. E-codes and P-codes displayed here.'},
+  {brand:'Canon',model_name:'G3010',component:'Color Button',description:'Start color print / confirm button',notes:'Press to start color print job. Also used to confirm selections in menu. Press to clear some errors.'},
+  {brand:'Canon',model_name:'G3010',component:'Black Button',description:'Start black print / confirm button',notes:'Press to start black & white print job. Also used to confirm selections in menu. Press to clear some errors.'},
+  {brand:'Canon',model_name:'G3010',component:'Stop Button',description:'Cancel / stop current operation',notes:'Press to cancel current print or scan job. Also used in service mode reset: hold Power + press Stop 5 times to reset waste ink counter.'},
+  {brand:'Canon',model_name:'G3010',component:'+ / - Buttons',description:'Navigation / value adjustment buttons',notes:'Used to navigate menus and adjust values (e.g., copy count, print settings). Also used during setup procedures.'},
+  {brand:'Canon',model_name:'G3010',component:'Ink System - GI-790 BK',description:'Black ink tank (front left)',notes:'135ml bottle. Fill when low or E60 error. Use only Canon GI-790 Black. Cap tightly after filling. Do not overfill.'},
+  {brand:'Canon',model_name:'G3010',component:'Ink System - GI-790 C',description:'Cyan ink tank',notes:'70ml bottle. Fill when low. Use only Canon GI-790 Cyan. Check level via tank window.'},
+  {brand:'Canon',model_name:'G3010',component:'Ink System - GI-790 M',description:'Magenta ink tank',notes:'70ml bottle. Fill when low. Use only Canon GI-790 Magenta. Check level via tank window.'},
+  {brand:'Canon',model_name:'G3010',component:'Ink System - GI-790 Y',description:'Yellow ink tank',notes:'70ml bottle. Fill when low. Use only Canon GI-790 Yellow. Check level via tank window.'},
+  {brand:'Canon',model_name:'G3010',component:'Service Mode - Waste Ink Reset',description:'Counter reset procedure for P07/5B00 error',notes:'Step 1: Power OFF the printer. Step 2: Hold Power button. Step 3: While holding Power, press Stop button 5 times. Step 4: Release Power button. Step 5: Printer enters service mode. Step 6: Press Color button to reset waste ink counter. Alternatively use Canon Service Tool V4720 software.'},
+  {brand:'Canon',model_name:'G3010',component:'Service Mode - Print Head Cleaning',description:'Head cleaning via panel',notes:'Setup button > Maintenance > Cleaning. Run 1-3 cycles. If nozzle check still shows gaps run Deep Cleaning. Too many cleanings waste ink - max 3 deep cleans before head replacement.'},
+  {brand:'Canon',model_name:'G3010',component:'Service Mode - Nozzle Check',description:'Print nozzle check pattern',notes:'Setup > Maintenance > Nozzle Check. Print pattern on A4 paper. Check for missing lines or gaps in pattern. Indicates blocked nozzles needing cleaning.'},
+  {brand:'Canon',model_name:'G3010',component:'WiFi Setup - Easy Wireless Connect',description:'Simplified WiFi setup method',notes:'1. Press Network button. 2. Select Easy Wireless Connect on LCD. 3. Open Canon app on phone/PC and follow instructions. 4. App configures WiFi automatically.'},
+  {brand:'Canon',model_name:'G3010',component:'WiFi Setup - WPS Push Button',description:'WPS one-push WiFi setup',notes:'1. Press and hold Network button for 3 seconds until WiFi LED flashes. 2. Press WPS button on router within 2 minutes. 3. Connection established when LED stops flashing.'},
+  // Canon G1010 Panel (simpler - no WiFi, no scanner)
+  {brand:'Canon',model_name:'G1010',component:'ON Button',description:'Power on/off button',notes:'Press to turn printer on or off. Hold 3 seconds to force off.'},
+  {brand:'Canon',model_name:'G1010',component:'ON Lamp (LED)',description:'Power indicator lamp',notes:'Lit white when ON. Flashing during operation or error.'},
+  {brand:'Canon',model_name:'G1010',component:'Alarm Lamp (LED)',description:'Error/alarm indicator',notes:'Lit orange when error occurs. Blink count indicates error code.'},
+  {brand:'Canon',model_name:'G1010',component:'Color Button',description:'Start color print',notes:'Press to start color print job. Also used to confirm selections.'},
+  {brand:'Canon',model_name:'G1010',component:'Black Button',description:'Start black print',notes:'Press to start black & white print job.'},
+  {brand:'Canon',model_name:'G1010',component:'Stop Button',description:'Cancel / stop current operation',notes:'Press to cancel current print job. Hold Power + press Stop 5 times to reset waste ink counter in service mode.'},
+  {brand:'Canon',model_name:'G1010',component:'Ink System - GI-790 BK',description:'Black ink tank (front left)',notes:'135ml bottle. Fill when low or E60 error. Use only Canon GI-790 Black.'},
+  {brand:'Canon',model_name:'G1010',component:'Ink System - GI-790 C/M/Y',description:'Color ink tanks',notes:'70ml bottles each. Fill when low. Use only Canon GI-790 inks.'},
+  {brand:'Canon',model_name:'G1010',component:'Service Mode - Waste Ink Reset',description:'Counter reset for P07/5B00',notes:'Power OFF > Hold Power > Press Stop 5 times > Release Power > Enter service mode > Press Color to reset counter. Or use Canon Service Tool V4720.'},
+  // Canon G4010 Panel (WiFi + ADF + LCD)
+  {brand:'Canon',model_name:'G4010',component:'ON Button',description:'Power on/off button',notes:'Press to turn printer on or off.'},
+  {brand:'Canon',model_name:'G4010',component:'ON Lamp (LED)',description:'Power indicator lamp',notes:'Lit white when ON. Flashing during operation or error.'},
+  {brand:'Canon',model_name:'G4010',component:'Network Button',description:'WiFi / network settings button',notes:'Press for wireless LAN setup. Hold 3 seconds to print network info. Long press + Color to reset network settings.'},
+  {brand:'Canon',model_name:'G4010',component:'Direct Button',description:'Wireless Direct mode button',notes:'Press to enable/disable Wireless Direct mode.'},
+  {brand:'Canon',model_name:'G4010',component:'Setup Button',description:'Settings and maintenance menu',notes:'Press to enter setup/maintenance menu on LCD.'},
+  {brand:'Canon',model_name:'G4010',component:'Alarm Lamp (LED)',description:'Error/alarm indicator',notes:'Lit orange on error. Blink count indicates error code.'},
+  {brand:'Canon',model_name:'G4010',component:'LCD Display',description:'LCD for status and menus',notes:'Shows print count, ink levels, error codes. E-codes and P-codes displayed.'},
+  {brand:'Canon',model_name:'G4010',component:'Color Button',description:'Start color print / confirm',notes:'Start color print. Confirm menu selections. Clear some errors.'},
+  {brand:'Canon',model_name:'G4010',component:'Black Button',description:'Start black print / confirm',notes:'Start black & white print. Confirm menu selections.'},
+  {brand:'Canon',model_name:'G4010',component:'Stop Button',description:'Cancel / stop button',notes:'Cancel current job. Service reset: hold Power + press Stop 5 times.'},
+  {brand:'Canon',model_name:'G4010',component:'ADF (Auto Document Feeder)',description:'Automatic multi-page document feeder',notes:'Load up to 20 sheets in ADF for multi-page copy/scan. Clean ADF rollers if misfeed occurs. Use ADF roller QM4-5396 for replacement.'},
+  {brand:'Canon',model_name:'G4010',component:'Ink System - GI-790 BK',description:'Black ink tank',notes:'135ml bottle. Fill when low. Use only Canon GI-790 Black.'},
+  {brand:'Canon',model_name:'G4010',component:'Ink System - GI-790 C/M/Y',description:'Color ink tanks',notes:'70ml bottles each. Use only Canon GI-790 inks.'},
+  {brand:'Canon',model_name:'G4010',component:'Service Mode - Waste Ink Reset',description:'Counter reset for P07/5B00',notes:'Power OFF > Hold Power > Press Stop 5 times > Release > Press Color to reset. Or use Canon Service Tool V4720.'}
+];
+
+// ===== MODEL GUIDE FUNCTIONS =====
+
+async function renderModelGuide(){
+  document.getElementById('topbar').querySelector('h1').textContent='📖 Model Guide';
+  var pc=document.getElementById('page-content');
+
+  // Load all known models
+  try{
+    var r1=await sb('model_parts','GET',null,'?select=brand,model_name&order=brand,model_name');
+    var r2=await sb('model_errors','GET',null,'?select=brand,model_name&order=brand,model_name');
+    var combined={};
+    (r1||[]).concat(r2||[]).forEach(function(x){combined[x.brand+'|'+x.model_name]={brand:x.brand,model_name:x.model_name};});
+    _mgAllModels=Object.values(combined);
+  }catch(e){_mgAllModels=[];}
+
+  // Merge with seed models
+  var seedModels={};
+  _MG_SEED_PARTS.forEach(function(p){seedModels[p.brand+'|'+p.model_name]={brand:p.brand,model_name:p.model_name};});
+  _MG_SEED_ERRORS.forEach(function(p){seedModels[p.brand+'|'+p.model_name]={brand:p.brand,model_name:p.model_name};});
+  Object.values(seedModels).forEach(function(m){
+    var key=m.brand+'|'+m.model_name;
+    if(!_mgAllModels.find(function(x){return x.brand===m.brand&&x.model_name===m.model_name;})){
+      _mgAllModels.push(m);
+    }
+  });
+
+  _mgRenderShell(pc);
+  await _mgLoadData(_mgBrand,_mgModel);
+}
+
+function _mgRenderShell(pc){
+  var isAdmin=(currentUser&&currentUser.role==='admin');
+  // Build brand list
+  var brands=[...new Set(_mgAllModels.map(function(m){return m.brand;}))].sort();
+  var brandOpts=brands.map(function(b){return '<option value="'+escHtml(b)+'"'+(b===_mgBrand?' selected':'')+'>'+escHtml(b)+'</option>';}).join('');
+
+  // Build model list for current brand
+  var models=_mgAllModels.filter(function(m){return m.brand===_mgBrand;}).map(function(m){return m.model_name;}).sort();
+  var modelOpts=models.map(function(m){return '<option value="'+escHtml(m)+'"'+(m===_mgModel?' selected':'')+'>'+escHtml(m)+'</option>';}).join('');
+
+  pc.innerHTML=
+    '<div id="mg-shell" style="max-width:1200px;">'
+    +'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<label style="font-weight:600;font-size:13px;">Brand:</label>'
+    +'<select id="mg-brand-sel" onchange="_mgOnBrandChange()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;min-width:120px;">'+brandOpts+'</select>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<label style="font-weight:600;font-size:13px;">Model:</label>'
+    +'<select id="mg-model-sel" onchange="_mgOnModelChange()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;min-width:140px;">'+modelOpts+'</select>'
+    +'</div>'
+    +(isAdmin?'<button onclick="_mgSeedAllDefault()" style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">⚡ Seed Default Data</button>':'')
+    +'<div id="mg-status" style="font-size:12px;color:#64748b;"></div>'
+    +'</div>'
+
+    // Tabs
+    +'<div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:16px;">'
+    +'<button id="mg-tab-parts" onclick="_mgSwitchTab(\'parts\')" style="padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;border-bottom:3px solid #7c3aed;margin-bottom:-2px;color:#7c3aed;">🔧 Parts (<span id="mg-parts-count">0</span>)</button>'
+    +'<button id="mg-tab-errors" onclick="_mgSwitchTab(\'errors\')" style="padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;color:#64748b;">⚠️ Errors (<span id="mg-errors-count">0</span>)</button>'
+    +'<button id="mg-tab-panel" onclick="_mgSwitchTab(\'panel\')" style="padding:9px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px;color:#64748b;">🖥️ Panel/Notes</button>'
+    +'</div>'
+
+    // Parts tab
+    +'<div id="mg-tab-content-parts">'
+    +'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+    +'<input id="mg-part-search" type="text" placeholder="Search parts..." oninput="_mgPartSearchChange()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;min-width:200px;flex:1;">'
+    +'<div id="mg-part-cats" style="display:flex;flex-wrap:wrap;gap:4px;"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +(isAdmin?'<button onclick="openAddMGPart(null)" style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">+ Add Part</button>':'')
+    +'<button onclick="downloadMGPartsTemplate()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📄 Template</button>'
+    +(isAdmin?'<button onclick="importMGParts()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📥 Import</button>':'')
+    +'<button onclick="exportMGParts()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📤 Export</button>'
+    +'</div>'
+    +'<div class="table-wrap" style="background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">'
+    +'<table><thead><tr><th style="width:36px;">#</th><th>Part No</th><th>Part Name</th><th>Category</th><th>Notes</th>'+(isAdmin?'<th style="width:90px;">Actions</th>':'')+'</tr></thead>'
+    +'<tbody id="mg-parts-tbody"><tr><td colspan="'+(isAdmin?6:5)+'" style="text-align:center;color:#64748b;padding:24px;">Loading...</td></tr></tbody>'
+    +'</table></div>'
+    +'</div>'
+
+    // Errors tab
+    +'<div id="mg-tab-content-errors" style="display:none;">'
+    +'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+    +'<input id="mg-err-search" type="text" placeholder="Search errors..." oninput="_mgErrSearchChange()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;min-width:200px;flex:1;">'
+    +'<div style="display:flex;gap:4px;">'
+    +'<button onclick="_mgErrSeriesFilter(\'all\')" id="mg-esf-all" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #7c3aed;background:#7c3aed;color:#fff;cursor:pointer;">All</button>'
+    +'<button onclick="_mgErrSeriesFilter(\'E\')" id="mg-esf-E" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #e2e8f0;background:#f1f5f9;color:#374151;cursor:pointer;">E Series</button>'
+    +'<button onclick="_mgErrSeriesFilter(\'P\')" id="mg-esf-P" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #e2e8f0;background:#f1f5f9;color:#374151;cursor:pointer;">P Series</button>'
+    +'<button onclick="_mgErrSeriesFilter(\'B\')" id="mg-esf-B" style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid #e2e8f0;background:#f1f5f9;color:#374151;cursor:pointer;">B Series</button>'
+    +'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +(isAdmin?'<button onclick="openAddMGError(null)" style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">+ Add Error</button>':'')
+    +'<button onclick="downloadMGErrorsTemplate()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📄 Template</button>'
+    +(isAdmin?'<button onclick="importMGErrors()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📥 Import</button>':'')
+    +'<button onclick="exportMGErrors()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📤 Export</button>'
+    +'</div>'
+    +'<div class="table-wrap" style="background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">'
+    +'<table><thead><tr><th>Code</th><th>Support Code</th><th>Series</th><th>Cause</th><th>Remedy</th><th>Severity</th>'+(isAdmin?'<th style="width:90px;">Actions</th>':'')+'</tr></thead>'
+    +'<tbody id="mg-errors-tbody"><tr><td colspan="'+(isAdmin?7:6)+'" style="text-align:center;color:#64748b;padding:24px;">Loading...</td></tr></tbody>'
+    +'</table></div>'
+    +'</div>'
+
+    // Panel tab
+    +'<div id="mg-tab-content-panel" style="display:none;">'
+    +'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+    +'<input id="mg-panel-search" type="text" placeholder="Search panel/notes..." oninput="_mgPanelSearchChange()" style="padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;min-width:200px;flex:1;">'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +(isAdmin?'<button onclick="openAddMGPanel(null)" style="padding:7px 14px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">+ Add Entry</button>':'')
+    +'<button onclick="downloadMGPanelTemplate()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📄 Template</button>'
+    +(isAdmin?'<button onclick="importMGPanel()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📥 Import</button>':'')
+    +'<button onclick="exportMGPanel()" style="padding:7px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">📤 Export</button>'
+    +'</div>'
+    +'<div class="table-wrap" style="background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">'
+    +'<table><thead><tr><th style="width:36px;">#</th><th>Component</th><th>Description</th><th>Notes</th>'+(isAdmin?'<th style="width:90px;">Actions</th>':'')+'</tr></thead>'
+    +'<tbody id="mg-panel-tbody"><tr><td colspan="'+(isAdmin?5:4)+'" style="text-align:center;color:#64748b;padding:24px;">Loading...</td></tr></tbody>'
+    +'</table></div>'
+    +'</div>'
+
+    // Modals container
+    +'<div id="mg-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;">'
+    +'<div id="mg-modal-box" style="background:#fff;border-radius:12px;padding:24px;min-width:340px;max-width:560px;width:90%;max-height:90vh;overflow-y:auto;position:relative;">'
+    +'<div id="mg-modal-content"></div>'
+    +'</div></div>'
+    +'</div>';
+
+  _mgRenderCatPills();
+}
+
+function _mgRenderCatPills(){
+  var cats=['all','PCB & Electronics','Print Head & Ink','Paper Feed','Carriage & Motor','Scanner','Frame & Cover','Maintenance','Cables & Sensors'];
+  var el=document.getElementById('mg-part-cats');
+  if(!el)return;
+  el.innerHTML=cats.map(function(c){
+    var active=c===_mgPartCat;
+    return '<button onclick="_mgCatFilter(\''+escHtml(c)+'\')" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid '+(active?'#7c3aed':'#e2e8f0')+';background:'+(active?'#7c3aed':'#f1f5f9')+';color:'+(active?'#fff':'#374151')+';cursor:pointer;">'+(c==='all'?'All':escHtml(c))+'</button>';
+  }).join('');
+}
+
+function _mgOnBrandChange(){
+  var sel=document.getElementById('mg-brand-sel');
+  if(!sel)return;
+  _mgBrand=sel.value;
+  // Update model dropdown
+  var models=_mgAllModels.filter(function(m){return m.brand===_mgBrand;}).map(function(m){return m.model_name;}).sort();
+  _mgModel=models[0]||'';
+  var msel=document.getElementById('mg-model-sel');
+  if(msel){
+    msel.innerHTML=models.map(function(m){return '<option value="'+escHtml(m)+'"'+(m===_mgModel?' selected':'')+'>'+escHtml(m)+'</option>';}).join('');
+  }
+  _mgLoadData(_mgBrand,_mgModel);
+}
+
+function _mgOnModelChange(){
+  var sel=document.getElementById('mg-model-sel');
+  if(!sel)return;
+  _mgModel=sel.value;
+  _mgLoadData(_mgBrand,_mgModel);
+}
+
+function _mgSwitchTab(tab){
+  _mgTab=tab;
+  ['parts','errors','panel'].forEach(function(t){
+    var btn=document.getElementById('mg-tab-'+t);
+    var content=document.getElementById('mg-tab-content-'+t);
+    if(btn){
+      if(t===tab){
+        btn.style.borderBottomColor='#7c3aed';
+        btn.style.color='#7c3aed';
+      }else{
+        btn.style.borderBottomColor='transparent';
+        btn.style.color='#64748b';
+      }
+    }
+    if(content)content.style.display=(t===tab?'block':'none');
+  });
+}
+
+function _mgPartSearchChange(){
+  var el=document.getElementById('mg-part-search');
+  _mgPartFilter=el?el.value.trim().toLowerCase():'';
+  _mgUpdatePartsTable();
+}
+
+function _mgCatFilter(cat){
+  _mgPartCat=cat;
+  _mgRenderCatPills();
+  _mgUpdatePartsTable();
+}
+
+function _mgErrSearchChange(){
+  var el=document.getElementById('mg-err-search');
+  _mgErrFilter=el?el.value.trim().toLowerCase():'';
+  _mgUpdateErrorsTable();
+}
+
+var _mgErrSeriesActive='all';
+function _mgErrSeriesFilter(s){
+  _mgErrSeriesActive=s;
+  ['all','E','P','B'].forEach(function(x){
+    var btn=document.getElementById('mg-esf-'+x);
+    if(!btn)return;
+    if(x===s){btn.style.background='#7c3aed';btn.style.color='#fff';btn.style.borderColor='#7c3aed';}
+    else{btn.style.background='#f1f5f9';btn.style.color='#374151';btn.style.borderColor='#e2e8f0';}
+  });
+  _mgUpdateErrorsTable();
+}
+
+function _mgPanelSearchChange(){
+  var el=document.getElementById('mg-panel-search');
+  _mgPanelFilter=el?el.value.trim().toLowerCase():'';
+  _mgUpdatePanelTable();
+}
+
+async function _mgLoadData(brand,model){
+  var st=document.getElementById('mg-status');
+  if(st)st.textContent='Loading...';
+  try{
+    var parts=await sb('model_parts','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=category,part_name');
+    var errors=await sb('model_errors','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=series,error_code');
+    var panel=await sb('model_panel','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=component');
+
+    if((!parts||!parts.length)&&(!errors||!errors.length)&&(!panel||!panel.length)){
+      // Auto-seed from constants
+      await _mgSeedModel(brand,model);
+      parts=await sb('model_parts','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=category,part_name');
+      errors=await sb('model_errors','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=series,error_code');
+      panel=await sb('model_panel','GET',null,'?brand=eq.'+encodeURIComponent(brand)+'&model_name=eq.'+encodeURIComponent(model)+'&order=component');
+    }
+
+    _mgParts=parts||[];
+    _mgErrors=errors||[];
+    _mgPanel=panel||[];
+  }catch(e){
+    // Fall back to seed data display
+    _mgParts=_MG_SEED_PARTS.filter(function(p){return p.brand===brand&&p.model_name===model;});
+    _mgErrors=_MG_SEED_ERRORS.filter(function(p){return p.brand===brand&&p.model_name===model;});
+    _mgPanel=_MG_SEED_PANEL.filter(function(p){return p.brand===brand&&p.model_name===model;});
+    if(st)st.textContent='⚠️ Using local data (DB unavailable)';
+  }
+
+  var pc=document.getElementById('mg-parts-count');
+  var ec=document.getElementById('mg-errors-count');
+  if(pc)pc.textContent=_mgParts.length;
+  if(ec)ec.textContent=_mgErrors.length;
+
+  _mgUpdatePartsTable();
+  _mgUpdateErrorsTable();
+  _mgUpdatePanelTable();
+  if(st&&st.textContent==='Loading...')st.textContent='';
+}
+
+async function _mgSeedModel(brand,model){
+  var seedParts=_MG_SEED_PARTS.filter(function(p){return p.brand===brand&&p.model_name===model;});
+  var seedErrors=_MG_SEED_ERRORS.filter(function(p){return p.brand===brand&&p.model_name===model;});
+  var seedPanel=_MG_SEED_PANEL.filter(function(p){return p.brand===brand&&p.model_name===model;});
+
+  for(var i=0;i<seedParts.length;i++){
+    try{await sb('model_parts','POST',{brand:seedParts[i].brand,model_name:seedParts[i].model_name,part_no:seedParts[i].part_no,part_name:seedParts[i].part_name,category:seedParts[i].category,notes:seedParts[i].notes,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+  }
+  for(var i=0;i<seedErrors.length;i++){
+    try{await sb('model_errors','POST',{brand:seedErrors[i].brand,model_name:seedErrors[i].model_name,error_code:seedErrors[i].error_code,support_code:seedErrors[i].support_code,series:seedErrors[i].series,cause:seedErrors[i].cause,remedy:seedErrors[i].remedy,severity:seedErrors[i].severity,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+  }
+  for(var i=0;i<seedPanel.length;i++){
+    try{await sb('model_panel','POST',{brand:seedPanel[i].brand,model_name:seedPanel[i].model_name,component:seedPanel[i].component,description:seedPanel[i].description,notes:seedPanel[i].notes,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+  }
+}
+
+async function _mgSeedAllDefault(){
+  if(!confirm('This will seed ALL default model data (parts, errors, panel notes) for all Canon models into the database.\n\nExisting entries may be duplicated. Continue?'))return;
+  var st=document.getElementById('mg-status');
+  if(st)st.textContent='Seeding all models...';
+
+  var modelKeys={};
+  _MG_SEED_PARTS.forEach(function(p){modelKeys[p.brand+'|'+p.model_name]=true;});
+  _MG_SEED_ERRORS.forEach(function(p){modelKeys[p.brand+'|'+p.model_name]=true;});
+  _MG_SEED_PANEL.forEach(function(p){modelKeys[p.brand+'|'+p.model_name]=true;});
+
+  var keys=Object.keys(modelKeys);
+  var total=0,done=0;
+  _MG_SEED_PARTS.forEach(function(){total++;});
+  _MG_SEED_ERRORS.forEach(function(){total++;});
+  _MG_SEED_PANEL.forEach(function(){total++;});
+
+  for(var ki=0;ki<keys.length;ki++){
+    var parts=keys[ki].split('|');
+    var b=parts[0],m=parts[1];
+    if(st)st.textContent='Seeding '+b+' '+m+'... ('+Math.round(done/total*100)+'%)';
+    var seedParts=_MG_SEED_PARTS.filter(function(p){return p.brand===b&&p.model_name===m;});
+    var seedErrors=_MG_SEED_ERRORS.filter(function(p){return p.brand===b&&p.model_name===m;});
+    var seedPanel=_MG_SEED_PANEL.filter(function(p){return p.brand===b&&p.model_name===m;});
+    for(var i=0;i<seedParts.length;i++){
+      try{await sb('model_parts','POST',{brand:seedParts[i].brand,model_name:seedParts[i].model_name,part_no:seedParts[i].part_no,part_name:seedParts[i].part_name,category:seedParts[i].category,notes:seedParts[i].notes,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+      done++;
+    }
+    for(var i=0;i<seedErrors.length;i++){
+      try{await sb('model_errors','POST',{brand:seedErrors[i].brand,model_name:seedErrors[i].model_name,error_code:seedErrors[i].error_code,support_code:seedErrors[i].support_code,series:seedErrors[i].series,cause:seedErrors[i].cause,remedy:seedErrors[i].remedy,severity:seedErrors[i].severity,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+      done++;
+    }
+    for(var i=0;i<seedPanel.length;i++){
+      try{await sb('model_panel','POST',{brand:seedPanel[i].brand,model_name:seedPanel[i].model_name,component:seedPanel[i].component,description:seedPanel[i].description,notes:seedPanel[i].notes,created_by:currentUser?currentUser.name:'System',created_at:new Date().toISOString()});}catch(e){}
+      done++;
+    }
+  }
+
+  if(st)st.textContent='✅ Seeded '+total+' records across '+keys.length+' models.';
+  await _mgLoadData(_mgBrand,_mgModel);
+}
+
+function _mgUpdatePartsTable(){
+  var tbody=document.getElementById('mg-parts-tbody');
+  if(!tbody)return;
+  var isAdmin=(currentUser&&currentUser.role==='admin');
+  var cols=isAdmin?6:5;
+
+  var filtered=_mgParts.filter(function(p){
+    var matchCat=_mgPartCat==='all'||p.category===_mgPartCat;
+    var matchSearch=!_mgPartFilter||(p.part_no||'').toLowerCase().indexOf(_mgPartFilter)>-1||(p.part_name||'').toLowerCase().indexOf(_mgPartFilter)>-1||(p.notes||'').toLowerCase().indexOf(_mgPartFilter)>-1||(p.category||'').toLowerCase().indexOf(_mgPartFilter)>-1;
+    return matchCat&&matchSearch;
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="'+cols+'" style="text-align:center;color:#64748b;padding:24px;">No parts found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=filtered.map(function(p,i){
+    var catColor={'PCB & Electronics':'#dbeafe','Print Head & Ink':'#fce7f3','Paper Feed':'#d1fae5','Carriage & Motor':'#fef3c7','Scanner':'#e0e7ff','Frame & Cover':'#f3f4f6','Maintenance':'#fee2e2','Cables & Sensors':'#ecfdf5'}[p.category]||'#f3f4f6';
+    return '<tr>'
+      +'<td style="color:#64748b;font-size:12px;">'+(i+1)+'</td>'
+      +'<td style="font-weight:600;font-family:monospace;font-size:12px;color:#1d4ed8;">'+escHtml(p.part_no||'')+'</td>'
+      +'<td style="font-weight:500;">'+escHtml(p.part_name||'')+'</td>'
+      +'<td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;background:'+catColor+';color:#374151;">'+escHtml(p.category||'')+'</span></td>'
+      +'<td style="font-size:12px;color:#374151;max-width:300px;">'+escHtml(p.notes||'')+'</td>'
+      +(isAdmin?'<td><button onclick="openAddMGPart(\''+escHtml(String(p.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:4px;">Edit</button><button onclick="deleteMGPart(\''+escHtml(String(p.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;cursor:pointer;">Del</button></td>':'')
+      +'</tr>';
+  }).join('');
+
+  var pc=document.getElementById('mg-parts-count');
+  if(pc)pc.textContent=_mgParts.length;
+}
+
+function _mgUpdateErrorsTable(){
+  var tbody=document.getElementById('mg-errors-tbody');
+  if(!tbody)return;
+  var isAdmin=(currentUser&&currentUser.role==='admin');
+  var cols=isAdmin?7:6;
+
+  var filtered=_mgErrors.filter(function(e){
+    var matchSeries=_mgErrSeriesActive==='all'||e.series===_mgErrSeriesActive;
+    var matchSearch=!_mgErrFilter||(e.error_code||'').toLowerCase().indexOf(_mgErrFilter)>-1||(e.support_code||'').toLowerCase().indexOf(_mgErrFilter)>-1||(e.cause||'').toLowerCase().indexOf(_mgErrFilter)>-1||(e.remedy||'').toLowerCase().indexOf(_mgErrFilter)>-1;
+    return matchSeries&&matchSearch;
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="'+cols+'" style="text-align:center;color:#64748b;padding:24px;">No errors found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=filtered.map(function(e){
+    var sevColor=e.severity==='Critical'?'#fee2e2':e.severity==='Service'?'#fef3c7':'#d1fae5';
+    var sevText=e.severity==='Critical'?'#dc2626':e.severity==='Service'?'#92400e':'#065f46';
+    var seriesColor=e.series==='P'?'#fee2e2':e.series==='E'?'#dbeafe':'#f3f4f6';
+    var seriesText=e.series==='P'?'#dc2626':e.series==='E'?'#1d4ed8':'#374151';
+    return '<tr>'
+      +'<td style="font-weight:700;font-size:14px;color:#7c3aed;">'+escHtml(e.error_code||'')+'</td>'
+      +'<td style="font-family:monospace;font-size:12px;color:#64748b;">'+escHtml(e.support_code||'')+'</td>'
+      +'<td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:'+seriesColor+';color:'+seriesText+';">'+escHtml(e.series||'')+'</span></td>'
+      +'<td style="font-size:12px;max-width:200px;">'+escHtml(e.cause||'')+'</td>'
+      +'<td style="font-size:12px;max-width:260px;">'+escHtml(e.remedy||'')+'</td>'
+      +'<td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;background:'+sevColor+';color:'+sevText+';">'+escHtml(e.severity||'')+'</span></td>'
+      +(isAdmin?'<td><button onclick="openAddMGError(\''+escHtml(String(e.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:4px;">Edit</button><button onclick="deleteMGError(\''+escHtml(String(e.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;cursor:pointer;">Del</button></td>':'')
+      +'</tr>';
+  }).join('');
+
+  var ec=document.getElementById('mg-errors-count');
+  if(ec)ec.textContent=_mgErrors.length;
+}
+
+function _mgUpdatePanelTable(){
+  var tbody=document.getElementById('mg-panel-tbody');
+  if(!tbody)return;
+  var isAdmin=(currentUser&&currentUser.role==='admin');
+  var cols=isAdmin?5:4;
+
+  var filtered=_mgPanel.filter(function(p){
+    return !_mgPanelFilter||(p.component||'').toLowerCase().indexOf(_mgPanelFilter)>-1||(p.description||'').toLowerCase().indexOf(_mgPanelFilter)>-1||(p.notes||'').toLowerCase().indexOf(_mgPanelFilter)>-1;
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="'+cols+'" style="text-align:center;color:#64748b;padding:24px;">No panel notes found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=filtered.map(function(p,i){
+    return '<tr>'
+      +'<td style="color:#64748b;font-size:12px;">'+(i+1)+'</td>'
+      +'<td style="font-weight:600;color:#1a202c;">'+escHtml(p.component||'')+'</td>'
+      +'<td style="font-size:12px;color:#374151;">'+escHtml(p.description||'')+'</td>'
+      +'<td style="font-size:12px;color:#374151;max-width:320px;white-space:pre-wrap;">'+escHtml(p.notes||'')+'</td>'
+      +(isAdmin?'<td><button onclick="openAddMGPanel(\''+escHtml(String(p.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:4px;">Edit</button><button onclick="deleteMGPanel(\''+escHtml(String(p.id||''))+'\')" style="padding:3px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;cursor:pointer;">Del</button></td>':'')
+      +'</tr>';
+  }).join('');
+}
+
+// ---- Modal helpers ----
+function _mgOpenModal(html){
+  var ov=document.getElementById('mg-modal-overlay');
+  var box=document.getElementById('mg-modal-content');
+  if(!ov||!box)return;
+  box.innerHTML=html;
+  ov.style.display='flex';
+  ov.onclick=function(e){if(e.target===ov)_mgCloseModal();};
+}
+function _mgCloseModal(){
+  var ov=document.getElementById('mg-modal-overlay');
+  if(ov)ov.style.display='none';
+}
+
+// ---- Part CRUD ----
+function openAddMGPart(id){
+  var existing=id?_mgParts.find(function(p){return String(p.id)===String(id);}):null;
+  var cats=['PCB & Electronics','Print Head & Ink','Paper Feed','Carriage & Motor','Scanner','Frame & Cover','Maintenance','Cables & Sensors'];
+  var catOpts=cats.map(function(c){return '<option value="'+escHtml(c)+'"'+(existing&&existing.category===c?' selected':'')+'>'+escHtml(c)+'</option>';}).join('');
+  _mgOpenModal(
+    '<h3 style="margin-bottom:16px;font-size:16px;">'+(existing?'Edit Part':'Add Part')+'</h3>'
+    +'<input id="mgp-id" type="hidden" value="'+(existing?escHtml(String(existing.id)):'')+'">'
+    +'<div style="display:flex;flex-direction:column;gap:12px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Part No *</label>'
+    +'<input id="mgp-no" value="'+(existing?escHtml(existing.part_no||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="e.g. QM4-5414"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Part Name *</label>'
+    +'<input id="mgp-name" value="'+(existing?escHtml(existing.part_name||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="e.g. Main Board"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Category</label>'
+    +'<select id="mgp-cat" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">'+catOpts+'</select></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Notes</label>'
+    +'<textarea id="mgp-notes" rows="3" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;resize:vertical;" placeholder="Notes...">'+(existing?escHtml(existing.notes||''):'')+'</textarea></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    +'<button onclick="_mgCloseModal()" style="padding:8px 16px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>'
+    +'<button onclick="saveMGPart()" style="padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Save</button>'
+    +'</div></div>'
+  );
+}
+
+async function saveMGPart(){
+  var id=document.getElementById('mgp-id').value;
+  var partNo=document.getElementById('mgp-no').value.trim();
+  var partName=document.getElementById('mgp-name').value.trim();
+  var cat=document.getElementById('mgp-cat').value;
+  var notes=document.getElementById('mgp-notes').value.trim();
+  if(!partNo||!partName){alert('Part No and Part Name are required.');return;}
+  var data={brand:_mgBrand,model_name:_mgModel,part_no:partNo,part_name:partName,category:cat,notes:notes,updated_by:currentUser?currentUser.name:'',updated_at:new Date().toISOString()};
+  try{
+    if(id){
+      await sb('model_parts','PATCH',data,'?id=eq.'+id);
+    }else{
+      data.created_by=currentUser?currentUser.name:'';
+      data.created_at=new Date().toISOString();
+      await sb('model_parts','POST',data);
+    }
+    _mgCloseModal();
+    await _mgLoadData(_mgBrand,_mgModel);
+  }catch(e){alert('Error saving part: '+e.message);}
+}
+
+async function deleteMGPart(id){
+  if(!id){alert('Cannot delete: no ID.');return;}
+  if(!confirm('Delete this part?'))return;
+  try{
+    await sb('model_parts','DELETE',null,'?id=eq.'+id);
+    await _mgLoadData(_mgBrand,_mgModel);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Error CRUD ----
+function openAddMGError(id){
+  var existing=id?_mgErrors.find(function(e){return String(e.id)===String(id);}):null;
+  var sevOpts=['User','Service','Critical'].map(function(s){return '<option'+(existing&&existing.severity===s?' selected':'')+'>'+s+'</option>';}).join('');
+  var serOpts=['E','P','B'].map(function(s){return '<option value="'+s+'"'+(existing&&existing.series===s?' selected':'')+'>'+s+'</option>';}).join('');
+  _mgOpenModal(
+    '<h3 style="margin-bottom:16px;font-size:16px;">'+(existing?'Edit Error':'Add Error')+'</h3>'
+    +'<input id="mge-id" type="hidden" value="'+(existing?escHtml(String(existing.id)):'')+'">'
+    +'<div style="display:flex;flex-direction:column;gap:12px;">'
+    +'<div style="display:flex;gap:10px;">'
+    +'<div style="flex:1"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Error Code *</label>'
+    +'<input id="mge-code" value="'+(existing?escHtml(existing.error_code||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="e.g. E02"></div>'
+    +'<div style="flex:1"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Support Code</label>'
+    +'<input id="mge-sup" value="'+(existing?escHtml(existing.support_code||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="e.g. 1300"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<div style="flex:1"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Series</label>'
+    +'<select id="mge-series" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">'+serOpts+'</select></div>'
+    +'<div style="flex:1"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Severity</label>'
+    +'<select id="mge-sev" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">'+sevOpts+'</select></div>'
+    +'</div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Cause *</label>'
+    +'<input id="mge-cause" value="'+(existing?escHtml(existing.cause||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="What causes this error..."></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Remedy *</label>'
+    +'<textarea id="mge-remedy" rows="3" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;resize:vertical;" placeholder="How to fix...">'+(existing?escHtml(existing.remedy||''):'')+'</textarea></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    +'<button onclick="_mgCloseModal()" style="padding:8px 16px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>'
+    +'<button onclick="saveMGError()" style="padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Save</button>'
+    +'</div></div>'
+  );
+}
+
+async function saveMGError(){
+  var id=document.getElementById('mge-id').value;
+  var code=document.getElementById('mge-code').value.trim();
+  var cause=document.getElementById('mge-cause').value.trim();
+  var remedy=document.getElementById('mge-remedy').value.trim();
+  if(!code||!cause||!remedy){alert('Error Code, Cause and Remedy are required.');return;}
+  var data={brand:_mgBrand,model_name:_mgModel,error_code:code,support_code:document.getElementById('mge-sup').value.trim(),series:document.getElementById('mge-series').value,cause:cause,remedy:remedy,severity:document.getElementById('mge-sev').value,updated_by:currentUser?currentUser.name:'',updated_at:new Date().toISOString()};
+  try{
+    if(id){await sb('model_errors','PATCH',data,'?id=eq.'+id);}
+    else{data.created_by=currentUser?currentUser.name:'';data.created_at=new Date().toISOString();await sb('model_errors','POST',data);}
+    _mgCloseModal();
+    await _mgLoadData(_mgBrand,_mgModel);
+  }catch(e){alert('Error saving: '+e.message);}
+}
+
+async function deleteMGError(id){
+  if(!id){alert('Cannot delete: no ID.');return;}
+  if(!confirm('Delete this error entry?'))return;
+  try{await sb('model_errors','DELETE',null,'?id=eq.'+id);await _mgLoadData(_mgBrand,_mgModel);}
+  catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Panel CRUD ----
+function openAddMGPanel(id){
+  var existing=id?_mgPanel.find(function(p){return String(p.id)===String(id);}):null;
+  _mgOpenModal(
+    '<h3 style="margin-bottom:16px;font-size:16px;">'+(existing?'Edit Panel Entry':'Add Panel Entry')+'</h3>'
+    +'<input id="mgpn-id" type="hidden" value="'+(existing?escHtml(String(existing.id)):'')+'">'
+    +'<div style="display:flex;flex-direction:column;gap:12px;">'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Component *</label>'
+    +'<input id="mgpn-comp" value="'+(existing?escHtml(existing.component||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="e.g. ON Button"></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Description</label>'
+    +'<input id="mgpn-desc" value="'+(existing?escHtml(existing.description||''):'')+'" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;" placeholder="Short description..."></div>'
+    +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Notes</label>'
+    +'<textarea id="mgpn-notes" rows="4" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;resize:vertical;" placeholder="Detailed notes...">'+(existing?escHtml(existing.notes||''):'')+'</textarea></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    +'<button onclick="_mgCloseModal()" style="padding:8px 16px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:13px;">Cancel</button>'
+    +'<button onclick="saveMGPanel()" style="padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Save</button>'
+    +'</div></div>'
+  );
+}
+
+async function saveMGPanel(){
+  var id=document.getElementById('mgpn-id').value;
+  var comp=document.getElementById('mgpn-comp').value.trim();
+  if(!comp){alert('Component is required.');return;}
+  var data={brand:_mgBrand,model_name:_mgModel,component:comp,description:document.getElementById('mgpn-desc').value.trim(),notes:document.getElementById('mgpn-notes').value.trim(),updated_by:currentUser?currentUser.name:'',updated_at:new Date().toISOString()};
+  try{
+    if(id){await sb('model_panel','PATCH',data,'?id=eq.'+id);}
+    else{data.created_by=currentUser?currentUser.name:'';data.created_at=new Date().toISOString();await sb('model_panel','POST',data);}
+    _mgCloseModal();
+    await _mgLoadData(_mgBrand,_mgModel);
+  }catch(e){alert('Error saving: '+e.message);}
+}
+
+async function deleteMGPanel(id){
+  if(!id){alert('Cannot delete: no ID.');return;}
+  if(!confirm('Delete this panel entry?'))return;
+  try{await sb('model_panel','DELETE',null,'?id=eq.'+id);await _mgLoadData(_mgBrand,_mgModel);}
+  catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Import/Export: Parts ----
+function exportMGParts(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var rows=[['Part No','Part Name','Category','Notes']];
+  _mgParts.forEach(function(p){rows.push([p.part_no||'',p.part_name||'',p.category||'',p.notes||'']);});
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:18},{wch:30},{wch:22},{wch:50}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Parts');
+  XLSX.writeFile(wb,(_mgBrand+'_'+_mgModel+'_parts.xlsx').replace(/\s+/g,'_'));
+}
+
+function downloadMGPartsTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Part No','Part Name','Category','Notes'],
+    ['QM4-5414','Main Board / Formatter PCB','PCB & Electronics','Primary logic board. Replace on board dead error.'],
+    ['QY6-8019','Print Head','Print Head & Ink','FINE cartridge. Replace on E04/E05 errors.']
+  ]);
+  ws['!cols']=[{wch:18},{wch:30},{wch:22},{wch:50}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Parts Template');
+  XLSX.writeFile(wb,'model_parts_template.xlsx');
+}
+
+function importMGParts(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){alert('No data in file');return;}
+        var ok=0,fail=0;
+        for(var i=0;i<rows.length;i++){
+          var r=rows[i];
+          var pno=String(r['Part No']||r.part_no||'').trim();
+          var pname=String(r['Part Name']||r.part_name||'').trim();
+          if(!pno||!pname){fail++;continue;}
+          try{
+            await sb('model_parts','POST',{brand:_mgBrand,model_name:_mgModel,part_no:pno,part_name:pname,category:String(r.Category||r.category||'').trim(),notes:String(r.Notes||r.notes||'').trim(),created_by:currentUser?currentUser.name:'Import',created_at:new Date().toISOString()});
+            ok++;
+          }catch(ex){fail++;}
+        }
+        alert('Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
+        await _mgLoadData(_mgBrand,_mgModel);
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+
+// ---- Import/Export: Errors ----
+function exportMGErrors(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var rows=[['Error Code','Support Code','Series','Cause','Remedy','Severity']];
+  _mgErrors.forEach(function(e){rows.push([e.error_code||'',e.support_code||'',e.series||'',e.cause||'',e.remedy||'',e.severity||'']);});
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:18},{wch:8},{wch:30},{wch:50},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Errors');
+  XLSX.writeFile(wb,(_mgBrand+'_'+_mgModel+'_errors.xlsx').replace(/\s+/g,'_'));
+}
+
+function downloadMGErrorsTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Error Code','Support Code','Series','Cause','Remedy','Severity'],
+    ['E02','1000,3442-3445','E','Paper out / no paper loaded','Load paper in tray, align guides.','User'],
+    ['P07','5B00,5B01','P','Waste ink absorber full','Reset counter with Service Tool V4720. Replace pad.','Critical']
+  ]);
+  ws['!cols']=[{wch:12},{wch:18},{wch:8},{wch:30},{wch:50},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Errors Template');
+  XLSX.writeFile(wb,'model_errors_template.xlsx');
+}
+
+function importMGErrors(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){alert('No data in file');return;}
+        var ok=0,fail=0;
+        for(var i=0;i<rows.length;i++){
+          var r=rows[i];
+          var code=String(r['Error Code']||r.error_code||'').trim();
+          var cause=String(r.Cause||r.cause||'').trim();
+          if(!code||!cause){fail++;continue;}
+          try{
+            await sb('model_errors','POST',{brand:_mgBrand,model_name:_mgModel,error_code:code,support_code:String(r['Support Code']||r.support_code||'').trim(),series:String(r.Series||r.series||'E').trim(),cause:cause,remedy:String(r.Remedy||r.remedy||'').trim(),severity:String(r.Severity||r.severity||'User').trim(),created_by:currentUser?currentUser.name:'Import',created_at:new Date().toISOString()});
+            ok++;
+          }catch(ex){fail++;}
+        }
+        alert('Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
+        await _mgLoadData(_mgBrand,_mgModel);
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+
+// ---- Import/Export: Panel ----
+function exportMGPanel(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var rows=[['Component','Description','Notes']];
+  _mgPanel.forEach(function(p){rows.push([p.component||'',p.description||'',p.notes||'']);});
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:30},{wch:60}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Panel Notes');
+  XLSX.writeFile(wb,(_mgBrand+'_'+_mgModel+'_panel.xlsx').replace(/\s+/g,'_'));
+}
+
+function downloadMGPanelTemplate(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var ws=XLSX.utils.aoa_to_sheet([
+    ['Component','Description','Notes'],
+    ['ON Button','Power on/off button','Press to turn printer on or off. Hold 3 seconds to force off.'],
+    ['Alarm Lamp (LED)','Error/alarm indicator','Blink count indicates error code. Count blinks to diagnose.']
+  ]);
+  ws['!cols']=[{wch:28},{wch:30},{wch:60}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Panel Template');
+  XLSX.writeFile(wb,'model_panel_template.xlsx');
+}
+
+function importMGPanel(){
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded');return;}
+  var inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=async function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=async function(ev){
+      try{
+        var wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length){alert('No data in file');return;}
+        var ok=0,fail=0;
+        for(var i=0;i<rows.length;i++){
+          var r=rows[i];
+          var comp=String(r.Component||r.component||'').trim();
+          if(!comp){fail++;continue;}
+          try{
+            await sb('model_panel','POST',{brand:_mgBrand,model_name:_mgModel,component:comp,description:String(r.Description||r.description||'').trim(),notes:String(r.Notes||r.notes||'').trim(),created_by:currentUser?currentUser.name:'Import',created_at:new Date().toISOString()});
+            ok++;
+          }catch(ex){fail++;}
+        }
+        alert('Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
+        await _mgLoadData(_mgBrand,_mgModel);
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+
+// ===== END MODEL GUIDE MODULE =====
+
 </script>
 </body>
 </html>
