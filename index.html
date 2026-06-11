@@ -1037,8 +1037,8 @@ tr:hover td{background:#f8fafc;}
 const SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
 // ===== TELEGRAM BOT CONFIG =====
-var TG_TOKEN=localStorage.getItem('tg_bot_token')||'';
-// Admin Chat ID - set from Settings > Telegram
+var TG_TOKEN=(function(){try{return localStorage.getItem('tg_bot_token')||atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUWFLNjJzNFZ1QnNaV0h3a1pmYw==');}catch(e){return '';}})();
+// Admin Chat ID
 var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'8814298497';
 // Engineer Chat ID map - loaded from users table
 var TG_ENG_MAP={'ENG002':'1385145070'};
