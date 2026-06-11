@@ -10568,8 +10568,10 @@ async function downloadWeeklyExcel(){
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
+document.addEventListener('mousedown',function(e){window._mdInsideModal=!!(e.target&&e.target.closest&&e.target.closest('.modal'));});
 function closeModal(id){
-  if(window._mdInsideModal)return;document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
+  if(window._mdInsideModal)return;
+  document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
 function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
 // Fix: dragging text inside modal must not close it
 (function(){var _dn=null;document.addEventListener('mousedown',function(e){_dn=e.target;});document.addEventListener('click',function(e){if(_dn!==e.target&&e.target.classList&&e.target.classList.contains('modal-overlay')){e.stopImmediatePropagation();}},true);})();
@@ -14456,6 +14458,7 @@ async function openAddVisitModal(siteId,siteName){
     +'</div>'
     +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Describe the work done..."></textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'av-work-'+siteId+'\')">✨ AI Remark</button></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>📷 Photos <small style="color:var(--text-muted);font-weight:400;">(optional, max 4)</small></label><input type="file" id="av-photos-'+siteId+'" accept="image/*" multiple style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;" onchange="previewVisitPhotos(this,'av-photo-preview-'+siteId+'')"><div id="av-photo-preview-'+siteId+'" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div></div>'
     +'<hr class="divider">'
     +'<h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">📦 Material Delivered</h3>'
     +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Site items — Purchase & Selling price will be auto-filled, just enter Qty</p>'
@@ -16089,6 +16092,9 @@ function skipDCSig(id,btn){
 
 // ── INQUIRIES MODULE ──
 // ─── INQUIRY HELPERS ────────────────────────────────────────────────────────
+
+function _toggleOtherInqType(sel,otherId){var ot=document.getElementById(otherId);if(ot)ot.style.display=sel.value==='Other'?'block':'none';}
+function _getInqGPS(){if(!navigator.geolocation){alert('GPS not available');return;}var el=document.getElementById('inq-location');if(el)el.value='Getting...';navigator.geolocation.getCurrentPosition(function(p){if(el)el.value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);},function(){if(el)el.value='';alert('Could not get location');});}
 function _inqEngOptions(selectedId){
   var engs=window._inqEngList||window.allEngineers||[];
   if(!engs.length&&window._allUsers){engs=window._allUsers.filter(function(u){return u.role==='engineer';});}
@@ -16257,6 +16263,7 @@ function openInquiryDetail(id){
     +'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Status</div><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;">'+inq.status+'</span></div>'
     +'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Type</div><div style="font-size:13px;font-weight:600;">🔖 '+(inq.inquiry_type||'—')+'</div></div>'
 +(inq.location?'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Location</div><div style="font-size:13px;font-weight:600;"><a href="https://maps.google.com/?q='+escQ(inq.location)+'" target="_blank" style="color:#2563eb;">📍 Open in Maps</a></div></div>':'')
++(inq.location?'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Location</div><div style="font-size:13px;font-weight:600;"><a href="https://maps.google.com/?q='+escQ(inq.location)+'" target="_blank" style="color:#2563eb;">📍 Open in Maps</a></div></div>':'')
     +(inq.address?'<div style="background:#f8fafc;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Address</div><div style="font-size:13px;">📍 '+escQ(inq.address)+'</div></div>':'')
     +(inq.followup_date?'<div style="background:#fffbeb;border:1px solid #fde68a;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:#92400e;text-transform:uppercase;font-weight:700;margin-bottom:3px;">Followup Date</div><div style="font-size:13px;font-weight:600;color:#92400e;">📅 '+new Date(inq.followup_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+'</div></div>':'')
     +(inq.description?'<div style="background:#f8fafc;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Description</div><div style="font-size:13px;">'+escQ(inq.description)+'</div></div>':'')
@@ -16288,9 +16295,9 @@ async function openAddInquiryModal(){
     +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('inq-mobile','Mobile number','','tel')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('inq-address','Address')+'</div>'
-+'<div class="form-group" style="margin-bottom:10px;"><label>📍 Location <small style="color:var(--text-muted);font-weight:400;">(optional)</small></label><div style="display:flex;gap:8px;align-items:center;"><input type="text" id="inq-location" placeholder="Lat, Lng or address..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" readonly><button type="button" class="btn btn-outline btn-sm" onclick="(function(){if(!navigator.geolocation){alert('GPS not available');return;}document.getElementById('inq-location').value='Getting...';navigator.geolocation.getCurrentPosition(function(p){document.getElementById('inq-location').value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);},function(){document.getElementById('inq-location').value='';alert('Could not get location');});})()">📍 Get GPS</button></div></div>'
++'<div class="form-group" style="margin-bottom:10px;"><label>📍 Location <small style="color:var(--text-muted);font-weight:400;">(optional)</small></label><div style="display:flex;gap:8px;align-items:center;"><input type="text" id="inq-location" placeholder="Lat, Lng or address..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" readonly><button type="button" class="btn btn-outline btn-sm" onclick="_getInqGPS()">📍 Get GPS</button></div></div>'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" onchange="var ot=document.getElementById('inq-type-other');if(ot)ot.style.display=this.value==='Other'?'block':'none';" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select><input type="text" id="inq-type-other" placeholder="Type here..." style="display:none;margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
+    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" onchange="_toggleOtherInqType(this,\'inq-type-other\')" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select><input type="text" id="inq-type-other" placeholder="Type here..." style="display:none;margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
     +'<div class="form-group"><label>📅 Followup Date</label>'+inp('inq-followup','','','date')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea>'
@@ -16343,7 +16350,7 @@ async function openEditInquiryModal(id){
     +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('einq-mobile','Mobile number',inq.mobile,'tel')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('einq-address','Address',inq.address)+'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" onchange="var ot=document.getElementById('einq-type-other');if(ot)ot.style.display=this.value==='Other'?'block':'none';" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select><input type="text" id="einq-type-other" placeholder="Type here..." style="display:'+(types.includes(inq.inquiry_type||'')?'none':'block')+';margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" value="'+(types.includes(inq.inquiry_type||'')?'':(inq.inquiry_type||'')):''+'"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" onchange="_toggleOtherInqType(this,\'einq-type-other\')" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select><input type="text" id="einq-type-other" placeholder="Type here..." style="display:'+(types.includes(inq.inquiry_type||'')?'none':'block')+';margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" value="'+(types.includes(inq.inquiry_type||'')?'':(inq.inquiry_type||'')):''+'"></div>'
     +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'einq-desc\')">✨ AI Remark</button></div>'
     +'<div class="form-group" style="margin-top:10px;"><label>👷 Assign to Engineer <small style="color:var(--text-muted);">(optional)</small></label><select id="einq-assign" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Unassigned --</option>'+_inqEngOptions(inq.assigned_to)+'</select></div>'
@@ -16411,6 +16418,11 @@ function openUpdateInquiryModal(id){
     +'<div class="form-group"><label>Status</label><select id="updinq-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'
     +'<option value="Open"'+(inq.status==='Open'?' selected':'')+'>Open</option>'
     +'<option value="In Progress"'+(inq.status==='In Progress'?' selected':'')+'>In Progress</option>'
+    +'<option value="Pending - Customer Call"'+(inq.status==='Pending - Customer Call'?' selected':'')+'>📞 Pending - Customer Call</option>'
+    +'<option value="Pending - Quotation"'+(inq.status==='Pending - Quotation'?' selected':'')+'>📋 Pending - Quotation</option>'
+    +'<option value="Pending - Customer Side"'+(inq.status==='Pending - Customer Side'?' selected':'')+'>⏳ Pending - Customer Side</option>'
+    +'<option value="Site Visit Scheduled"'+(inq.status==='Site Visit Scheduled'?' selected':'')+'>📅 Site Visit Scheduled</option>'
+    +'<option value="Demo Scheduled"'+(inq.status==='Demo Scheduled'?' selected':'')+'>🎯 Demo Scheduled</option>'
     +'<option value="Converted"'+(inq.status==='Converted'?' selected':'')+'>✅ Converted (Won)</option>'
     +'<option value="Lost"'+(inq.status==='Lost'?' selected':'')+'>❌ Lost</option>'
     +'</select></div>'
@@ -18972,6 +18984,18 @@ function previewVisitPhotos(input,previewId){
     };
     reader.readAsDataURL(file);
   });
+}
+async function _readPhotosBase64(inputId){
+  var input=document.getElementById(inputId);
+  if(!input||!input.files||!input.files.length)return[];
+  var files=Array.from(input.files).slice(0,4);
+  return Promise.all(files.map(function(file){
+    return new Promise(function(resolve){
+      var reader=new FileReader();
+      reader.onload=function(e){resolve(e.target.result);};
+      reader.readAsDataURL(file);
+    });
+  }));
 }
 async function _readPhotosBase64(inputId){
   var input=document.getElementById(inputId);
