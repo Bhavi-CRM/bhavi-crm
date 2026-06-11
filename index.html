@@ -10568,7 +10568,8 @@ async function downloadWeeklyExcel(){
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
-function closeModal(id){document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
+function closeModal(id){
+  if(window._mdInsideModal)return;document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
 function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
 // Fix: dragging text inside modal must not close it
 (function(){var _dn=null;document.addEventListener('mousedown',function(e){_dn=e.target;});document.addEventListener('click',function(e){if(_dn!==e.target&&e.target.classList&&e.target.classList.contains('modal-overlay')){e.stopImmediatePropagation();}},true);})();
@@ -11747,14 +11748,16 @@ async function loadWalkInReport(){
 
     var totalProducts=logs.reduce(function(a,l){return a+(l.product_count||0);},0);
     // Inward/Outward breakdown from products array
-    var inwardCusts=0,inwardProds=0,outwardCusts=0,outwardProds=0;
+    var inwardCusts=0,inwardProds=0,outwardCusts=0,outwardProds=0,otherCusts=0,otherProds=0;
     logs.forEach(function(l){
       var prods=l.products||[];
       if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
       var inProd=prods.filter(function(p){return(p.type||'Inward')==='Inward';});
       var outProd=prods.filter(function(p){return p.type==='Outward';});
+      var otherProd=prods.filter(function(p){return p.type!=='Inward'&&p.type!=='Outward';});
       if(inProd.length){inwardCusts++;inwardProds+=inProd.length;}
       if(outProd.length){outwardCusts++;outwardProds+=outProd.length;}
+      if(otherProd.length){otherCusts++;otherProds+=otherProd.length;}
     });
     var mkCard=function(bg,bc,tc,sub,icon,val){
       return '<div class="kpi-card" style="padding:14px 10px;border-color:'+bc+';background:'+bg+';min-width:0;">'
@@ -11762,13 +11765,19 @@ async function loadWalkInReport(){
         +'<div style="font-size:44px;font-weight:800;color:'+tc+';line-height:1;">'+val+'</div>'
         +'</div>';
     };
-    var html='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px;">'
+    var totalCusts=inwardCusts+outwardCusts+otherCusts;
+    var allProds=inwardProds+outwardProds+otherProds;
+    var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">'
       +mkCard('linear-gradient(135deg,#eff6ff,#fff)','#1d4ed8','#1d4ed8','Inward Customers','📥',inwardCusts)
       +mkCard('linear-gradient(135deg,#dbeafe,#fff)','#3b82f6','#1d4ed8','Inward Products','📥',inwardProds)
       +mkCard('linear-gradient(135deg,#ecfdf5,#fff)','#059669','#059669','Outward Customers','📤',outwardCusts)
       +mkCard('linear-gradient(135deg,#d1fae5,#fff)','#10b981','#047857','Outward Products','📤',outwardProds)
-      +mkCard('linear-gradient(135deg,#f5f3ff,#fff)','#7c3aed','#7c3aed','Total Customers','📊',logs.length)
-      +mkCard('linear-gradient(135deg,#ede9fe,#fff)','#a855f7','#9333ea','Total Products','📊',totalProducts)
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">'
+      +mkCard('linear-gradient(135deg,#fef9c3,#fff)','#ca8a04','#92400e','Other Customers','📦',otherCusts)
+      +mkCard('linear-gradient(135deg,#fef3c7,#fff)','#f59e0b','#78350f','Other Products','📦',otherProds)
+      +mkCard('linear-gradient(135deg,#f5f3ff,#fff)','#7c3aed','#7c3aed','Total Customers','📊',totalCusts)
+      +mkCard('linear-gradient(135deg,#ede9fe,#fff)','#a855f7','#9333ea','Total Products','📊',allProds)
       +'</div>';
 
     // Group by date
@@ -14417,6 +14426,7 @@ async function openSiteVisitModal(){
       +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done..."></textarea>'
       +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'qv-work\')">✨ AI Remark</button></div>'
       +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable..."></textarea></div>'
++'<div class="form-group" style="margin-top:10px;"><label>📷 Photos <small style="color:var(--text-muted);">(optional)</small></label><input type="file" id="qv-photos" accept="image/*" multiple style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;" onchange="previewVisitPhotos(this,'qv-photo-preview')"><div id="qv-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div></div>'
       +'</div>'
       +'<div class="modal-footer">'
       +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">Cancel</button>'
@@ -16107,9 +16117,9 @@ async function showInqReport(){
     if(!engMap[key])engMap[key]={name:key,total:0,open:0,inProgress:0,converted:0,lost:0};
     engMap[key].total++;
     if(inq.status==='Open')engMap[key].open++;
-    else if(inq.status==='In Progress')engMap[key].inProgress++;
     else if(inq.status==='Converted')engMap[key].converted++;
     else if(inq.status==='Lost')engMap[key].lost++;
+    else engMap[key].inProgress++;
   });
   var rows=Object.values(engMap).sort(function(a,b){return b.converted-a.converted;});
   var existing=document.getElementById('modal-inq-report');if(existing)existing.remove();
@@ -16176,7 +16186,7 @@ async function renderInquiries(){
     html+='<div class="filter-bar" style="margin-bottom:14px;">'
       +'<input type="text" id="inq-search" placeholder="Search name / mobile..." style="flex:1;min-width:180px;" oninput="filterInquiryList()">'
       +'<select id="inq-status-filter" onchange="filterInquiryList()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
-      +'<option value="">All Status</option><option value="Open">Open</option><option value="In Progress">In Progress</option><option value="Converted">Converted</option><option value="Lost">Lost</option>'
+      +'<option value="">All Status</option><option value="Open">Open</option><option value="In Progress">In Progress</option><option value="Pending - Customer Call">Pending - Customer Call</option><option value="Pending - Quotation">Pending - Quotation</option><option value="Pending - Customer Side">Pending - Customer Side</option><option value="Site Visit Scheduled">Site Visit Scheduled</option><option value="Demo Scheduled">Demo Scheduled</option><option value="Converted">Converted ✅</option><option value="Lost">Lost ❌</option>'
       +'</select></div>';
     if(!inqs.length){
       html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🔍 No inquiries found. Click "New Inquiry" to add one!</div>';
@@ -16185,7 +16195,7 @@ async function renderInquiries(){
       inqs.forEach(function(inq){
         var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
         var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
-        var statusColor={Open:'#2563eb','In Progress':'#d97706',Converted:'#059669',Lost:'#6b7280'}[inq.status]||'#6b7280';
+        var statusColor={'Open':'#2563eb','In Progress':'#d97706','Pending - Customer Call':'#7c3aed','Pending - Quotation':'#0369a1','Pending - Customer Side':'#b45309','Site Visit Scheduled':'#0891b2','Demo Scheduled':'#9333ea','Converted':'#059669','Lost':'#6b7280'}[inq.status]||'#6b7280';
         html+='<div class="card" style="margin-bottom:10px;border-left:4px solid '+statusColor+';'+(isFollowup?'background:#fffbeb;':'')+(isPast?'background:#fff1f2;':'')+'"'
           +' data-name="'+(inq.customer_name||'').toLowerCase()+'" data-mobile="'+(inq.mobile||'').toLowerCase()+'" data-status="'+(inq.status||'')+'">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
@@ -16197,7 +16207,7 @@ async function renderInquiries(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +(inq.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(inq.assigned_name)+'</span>':'')
+          +(inq.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(inq.assigned_name)+'</span>':(inq.created_by_name?'<span style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 9px;border-radius:99px;font-weight:600;">👤 '+escHtml(inq.created_by_name)+'</span>':''))
           +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
           +(isAdm?'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>':'')
           +(isAdm?'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>':'')
@@ -16246,6 +16256,7 @@ function openInquiryDetail(id){
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
     +'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Status</div><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;">'+inq.status+'</span></div>'
     +'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Type</div><div style="font-size:13px;font-weight:600;">🔖 '+(inq.inquiry_type||'—')+'</div></div>'
++(inq.location?'<div style="background:#f8fafc;padding:10px;border-radius:8px;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Location</div><div style="font-size:13px;font-weight:600;"><a href="https://maps.google.com/?q='+escQ(inq.location)+'" target="_blank" style="color:#2563eb;">📍 Open in Maps</a></div></div>':'')
     +(inq.address?'<div style="background:#f8fafc;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Address</div><div style="font-size:13px;">📍 '+escQ(inq.address)+'</div></div>':'')
     +(inq.followup_date?'<div style="background:#fffbeb;border:1px solid #fde68a;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:#92400e;text-transform:uppercase;font-weight:700;margin-bottom:3px;">Followup Date</div><div style="font-size:13px;font-weight:600;color:#92400e;">📅 '+new Date(inq.followup_date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+'</div></div>':'')
     +(inq.description?'<div style="background:#f8fafc;padding:10px;border-radius:8px;grid-column:1/-1;"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:3px;">Description</div><div style="font-size:13px;">'+escQ(inq.description)+'</div></div>':'')
@@ -16267,7 +16278,7 @@ async function openAddInquiryModal(){
   var existing=document.getElementById('modal-add-inquiry');if(existing)existing.remove();
   var modal=document.createElement('div');
   modal.id='modal-add-inquiry';modal.className='modal-overlay';
-  var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var types=['CCTV','Camera','Automation','Home Theater','Printer Repair','Printer Service','Buy New Printer','Buy New Camera','Repair','New Installation','Networking','Other'];
   var inp=function(id,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id+'" value="'+(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>🔍 New Inquiry</h2><button class="close-btn" onclick="document.getElementById(\'modal-add-inquiry\').remove()">✕</button></div>'
@@ -16277,8 +16288,9 @@ async function openAddInquiryModal(){
     +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('inq-mobile','Mobile number','','tel')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('inq-address','Address')+'</div>'
++'<div class="form-group" style="margin-bottom:10px;"><label>📍 Location <small style="color:var(--text-muted);font-weight:400;">(optional)</small></label><div style="display:flex;gap:8px;align-items:center;"><input type="text" id="inq-location" placeholder="Lat, Lng or address..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" readonly><button type="button" class="btn btn-outline btn-sm" onclick="(function(){if(!navigator.geolocation){alert('GPS not available');return;}document.getElementById('inq-location').value='Getting...';navigator.geolocation.getCurrentPosition(function(p){document.getElementById('inq-location').value=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6);},function(){document.getElementById('inq-location').value='';alert('Could not get location');});})()">📍 Get GPS</button></div></div>'
     +'<div class="form-grid">'
-    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>Inquiry Type</label><select id="inq-type" onchange="var ot=document.getElementById('inq-type-other');if(ot)ot.style.display=this.value==='Other'?'block':'none';" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option>'+t+'</option>';}).join('')+'</select><input type="text" id="inq-type-other" placeholder="Type here..." style="display:none;margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
     +'<div class="form-group"><label>📅 Followup Date</label>'+inp('inq-followup','','','date')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Description / Product</label><textarea id="inq-desc" rows="2" placeholder="Inquiry details, product name..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></textarea>'
@@ -16296,7 +16308,7 @@ async function saveNewInquiry(){
   var name=(document.getElementById('inq-name')?.value||'').trim();
   var mobile=(document.getElementById('inq-mobile')?.value||'').trim();
   var address=(document.getElementById('inq-address')?.value||'').trim();
-  var type=document.getElementById('inq-type')?.value||'Other';
+  var type=document.getElementById('inq-type')?.value||'Other';if(type==='Other'){var ot=(document.getElementById('inq-type-other')?.value||'').trim();if(ot)type=ot;}
   var desc=(document.getElementById('inq-desc')?.value||'').trim();
   var followup=document.getElementById('inq-followup')?.value||null;
   if(!name||!mobile){alert('Name and Mobile are required!');return;}
@@ -16305,7 +16317,8 @@ async function saveNewInquiry(){
     var assignVal=assignSel?assignSel.value:'';
     var assignName=assignSel?assignSel.options[assignSel.selectedIndex]?.text||'':'';
     if(assignName==='-- Unassigned --')assignName='';
-    await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,updated_at:new Date().toISOString()});
+    var inqLoc=(document.getElementById('inq-location')?.value||'').trim();
+await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,location:inqLoc||null,updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
@@ -16319,7 +16332,7 @@ async function openEditInquiryModal(id){
   var existing=document.getElementById('modal-edit-inquiry');if(existing)existing.remove();
   var modal=document.createElement('div');
   modal.id='modal-edit-inquiry';modal.className='modal-overlay';
-  var types=['CCTV','Automation','Home Theater','Repair','New Installation','Networking','Other'];
+  var types=['CCTV','Camera','Automation','Home Theater','Printer Repair','Printer Service','Buy New Printer','Buy New Camera','Repair','New Installation','Networking','Other'];
   var inp=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escQ(v||'')+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">';};
   modal.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
     +'<div class="modal-header"><h2>✏️ Edit Inquiry Details</h2><button class="close-btn" onclick="document.getElementById(\'modal-edit-inquiry\').remove()">✕</button></div>'
@@ -16330,7 +16343,7 @@ async function openEditInquiryModal(id){
     +'<div class="form-group"><label>Mobile No <span class="req">*</span></label>'+inp('einq-mobile','Mobile number',inq.mobile,'tel')+'</div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Address</label>'+inp('einq-address','Address',inq.address)+'</div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Inquiry Type</label><select id="einq-type" onchange="var ot=document.getElementById('einq-type-other');if(ot)ot.style.display=this.value==='Other'?'block':'none';" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+types.map(function(t){return'<option value="'+t+'"'+(inq.inquiry_type===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select><input type="text" id="einq-type-other" placeholder="Type here..." style="display:'+(types.includes(inq.inquiry_type||'')?'none':'block')+';margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" value="'+(types.includes(inq.inquiry_type||'')?'':(inq.inquiry_type||'')):''+'"></div>'
     +'<div class="form-group"><label>Description / Product</label><textarea id="einq-desc" rows="2" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;">'+escQ(inq.description||'')+'</textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'einq-desc\')">✨ AI Remark</button></div>'
     +'<div class="form-group" style="margin-top:10px;"><label>👷 Assign to Engineer <small style="color:var(--text-muted);">(optional)</small></label><select id="einq-assign" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Unassigned --</option>'+_inqEngOptions(inq.assigned_to)+'</select></div>'
@@ -16351,7 +16364,7 @@ async function saveEditInquiry(id){
     var asgVal2=asgSel2?asgSel2.value:'';
     var asgName2=asgSel2?(asgSel2.options[asgSel2.selectedIndex]?.text||''):'';
     if(asgName2==='-- Unassigned --'||asgName2==='-- Keep Current --')asgName2=asgVal2?asgName2:'';
-    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:document.getElementById('einq-type')?.value||'Other',description:(document.getElementById('einq-desc')?.value||'').trim(),assigned_to:asgVal2||null,assigned_name:(asgName2&&asgName2!=='-- Unassigned --')?asgName2:null,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    await sb('auto_inquiries','PATCH',{customer_name:name,mobile:mobile,address:(document.getElementById('einq-address')?.value||'').trim(),inquiry_type:(function(){var v=document.getElementById('einq-type')?.value||'Other';if(v==='Other'){var ot=(document.getElementById('einq-type-other')?.value||'').trim();if(ot)v=ot;}return v;})(),description:(document.getElementById('einq-desc')?.value||'').trim(),assigned_to:asgVal2||null,assigned_name:(asgName2&&asgName2!=='-- Unassigned --')?asgName2:null,updated_at:new Date().toISOString()},'?id=eq.'+id);
     document.getElementById('modal-edit-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
@@ -18945,6 +18958,33 @@ function _aiTypeForField(targetId) {
   return 'update';
 }
 
+function previewVisitPhotos(input,previewId){
+  var preview=document.getElementById(previewId);if(!preview)return;
+  preview.innerHTML='';
+  var files=Array.from(input.files).slice(0,4);
+  files.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=document.createElement('img');
+      img.src=e.target.result;
+      img.style.cssText='width:70px;height:70px;object-fit:cover;border-radius:6px;border:1px solid var(--border);';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function _readPhotosBase64(inputId){
+  var input=document.getElementById(inputId);
+  if(!input||!input.files||!input.files.length)return[];
+  var files=Array.from(input.files).slice(0,4);
+  return Promise.all(files.map(function(file){
+    return new Promise(function(resolve){
+      var reader=new FileReader();
+      reader.onload=function(e){resolve(e.target.result);};
+      reader.readAsDataURL(file);
+    });
+  }));
+}
 function showAIRemarkPicker(targetId) {
   var existing = document.getElementById('ai-picker-overlay');
   if (existing) existing.remove();
