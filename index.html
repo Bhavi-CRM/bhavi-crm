@@ -7678,8 +7678,8 @@ function _tgTest(chatId,name){testTGId(chatId,name);}
 function _tgSaveRow(btn){var inp=btn.closest('tr').querySelector('input[data-dbid]');if(inp)_tgSave(inp.dataset.dbid,inp.dataset.uid);}
 function _tgTestRow(btn){var inp=btn.closest('tr').querySelector('input[data-dbid]');if(inp)testTGId(inp.value,inp.dataset.name);}
 async function _tgSave(dbId,engUid){
-  var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';
-  chatId=chatId.trim();
+  var el=document.querySelector('input[data-dbid="'+dbId+'"]')||document.getElementById('tgid-'+dbId);
+  var chatId=el?el.value.trim():'';
   if(chatId)TG_ENG_MAP[engUid]=chatId;
   else delete TG_ENG_MAP[engUid];
   try{
