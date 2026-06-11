@@ -1042,14 +1042,12 @@ var TG_ADMIN_CHAT='8814298497';
 var TG_ENG_MAP={'ENG002':'1385145070'};
 async function _tgSbGet(key){try{var r=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=value');return(r&&r[0])?r[0].value:null;}catch(e){return null;}}
 async function _tgSbSet(key,value){
-  try{
-    var ex=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=key');
-    if(ex&&ex.length){
-      await sb('telegram_settings','PATCH',{value:value,updated_at:new Date().toISOString()},'?key=eq.'+encodeURIComponent(key));
-    }else{
-      await sb('telegram_settings','POST',{key:key,value:value,updated_at:new Date().toISOString()});
-    }
-  }catch(e){console.log('TG save err',e);}
+  var ex=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=key');
+  if(ex&&ex.length){
+    await sb('telegram_settings','PATCH',{value:value,updated_at:new Date().toISOString()},'?key=eq.'+encodeURIComponent(key));
+  }else{
+    await sb('telegram_settings','POST',{key:key,value:value,updated_at:new Date().toISOString()});
+  }
 }
 async function loadTGSettings(){
   try{
@@ -7674,15 +7672,19 @@ async function renderTelegramSettings(){
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo</p>'
     +'</div>';
 }
-function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';_tgTest(c,'Admin');}
-function _tgTest(chatId,name){chatId=(chatId||'').trim();if(!chatId){alert('Chat ID enter karo');return;}tgNotify(chatId,'✅ Bhavi CRM Bot Test\n\nBot connected! Notifications will come here. 🎉');alert('Test sent to '+name+' — Telegram check karo!');}
+function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';testTGId(c,'Admin');}
+function _tgTest(chatId,name){testTGId(chatId,name);}
 async function _tgSave(dbId,engUid){
   var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';
   chatId=chatId.trim();
   if(chatId)TG_ENG_MAP[engUid]=chatId;
   else delete TG_ENG_MAP[engUid];
-  await _tgSbSet('tg_eng_map',JSON.stringify(TG_ENG_MAP));
-  alert('Saved!');
+  try{
+    await _tgSbSet('tg_eng_map',JSON.stringify(TG_ENG_MAP));
+    alert('✅ Saved! Page reload karo to verify.');
+  }catch(e){
+    alert('❌ Save failed: '+e.message+'\n\nSupabase SQL Editor ma aa run karo:\ndrop policy if exists "allow_write" on telegram_settings;\ncreate policy "allow_all" on telegram_settings for all to anon, authenticated using (true) with check (true);');
+  }
 }
 async function saveTGToken(){
   var token=(document.getElementById('tg-bot-token')?.value||'').trim();
@@ -7708,9 +7710,11 @@ async function saveTGId(dbId,engUid){
 async function testTGId(chatId,name){
   chatId=(chatId||'').trim();
   if(!chatId){alert('Chat ID enter karo pehla\n\nSteps:\n1. Telegram ma @BhaviCRM_bot search karo\n2. /start send karo\n3. @userinfobot ma /start send karo → Chat ID kadho\n4. Aama save karo');return;}
-  if(!TG_TOKEN){alert('Bot Token set nathi! Settings > Telegram > Token save karo.');return;}
-  await tgNotify(chatId,'✅ Bhavi CRM Bot — Test message for '+name+'\n\nBot connected successfully! 🎉');
-  alert('Request sent!\n\nJo message na aave to:\n1. '+name+' e Telegram ma @BhaviCRM_bot ne /start moku joiye\n2. Chat ID correct chhe ke check karo: '+chatId);
+  if(!TG_TOKEN){alert('Bot Token set nathi!');return;}
+  var url='https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(chatId)+'&text='+encodeURIComponent('✅ Test from Bhavi CRM\n\nBot connected! – '+name);
+  // Open in new tab so we can see Telegram API response directly
+  var w=window.open(url,'_blank');
+  if(!w)alert('Popup blocked! Browser ma popup allow karo, phir test karo.');
 }
 async function renderSettings(){
   const engineers=await sb('users','GET',null,'?role=eq.engineer&order=name');
