@@ -3919,6 +3919,9 @@ async function saveCall(){
       const id=await generateTicketNo();data.id=id;data.job_sheet=id;
       await sb('tickets','POST',data);
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
+      // Telegram: new ticket notification
+      tgNotify(TG_ADMIN_CHAT,'🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
+      if(engId)tgNotifyEngineer(engId,'🎫 <b>New Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—'));
       // Link job to walk-in entry if created from walk-in
       if(window._fromWalkInId){
         try{await sb('walkin_log','PATCH',{job_id:id},'?id=eq.'+window._fromWalkInId);}catch(e){}
@@ -4404,8 +4407,13 @@ async function quickEngChange(id,val){
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   const tl=[...(t?.timeline||[]),{action:'Assigned to '+eName,by:currentUser.name,at:new Date().toISOString()}];
   await sb('tickets','PATCH',{assigned_to:eId,assigned_name:eName,status:'Assigned',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
-    // Telegram: notify engineer + admin
-    if(eId)tgNotifyEngineer(eId,'📋 <b>Ticket Assigned to You</b>\n🎫 '+id+'\n👤 '+(typeof t!=='undefined'&&t?t.cname||'':'')+' | '+(typeof t!=='undefined'&&t?t.city||'':'')+'\n🔧 '+(typeof t!=='undefined'&&t?t.problem||'':''));
+  // Telegram notifications
+  var _prevEng=t?.assigned_name||'';
+  var _reassign=_prevEng&&_prevEng!==eName?'♻️ Reassigned (was: '+_prevEng+')':'🆕 New Assignment';
+  // Admin: full details
+  tgNotify(TG_ADMIN_CHAT,'📋 <b>Ticket '+_reassign+'</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||'')+'\n👷 Assigned to: '+eName);
+  // Engineer: personal message
+  if(eId)tgNotifyEngineer(eId,'📋 <b>Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||''));
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
 
@@ -7671,6 +7679,12 @@ async function renderTelegramSettings(){
     +'<th style="padding:10px 12px;text-align:left;">Action</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo</p>'
+    +'</div>'
+    +'<div class="card" style="margin-top:14px;padding:14px;background:#f0fdf4;border:1.5px solid #059669;border-radius:10px;">'
+    +'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#065f46;">📊 Daily Report (Admin)</h4>'
+    +'<p style="font-size:12px;color:#065f46;margin-bottom:10px;">Aaj na badha tickets, inquiries ane walk-in no summary report admin ne Telegram par moko.</p>'
+    +'<button class="btn btn-success" onclick="sendDailyTGReport()">📤 Send Report Now</button>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Automatic 8 PM report mate Supabase cron setup karo (instructions niche)</p>'
     +'</div>';
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';testTGId(c,'Admin');}
@@ -7718,6 +7732,41 @@ async function testTGId(chatId,name){
   // Open in new tab so we can see Telegram API response directly
   var w=window.open(url,'_blank');
   if(!w)alert('Popup blocked! Browser ma popup allow karo, phir test karo.');
+}
+async function sendDailyTGReport(){
+  if(!TG_ADMIN_CHAT){alert('Admin Chat ID set karo pehla');return;}
+  var today=new Date().toLocaleDateString('en-CA');
+  var dateLabel=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  try{
+    var [tickets,inquiries,walkins]=await Promise.all([
+      sb('tickets','GET',null,'?created_at=gte.'+today+'T00:00:00&select=id,status,assigned_name,assigned_to,cname'),
+      sb('auto_inquiries','GET',null,'?created_at=gte.'+today+'T00:00:00&select=id,status,assigned_name,inquiry_type'),
+      sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=id,products')
+    ]);
+    // Eng-wise ticket breakdown
+    var engMap={};
+    (tickets||[]).forEach(function(t){
+      var en=t.assigned_name||'Unassigned';
+      if(!engMap[en])engMap[en]={total:0,closed:0};
+      engMap[en].total++;
+      if(t.status==='Closed'||t.status==='Delivered')engMap[en].closed++;
+    });
+    var engLines=Object.entries(engMap).map(function([n,v]){return'  👷 '+n+': '+v.total+' tickets ('+v.closed+' closed)';}).join('\n');
+    // Walk-in product count
+    var wiProds=0;
+    (walkins||[]).forEach(function(w){var p=w.products||[];if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p=[];}}wiProds+=p.length;});
+    // Inquiry status breakdown
+    var inqOpen=(inquiries||[]).filter(function(i){return i.status==='Open'||i.status==='In Progress';}).length;
+    var inqWon=(inquiries||[]).filter(function(i){return i.status==='Converted (Won)';}).length;
+    var msg='📊 <b>Daily Report — '+dateLabel+'</b>\n\n'
+      +'🎫 <b>Tickets Today: '+(tickets||[]).length+'</b>\n'+(engLines||'  No tickets')+'\n\n'
+      +'🔔 <b>Inquiries Today: '+(inquiries||[]).length+'</b>\n'
+      +'  Open/In Progress: '+inqOpen+'\n'
+      +'  Converted (Won): '+inqWon+'\n\n'
+      +'🚶 <b>Walk-ins: '+(walkins||[]).length+' customers | '+wiProds+' products</b>';
+    await tgNotify(TG_ADMIN_CHAT,msg);
+    alert('✅ Report sent to Admin Telegram!');
+  }catch(e){alert('Error: '+e.message);}
 }
 async function renderSettings(){
   const engineers=await sb('users','GET',null,'?role=eq.engineer&order=name');
@@ -16512,8 +16561,9 @@ async function saveNewInquiry(){
 await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,location:inqLoc||null,updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
-    // Telegram notification
+    // Telegram: admin + assigned engineer
     tgNotifyAll('🔔 <b>New Inquiry</b>\n👤 '+name+(mobile?' | 📱 '+mobile:'')+'\n🔖 '+type+(assignName?'\n👷 Assigned: '+assignName:'')+'\n📝 '+(desc||'No description'));
+    if(assignVal)tgNotifyEngineer(assignVal,'📌 <b>New Inquiry Assigned to You</b>\n👤 '+name+' | 📱 '+mobile+'\n🔖 '+type+'\n📝 '+(desc||'No description')+(inqLoc?'\n📍 '+inqLoc:''));
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -16639,6 +16689,14 @@ async function saveUpdateInquiry(id){
       newNotes=existingNotes?existingNotes+'\n'+entry:entry;
     }
     await sb('auto_inquiries','PATCH',{status:status,followup_date:followup||null,notes:newNotes||null,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    // Telegram: notify on key status changes
+    if(status==='Converted (Won)'||status==='Lost'){
+      var _icon=status==='Converted (Won)'?'🏆':'❌';
+      tgNotifyAll(_icon+' <b>Inquiry '+status+'</b>\n👤 '+(inq?.customer_name||'')+' | 📱 '+(inq?.mobile||'')+'\n🔖 '+(inq?.inquiry_type||'')+(inq?.assigned_name?'\n👷 '+inq.assigned_name:'')+(remark?'\n💬 '+remark:''));
+    } else if(status==='Site Visit Scheduled'||status==='Demo Scheduled'){
+      tgNotifyAll('📅 <b>'+status+'</b>\n👤 '+(inq?.customer_name||'')+' | 📱 '+(inq?.mobile||'')+'\n🔖 '+(inq?.inquiry_type||'')+(inq?.assigned_name?'\n👷 '+inq.assigned_name:''));
+      if(inq?.assigned_to)tgNotifyEngineer(inq.assigned_to,'📅 <b>'+status+'</b>\n👤 '+(inq?.customer_name||'')+' | 📱 '+(inq?.mobile||'')+'\n🔖 '+(inq?.inquiry_type||'')+(remark?'\n💬 '+remark:''));
+    }
     document.getElementById('modal-update-inquiry').remove();
     renderInquiries();
   }catch(e){alert('Error: '+e.message);}
@@ -18289,6 +18347,7 @@ async function markDelivered(ticketId){
     var t=tRow[0];
     var tl=[...(t.timeline||[]),{action:'Delivered',by:currentUser.name,at:new Date().toISOString(),note:'Customer collected device'}];
     await sb('tickets','PATCH',{status:'Delivered',timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
+    tgNotify(TG_ADMIN_CHAT,'✅ <b>Ticket Delivered</b>\n🎫 #'+ticketId+'\n👤 '+t.cname+' | 📱 '+(t.mobile||'—')+'\n🔧 '+t.model+' | S/N: '+(t.serial||'—')+(t.assigned_name?'\n👷 '+t.assigned_name:''));
     window._pendingData=(window._pendingData||[]).filter(function(x){return x.id!==ticketId;});
     var idx=(allTickets||[]).findIndex(function(x){return x.id===ticketId;});
     if(idx>=0&&allTickets[idx])allTickets[idx].status='Delivered';
