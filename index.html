@@ -7619,7 +7619,7 @@ async function renderTelegramSettings(){
       +'<td style="padding:10px 12px;font-weight:600;">'+e.name+'</td>'
       +'<td style="padding:10px 12px;color:var(--text-muted);">'+uid+'</td>'
       +'<td style="padding:10px 12px;"><input type="text" value="'+( tgId||'')+'" placeholder="Telegram Chat ID..." id="tgid-'+e.id+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
-      +'<td style="padding:10px 12px;"><button class="btn btn-outline btn-sm" onclick="saveTGId(''+e.id+'',''+uid+'')">Save</button> <button class="btn btn-outline btn-sm" onclick="testTGId(document.getElementById('tgid-'+e.id+'').value,''+e.name+'')">Test</button></td>'
+      +'<td style="padding:10px 12px;"><button class="btn btn-outline btn-sm" onclick="saveTGId(\''+e.id+'\',\''+uid+'\')">Save</button> <button class="btn btn-outline btn-sm" onclick="testTGId(document.getElementById(\'tgid-'+e.id+'\').value,\''+e.name+'\')">Test</button></td>'
       +'</tr>';
   }).join('');
   document.getElementById('settings-content').innerHTML='<div class="card">'
