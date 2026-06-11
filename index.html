@@ -1040,8 +1040,8 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 var TG_TOKEN=(function(){try{return localStorage.getItem('tg_bot_token')||atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUWFLNjJzNFZ1QnNaV0h3a1pmYw==');}catch(e){return '';}})();
 // Admin Chat ID
 var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'8814298497';
-// Engineer Chat ID map - loaded from users table
-var TG_ENG_MAP={'ENG002':'1385145070'};
+// Engineer Chat ID map
+var TG_ENG_MAP=Object.assign({'ENG002':'1385145070'},JSON.parse(localStorage.getItem('tg_eng_map')||'{}'));
 async function tgNotify(chatId,text){
   if(!chatId||!TG_TOKEN)return;
   try{await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:text,parse_mode:'HTML'})});}catch(e){console.log('TG notify error:',e);}
@@ -7610,11 +7610,12 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 // SETTINGS
 
 async function renderTelegramSettings(){
-  var engs=await sb('users','GET',null,'?role=eq.engineer&order=name&select=id,name,eng_id,user_id,telegram_id');
+  var engs=[];
+  try{engs=await sb('users','GET',null,'?role=eq.engineer&order=name&select=id,name,eng_id,user_id');}catch(ex){engs=[];}
   var adminChat=localStorage.getItem('tg_admin_chat')||TG_ADMIN_CHAT||'';
   var rows=engs.map(function(e){
     var uid=e.eng_id||e.user_id||'';
-    var tgId=e.telegram_id||TG_ENG_MAP[uid]||'';
+    var tgId=TG_ENG_MAP[uid]||'';
     var dbId=e.id;
     return '<tr>'
       +'<td style="padding:10px 12px;font-weight:600;">'+e.name+'</td>'
@@ -7660,7 +7661,15 @@ async function renderTelegramSettings(){
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';_tgTest(c,'Admin');}
 function _tgTest(chatId,name){chatId=(chatId||'').trim();if(!chatId){alert('Chat ID enter karo');return;}tgNotify(chatId,'✅ Bhavi CRM Bot Test\n\nBot connected! Notifications will come here. 🎉');alert('Test sent to '+name+' — Telegram check karo!');}
-function _tgSave(dbId,engUid){var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';chatId=chatId.trim();sb('users','PATCH',{telegram_id:chatId||null},'?id=eq.'+dbId).then(function(){if(chatId)TG_ENG_MAP[engUid]=chatId;else delete TG_ENG_MAP[engUid];alert('Saved!');}).catch(function(e){alert('Error: '+e.message);});}
+function _tgSave(dbId,engUid){
+  var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';
+  chatId=chatId.trim();
+  if(chatId)TG_ENG_MAP[engUid]=chatId;
+  else delete TG_ENG_MAP[engUid];
+  // Save entire map to localStorage so persists across pages
+  localStorage.setItem('tg_eng_map',JSON.stringify(TG_ENG_MAP));
+  alert('Saved!');
+}
 async function saveTGToken(){
   var token=(document.getElementById('tg-bot-token')?.value||'').trim();
   if(!token){alert('Token enter karo');return;}
