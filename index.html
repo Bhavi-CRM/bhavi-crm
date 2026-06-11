@@ -7633,12 +7633,12 @@ async function renderTelegramSettings(){
     var tgId=TG_ENG_MAP[uid]||'';
     var dbId=e.id;
     return '<tr>'
-      +'<td style="padding:10px 12px;font-weight:600;">'+e.name+'</td>'
-      +'<td style="padding:10px 12px;color:var(--text-muted);">'+uid+'</td>'
-      +'<td style="padding:10px 12px;"><input type="text" value="'+(tgId||'')+'" placeholder="Chat ID..." id="tgid-'+dbId+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
+      +'<td style="padding:10px 12px;font-weight:600;">'+escHtml(e.name)+'</td>'
+      +'<td style="padding:10px 12px;color:var(--text-muted);">'+escHtml(uid)+'</td>'
+      +'<td style="padding:10px 12px;"><input type="text" value="'+escHtml(tgId||'')+'" placeholder="Chat ID..." data-dbid="'+escHtml(String(dbId))+'" data-uid="'+escHtml(uid)+'" data-name="'+escHtml(e.name)+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
       +'<td style="padding:10px 12px;">'
-      +'<button class="btn btn-outline btn-sm" onclick="_tgSave('+JSON.stringify(String(dbId))+','+JSON.stringify(uid)+')">Save</button> '
-      +'<button class="btn btn-outline btn-sm" onclick="testTGId((document.getElementById(\'tgid-'+dbId+'\')?.value||\'\'),('+JSON.stringify(e.name)+'))">Test</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="_tgSaveRow(this)">Save</button> '
+      +'<button class="btn btn-outline btn-sm" onclick="_tgTestRow(this)">Test</button>'
       +'</td>'
       +'</tr>';
   }).join('');
@@ -7675,6 +7675,8 @@ async function renderTelegramSettings(){
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';testTGId(c,'Admin');}
 function _tgTest(chatId,name){testTGId(chatId,name);}
+function _tgSaveRow(btn){var inp=btn.closest('tr').querySelector('input[data-dbid]');if(inp)_tgSave(inp.dataset.dbid,inp.dataset.uid);}
+function _tgTestRow(btn){var inp=btn.closest('tr').querySelector('input[data-dbid]');if(inp)testTGId(inp.value,inp.dataset.name);}
 async function _tgSave(dbId,engUid){
   var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';
   chatId=chatId.trim();
