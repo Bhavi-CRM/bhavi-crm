@@ -1041,7 +1041,16 @@ var TG_TOKEN=(function(){try{return atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUW
 var TG_ADMIN_CHAT='8814298497';
 var TG_ENG_MAP={'ENG002':'1385145070'};
 async function _tgSbGet(key){try{var r=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=value');return(r&&r[0])?r[0].value:null;}catch(e){return null;}}
-async function _tgSbSet(key,value){try{await sb('telegram_settings','POST',{key:key,value:value,updated_at:new Date().toISOString()},'?on_conflict=key');}catch(e){console.log('TG save err',e);}}
+async function _tgSbSet(key,value){
+  try{
+    var ex=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=key');
+    if(ex&&ex.length){
+      await sb('telegram_settings','PATCH',{value:value,updated_at:new Date().toISOString()},'?key=eq.'+encodeURIComponent(key));
+    }else{
+      await sb('telegram_settings','POST',{key:key,value:value,updated_at:new Date().toISOString()});
+    }
+  }catch(e){console.log('TG save err',e);}
+}
 async function loadTGSettings(){
   try{
     var rows=await sb('telegram_settings','GET',null,'?select=key,value');
@@ -7640,10 +7649,10 @@ async function renderTelegramSettings(){
     +'<div class="form-group" style="margin-bottom:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">'
     +'<label style="font-weight:700;">🤖 Bot Token '+tokenStatus+'</label>'
     +'<div style="display:flex;gap:8px;margin-top:6px;">'
-    +'<input type="text" id="tg-bot-token" value="" placeholder="Paste new bot token here..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;outline:none;font-family:monospace;">'
+    +'<input type="text" id="tg-bot-token" value="" placeholder="'+(TG_TOKEN?'Token already set — change karvanu hoy to paste karo':'Paste bot token here...')+'" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;outline:none;font-family:monospace;">'
     +'<button class="btn btn-primary" onclick="saveTGToken()">Save</button>'
     +'</div>'
-    +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@BotFather → /mybots → @BhaviCRM_bot → API Token</p>'
+    +(TG_TOKEN?'<p style="font-size:11px;color:#059669;margin-top:4px;">✅ Token active chhe — badha notifications kaam karshe. Change karvanu hoy to j navo token enter karo.</p>':'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@BotFather → /mybots → @BhaviCRM_bot → API Token</p>')
     +'</div>'
     +'<div class="form-group" style="margin-bottom:16px;">'
     +'<label style="font-weight:700;">👑 Admin Chat ID</label>'
@@ -11223,14 +11232,11 @@ async function fetchWalkInCustomer(){
 }
 
 async function getNextWalkInToken(today){
-  // Sequential token per day, resets every new day from #1
+  // Count today's entries → always starts from 1 each day
   try{
-    var rows=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
-    var maxToken=(rows&&rows.length&&rows[0].token_no)||0;
-    return maxToken+1;
-  }catch(e){
-    try{var c=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=id');return(c?c.length:0)+1;}catch(e2){return 1;}
-  }
+    var rows=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=id');
+    return (rows?rows.length:0)+1;
+  }catch(e){return 1;}
 }
 
 async function saveWalkIn(){
