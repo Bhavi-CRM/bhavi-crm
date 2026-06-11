@@ -1036,6 +1036,33 @@ tr:hover td{background:#f8fafc;}
 <script>
 const SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
+// ===== TELEGRAM BOT CONFIG =====
+const TG_TOKEN='8917475333:AAGYeNwREwdiE8QSaDYuJj7rP8yoYTNZuv8';
+// Admin Chat ID - set from Settings > Telegram
+var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'';
+// Engineer Chat ID map - loaded from users table
+var TG_ENG_MAP={'ENG002':'1385145070'};
+async function tgNotify(chatId,text){
+  if(!chatId||!TG_TOKEN)return;
+  try{await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:text,parse_mode:'HTML'})});}catch(e){console.log('TG notify error:',e);}
+}
+async function tgNotifyAll(text){
+  // Notify admin
+  if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
+}
+async function tgNotifyEngineer(engId,text){
+  var chatId=TG_ENG_MAP[engId]||'';
+  if(chatId)tgNotify(chatId,text);
+  // Also notify admin
+  if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
+}
+async function loadTGEngMap(){
+  try{
+    var engs=await sb('users','GET',null,'?role=eq.engineer&select=user_id,eng_id,telegram_id&not.telegram_id.is.null');
+    if(engs&&engs.length){engs.forEach(function(e){var id=e.telegram_id;var uid=e.eng_id||e.user_id;if(id&&uid)TG_ENG_MAP[uid]=id;});}
+  }catch(ex){}
+}
+// ===== END TELEGRAM BOT CONFIG =====
 
 function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);if(!u.role_type)u.role_type='work_controller';}return u;}
 async function sb(t,m='GET',b=null,q=''){
@@ -4363,6 +4390,8 @@ async function quickEngChange(id,val){
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   const tl=[...(t?.timeline||[]),{action:'Assigned to '+eName,by:currentUser.name,at:new Date().toISOString()}];
   await sb('tickets','PATCH',{assigned_to:eId,assigned_name:eName,status:'Assigned',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    // Telegram: notify engineer + admin
+    if(eId)tgNotifyEngineer(eId,'📋 <b>Ticket Assigned to You</b>\n🎫 '+id+'\n👤 '+(typeof t!=='undefined'&&t?t.cname||'':'')+' | '+(typeof t!=='undefined'&&t?t.city||'':'')+'\n🔧 '+(typeof t!=='undefined'&&t?t.problem||'':''));
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
 
@@ -7579,6 +7608,66 @@ async function importModels(){const f=document.getElementById('model-file')?.fil
 async function importProblems(){const f=document.getElementById('prob-file')?.files[0];if(!f)return;const r=new FileReader();r.onload=async e=>{const wb=XLSX.read(e.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0;for(const row of data){try{await sb('problem_types','POST',{problem:row['Problem']||'',is_active:true});c++;}catch(e){}}alert(`Imported ${c}`);await loadMasterData();switchMasterTab('problems',null);};r.readAsBinaryString(f);}
 
 // SETTINGS
+
+async function renderTelegramSettings(){
+  var engs=await sb('users','GET',null,'?role=eq.engineer&order=name&select=id,name,eng_id,user_id,telegram_id');
+  var adminChat=localStorage.getItem('tg_admin_chat')||TG_ADMIN_CHAT||'';
+  var rows=engs.map(function(e){
+    var uid=e.eng_id||e.user_id||'';
+    var tgId=e.telegram_id||TG_ENG_MAP[uid]||'';
+    return '<tr>'
+      +'<td style="padding:10px 12px;font-weight:600;">'+e.name+'</td>'
+      +'<td style="padding:10px 12px;color:var(--text-muted);">'+uid+'</td>'
+      +'<td style="padding:10px 12px;"><input type="text" value="'+( tgId||'')+'" placeholder="Telegram Chat ID..." id="tgid-'+e.id+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
+      +'<td style="padding:10px 12px;"><button class="btn btn-outline btn-sm" onclick="saveTGId(''+e.id+'',''+uid+'')">Save</button> <button class="btn btn-outline btn-sm" onclick="testTGId(document.getElementById('tgid-'+e.id+'').value,''+e.name+'')">Test</button></td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('settings-content').innerHTML='<div class="card">'
+    +'<h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">📱 Telegram Bot Notifications</h3>'
+    +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">'
+    +'✅ Bot: <b>@BhaviCRM_bot</b> — Active<br>'
+    +'<span style="color:var(--text-muted);font-size:12px;">Notifications: New Inquiry, Ticket Assigned, Ticket Created</span></div>'
+    +'<div class="form-group" style="margin-bottom:16px;">'
+    +'<label style="font-weight:700;">👑 Admin Chat ID (tamaro)</label>'
+    +'<div style="display:flex;gap:8px;margin-top:6px;">'
+    +'<input type="text" id="tg-admin-chat" value="'+adminChat+'" placeholder="Your Telegram Chat ID..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
+    +'<button class="btn btn-primary" onclick="saveTGAdmin()">Save</button>'
+    +'<button class="btn btn-outline" onclick="testTGId(document.getElementById('tg-admin-chat').value,'Admin')">Test</button>'
+    +'</div>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@userinfobot thi tamaro Chat ID kadho</p>'
+    +'</div>'
+    +'<h4 style="font-size:13px;font-weight:700;margin-bottom:10px;">👷 Engineer Chat IDs</h4>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#f1f5f9;">'
+    +'<th style="padding:10px 12px;text-align:left;">Engineer</th>'
+    +'<th style="padding:10px 12px;text-align:left;">ID</th>'
+    +'<th style="padding:10px 12px;text-align:left;">Telegram Chat ID</th>'
+    +'<th style="padding:10px 12px;text-align:left;">Action</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhine tame ne aapse — aama save karo</p>'
+    +'</div>';
+}
+async function saveTGAdmin(){
+  var chatId=(document.getElementById('tg-admin-chat')?.value||'').trim();
+  localStorage.setItem('tg_admin_chat',chatId);
+  TG_ADMIN_CHAT=chatId;
+  alert('Admin Chat ID saved!');
+}
+async function saveTGId(dbId,engUid){
+  var chatId=(document.getElementById('tgid-'+dbId)?.value||'').trim();
+  try{
+    await sb('users','PATCH',{telegram_id:chatId||null},'?id=eq.'+dbId);
+    if(chatId)TG_ENG_MAP[engUid]=chatId;
+    else delete TG_ENG_MAP[engUid];
+    alert('Saved!');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function testTGId(chatId,name){
+  chatId=(chatId||'').trim();
+  if(!chatId){alert('Chat ID enter karo pehla');return;}
+  await tgNotify(chatId,'✅ Bhavi CRM Bot — Test message for '+name+'\n\nBot connected successfully! 🎉');
+  alert('Test message sent to '+name+'! Telegram check karo.');
+}
 async function renderSettings(){
   const engineers=await sb('users','GET',null,'?role=eq.engineer&order=name');
   document.getElementById('page-content').innerHTML=`
@@ -7594,6 +7683,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('company',this)">🏢 Company Info</button>
       <button class="tab" onclick="switchSettings('portal',this)">🌐 Portal Services</button>
       <button class="tab" onclick="switchSettings('msc',this)">🏭 MSC Centers</button>
+      <button class="tab" onclick="switchSettings('telegram',this)">📱 Telegram</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -7604,6 +7694,7 @@ function switchSettings(tab,el){
   else if(tab==='admin') renderAdminTab();
   else if(tab==='portal') renderPortalServicesTab();
   else if(tab==='msc') renderMSCTab();
+  else if(tab==='telegram') renderTelegramSettings();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -16340,6 +16431,8 @@ async function saveNewInquiry(){
 await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,location:inqLoc||null,updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
+    // Telegram notification
+    tgNotifyAll('🔔 <b>New Inquiry</b>\n👤 '+name+(mobile?' | 📱 '+mobile:'')+'\n🔖 '+type+(assignName?'\n👷 Assigned: '+assignName:'')+'\n📝 '+(desc||'No description'));
   }catch(e){alert('Error: '+e.message);}
 }
 
