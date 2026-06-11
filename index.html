@@ -1044,7 +1044,11 @@ var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'8814298497';
 var TG_ENG_MAP=Object.assign({'ENG002':'1385145070'},JSON.parse(localStorage.getItem('tg_eng_map')||'{}'));
 async function tgNotify(chatId,text){
   if(!chatId||!TG_TOKEN)return;
-  try{await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:text,parse_mode:'HTML'})});}catch(e){console.log('TG notify error:',e);}
+  try{
+    var tok=localStorage.getItem('tg_bot_token')||TG_TOKEN;
+    var url='https://api.telegram.org/bot'+tok+'/sendMessage?chat_id='+encodeURIComponent(chatId)+'&text='+encodeURIComponent(text)+'&parse_mode=HTML';
+    await fetch(url,{mode:'no-cors'});
+  }catch(e){console.log('TG notify error:',e);}
 }
 async function tgNotifyAll(text){
   // Notify admin
