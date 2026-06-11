@@ -7624,6 +7624,7 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 // SETTINGS
 
 async function renderTelegramSettings(){
+  await loadTGSettings();
   var engs=[];
   try{engs=await sb('users','GET',null,'?role=eq.engineer&order=name&select=id,name,eng_id,user_id');}catch(ex){engs=[];}
   var adminChat=TG_ADMIN_CHAT||'';
@@ -7636,7 +7637,7 @@ async function renderTelegramSettings(){
       +'<td style="padding:10px 12px;color:var(--text-muted);">'+uid+'</td>'
       +'<td style="padding:10px 12px;"><input type="text" value="'+(tgId||'')+'" placeholder="Chat ID..." id="tgid-'+dbId+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
       +'<td style="padding:10px 12px;">'
-      +'<button class="btn btn-outline btn-sm" onclick="_tgSave('+dbId+','+JSON.stringify(uid)+')">Save</button> '
+      +'<button class="btn btn-outline btn-sm" onclick="_tgSave('+JSON.stringify(String(dbId))+','+JSON.stringify(uid)+')">Save</button> '
       +'<button class="btn btn-outline btn-sm" onclick="testTGId((document.getElementById(\'tgid-'+dbId+'\')?.value||\'\'),('+JSON.stringify(e.name)+'))">Test</button>'
       +'</td>'
       +'</tr>';
@@ -7681,7 +7682,7 @@ async function _tgSave(dbId,engUid){
   else delete TG_ENG_MAP[engUid];
   try{
     await _tgSbSet('tg_eng_map',JSON.stringify(TG_ENG_MAP));
-    alert('✅ Saved! Page reload karo to verify.');
+    renderTelegramSettings();
   }catch(e){
     alert('❌ Save failed: '+e.message+'\n\nSupabase SQL Editor ma aa run karo:\ndrop policy if exists "allow_write" on telegram_settings;\ncreate policy "allow_all" on telegram_settings for all to anon, authenticated using (true) with check (true);');
   }
