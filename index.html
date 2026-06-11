@@ -1039,7 +1039,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 // ===== TELEGRAM BOT CONFIG =====
 const TG_TOKEN='8917475333:AAGYeNwREwdiE8QSaDYuJj7rP8yoYTNZuv8';
 // Admin Chat ID - set from Settings > Telegram
-var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'';
+var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'8814298497';
 // Engineer Chat ID map - loaded from users table
 var TG_ENG_MAP={'ENG002':'1385145070'};
 async function tgNotify(chatId,text){
@@ -7615,24 +7615,28 @@ async function renderTelegramSettings(){
   var rows=engs.map(function(e){
     var uid=e.eng_id||e.user_id||'';
     var tgId=e.telegram_id||TG_ENG_MAP[uid]||'';
+    var dbId=e.id;
     return '<tr>'
       +'<td style="padding:10px 12px;font-weight:600;">'+e.name+'</td>'
       +'<td style="padding:10px 12px;color:var(--text-muted);">'+uid+'</td>'
-      +'<td style="padding:10px 12px;"><input type="text" value="'+( tgId||'')+'" placeholder="Telegram Chat ID..." id="tgid-'+e.id+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
-      +'<td style="padding:10px 12px;"><button class="btn btn-outline btn-sm" onclick="saveTGId(\''+e.id+'\',\''+uid+'\')">Save</button> <button class="btn btn-outline btn-sm" onclick="testTGId(document.getElementById(\'tgid-'+e.id+'\').value,\''+e.name+'\')">Test</button></td>'
+      +'<td style="padding:10px 12px;"><input type="text" value="'+(tgId||'')+'" placeholder="Chat ID..." id="tgid-'+dbId+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
+      +'<td style="padding:10px 12px;">'
+      +'<button class="btn btn-outline btn-sm" onclick="_tgSave('+dbId+','+JSON.stringify(uid)+')">Save</button> '
+      +'<button class="btn btn-outline btn-sm" onclick="_tgTest('+JSON.stringify(tgId||'')+','+JSON.stringify(e.name)+')">Test</button>'
+      +'</td>'
       +'</tr>';
   }).join('');
   document.getElementById('settings-content').innerHTML='<div class="card">'
     +'<h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">📱 Telegram Bot Notifications</h3>'
     +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">'
     +'✅ Bot: <b>@BhaviCRM_bot</b> — Active<br>'
-    +'<span style="color:var(--text-muted);font-size:12px;">Notifications: New Inquiry, Ticket Assigned, Ticket Created</span></div>'
+    +'<span style="color:var(--text-muted);font-size:12px;">New Inquiry, Ticket Assigned notifications</span></div>'
     +'<div class="form-group" style="margin-bottom:16px;">'
-    +'<label style="font-weight:700;">👑 Admin Chat ID (tamaro)</label>'
+    +'<label style="font-weight:700;">👑 Admin Chat ID</label>'
     +'<div style="display:flex;gap:8px;margin-top:6px;">'
     +'<input type="text" id="tg-admin-chat" value="'+adminChat+'" placeholder="Your Telegram Chat ID..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
     +'<button class="btn btn-primary" onclick="saveTGAdmin()">Save</button>'
-    +'<button class="btn btn-outline" onclick="testTGId(document.getElementById('tg-admin-chat').value,'Admin')">Test</button>'
+    +'<button class="btn btn-outline" onclick="_tgTestAdmin()">Test</button>'
     +'</div>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@userinfobot thi tamaro Chat ID kadho</p>'
     +'</div>'
@@ -7644,9 +7648,12 @@ async function renderTelegramSettings(){
     +'<th style="padding:10px 12px;text-align:left;">Telegram Chat ID</th>'
     +'<th style="padding:10px 12px;text-align:left;">Action</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhine tame ne aapse — aama save karo</p>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo</p>'
     +'</div>';
 }
+function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';_tgTest(c,'Admin');}
+function _tgTest(chatId,name){chatId=(chatId||'').trim();if(!chatId){alert('Chat ID enter karo');return;}tgNotify(chatId,'✅ Bhavi CRM Bot Test\n\nBot connected! Notifications will come here. 🎉');alert('Test sent to '+name+' — Telegram check karo!');}
+function _tgSave(dbId,engUid){var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';chatId=chatId.trim();sb('users','PATCH',{telegram_id:chatId||null},'?id=eq.'+dbId).then(function(){if(chatId)TG_ENG_MAP[engUid]=chatId;else delete TG_ENG_MAP[engUid];alert('Saved!');}).catch(function(e){alert('Error: '+e.message);});}
 async function saveTGAdmin(){
   var chatId=(document.getElementById('tg-admin-chat')?.value||'').trim();
   localStorage.setItem('tg_admin_chat',chatId);
