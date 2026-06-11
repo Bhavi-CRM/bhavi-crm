@@ -10568,13 +10568,17 @@ async function downloadWeeklyExcel(){
 function closeEditModelModal(){var el=document.getElementById('edit-model-modal');if(el)el.remove();}
 function closeEditScModal(){var el=document.getElementById('edit-sc-modal');if(el)el.remove();}
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
-document.addEventListener('mousedown',function(e){window._mdInsideModal=!!(e.target&&e.target.closest&&e.target.closest('.modal'));});
+document.addEventListener('mousedown',function(e){window._mdInsideModal=!!(e.target&&e.target.closest&&e.target.closest('.modal'));},true);
+document.addEventListener('mouseup',function(){setTimeout(function(){window._mdInsideModal=false;},50);},true);
+document.addEventListener('click',function(e){
+  if(window._mdInsideModal&&e.target&&e.target.classList&&(e.target.classList.contains('modal-overlay')||e.target===e.currentTarget)){
+    e.stopImmediatePropagation();e.preventDefault();
+  }
+},true);
 function closeModal(id){
-  if(window._mdInsideModal)return;
   document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
 function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
-// Fix: dragging text inside modal must not close it
-(function(){var _dn=null;document.addEventListener('mousedown',function(e){_dn=e.target;});document.addEventListener('click',function(e){if(_dn!==e.target&&e.target.classList&&e.target.classList.contains('modal-overlay')){e.stopImmediatePropagation();}},true);})();
+
 // Mobile menu
 function toggleMobileMenu(){
   const sidebar=document.getElementById('sidebar');
