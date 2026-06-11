@@ -1037,34 +1037,35 @@ tr:hover td{background:#f8fafc;}
 const SB_URL='https://uphdotzqhemnyxtvlcls.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwaGRvdHpxaGVtbnl4dHZsY2xzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NDk1MTMsImV4cCI6MjA5MzAyNTUxM30.RwnevciS6L0HyMP6m9Y-AWuI_Nx6ozrfNoCdr_lePZw';
 // ===== TELEGRAM BOT CONFIG =====
-var TG_TOKEN=(function(){try{return localStorage.getItem('tg_bot_token')||atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUWFLNjJzNFZ1QnNaV0h3a1pmYw==');}catch(e){return '';}})();
-// Admin Chat ID
-var TG_ADMIN_CHAT=localStorage.getItem('tg_admin_chat')||'8814298497';
-// Engineer Chat ID map
-var TG_ENG_MAP=Object.assign({'ENG002':'1385145070'},JSON.parse(localStorage.getItem('tg_eng_map')||'{}'));
+var TG_TOKEN=(function(){try{return atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUWFLNjJzNFZ1QnNaV0h3a1pmYw==');}catch(e){return '';}})();
+var TG_ADMIN_CHAT='8814298497';
+var TG_ENG_MAP={'ENG002':'1385145070'};
+async function _tgSbGet(key){try{var r=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=value');return(r&&r[0])?r[0].value:null;}catch(e){return null;}}
+async function _tgSbSet(key,value){try{await sb('telegram_settings','POST',{key:key,value:value,updated_at:new Date().toISOString()},'?on_conflict=key');}catch(e){console.log('TG save err',e);}}
+async function loadTGSettings(){
+  try{
+    var rows=await sb('telegram_settings','GET',null,'?select=key,value');
+    if(!rows||!rows.length)return;
+    var map={};rows.forEach(function(r){map[r.key]=r.value;});
+    if(map['tg_bot_token'])TG_TOKEN=map['tg_bot_token'];
+    if(map['tg_admin_chat'])TG_ADMIN_CHAT=map['tg_admin_chat'];
+    if(map['tg_eng_map']){try{var em=JSON.parse(map['tg_eng_map']);TG_ENG_MAP=Object.assign(TG_ENG_MAP,em);}catch(ex){}}
+  }catch(e){console.log('loadTGSettings err',e);}
+}
 async function tgNotify(chatId,text){
   if(!chatId||!TG_TOKEN)return;
   try{
-    var tok=localStorage.getItem('tg_bot_token')||TG_TOKEN;
-    var url='https://api.telegram.org/bot'+tok+'/sendMessage?chat_id='+encodeURIComponent(chatId)+'&text='+encodeURIComponent(text)+'&parse_mode=HTML';
+    var url='https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(chatId)+'&text='+encodeURIComponent(text)+'&parse_mode=HTML';
     await fetch(url,{mode:'no-cors'});
   }catch(e){console.log('TG notify error:',e);}
 }
 async function tgNotifyAll(text){
-  // Notify admin
   if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
 }
 async function tgNotifyEngineer(engId,text){
   var chatId=TG_ENG_MAP[engId]||'';
   if(chatId)tgNotify(chatId,text);
-  // Also notify admin
   if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
-}
-async function loadTGEngMap(){
-  try{
-    var engs=await sb('users','GET',null,'?role=eq.engineer&select=user_id,eng_id,telegram_id&not.telegram_id.is.null');
-    if(engs&&engs.length){engs.forEach(function(e){var id=e.telegram_id;var uid=e.eng_id||e.user_id;if(id&&uid)TG_ENG_MAP[uid]=id;});}
-  }catch(ex){}
 }
 // ===== END TELEGRAM BOT CONFIG =====
 
@@ -2470,6 +2471,7 @@ async function doLogin(){
     if(pc)pc.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
+    loadTGSettings();
     setupNav();
     await navigate('dashboard');
     setTimeout(setupNav, 100);
@@ -2540,6 +2542,7 @@ async function tryAutoLogin(){
     if(pc2)pc2.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
+    loadTGSettings();
     await navigate('dashboard');
     setTimeout(setupNav,100);
     setTimeout(checkTATReminder, 800);
@@ -7616,7 +7619,7 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 async function renderTelegramSettings(){
   var engs=[];
   try{engs=await sb('users','GET',null,'?role=eq.engineer&order=name&select=id,name,eng_id,user_id');}catch(ex){engs=[];}
-  var adminChat=localStorage.getItem('tg_admin_chat')||TG_ADMIN_CHAT||'';
+  var adminChat=TG_ADMIN_CHAT||'';
   var rows=engs.map(function(e){
     var uid=e.eng_id||e.user_id||'';
     var tgId=TG_ENG_MAP[uid]||'';
@@ -7627,18 +7630,17 @@ async function renderTelegramSettings(){
       +'<td style="padding:10px 12px;"><input type="text" value="'+(tgId||'')+'" placeholder="Chat ID..." id="tgid-'+dbId+'" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;width:140px;outline:none;"></td>'
       +'<td style="padding:10px 12px;">'
       +'<button class="btn btn-outline btn-sm" onclick="_tgSave('+dbId+','+JSON.stringify(uid)+')">Save</button> '
-      +'<button class="btn btn-outline btn-sm" onclick="_tgTest('+JSON.stringify(tgId||'')+','+JSON.stringify(e.name)+')">Test</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="testTGId((document.getElementById(\'tgid-'+dbId+'\')?.value||\'\'),('+JSON.stringify(e.name)+'))">Test</button>'
       +'</td>'
       +'</tr>';
   }).join('');
-  var savedToken=localStorage.getItem('tg_bot_token')||'';
-  var tokenStatus=savedToken?'<span style="color:#059669;font-weight:600;">✅ Token Set</span>':'<span style="color:#dc2626;font-weight:600;">❌ Token not set</span>';
+  var tokenStatus=TG_TOKEN?'<span style="color:#059669;font-weight:600;">✅ Token Set</span>':'<span style="color:#dc2626;font-weight:600;">❌ Token not set</span>';
   document.getElementById('settings-content').innerHTML='<div class="card">'
     +'<h3 style="font-size:15px;font-weight:700;margin-bottom:14px;">📱 Telegram Bot Notifications</h3>'
     +'<div class="form-group" style="margin-bottom:16px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">'
     +'<label style="font-weight:700;">🤖 Bot Token '+tokenStatus+'</label>'
     +'<div style="display:flex;gap:8px;margin-top:6px;">'
-    +'<input type="text" id="tg-bot-token" value="'+savedToken+'" placeholder="Paste new bot token here..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;outline:none;font-family:monospace;">'
+    +'<input type="text" id="tg-bot-token" value="" placeholder="Paste new bot token here..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;outline:none;font-family:monospace;">'
     +'<button class="btn btn-primary" onclick="saveTGToken()">Save</button>'
     +'</div>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@BotFather → /mybots → @BhaviCRM_bot → API Token</p>'
@@ -7665,43 +7667,41 @@ async function renderTelegramSettings(){
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';_tgTest(c,'Admin');}
 function _tgTest(chatId,name){chatId=(chatId||'').trim();if(!chatId){alert('Chat ID enter karo');return;}tgNotify(chatId,'✅ Bhavi CRM Bot Test\n\nBot connected! Notifications will come here. 🎉');alert('Test sent to '+name+' — Telegram check karo!');}
-function _tgSave(dbId,engUid){
+async function _tgSave(dbId,engUid){
   var chatId=(document.getElementById('tgid-'+dbId)||{}).value||'';
   chatId=chatId.trim();
   if(chatId)TG_ENG_MAP[engUid]=chatId;
   else delete TG_ENG_MAP[engUid];
-  // Save entire map to localStorage so persists across pages
-  localStorage.setItem('tg_eng_map',JSON.stringify(TG_ENG_MAP));
+  await _tgSbSet('tg_eng_map',JSON.stringify(TG_ENG_MAP));
   alert('Saved!');
 }
 async function saveTGToken(){
   var token=(document.getElementById('tg-bot-token')?.value||'').trim();
   if(!token){alert('Token enter karo');return;}
-  localStorage.setItem('tg_bot_token',token);
+  await _tgSbSet('tg_bot_token',token);
   TG_TOKEN=token;
   alert('Bot Token saved! Test button thi check karo.');
   renderTelegramSettings();
 }
 async function saveTGAdmin(){
   var chatId=(document.getElementById('tg-admin-chat')?.value||'').trim();
-  localStorage.setItem('tg_admin_chat',chatId);
+  await _tgSbSet('tg_admin_chat',chatId);
   TG_ADMIN_CHAT=chatId;
   alert('Admin Chat ID saved!');
 }
 async function saveTGId(dbId,engUid){
   var chatId=(document.getElementById('tgid-'+dbId)?.value||'').trim();
-  try{
-    await sb('users','PATCH',{telegram_id:chatId||null},'?id=eq.'+dbId);
-    if(chatId)TG_ENG_MAP[engUid]=chatId;
-    else delete TG_ENG_MAP[engUid];
-    alert('Saved!');
-  }catch(e){alert('Error: '+e.message);}
+  if(chatId)TG_ENG_MAP[engUid]=chatId;
+  else delete TG_ENG_MAP[engUid];
+  await _tgSbSet('tg_eng_map',JSON.stringify(TG_ENG_MAP));
+  alert('Saved!');
 }
 async function testTGId(chatId,name){
   chatId=(chatId||'').trim();
-  if(!chatId){alert('Chat ID enter karo pehla');return;}
+  if(!chatId){alert('Chat ID enter karo pehla\n\nSteps:\n1. Telegram ma @BhaviCRM_bot search karo\n2. /start send karo\n3. @userinfobot ma /start send karo → Chat ID kadho\n4. Aama save karo');return;}
+  if(!TG_TOKEN){alert('Bot Token set nathi! Settings > Telegram > Token save karo.');return;}
   await tgNotify(chatId,'✅ Bhavi CRM Bot — Test message for '+name+'\n\nBot connected successfully! 🎉');
-  alert('Test message sent to '+name+'! Telegram check karo.');
+  alert('Request sent!\n\nJo message na aave to:\n1. '+name+' e Telegram ma @BhaviCRM_bot ne /start moku joiye\n2. Chat ID correct chhe ke check karo: '+chatId);
 }
 async function renderSettings(){
   const engineers=await sb('users','GET',null,'?role=eq.engineer&order=name');
@@ -11288,6 +11288,24 @@ async function saveWalkIn(){
     if(routeVal==='ICP'){saveWcId='SELF_CHECKIN_ICP';saveWcName='Self Check-in (ICP)';}
     else if(routeVal==='CSP'){saveWcId='SELF_CHECKIN_CSP';saveWcName='Self Check-in (CSP)';}
   }
+  // Duplicate check: same mobile today?
+  try{
+    var existCheck=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&mobile=eq.'+mobile+'&limit=1');
+    if(existCheck&&existCheck.length){
+      var exEntry=existCheck[0];
+      var choice=confirm('⚠️ Aa customer aaj already registered chhe!\n\nCustomer: '+exEntry.customer_name+'\nToken: #'+(exEntry.token_no||'—')+' | Time: '+exEntry.arrival_time+'\n\nOK = Existing entry ma products add karo\nCancel = New separate entry banavo');
+      if(choice){
+        var exProds=exEntry.products||[];
+        if(typeof exProds==='string'){try{exProds=JSON.parse(exProds);}catch(e2){exProds=[];}}
+        var mergedProds=exProds.concat(products);
+        await sb('walkin_log','PATCH',{products:mergedProds,product_count:mergedProds.length,updated_at:new Date().toISOString()},'?id=eq.'+exEntry.id);
+        showToastWI('✅ Products existing entry ma add kari didhaj!');
+        if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Walk-in Entry';}
+        renderWalkIn();return;
+      }
+    }
+  }catch(dupErr){/* ignore duplicate check errors, proceed with save */}
+
   try{
     var tokenNo=await getNextWalkInToken(today);
     await sb('walkin_log','POST',{
@@ -11317,14 +11335,14 @@ async function saveWalkIn(){
 }
 
 // Update departure time for existing entry
-async function updateWIDeparture(id){
+async function updateWIDeparture(id,fromReport){
   var now=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var conf=confirm('Set departure time to: '+now+'?');
   if(!conf)return;
   try{
     await sb('walkin_log','PATCH',{departure_time:now,updated_at:new Date().toISOString()},'?id=eq.'+id);
     showToastWI('✅ Departure time updated: '+now);
-    renderWalkIn();
+    if(fromReport)loadWalkInReport();else renderWalkIn();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -11929,10 +11947,25 @@ async function loadWalkInReport(){
         +'<div style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:12px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+' — '+entries.length+' customers</div>';
       entries.forEach(function(l){
         var products=l.products||[];
+        if(typeof products==='string'){try{products=JSON.parse(products);}catch(e){products=[];}}
+        var hasService=products.some(function(p){return p.type==='Inward'||p.type==='For Checking Only';});
+        var tokenBadge=l.token_no?'<span style="background:#1d4ed8;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-right:6px;">#'+l.token_no+'</span>':'';
+        var jobBadge=l.job_id?'<span style="background:#d1fae5;color:#065f46;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;">✅ '+l.job_id+'</span>':'';
+        var depBtn=!l.departure_time
+          ?'<button onclick="updateWIDeparture(\''+l.id+'\',true)" style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">⏰ Departure</button>'
+          :'<span style="font-size:11px;color:#065f46;background:#d1fae5;padding:2px 8px;border-radius:99px;">Out: '+l.departure_time+'</span>';
+        var createJobBtn=hasService&&!l.job_id
+          ?'<button onclick="createJobFromWalkIn(\''+l.id+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">🔧 Create Job</button>'
+          :'';
         html+='<div style="background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--primary);">'
-          +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">'
-          +'<div><span style="font-weight:600;">'+l.customer_name+'</span> <span style="color:var(--text-muted);font-size:12px;">'+l.mobile+'</span></div>'
-          +'<div style="font-size:11px;color:var(--text-muted);">🕐 In: <b>'+l.arrival_time+'</b>'+(l.departure_time?' | Out: <b>'+l.departure_time+'</b>':' | <span style="color:#f59e0b;">Still in office</span>')+'</div>'
+          +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:flex-start;">'
+          +'<div>'
+          +'<div style="font-weight:600;font-size:13px;">'+tokenBadge+escHtml(l.customer_name)+' <span style="color:var(--text-muted);font-size:12px;font-weight:400;">'+l.mobile+'</span> '+jobBadge+'</div>'
+          +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🕐 In: <b>'+l.arrival_time+'</b>'+(l.departure_time?' | Out: <b>'+l.departure_time+'</b>':' | <span style="color:#f59e0b;">Still in office</span>')+'</div>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+          +createJobBtn+depBtn
+          +'</div>'
           +'</div>'
           +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">'
           +products.map(function(p){
@@ -11948,7 +11981,7 @@ async function loadWalkInReport(){
               +(p.remarks?' — '+escHtml(p.remarks):'')+'</span>';
           }).join('')
           +'</div>'
-          +(l.wc_name?'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">By: '+l.wc_name+'</div>':'')
+          +(l.wc_name?'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">By: '+escHtml(l.wc_name)+'</div>':'')
           +'</div>';
       });
       html+='</div>';
