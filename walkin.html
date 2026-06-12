@@ -86,6 +86,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* Context pill */
 .ctx-pill{display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;color:#1e40af;margin-bottom:14px;}
+/* Extra product card */
+.extra-prod-card{border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px;position:relative;}
+.extra-prod-card .ep-num{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+.extra-prod-card .ep-remove{position:absolute;top:10px;right:12px;background:none;border:none;font-size:18px;cursor:pointer;color:#94a3b8;line-height:1;}
 /* Model suggestions */
 .model-suggest{position:absolute;z-index:500;background:#fff;border:1.5px solid #1a56db;border-radius:10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 16px rgba(0,0,0,.12);top:100%;left:0;margin-top:2px;}
 .model-suggest div{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;}
@@ -328,6 +332,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <textarea class="inp" id="inp-problem-detail" rows="2" placeholder="Any additional information..."></textarea>
       </div>
     </div>
+
+    <!-- Extra products (added dynamically) -->
+    <div id="extra-products"></div>
+    <button type="button" class="btn-outline" onclick="addExtraProduct()" style="margin-top:4px;margin-bottom:4px;" id="btn-add-product">+ Add Another Product</button>
 
     <div class="error-msg" id="product-error"></div>
     <button class="btn-primary" onclick="submitProductDetails()" style="margin-top:8px;"><span id="lbl-submit">Complete Check-in ✓</span></button>
@@ -740,6 +748,7 @@ function selectPurpose(purposeId,type){
   document.getElementById('inp-problem').value='';
   document.getElementById('inp-problem-detail').value='';
   document.querySelectorAll('.w-btn').forEach(function(b){b.classList.remove('selected');});
+  _extraProducts=[];var ep=document.getElementById('extra-products');if(ep)ep.innerHTML='';
 
   if(purposeId==='delivery'){
     loadDeliveryProducts();
@@ -896,6 +905,65 @@ function onProblemSelChange(){
   document.getElementById('problem-text-group').style.display='';
 }
 
+var _extraProducts=[];
+
+function addExtraProduct(){
+  var idx=_extraProducts.length;
+  _extraProducts.push({model:'',serial:'',problem:'',problemDetail:''});
+  var container=document.getElementById('extra-products');
+  var card=document.createElement('div');
+  card.className='extra-prod-card fade';
+  card.id='ep-card-'+idx;
+  var opts=(window._wiAllProblems||[]).length
+    ?(window._wiAllProblems||[]).map(function(o){return'<option value="'+o+'">'+o+'</option>';}).join('')
+    :(PROBLEM_OPTS[state.catId]||PROBLEM_OPTS.camera||[]).map(function(o){return'<option value="'+o+'">'+o+'</option>';}).join('');
+  card.innerHTML='<div class="ep-num">Product '+(idx+2)+'</div>'
+    +'<button class="ep-remove" onclick="removeExtraProduct('+idx+')" title="Remove">×</button>'
+    +'<div class="inp-group" style="position:relative;">'
+    +'<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">Model Number</label>'
+    +'<input class="inp" type="text" id="ep-model-'+idx+'" autocomplete="off" placeholder="Type to search model..." oninput="filterModelSugEP(this.value,'+idx+')" onfocus="filterModelSugEP(this.value,'+idx+')" onblur="setTimeout(function(){var s=document.getElementById(\'ep-sug-'+idx+'\');if(s)s.style.display=\'none\';},200)">'
+    +'<div class="model-suggest" id="ep-sug-'+idx+'" style="display:none;"></div>'
+    +'</div>'
+    +'<div class="inp-group"><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">Serial No (optional)</label>'
+    +'<input class="inp" type="text" id="ep-serial-'+idx+'" placeholder="Found on product label..."></div>'
+    +'<div class="inp-group"><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">Problem Type</label>'
+    +'<select class="inp" id="ep-problem-'+idx+'" onchange="onEpProblemChange('+idx+')">'
+    +'<option value="">— Select problem —</option>'+opts+'</select></div>'
+    +'<div class="inp-group" id="ep-other-grp-'+idx+'" style="display:none;">'
+    +'<label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;">Describe Problem</label>'
+    +'<textarea class="inp" id="ep-other-'+idx+'" rows="2" placeholder="Describe the issue..."></textarea></div>';
+  container.appendChild(card);
+}
+
+function removeExtraProduct(idx){
+  var card=document.getElementById('ep-card-'+idx);
+  if(card)card.remove();
+  _extraProducts[idx]=null;
+}
+
+function onEpProblemChange(idx){
+  var val=(document.getElementById('ep-problem-'+idx)||{}).value;
+  var grp=document.getElementById('ep-other-grp-'+idx);
+  if(grp)grp.style.display=val==='Other'?'':'none';
+}
+
+function filterModelSugEP(query,idx){
+  var sug=document.getElementById('ep-sug-'+idx);
+  if(!sug)return;
+  var q=(query||'').trim().toLowerCase();
+  if(!q){sug.style.display='none';return;}
+  var models=window._wiFilteredModels.length?window._wiFilteredModels:window._wiAllModels;
+  var filtered=models.filter(function(m){
+    return(m.model_no||'').toLowerCase().indexOf(q)>=0||(m.model_name||'').toLowerCase().indexOf(q)>=0;
+  }).slice(0,10);
+  if(!filtered.length){sug.style.display='none';return;}
+  sug.innerHTML=filtered.map(function(m){
+    var safe=(m.model_no||'').replace(/'/g,"\\'");
+    return'<div onmousedown="document.getElementById(\'ep-model-'+idx+'\').value=\''+safe+'\';document.getElementById(\'ep-sug-'+idx+'\').style.display=\'none\'"><b>'+m.model_no+'</b>'+(m.model_name?'<span style="color:var(--muted);font-size:12px;"> — '+m.model_name+'</span>':'')+'</div>';
+  }).join('');
+  sug.style.display='';
+}
+
 function submitProductDetails(){
   var errEl=document.getElementById('product-error');errEl.style.display='none';
   var isInward=state.purposeType==='Inward';
@@ -909,6 +977,17 @@ function submitProductDetails(){
   var probDetail=document.getElementById('inp-problem-detail').value.trim();
   state.problem=probSel==='Other'?(probText||probSel):probSel;
   state.problemDetail=probDetail;
+  // Collect extra products
+  state._extraProds=[];
+  _extraProducts.forEach(function(ep,idx){
+    if(ep===null)return;
+    var m=(document.getElementById('ep-model-'+idx)||{}).value||'';
+    if(!m.trim())return;
+    var ps=(document.getElementById('ep-problem-'+idx)||{}).value||'';
+    var po=(document.getElementById('ep-other-'+idx)||{}).value||'';
+    var sr=(document.getElementById('ep-serial-'+idx)||{}).value||'';
+    state._extraProds.push({model:m.trim(),serial:sr,problem:ps==='Other'?(po||ps):ps});
+  });
   submitEntry();
 }
 
@@ -953,6 +1032,10 @@ async function submitEntry(){
     remarks:remarks,
     serial:state.serial||''
   };
+  var allProducts=[product];
+  (state._extraProds||[]).forEach(function(ep){
+    allProducts.push({brand:state.brandName||state.catLabel,model:ep.model,type:state.purposeType,warranty:state.warranty||'',subtype:state.purposeId,remarks:ep.problem||remarks,serial:ep.serial||''});
+  });
 
   try{
     await sbPost('walkin_log',{
@@ -962,7 +1045,7 @@ async function submitEntry(){
       state:state.state_||null,city:state.city||null,pin:state.pin||null,
       area:state.area||null,address:state.address||null,
       arrival_time:arrivalTime,departure_time:null,
-      products:[product],product_count:1,
+      products:allProducts,product_count:allProducts.length,
       token_no:tokenNum,created_at:now.toISOString()
     });
 
@@ -976,9 +1059,10 @@ async function submitEntry(){
       {icon:state.catIcon,label:'Category',val:state.catLabel+(state.brandName?' — '+state.brandName:'')},
       {icon:'🎯',label:'Purpose',val:state.purposeLabel},
     ];
-    if(state.model)summaryRows.push({icon:'🔖',label:'Model',val:state.model+(state.serial?' (S/N: '+state.serial+')':'')});
+    allProducts.forEach(function(p,i){
+      summaryRows.push({icon:'🔖',label:'Product '+(i+1),val:p.model+(p.serial?' (S/N: '+p.serial+')':'')+(p.remarks?' — '+p.remarks:'')});
+    });
     if(state.warranty)summaryRows.push({icon:'🛡️',label:'Warranty',val:state.warranty});
-    if(state.problem)summaryRows.push({icon:'🔧',label:'Problem',val:state.problem+(state.problemDetail?' — '+state.problemDetail:'')});
     summaryRows.push({icon:'🏢',label:'Service',val:wcName.replace('Self Check-in ','')});
 
     document.getElementById('summary-box').innerHTML=
@@ -997,7 +1081,9 @@ function startOver(){
     brandName:'',brandWc:'',brandEmoji:'',
     purposeId:'',purposeLabel:'',purposeType:'',
     warranty:'',model:'',serial:'',problem:'',problemDetail:'',
-    _deliveryItems:null,_selectedDelivery:null};
+    _deliveryItems:null,_selectedDelivery:null,_extraProds:[]};
+  _extraProducts=[];
+  var ep=document.getElementById('extra-products');if(ep)ep.innerHTML='';
   document.getElementById('inp-mobile').value='';
   goPage('pg-lang');
 }

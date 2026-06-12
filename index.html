@@ -12102,7 +12102,7 @@ async function downloadWalkInExcel(){
 }
 
 // ===== COURIER REGISTER =====
-var ACCESSORIES_LIST=['Body Cap','Lens Cap Front','Lens Cap Rear','Both Lens Caps','Eye Cap','UV Filter','Neck Strip','Other'];
+var ACCESSORIES_LIST=['Body Cap','Lens Cap Front','Lens Cap Rear','Both Lens Caps','Eye Cap','UV Filter','Neck Strip','Battery','Nill','Other'];
 
 async function renderCourier(){
   var pc=document.getElementById('page-content');
@@ -12304,7 +12304,7 @@ function addCourierProduct(dir){
   var idx=container.children.length;
   var div=document.createElement('div');
   div.className='cr-product-row';
-  div.style.cssText='background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid var(--border);position:relative;';
+  div.style.cssText='background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid var(--border);position:relative;border-left:3px solid #1d4ed8;';
 
   var accOptions=ACCESSORIES_LIST.map(function(a){
     return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;">'
@@ -12348,7 +12348,13 @@ function addCourierProduct(dir){
     +'<div class="form-group"><label>Accessories Received</label>'
     +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:2px;">'
     +accOptions+'</div></div>';
-  container.appendChild(div);
+  // Insert new product at TOP so user doesn't have to scroll down
+  container.insertBefore(div, container.firstChild);
+  // Renumber all product labels
+  Array.from(container.children).forEach(function(row,i){
+    var lbl=row.querySelector('span');
+    if(lbl&&lbl.textContent.startsWith('Product '))lbl.textContent='Product '+(i+1);
+  });
 }
 
 function toggleInvoiceAmount(sel){
