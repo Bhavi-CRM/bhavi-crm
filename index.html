@@ -12346,7 +12346,7 @@ function addCourierProduct(dir){
       +'<input type="number" class="cr-invoice-amt" placeholder="e.g. 2500" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;max-width:200px;"></div>'
       +'</div>':'')
     +'<div class="form-group"><label>Accessories Received</label>'
-    +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:2px;">'
+    +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:repeat(2,max-content);gap:2px 32px;">'
     +accOptions+'</div></div>';
   // Insert new product at TOP so user doesn't have to scroll down
   container.insertBefore(div, container.firstChild);
