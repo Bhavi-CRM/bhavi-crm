@@ -10959,7 +10959,87 @@ async function renderWalkIn(){
       <div style="font-size:10px;color:#64748b;margin-top:4px;">ICP + CSP combined</div>
     </div>
   </div>
-  <div id="wi-entry-wizard" class="card" style="margin-bottom:14px;"></div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <h2>🚶 Walk-in Customer Entry</h2>
+    </div>
+
+    ${_isAdm?`<div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Route To Work Center</label>
+      <select id="wi-route" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;max-width:320px;">
+        <option value="ICP">📷 ICP — Camera Service</option>
+        <option value="CSP">🖨️ CSP — Printer / Fujifilm Service</option>
+        <option value="self">🧑 My Queue (Admin)</option>
+      </select>
+    </div>`:''}
+
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="form-group">
+        <label>Mobile No <span class="req">*</span></label>
+        <div style="display:flex;gap:8px;">
+          <input type="tel" id="wi-mobile" maxlength="10" placeholder="10 digit mobile" oninput="if(this.value.length===10)fetchWalkInCustomer()" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
+          <button class="btn btn-primary btn-sm" onclick="fetchWalkInCustomer()" style="flex-shrink:0;">🔍 Fetch</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Customer Name <span class="req">*</span></label>
+        <input type="text" id="wi-name" placeholder="Customer full name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="form-group">
+        <label>Arrival Time <span class="req">*</span></label>
+        <input type="time" id="wi-arrival" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+      </div>
+      <div class="form-group">
+        <label>Departure Time</label>
+        <input type="time" id="wi-departure" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+      </div>
+    </div>
+
+    <hr class="divider">
+    <h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text-muted);">📍 Address <small style="font-weight:400;">(optional — auto-filled if customer exists)</small></h3>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="form-group form-full"><label>Address Line 1</label><input type="text" id="wi-address" placeholder="House No, Street, Building..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+      <div class="form-group form-full"><label>Address Line 2</label><input type="text" id="wi-address2" placeholder="Society, Landmark, Colony..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+      <div class="form-group">
+        <label>State</label>
+        <select id="wi-state" onchange="onWiStateChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+          <option value="">-- Select State --</option>
+          <option value="Gujarat">Gujarat</option>
+          <option value="Rajasthan">Rajasthan</option>
+          <option value="Maharashtra">Maharashtra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>City</label>
+        <select id="wi-city" onchange="onWiCityChange()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
+          <option value="">-- Select City --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Pin Code</label>
+        <div style="position:relative;">
+          <input type="text" id="wi-pin" autocomplete="off" placeholder="Type area name or pin code..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;" oninput="filterWiPinList(this.value)" onfocus="filterWiPinList(this.value)" onblur="setTimeout(function(){var d=document.getElementById('wi-pin-drop');if(d)d.style.display='none';},200)">
+          <div id="wi-pin-drop" style="display:none;position:absolute;z-index:500;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:2px;"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Area</label>
+        <input type="text" id="wi-area" placeholder="Auto-filled from Pin Code" readonly style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;background:#f8fafc;color:#64748b;cursor:not-allowed;">
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <label style="font-weight:600;font-size:13px;">Products <span class="req">*</span></label>
+      <button class="btn btn-outline btn-sm" onclick="addWalkInProduct()">+ Add Product</button>
+    </div>
+    <div id="wi-products"></div>
+
+    <button id="wi-save-btn" class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="saveWalkIn()">💾 Save Walk-in Entry</button>
+  </div>
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -10976,11 +11056,15 @@ async function renderWalkIn(){
     <div id="wi-today-list">${renderWalkInList(todayLogs)}</div>
   </div>`;
 
+  // Set current time as arrival
+  var now=new Date();
+  document.getElementById('wi-arrival').value=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
   // Populate voice dropdown now that the element exists in DOM
   populateVoiceDropdown();
 
-  // Init walk-in wizard
-  initWalkInWizard();
+  // Add first product row
+  addWalkInProduct();
 }
 
 async function loadWIDateView(){
@@ -11309,425 +11393,6 @@ async function saveWalkIn(){
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Walk-in Entry';}
   }
 }
-
-// =============================================
-// WALK-IN WIZARD
-// =============================================
-function initWalkInWizard(){
-  var W=window._wiW={
-    step:'purpose',
-    purpose:'',
-    mobile:'',
-    custName:'',
-    custCity:'',
-    custAddress:'',
-    isNew:false,
-    products:[],
-    prevEntries:[],
-    arrival:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
-    isAdm:!!(currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller'),
-    wcRoute:'ICP'
-  };
-  _wiRender();
-}
-
-function _wiEl(){return document.getElementById('wi-entry-wizard');}
-
-function _wiRender(){
-  var W=window._wiW;
-  if(!W)return;
-  var el=_wiEl();
-  if(!el)return;
-  var steps={purpose:1,mobile:2,customer:3,product:4,delivery:4,purchase:4,summary:5};
-  var stepNum=steps[W.step]||1;
-  var prog='';
-  var labels=['Purpose','Mobile','Customer','Details','Done'];
-  for(var i=0;i<5;i++){
-    var active=i+1===stepNum,done=i+1<stepNum;
-    prog+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">'
-      +'<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;'
-      +(done?'background:#059669;color:#fff;':'active'===(active?'active':'')&&active?'background:#1d4ed8;color:#fff;':'background:#e2e8f0;color:#64748b;')
-      +'">'+(done?'✓':(i+1))+'</div>'
-      +'<div style="font-size:10px;color:'+(active?'#1d4ed8':(done?'#059669':'#94a3b8'))+';font-weight:'+(active?'700':'500')+';">'+labels[i]+'</div>'
-      +'</div>';
-    if(i<4)prog+='<div style="flex:1;height:2px;background:'+(done?'#059669':'#e2e8f0')+';margin-top:14px;"></div>';
-  }
-  var header='<div style="margin-bottom:16px;">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
-    +'<h2 style="font-size:15px;font-weight:700;margin:0;">🚶 New Walk-in Entry</h2>'
-    +(W.step!=='purpose'?'<button class="btn btn-outline btn-sm" onclick="initWalkInWizard()">↩ Restart</button>':'')
-    +'</div>'
-    +'<div style="display:flex;align-items:flex-start;gap:0;">'+prog+'</div>'
-    +'</div>';
-  if(W.step==='purpose')el.innerHTML=header+_wiStepPurpose();
-  else if(W.step==='mobile')el.innerHTML=header+_wiStepMobile();
-  else if(W.step==='customer')el.innerHTML=header+_wiStepCustomer();
-  else if(W.step==='product')el.innerHTML=header+_wiStepProduct();
-  else if(W.step==='delivery')el.innerHTML=header+_wiStepDelivery();
-  else if(W.step==='purchase')el.innerHTML=header+_wiStepPurchase();
-  else if(W.step==='summary')el.innerHTML=header+_wiStepSummary();
-}
-
-function _wiStepPurpose(){
-  var W=window._wiW;
-  var purposes=[
-    {id:'inward',icon:'📥',label:'Inward Service',desc:'Camera, printer, or equipment for repair'},
-    {id:'eol',icon:'🔁',label:'EOL Product',desc:'End-of-life / replacement product'},
-    {id:'delivery',icon:'📤',label:'Delivery / Collection',desc:'Customer collecting their repaired product'},
-    {id:'purchase',icon:'🛍️',label:'Purchase / Accessories',desc:'Customer buying accessories or products'}
-  ];
-  var isAdm=W.isAdm;
-  var routeHtml=isAdm?'<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">'
-    +'<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Route to Work Center</label>'
-    +'<select id="wi-wiz-route" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;max-width:280px;">'
-    +'<option value="ICP">📷 ICP — Camera Service</option>'
-    +'<option value="CSP">🖨️ CSP — Printer / Fujifilm Service</option>'
-    +'<option value="self">🧑 My Queue (Admin)</option>'
-    +'</select></div>':'';
-  return routeHtml
-    +'<p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">What brings the customer in today?</p>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-    +purposes.map(function(p){
-      return '<button onclick="_wiPickPurpose(\''+p.id+'\')" style="background:#fff;border:2px solid var(--border);border-radius:12px;padding:16px 12px;text-align:center;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:6px;" onmouseover="this.style.borderColor=\'#1d4ed8\';this.style.background=\'#eff6ff\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'#fff\'">'
-        +'<span style="font-size:28px;">'+p.icon+'</span>'
-        +'<span style="font-size:13px;font-weight:700;color:var(--text);">'+p.label+'</span>'
-        +'<span style="font-size:11px;color:var(--text-muted);">'+p.desc+'</span>'
-        +'</button>';
-    }).join('')
-    +'</div>';
-}
-
-function _wiPickPurpose(p){
-  var W=window._wiW;
-  W.purpose=p;
-  var routeSel=document.getElementById('wi-wiz-route');
-  if(routeSel)W.wcRoute=routeSel.value;
-  W.step='mobile';
-  _wiRender();
-  setTimeout(function(){var m=document.getElementById('wi-wiz-mobile');if(m)m.focus();},100);
-}
-
-function _wiStepMobile(){
-  var W=window._wiW;
-  var purposeLabel={inward:'📥 Inward Service',eol:'🔁 EOL Product',delivery:'📤 Delivery',purchase:'🛍️ Purchase'}[W.purpose]||W.purpose;
-  return '<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">'
-    +'<span style="font-weight:600;">Purpose: </span>'+escHtml(purposeLabel)
-    +'</div>'
-    +'<p style="font-size:15px;font-weight:600;margin-bottom:12px;">Enter customer\'s mobile number:</p>'
-    +'<div style="display:flex;gap:8px;margin-bottom:10px;">'
-    +'<input id="wi-wiz-mobile" type="tel" maxlength="10" placeholder="10-digit mobile number" value="'+escHtml(W.mobile||'')+'" oninput="if(this.value.length===10)_wiMobileNext()" style="flex:1;border:2px solid var(--border);border-radius:10px;padding:12px 16px;font-size:16px;outline:none;letter-spacing:2px;" onfocus="this.style.borderColor=\'#1d4ed8\'" onblur="this.style.borderColor=\'var(--border)\'">'
-    +'<button class="btn btn-primary" onclick="_wiMobileNext()" style="padding:12px 20px;font-size:14px;">→</button>'
-    +'</div>'
-    +'<p style="font-size:12px;color:var(--text-muted);">We\'ll look up the customer automatically.</p>';
-}
-
-async function _wiMobileNext(){
-  var W=window._wiW;
-  var inp=document.getElementById('wi-wiz-mobile');
-  if(!inp)return;
-  var mobile=inp.value.trim();
-  if(mobile.length!==10){inp.style.borderColor='#ef4444';inp.focus();return;}
-  W.mobile=mobile;
-  var btn=inp.nextElementSibling;
-  if(btn){btn.disabled=true;btn.textContent='...';}
-  try{
-    var rows=await sb('customers','GET',null,'?mobile=eq.'+mobile+'&limit=1');
-    if(rows&&rows.length){
-      var c=rows[0];
-      W.custName=c.name||'';
-      W.custCity=c.city||'';
-      W.custAddress=(c.address||'')+(c.area?', '+c.area:'');
-      W.custData=c;
-      W.isNew=false;
-    } else {
-      W.custName='';W.custCity='';W.custAddress='';W.custData=null;W.isNew=true;
-    }
-    if(W.purpose==='delivery'){
-      var prev=await sb('walkin_log','GET',null,'?mobile=eq.'+mobile+'&order=created_at.desc&limit=30');
-      W.prevEntries=(prev||[]).filter(function(l){
-        var prods=l.products||[];
-        if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
-        return prods.some(function(p){return p.type==='Inward'||p.type==='For Checking Only'||p.type==='EOL';});
-      });
-    }
-    W.step='customer';
-    _wiRender();
-  }catch(e){
-    alert('Error looking up customer: '+e.message);
-    if(btn){btn.disabled=false;btn.textContent='→';}
-  }
-}
-
-function _wiStepCustomer(){
-  var W=window._wiW;
-  if(!W.isNew){
-    return '<p style="font-size:15px;font-weight:600;margin-bottom:16px;">Is this the right customer?</p>'
-      +'<div style="background:#f0fdf4;border:2px solid #059669;border-radius:12px;padding:16px;margin-bottom:16px;">'
-      +'<div style="font-size:18px;font-weight:700;color:#065f46;margin-bottom:4px;">'+escHtml(W.custName)+'</div>'
-      +'<div style="font-size:13px;color:#047857;">📱 '+escHtml(W.mobile)+(W.custCity?' &nbsp;|&nbsp; 🏙️ '+escHtml(W.custCity):'')+'</div>'
-      +(W.custAddress?'<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 '+escHtml(W.custAddress)+'</div>':'')
-      +'</div>'
-      +'<div style="display:flex;gap:10px;">'
-      +'<button class="btn btn-primary" style="flex:1;padding:12px;" onclick="_wiConfirmCustomer(true)">✅ Yes, that\'s correct</button>'
-      +'<button class="btn btn-outline" style="flex:1;padding:12px;" onclick="_wiConfirmCustomer(false)">✏️ Different customer</button>'
-      +'</div>';
-  } else {
-    return '<p style="font-size:15px;font-weight:600;margin-bottom:4px;">New customer — please fill in details:</p>'
-      +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Mobile: <strong>'+escHtml(W.mobile)+'</strong></p>'
-      +'<div style="display:flex;flex-direction:column;gap:10px;">'
-      +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Full Name <span style="color:#ef4444;">*</span></label>'
-      +'<input id="wi-wiz-name" type="text" placeholder="Customer full name" value="'+escHtml(W.custName||'')+'" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;outline:none;width:100%;" onfocus="this.style.borderColor=\'#1d4ed8\'" onblur="this.style.borderColor=\'var(--border)\'"></div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-      +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">City</label>'
-      +'<input id="wi-wiz-city" type="text" placeholder="City" value="'+escHtml(W.custCity||'')+'" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;outline:none;width:100%;"></div>'
-      +'<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Address <small>(optional)</small></label>'
-      +'<input id="wi-wiz-address" type="text" placeholder="Street / area" value="'+escHtml(W.custAddress||'')+'" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;outline:none;width:100%;"></div>'
-      +'</div></div>'
-      +'<button class="btn btn-primary" style="width:100%;padding:12px;margin-top:14px;" onclick="_wiSaveNewCustomer()">Continue →</button>';
-  }
-}
-
-function _wiConfirmCustomer(yes){
-  var W=window._wiW;
-  if(!yes){W.isNew=true;_wiRender();return;}
-  W.step=(W.purpose==='delivery'?'delivery':(W.purpose==='purchase'?'purchase':'product'));
-  _wiRender();
-}
-
-function _wiSaveNewCustomer(){
-  var W=window._wiW;
-  var nameEl=document.getElementById('wi-wiz-name');
-  if(!nameEl||!nameEl.value.trim()){nameEl&&(nameEl.style.borderColor='#ef4444');return;}
-  W.custName=nameEl.value.trim();
-  W.custCity=(document.getElementById('wi-wiz-city')||{}).value||'';
-  W.custAddress=(document.getElementById('wi-wiz-address')||{}).value||'';
-  W.step=(W.purpose==='delivery'?'delivery':(W.purpose==='purchase'?'purchase':'product'));
-  _wiRender();
-}
-
-function _wiStepProduct(){
-  var W=window._wiW;
-  if(!W.products||!W.products.length)W.products=[{brand:'',model:'',problem:'',warranty:'In Warranty',type:W.purpose==='eol'?'EOL':'Inward'}];
-  var isEol=W.purpose==='eol';
-  var rows=W.products.map(function(p,i){
-    var brandOpts=(window.allBrands||[]).map(function(b){return '<option value="'+escHtml(b.name)+'"'+(p.brand===b.name?' selected':'')+'>'+escHtml(b.name)+'</option>';}).join('');
-    return '<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;position:relative;">'
-      +(W.products.length>1?'<button onclick="_wiRemoveProduct('+i+')" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#94a3b8;">×</button>':'')
-      +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">PRODUCT '+(i+1)+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
-      +'<div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Brand</label>'
-      +'<select data-pi="'+i+'" data-field="brand" onchange="_wiProdChange(this)" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;"><option value="">-- Brand --</option>'+brandOpts+'</select></div>'
-      +'<div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Model No</label>'
-      +'<input type="text" data-pi="'+i+'" data-field="model" oninput="_wiProdChange(this)" value="'+escHtml(p.model||'')+'" placeholder="Model number" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;"></div>'
-      +'</div>'
-      +(isEol?'':'<div style="margin-bottom:8px;"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Problem / Issue</label>'
-      +'<input type="text" data-pi="'+i+'" data-field="problem" oninput="_wiProdChange(this)" value="'+escHtml(p.problem||'')+'" placeholder="Describe the issue..." style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;"></div>')
-      +'<div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Warranty</label>'
-      +'<select data-pi="'+i+'" data-field="warranty" onchange="_wiProdChange(this)" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;">'
-      +'<option value="In Warranty"'+(p.warranty==='In Warranty'?' selected':'')+'>In Warranty</option>'
-      +'<option value="Out of Warranty"'+(p.warranty==='Out of Warranty'?' selected':'')+'>Out of Warranty</option>'
-      +'<option value="AMC"'+(p.warranty==='AMC'?' selected':'')+'>AMC</option>'
-      +'</select></div>'
-      +'</div>';
-  }).join('');
-  return '<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">'
-    +'<strong>'+escHtml(W.custName)+'</strong> &nbsp;|&nbsp; 📱 '+escHtml(W.mobile)+(W.custCity?' &nbsp;|&nbsp; '+escHtml(W.custCity):'')
-    +'</div>'
-    +'<p style="font-size:15px;font-weight:600;margin-bottom:12px;">'+(isEol?'Tell us about the EOL product:':'What product is the customer bringing in?')+'</p>'
-    +rows
-    +'<button class="btn btn-outline btn-sm" onclick="_wiAddProduct()" style="margin-bottom:14px;">+ Add another product</button>'
-    +'<button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;" onclick="_wiGoSummary()">Review & Save →</button>';
-}
-
-function _wiProdChange(el){
-  var W=window._wiW;
-  var i=parseInt(el.dataset.pi);
-  if(!W.products[i])return;
-  W.products[i][el.dataset.field]=el.value;
-}
-
-function _wiAddProduct(){
-  var W=window._wiW;
-  W.products.push({brand:'',model:'',problem:'',warranty:'In Warranty',type:W.purpose==='eol'?'EOL':'Inward'});
-  _wiRender();
-}
-
-function _wiRemoveProduct(i){
-  var W=window._wiW;
-  W.products.splice(i,1);
-  _wiRender();
-}
-
-function _wiStepDelivery(){
-  var W=window._wiW;
-  var hasEntries=W.prevEntries&&W.prevEntries.length;
-  if(!hasEntries){
-    return '<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">'
-      +'<strong>'+escHtml(W.custName||'Customer')+'</strong> &nbsp;|&nbsp; 📱 '+escHtml(W.mobile)+'</div>'
-      +'<div style="text-align:center;padding:30px;color:var(--text-muted);">'
-      +'<div style="font-size:32px;margin-bottom:10px;">📭</div>'
-      +'<p style="font-size:14px;font-weight:600;">No previous inward entries found</p>'
-      +'<p style="font-size:12px;margin-bottom:20px;">This customer has no repair/inward history to collect.</p>'
-      +'<button class="btn btn-outline" onclick="initWalkInWizard()">← Start Over</button>'
-      +'</div>';
-  }
-  var itemRows=W.prevEntries.map(function(l,li){
-    var prods=l.products||[];
-    if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
-    var inwardProds=prods.filter(function(p){return p.type==='Inward'||p.type==='For Checking Only'||p.type==='EOL';});
-    return inwardProds.map(function(p,pi){
-      var uid='del-'+li+'-'+pi;
-      return '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;" for="'+uid+'">'
-        +'<input type="checkbox" id="'+uid+'" data-li="'+li+'" data-pi="'+pi+'" style="margin-top:2px;width:16px;height:16px;cursor:pointer;">'
-        +'<div>'
-        +'<div style="font-size:13px;font-weight:600;">'+(p.brand?escHtml(p.brand)+' ':'')+(p.model?escHtml(p.model):'Unknown Model')+'</div>'
-        +(p.problem?'<div style="font-size:12px;color:#64748b;">'+escHtml(p.problem)+'</div>':'')
-        +'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Inward: '+escHtml(l.visit_date||'')+(l.arrival_time?' at '+escHtml(l.arrival_time):'')+'</div>'
-        +'</div></label>';
-    }).join('');
-  }).join('');
-  return '<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">'
-    +'<strong>'+escHtml(W.custName||'Customer')+'</strong> &nbsp;|&nbsp; 📱 '+escHtml(W.mobile)+'</div>'
-    +'<p style="font-size:15px;font-weight:600;margin-bottom:12px;">Which products is the customer collecting?</p>'
-    +'<p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Select all that apply:</p>'
-    +itemRows
-    +'<button class="btn btn-primary" style="width:100%;padding:12px;margin-top:6px;font-size:14px;" onclick="_wiGoSummary()">Review & Save →</button>';
-}
-
-function _wiStepPurchase(){
-  var W=window._wiW;
-  if(!W.products||!W.products.length)W.products=[{brand:'',model:'',problem:'',warranty:'',type:'Purchase',qty:'1'}];
-  var rows=W.products.map(function(p,i){
-    return '<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;position:relative;">'
-      +(W.products.length>1?'<button onclick="_wiRemoveProduct('+i+')" style="position:absolute;top:8px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#94a3b8;">×</button>':'')
-      +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">ITEM '+(i+1)+'</div>'
-      +'<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;">'
-      +'<div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Item / Product Name</label>'
-      +'<input type="text" data-pi="'+i+'" data-field="model" oninput="_wiProdChange(this)" value="'+escHtml(p.model||'')+'" placeholder="e.g. Memory card, paper roll..." style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;"></div>'
-      +'<div><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px;">Qty</label>'
-      +'<input type="number" data-pi="'+i+'" data-field="qty" oninput="_wiProdChange(this)" value="'+escHtml(p.qty||'1')+'" min="1" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;width:100%;"></div>'
-      +'</div></div>';
-  }).join('');
-  return '<div style="background:#eff6ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px;">'
-    +'<strong>'+escHtml(W.custName||'Customer')+'</strong> &nbsp;|&nbsp; 📱 '+escHtml(W.mobile)+'</div>'
-    +'<p style="font-size:15px;font-weight:600;margin-bottom:12px;">What is the customer purchasing?</p>'
-    +rows
-    +'<button class="btn btn-outline btn-sm" onclick="_wiAddProduct()" style="margin-bottom:14px;">+ Add another item</button>'
-    +'<button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;" onclick="_wiGoSummary()">Review & Save →</button>';
-}
-
-function _wiGoSummary(){
-  var W=window._wiW;
-  if(W.step==='delivery'){
-    var selected=[];
-    document.querySelectorAll('#wi-entry-wizard input[type=checkbox]:checked').forEach(function(chk){
-      var li=parseInt(chk.dataset.li),pi=parseInt(chk.dataset.pi);
-      var entry=W.prevEntries[li];
-      if(!entry)return;
-      var prods=entry.products||[];
-      if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
-      var inwardProds=prods.filter(function(p){return p.type==='Inward'||p.type==='For Checking Only'||p.type==='EOL';});
-      var prod=inwardProds[pi];
-      if(prod)selected.push(Object.assign({},prod,{type:'Outward'}));
-    });
-    if(!selected.length){alert('Please select at least one product to collect.');return;}
-    W.products=selected;
-  } else {
-    var validProds=W.products.filter(function(p){return p.model||p.brand;});
-    if(!validProds.length){alert('Please add at least one product.');return;}
-    W.products=validProds;
-  }
-  W.step='summary';
-  _wiRender();
-}
-
-function _wiStepSummary(){
-  var W=window._wiW;
-  var purposeLabel={inward:'📥 Inward Service',eol:'🔁 EOL Product',delivery:'📤 Delivery',purchase:'🛍️ Purchase'}[W.purpose]||W.purpose;
-  var prodRows=W.products.map(function(p,i){
-    return '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">'
-      +'<span style="font-weight:600;">'+(i+1)+'. </span>'
-      +(p.brand?escHtml(p.brand)+' ':'')+(p.model?escHtml(p.model):'—')
-      +(p.problem?' — <span style="color:#64748b;">'+escHtml(p.problem)+'</span>':'')
-      +(p.type?'<span style="font-size:11px;margin-left:6px;padding:1px 6px;border-radius:4px;background:#e2e8f0;color:#475569;">'+escHtml(p.type)+'</span>':'')
-      +'</div>';
-  }).join('');
-  return '<p style="font-size:15px;font-weight:600;margin-bottom:14px;">Confirm & Save</p>'
-    +'<div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px;">'
-    +'<div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:10px;">CUSTOMER</div>'
-    +'<div style="font-size:14px;font-weight:700;">'+escHtml(W.custName)+'</div>'
-    +'<div style="font-size:13px;color:#64748b;">📱 '+escHtml(W.mobile)+(W.custCity?' &nbsp;|&nbsp; 🏙️ '+escHtml(W.custCity):'')+'</div>'
-    +'<div style="margin-top:10px;font-size:12px;color:var(--text-muted);font-weight:600;">PURPOSE</div>'
-    +'<div style="font-size:13px;font-weight:600;color:#1d4ed8;">'+purposeLabel+'</div>'
-    +'<div style="margin-top:10px;font-size:12px;color:var(--text-muted);font-weight:600;">PRODUCTS ('+W.products.length+')</div>'
-    +prodRows
-    +'</div>'
-    +'<div style="display:flex;gap:10px;">'
-    +'<button class="btn btn-outline" style="flex:1;padding:12px;" onclick="window._wiW.step=(window._wiW.purpose===\'delivery\'?\'delivery\':(window._wiW.purpose===\'purchase\'?\'purchase\':\'product\'));_wiRender()">← Edit</button>'
-    +'<button id="wi-wiz-save-btn" class="btn btn-primary" style="flex:2;padding:12px;font-size:14px;font-weight:700;" onclick="_wiSaveEntry()">💾 Save Entry</button>'
-    +'</div>';
-}
-
-async function _wiSaveEntry(){
-  var W=window._wiW;
-  var saveBtn=document.getElementById('wi-wiz-save-btn');
-  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
-  var today=new Date().toLocaleDateString('en-CA');
-  var saveWcId=currentUser.user_id,saveWcName=currentUser.name;
-  if(W.isAdm){
-    var r=W.wcRoute;
-    if(r==='ICP'){saveWcId='SELF_CHECKIN_ICP';saveWcName='Self Check-in (ICP)';}
-    else if(r==='CSP'){saveWcId='SELF_CHECKIN_CSP';saveWcName='Self Check-in (CSP)';}
-  }
-  try{
-    var existCheck=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&mobile=eq.'+W.mobile+'&limit=1');
-    if(existCheck&&existCheck.length){
-      var exEntry=existCheck[0];
-      var choice=confirm('⚠️ This customer is already registered today!\n\nCustomer: '+exEntry.customer_name+'\nToken: #'+(exEntry.token_no||'—')+'\n\nOK = Add products to existing entry\nCancel = Create new entry');
-      if(choice){
-        var exProds=exEntry.products||[];
-        if(typeof exProds==='string'){try{exProds=JSON.parse(exProds);}catch(e){exProds=[];}}
-        var merged=exProds.concat(W.products);
-        await sb('walkin_log','PATCH',{products:merged,product_count:merged.length,updated_at:new Date().toISOString()},'?id=eq.'+exEntry.id);
-        showToastWI('✅ Products added to existing entry!');
-        renderWalkIn();return;
-      }
-    }
-  }catch(dupErr){}
-  try{
-    var tokenNo=await getNextWalkInToken(today);
-    await sb('walkin_log','POST',{
-      wc_id:saveWcId,
-      wc_name:saveWcName,
-      visit_date:today,
-      mobile:W.mobile,
-      customer_name:W.custName,
-      city:W.custCity||null,
-      address:W.custAddress||null,
-      arrival_time:W.arrival,
-      products:W.products,
-      product_count:W.products.length,
-      token_no:tokenNo,
-      created_at:new Date().toISOString()
-    });
-    if(W.isNew&&W.custName){
-      try{
-        var existCust=await sb('customers','GET',null,'?mobile=eq.'+W.mobile+'&limit=1');
-        if(!existCust||!existCust.length){
-          await sb('customers','POST',{name:W.custName,mobile:W.mobile,city:W.custCity||null,address:W.custAddress||null,created_at:new Date().toISOString()});
-        }
-      }catch(ce){}
-    }
-    showToastWI('✅ Walk-in entry saved! Token #'+tokenNo);
-    renderWalkIn();
-  }catch(e){
-    alert('Error saving: '+e.message);
-    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Save Entry';}
-  }
-}
-// =============================================
-// END WALK-IN WIZARD
-// =============================================
 
 // Update departure time for existing entry
 async function updateWIDeparture(id,fromReport){
@@ -14957,6 +14622,14 @@ async function viewSiteVisits(siteId,siteName){
         +(v.work_done?'<div style="margin-top:6px;font-size:13px;"><b>🔧 Work Done:</b> '+v.work_done+'</div>':'')
         +matHtml
         +ddHtml
+        +(function(){
+          var photos=v.photos||[];
+          if(typeof photos==='string'){try{photos=JSON.parse(photos);}catch(e){photos=[];}}
+          return photos.length
+            ?'<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">'
+              +photos.map(function(src){return'<img src="'+src+'" onclick="window._showVisitPhoto(\''+encodeURIComponent(src)+'\')" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;" title="Click to enlarge">';}).join('')
+              +'</div>':'';
+        })()
         +'</div>';
     }).join(''):'<div style="text-align:center;padding:30px;color:var(--text-muted);">No visits yet</div>';
     modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
@@ -15170,6 +14843,7 @@ async function saveVisitWithMaterial(siteId,btn){
   }
 
   try{
+    var photos=await _readPhotosBase64('av-photos-'+siteId);
     var visitData={
       site_id:siteId,visit_date:date,visit_time:time,
       work_done:work,
@@ -15177,6 +14851,7 @@ async function saveVisitWithMaterial(siteId,btn){
       material_items:materials.length?JSON.stringify(materials):null,
       material_total:totalSelling||null,
       delivery_details:deliveryDetails?JSON.stringify(deliveryDetails):null,
+      photos:photos.length?photos:null,
       created_by:currentUser?.user_id||'ENG002',
       created_by_name:currentUser?.name||currentUser?.user_id||''
     };
@@ -15231,7 +14906,9 @@ async function saveQuickVisit(){
   if(!siteId){alert('Please select a site!');return;}
   if(!date){alert('Date required!');return;}
   try{
-    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({site_id:parseInt(siteId),visit_date:date,visit_time:time,work_done:work,material_delivered:material,created_by:currentUser?.user_id||'ENG002',created_by_name:currentUser?.name||currentUser?.user_id||''})});
+    var photos=await _readPhotosBase64('qv-photos');
+    var vData={site_id:parseInt(siteId),visit_date:date,visit_time:time,work_done:work,material_delivered:material,photos:photos.length?photos:null,created_by:currentUser?.user_id||'ENG002',created_by_name:currentUser?.name||currentUser?.user_id||''};
+    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(vData)});
     document.getElementById('modal-site-visit-quick').remove();
     alert('✅ Visit saved!');
   }catch(e){alert('Error: '+e.message);}
@@ -15298,15 +14975,23 @@ async function loadAutoVisitReport(){
       html+='<div class="card" style="margin-bottom:14px;">'
         +'<div style="font-size:15px;font-weight:700;color:#7c3aed;margin-bottom:2px;">🏗️ '+sg.site_name+'</div>'
         +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">👤 '+sg.client_name+' &nbsp;|&nbsp; '+sg.visits.length+' visits</div>'
-        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Logged By</th><th>Work Done</th><th>Material Delivered</th></tr></thead><tbody>'
+        +'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Logged By</th><th>Work Done</th><th>Material Delivered</th><th>📷</th></tr></thead><tbody>'
         +sg.visits.map(function(v){
           var loggedBy=v.created_by_name||v.created_by||'—';
+          var photos=v.photos||[];
+          if(typeof photos==='string'){try{photos=JSON.parse(photos);}catch(e){photos=[];}}
+          var photoHtml=photos.length
+            ?photos.map(function(src,pi){
+              return '<img src="'+src+'" onclick="window._showVisitPhoto(\''+encodeURIComponent(src)+'\')" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);cursor:pointer;margin:2px;" title="Click to enlarge">';
+            }).join('')
+            :'<span style="color:#9ca3af;font-size:11px;">—</span>';
           return '<tr>'
             +'<td><b>'+fmtDate(v.visit_date)+'</b></td>'
             +'<td>'+(v.visit_time||'—')+'</td>'
             +'<td><span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+loggedBy+'</span></td>'
             +'<td style="max-width:200px;white-space:pre-wrap;">'+(v.work_done||'—')+'</td>'
             +'<td style="max-width:200px;white-space:pre-wrap;">'+(v.material_delivered||'—')+'</td>'
+            +'<td style="white-space:nowrap;">'+photoHtml+'</td>'
             +'</tr>';
         }).join('')
         +'</tbody></table></div></div>';
@@ -19575,18 +19260,17 @@ async function _readPhotosBase64(inputId){
     });
   }));
 }
-async function _readPhotosBase64(inputId){
-  var input=document.getElementById(inputId);
-  if(!input||!input.files||!input.files.length)return[];
-  var files=Array.from(input.files).slice(0,4);
-  return Promise.all(files.map(function(file){
-    return new Promise(function(resolve){
-      var reader=new FileReader();
-      reader.onload=function(e){resolve(e.target.result);};
-      reader.readAsDataURL(file);
-    });
-  }));
-}
+window._showVisitPhoto=function(encodedSrc){
+  var src=decodeURIComponent(encodedSrc);
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  ov.onclick=function(){ov.remove();};
+  var img=document.createElement('img');
+  img.src=src;
+  img.style.cssText='max-width:92vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);';
+  ov.appendChild(img);
+  document.body.appendChild(ov);
+};
 function showAIRemarkPicker(targetId) {
   var existing = document.getElementById('ai-picker-overlay');
   if (existing) existing.remove();
