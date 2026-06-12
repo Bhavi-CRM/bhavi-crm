@@ -334,6 +334,21 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
 </div>
 
+<!-- PAGE 7b: DELIVERY — previous inward products -->
+<div class="page fade" id="pg-delivery">
+  <div class="header">
+    <h1 id="hdr-delivery">Collecting Your Product</h1>
+    <div class="tagline" id="hdr-delivery-pg-sub">Select what you are collecting today</div>
+    <div class="step-badge">Step 5 of 5</div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="backFromPurpose()">&#8592; <span id="lbl-back-delivery">Back</span></button>
+    <div id="delivery-products-list"></div>
+    <div class="error-msg" id="delivery-error"></div>
+    <button class="btn-primary" onclick="submitDelivery()" id="btn-delivery-submit" style="margin-top:8px;"><span id="lbl-delivery-submit">Confirm Collection ✓</span></button>
+  </div>
+</div>
+
 <!-- PAGE 8: SUCCESS -->
 <div class="page fade" id="pg-success">
   <div class="header" style="background:linear-gradient(160deg,#064e3b,#059669,#10b981);">
@@ -460,6 +475,8 @@ var T={
     err_name:'નામ ભરો',
     err_warranty:'વૉરન્ટી સ્થિતિ પસંદ કરો',
     err_model:'Model Number ભરો',
+    delivery_hdr:'Product Collection', delivery_pg_sub:'આજે કયો Product લઈ જવો છે?',
+    lbl_delivery_submit:'Collection Confirm કરો ✓',
   },
   hi:{
     mobile_hdr:'आपका स्वागत है', mobile_sub:'कृपया अपना मोबाइल नंबर दर्ज करें',
@@ -489,6 +506,8 @@ var T={
     err_name:'नाम भरें',
     err_warranty:'वारंटी स्थिति चुनें',
     err_model:'Model Number भरें',
+    delivery_hdr:'Product Collection', delivery_pg_sub:'आज कौन-सा product लेना है?',
+    lbl_delivery_submit:'Collection Confirm करें ✓',
   },
   en:{
     mobile_hdr:'Welcome', mobile_sub:'Enter your mobile number to proceed',
@@ -518,6 +537,8 @@ var T={
     err_name:'Full name is required',
     err_warranty:'Please select warranty status',
     err_model:'Model number is required',
+    delivery_hdr:'Product Collection', delivery_pg_sub:'Select what you are collecting today',
+    lbl_delivery_submit:'Confirm Collection ✓',
   }
 };
 
@@ -553,10 +574,12 @@ function applyLang(){
     'lbl-problem-sel':'lbl_problem_sel','lbl-problem-text':'lbl_problem_text','lbl-problem-detail':'lbl_problem_detail',
     'lbl-submit':'submit',
     'hdr-success':'success_hdr','hdr-success-sub':'success_sub','lbl-token-label':'token_label',
-    'lbl-wait-msg':'wait_msg','lbl-new-entry':'new_entry'
+    'lbl-wait-msg':'wait_msg','lbl-new-entry':'new_entry',
+    'hdr-delivery':'delivery_hdr','hdr-delivery-pg-sub':'delivery_pg_sub',
+    'lbl-delivery-submit':'lbl_delivery_submit'
   };
   Object.keys(m).forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=t(m[id]);});
-  ['lbl-back-lang','lbl-back-mob','lbl-back-cust','lbl-back-cat','lbl-back-brand','lbl-back-purpose'].forEach(function(id){
+  ['lbl-back-lang','lbl-back-mob','lbl-back-cust','lbl-back-cat','lbl-back-brand','lbl-back-purpose','lbl-back-delivery'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.textContent=t('back');
   });
   // Render category list
@@ -717,6 +740,12 @@ function selectPurpose(purposeId,type){
   document.getElementById('inp-problem').value='';
   document.getElementById('inp-problem-detail').value='';
   document.querySelectorAll('.w-btn').forEach(function(b){b.classList.remove('selected');});
+
+  if(purposeId==='delivery'){
+    loadDeliveryProducts();
+    return;
+  }
+
   // Show/hide warranty and problem for Outward
   var isOutward=type==='Outward';
   document.getElementById('warranty-group').style.display=isOutward?'none':'';
@@ -727,6 +756,121 @@ function selectPurpose(purposeId,type){
   ctxTxt+=' › '+state.purposeLabel;
   document.getElementById('ctx-summary-pill').innerHTML=ctxTxt;
   goPage('pg-product');
+}
+
+// ─── DELIVERY: show previous inward products ────────────────────────────────
+async function loadDeliveryProducts(){
+  var listEl=document.getElementById('delivery-products-list');
+  var errEl=document.getElementById('delivery-error');
+  var submitBtn=document.getElementById('btn-delivery-submit');
+  listEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;"><span class="spinner" style="border-color:rgba(26,63,168,.2);border-top-color:var(--primary);"></span> Loading...</div>';
+  errEl.style.display='none';
+  goPage('pg-delivery');
+  try{
+    var logs=await sbGet('walkin_log','?mobile=eq.'+encodeURIComponent(state.mobile)+'&order=created_at.desc&limit=30');
+    var items=[];
+    (logs||[]).forEach(function(l){
+      var prods=l.products||[];
+      if(typeof prods==='string'){try{prods=JSON.parse(prods);}catch(e){prods=[];}}
+      prods.forEach(function(p,pi){
+        if(p.type==='Inward'||p.type==='For Checking Only'||p.type==='EOL'){
+          items.push({logId:l.id,prodIdx:pi,prod:p,date:l.visit_date,time:l.arrival_time});
+        }
+      });
+    });
+    if(!items.length){
+      listEl.innerHTML='<div style="text-align:center;padding:28px;">'
+        +'<div style="font-size:36px;margin-bottom:10px;">📭</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">No previous inward entries found</div>'
+        +'<div style="font-size:13px;color:var(--muted);">We could not find any products submitted for service under this mobile number.</div>'
+        +'</div>';
+      submitBtn.style.display='none';
+      return;
+    }
+    submitBtn.style.display='';
+    state._deliveryItems=items;
+    listEl.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;">Select product(s) you are collecting:</div>'
+      +items.map(function(item,i){
+        var p=item.prod;
+        return '<label style="display:flex;align-items:flex-start;gap:12px;padding:13px;border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;transition:all .18s;" for="dprod-'+i+'">'
+          +'<input type="checkbox" id="dprod-'+i+'" name="dprod" value="'+i+'" style="margin-top:3px;width:18px;height:18px;cursor:pointer;accent-color:var(--primary);" onchange="this.closest(\'label\').style.borderColor=this.checked?\'var(--primary-light)\':\' var(--border)\';this.closest(\'label\').style.background=this.checked?\'#eff6ff\':\'\';">'
+          +'<div style="flex:1;">'
+          +'<div style="font-size:14px;font-weight:700;color:var(--text);">'+(p.brand?p.brand+' ':'')+( p.model||'Unknown model')+'</div>'
+          +(p.remarks||p.problem?'<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+(p.problem||p.remarks||'')+'</div>':'')
+          +'<div style="font-size:11px;color:#94a3b8;margin-top:4px;">📅 Submitted: '+item.date+(item.time?' at '+item.time:'')+'</div>'
+          +'</div></label>';
+      }).join('');
+  }catch(e){
+    listEl.innerHTML='';
+    errEl.textContent='Could not load products. Please ask our staff.';
+    errEl.style.display='';
+  }
+}
+
+function submitDelivery(){
+  var errEl=document.getElementById('delivery-error');
+  errEl.style.display='none';
+  var selected=[];
+  document.querySelectorAll('#delivery-products-list input[name="dprod"]:checked').forEach(function(chk){
+    var i=parseInt(chk.value);
+    var item=state._deliveryItems&&state._deliveryItems[i];
+    if(item)selected.push(item);
+  });
+  if(!selected.length){errEl.textContent='Please select at least one product.';errEl.style.display='';return;}
+  state._selectedDelivery=selected;
+  submitDeliveryEntry();
+}
+
+async function submitDeliveryEntry(){
+  var btn=document.getElementById('btn-delivery-submit');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  var now=new Date();
+  var arrivalTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var today=now.toLocaleDateString('en-CA');
+  var wcId='SELF_CHECKIN_ICP',wcName='Self Check-in (ICP)';
+  if(state.directWc){wcId='SELF_CHECKIN_'+state.directWc;wcName='Self Check-in ('+state.directWc+')';}
+  else if(state.brandWc){wcId='SELF_CHECKIN_'+state.brandWc;wcName='Self Check-in ('+state.brandWc+')';}
+
+  var tokenNum=1;
+  try{
+    var rows=await sbGet('walkin_log','?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
+    tokenNum=((rows&&rows.length&&rows[0].token_no)||0)+1;
+  }catch(e){}
+
+  var products=state._selectedDelivery.map(function(item){
+    return Object.assign({},item.prod,{type:'Outward'});
+  });
+
+  try{
+    await sbPost('walkin_log',{
+      wc_id:wcId,wc_name:wcName,
+      visit_date:today,mobile:state.mobile,
+      customer_name:state.name,
+      state:state.state_||null,city:state.city||null,
+      arrival_time:arrivalTime,departure_time:null,
+      products:products,product_count:products.length,
+      token_no:tokenNum,created_at:now.toISOString()
+    });
+    document.getElementById('token-number').textContent=tokenNum;
+    document.getElementById('lbl-token-time').textContent=arrivalTime+' · '+today.split('-').reverse().join('-');
+    var summaryRows=[
+      {icon:'👤',label:'Name',val:state.name},
+      {icon:'📱',label:'Mobile',val:state.mobile},
+      {icon:'📤',label:'Purpose',val:'Product Collection / Delivery'},
+    ];
+    products.forEach(function(p,i){
+      summaryRows.push({icon:'📦',label:'Item '+(i+1),val:(p.brand?p.brand+' ':'')+( p.model||'—')});
+    });
+    document.getElementById('summary-box').innerHTML=
+      '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Registration Summary</div>'
+      +summaryRows.map(function(r){
+        return '<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';
+      }).join('');
+    goPage('pg-success');
+  }catch(e){
+    btn.disabled=false;btn.innerHTML='<span>'+t('lbl_delivery_submit')||'Confirm Collection ✓'+'</span>';
+    alert('Submission failed. Please ask our staff.\nError: '+e.message);
+  }
 }
 
 // ─── STEP 7: PRODUCT DETAILS ─────────────────────────────────────────────────
@@ -852,7 +996,8 @@ function startOver(){
     catId:'',catLabel:'',catIcon:'',hasBrand:false,directWc:'',
     brandName:'',brandWc:'',brandEmoji:'',
     purposeId:'',purposeLabel:'',purposeType:'',
-    warranty:'',model:'',serial:'',problem:'',problemDetail:''};
+    warranty:'',model:'',serial:'',problem:'',problemDetail:'',
+    _deliveryItems:null,_selectedDelivery:null};
   document.getElementById('inp-mobile').value='';
   goPage('pg-lang');
 }
