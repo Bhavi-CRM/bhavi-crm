@@ -12102,7 +12102,7 @@ async function downloadWalkInExcel(){
 }
 
 // ===== COURIER REGISTER =====
-var ACCESSORIES_LIST=['Body Cap','Lens Cap Front','Lens Cap Rear','Both Lens Caps','Eye Cap','UV Filter','Neck Strip','Battery','Nill','Other'];
+var ACCESSORIES_LIST=['Body Cap','Lens Cap Front','Lens Cap Rear','Both Lens Caps','Eye Cap','UV Filter','Neck Strip','Battery','Nill','Memory card'];
 
 async function renderCourier(){
   var pc=document.getElementById('page-content');
@@ -12308,7 +12308,7 @@ function addCourierProduct(dir){
 
   var accOptions=ACCESSORIES_LIST.map(function(a){
     return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;">'
-      +'<input type="checkbox" value="'+a+'" style="cursor:pointer;"> '+a+'</label>';
+      +'<input type="checkbox" class="cr-acc-check" value="'+a+'" style="cursor:pointer;"> '+a+'</label>';
   }).join('');
 
   var isOut=dir==='out';
@@ -12347,7 +12347,15 @@ function addCourierProduct(dir){
       +'</div>':'')
     +'<div class="form-group"><label>Accessories Received</label>'
     +'<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:repeat(5,1fr);gap:4px 6px;">'
-    +accOptions+'</div></div>';
+    +accOptions+'</div></div>'
+    +'<div class="form-group" style="margin-top:6px;"><label>Product Condition</label>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;">'
+    +['Good','Scratched','Cracked','Physical Damage','Water Damage'].map(function(c){
+      return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:400;cursor:pointer;">'
+        +'<input type="checkbox" class="cr-cond-check" value="'+c+'" style="width:14px;height:14px;accent-color:#1d4ed8;">'+c+'</label>';
+    }).join('')
+    +'<input type="text" class="cr-cond-note" placeholder="Condition notes..." style="flex:1;min-width:160px;border:none;border-left:1px solid var(--border);padding:2px 8px;font-size:13px;outline:none;background:transparent;">'
+    +'</div></div>';
   // Insert new product at TOP so user doesn't have to scroll down
   container.insertBefore(div, container.firstChild);
   // Renumber all product labels
@@ -12400,8 +12408,11 @@ function getCourierProducts(dir){
     var callId=row.querySelector('.cr-callid')?.value.trim()||'';
     var warranty=row.querySelector('.cr-warranty')?.value||'';
     var accessories=[];
-    row.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){accessories.push(cb.value);});
-    var obj={model,serial,call_id:callId,warranty,accessories};
+    row.querySelectorAll('.cr-acc-check:checked').forEach(function(cb){accessories.push(cb.value);});
+    var condChecks=[];
+    row.querySelectorAll('.cr-cond-check:checked').forEach(function(cb){condChecks.push(cb.value);});
+    var condNote=row.querySelector('.cr-cond-note')?.value.trim()||'';
+    var obj={model,serial,call_id:callId,warranty,accessories,condition:condChecks,condition_note:condNote};
     if(dir==='out'){
       obj.faulty_part=row.querySelector('.cr-faulty')?.value||'No';
       obj.invoice_avail=row.querySelector('.cr-invoice-avail')?.value||'No';
