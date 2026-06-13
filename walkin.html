@@ -788,12 +788,10 @@ async function loadDeliveryProducts(){
       });
     });
     if(!items.length){
-      listEl.innerHTML='<div style="text-align:center;padding:28px;">'
-        +'<div style="font-size:36px;margin-bottom:10px;">📭</div>'
-        +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">No previous inward entries found</div>'
-        +'<div style="font-size:13px;color:var(--muted);">We could not find any products submitted for service under this mobile number.</div>'
-        +'</div>';
+      // No previous entries — let them fill product details and generate token normally
+      listEl.innerHTML='';
       submitBtn.style.display='none';
+      goPage('pg-product');
       return;
     }
     submitBtn.style.display='';
