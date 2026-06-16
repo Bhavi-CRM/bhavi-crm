@@ -2479,6 +2479,8 @@ function chatAns(i){
   msgs.innerHTML+=ans;
   msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
   msgs.scrollTop=msgs.scrollHeight;
+  // Re-show main question list so user can ask another question
+  setTimeout(function(){ _renderChatQ(); }, 300);
 }
 
 // ── Brochure URL auto-detect (jpg OR pdf) ─────────────────────
