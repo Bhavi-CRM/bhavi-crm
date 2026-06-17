@@ -12802,7 +12802,15 @@ async function loadCourierReport(){
 
 async function downloadCourierExcel(){
   var entries=window._crrEntries||[];
-  if(!entries.length){alert('Please search first');return;}
+  // If no data loaded yet, fetch all
+  if(!entries.length){
+    try{
+      showToastWI('⏳ Fetching all data...');
+      entries=await sb('courier_log','GET',null,'?order=entry_date.desc,created_at.desc&limit=2000');
+      if(!entries||!entries.length){alert('No data found');return;}
+      window._crrEntries=entries;
+    }catch(e){alert('Error fetching data: '+e.message);return;}
+  }
   var wb=XLSX.utils.book_new();
 
   function fmtExcelDate(d){if(!d)return'';var p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:d;}
@@ -12854,10 +12862,14 @@ async function downloadCourierExcel(){
 }
 
 async function downloadWCCourierExcel(){
-  // Fetch today's + recent entries for this WC
   try{
-    showToastWI('⏳ Loading data...');
-    var entries=await sb('courier_log','GET',null,'?wc_id=eq.'+encodeURIComponent(currentUser.user_id)+'&order=entry_date.desc,created_at.desc&limit=200');
+    showToastWI('⏳ Loading all data...');
+    var isAdmin=(currentUser.role==='admin');
+    // Admin gets all entries; WC gets only their own
+    var q=isAdmin
+      ?'?order=entry_date.desc,created_at.desc&limit=2000'
+      :'?wc_id=eq.'+encodeURIComponent(currentUser.user_id)+'&order=entry_date.desc,created_at.desc&limit=2000';
+    var entries=await sb('courier_log','GET',null,q);
     if(!entries||!entries.length){alert('No data found');return;}
     window._crrEntries=entries;
     downloadCourierExcel();
