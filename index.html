@@ -5206,7 +5206,7 @@ async function renderInventory(tab){
   tab=tab||'stock';
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
-    allInventory=await sb('inventory','GET',null,'?order=item_name');
+    allInventory=await sb('inventory','GET',null,'?order=item_name&limit=5000');
     // Fetch purchase and sales logs
     let purchases=[],salesLogs=[];
     try{purchases=await sb('inventory_purchases','GET',null,'?order=purchase_date.desc&limit=500');}catch(e){}
@@ -6602,7 +6602,7 @@ async function renderEngParts(tab){
   const isAdmin=!isEng&&!isWC;
   if(!tab) tab=isEng?'my-requests':(isWC?'pending':'overview');
   try{
-    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
+    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name&limit=5000');
     if(!allEngineers||!allEngineers.length) await loadMasterData();
     if(isEng){await renderEngSelfService(tab);return;}
     allEngStock=await sb('eng_stock','GET',null,'?order=owner');
@@ -7640,7 +7640,7 @@ async function approveEngReq(reqId,req){
   if(!confirm(`Approve this request?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
   try{
     if(!allEngStock) allEngStock=await sb('eng_stock','GET',null,'?order=owner');
-    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name');
+    if(!allInventory||!allInventory.length) allInventory=await sb('inventory','GET',null,'?order=item_name&limit=5000');
     for(const p of parts){
       if(req.type==='RECEIVE'){
         await invQtyAdjust(p.part_id,-p.qty);
@@ -10953,7 +10953,7 @@ async function renderReorder(){
 }
 async function loadReorder(){
   try{
-    var parts=await sb('inventory','GET',null,'?order=item_name.asc&limit=1000');
+    var parts=await sb('inventory','GET',null,'?order=item_name.asc&limit=5000');
     var all=parts||[];
     var critical=all.filter(function(p){var min=parseInt(p.min_stock)||0;return min>0&&(parseInt(p.qty_in_stock)||0)<=min;});
     var low=all.filter(function(p){var min=parseInt(p.min_stock)||0;return min>0&&(parseInt(p.qty_in_stock)||0)>min&&(parseInt(p.qty_in_stock)||0)<=min*2;});
