@@ -9953,6 +9953,17 @@ function capturePunchOutSelfie(){
 }
 
 // ===== ADMIN LIVE MAP =====
+function lmSetLayer(type){
+  window._lmLayer=type;
+  var d=window._liveMapLayers;
+  if(!d)return;
+  d.map.removeLayer(d.street);d.map.removeLayer(d.satellite);
+  (type==='satellite'?d.satellite:d.street).addTo(d.map);
+  var b1=document.getElementById('lm-btn-street'),b2=document.getElementById('lm-btn-satellite');
+  if(!b1||!b2)return;
+  if(type==='satellite'){b2.style.background='#1d4ed8';b2.style.color='#fff';b1.style.background='#f8fafc';b1.style.color='#374151';}
+  else{b1.style.background='#1d4ed8';b1.style.color='#fff';b2.style.background='#f8fafc';b2.style.color='#374151';}
+}
 async function renderLiveMap(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
@@ -9962,6 +9973,10 @@ async function renderLiveMap(){
     +'<input type="date" id="lm-date" value="'+today+'" onchange="renderLiveMap()" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;">'
     +'</div>'
     +'<button class="btn btn-primary btn-sm" onclick="renderLiveMap()" style="margin-top:18px;">🔄 Refresh</button>'
+    +'<div style="margin-top:18px;display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+    +'<button id="lm-btn-street" onclick="lmSetLayer(\'street\')" style="padding:7px 14px;font-size:12px;font-weight:600;background:#1d4ed8;color:#fff;border:none;cursor:pointer;">🗺️ Map</button>'
+    +'<button id="lm-btn-satellite" onclick="lmSetLayer(\'satellite\')" style="padding:7px 14px;font-size:12px;font-weight:600;background:#f8fafc;color:#374151;border:none;cursor:pointer;">🛰️ Satellite</button>'
+    +'</div>'
     +'</div>'
     +'<div id="lm-map" style="width:100%;height:460px;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#e8f4f8;"></div>'
     +'<div id="lm-legend" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;"></div>'
@@ -9980,7 +9995,13 @@ async function renderLiveMap(){
   if(window._liveMap){try{window._liveMap.remove();}catch(e){}}
   var map=L.map('lm-map').setView([23.0225,72.5714],11);
   window._liveMap=map;
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+  var streetLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19});
+  var satelliteLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri World Imagery',maxZoom:19});
+  var _curLayer=window._lmLayer||'street';
+  (_curLayer==='satellite'?satelliteLayer:streetLayer).addTo(map);
+  window._liveMapLayers={street:streetLayer,satellite:satelliteLayer,map:map};
+  // sync button state
+  (function(){var b1=document.getElementById('lm-btn-street'),b2=document.getElementById('lm-btn-satellite');if(!b1||!b2)return;if(_curLayer==='satellite'){b2.style.background='#1d4ed8';b2.style.color='#fff';b1.style.background='#f8fafc';b1.style.color='#374151';}else{b1.style.background='#1d4ed8';b1.style.color='#fff';b2.style.background='#f8fafc';b2.style.color='#374151';}})();
 
   // Group by engineer
   var engMap={};
