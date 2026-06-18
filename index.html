@@ -294,7 +294,7 @@ tr:hover td{background:#f8fafc;}
       <div class="login-tab active" onclick="setLoginRole('admin')">Admin / WC</div>
       <div class="login-tab" onclick="setLoginRole('engineer')">Engineer</div>
     </div>
-    <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ADMIN001" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ENG001, ADMIN001" onkeydown="if(event.key==='Enter')doLogin()" oninput="_loginIdLookup(this.value)" autocomplete="off" style="text-transform:uppercase;"><div id="login-id-hint" style="min-height:18px;margin-top:4px;font-size:12px;font-weight:600;padding-left:2px;"></div></div>
     <div class="login-field"><label>Password</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" onclick="doLogin()">Sign In →</button>
     <div class="login-error" id="login-error"></div>
@@ -2448,6 +2448,30 @@ async function autoFillFromMobile(mobile, fields){
 
 // LOGIN
 let loginRole='admin';
+var _loginLookupTimer=null;
+function _loginIdLookup(val){
+  var hint=document.getElementById('login-id-hint');
+  if(!hint)return;
+  val=(val||'').trim().toUpperCase();
+  if(!val){hint.innerHTML='';return;}
+  clearTimeout(_loginLookupTimer);
+  _loginLookupTimer=setTimeout(async function(){
+    try{
+      var res=await fetch(SB_URL+'/rest/v1/users?user_id=eq.'+encodeURIComponent(val)+'&select=user_id,name,role,is_active',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      var users=await res.json();
+      if(users&&users.length){
+        var u=users[0];
+        var active=u.is_active!==false;
+        var roleLabel=u.role==='engineer'?'Engineer':u.role==='admin'?'Admin':'Work Controller';
+        hint.innerHTML=active
+          ?'<span style="color:#059669;">✓ '+escHtml(u.name)+' <span style="font-weight:400;color:#64748b;">('+roleLabel+')</span></span>'
+          :'<span style="color:#dc2626;">✗ Account inactive</span>';
+      }else{
+        hint.innerHTML=val.length>=3?'<span style="color:#94a3b8;">No user found</span>':'';
+      }
+    }catch(e){hint.innerHTML='';}
+  },400);
+}
 function setLoginRole(r){loginRole=r;document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active',(r==='admin'&&i===0)||(r==='engineer'&&i===1)));}
 async function doLogin(){
   const uid=document.getElementById('login-id').value.trim();
@@ -2568,7 +2592,7 @@ async function tryAutoLogin(){
           <div class="login-tab active" onclick="setLoginRole('admin')">Admin / WC</div>
           <div class="login-tab" onclick="setLoginRole('engineer')">Engineer</div>
         </div>
-        <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ADMIN001" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ENG001, ADMIN001" onkeydown="if(event.key==='Enter')doLogin()" oninput="_loginIdLookup(this.value)" autocomplete="off" style="text-transform:uppercase;"><div id="login-id-hint" style="min-height:18px;margin-top:4px;font-size:12px;font-weight:600;padding-left:2px;"></div></div>
         <div class="login-field"><label>Password</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')doLogin()"></div>
         <button class="login-btn" onclick="doLogin()">Sign In →</button>
         <div class="login-error" id="login-error"></div>
