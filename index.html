@@ -4202,12 +4202,12 @@ async function viewTicket(id,autoPrint=false){
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${s.price}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">₹${(s.qty*s.price).toFixed(2)}</td></tr>`).join('')}</tbody>
+      <tbody>${spares.map(s=>{const sp=isWarranty?0:(s.price||0);const sa=isWarranty?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
     </table>
     <div style="font-size:13px;background:#f0fdf4;padding:10px;border-radius:8px;">
-    ${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}
+    ${isWarranty?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
     </div>`:''}
-    ${svcCharge>0&&!spares.length?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
+    ${svcCharge>0&&!spares.length&&!isWarranty?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
@@ -5105,18 +5105,20 @@ async function saveEngUpdate(){
               const existing=await sb('eng_movements','GET',null,
                 '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
               if(!existing||!existing.length){
-                await sb('eng_movements','POST',{
-                  type:'USE',
-                  part_id:partId,
-                  qty:s.qty||1,
-                  from_owner:currentUser.name||currentUser.user_id,
-                  to_owner:null,
-                  job_sheet:trackId,
-                  warranty:true,
-                  warranty_status:'PENDING',
-                  notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallIdRaw?' | SE: '+seCallIdRaw:''),
-                  created_by:currentUser.name||'System'
-                }).catch(()=>{});
+                try{
+                  await sb('eng_movements','POST',{
+                    type:'USE',
+                    part_id:partId,
+                    qty:s.qty||1,
+                    from_owner:currentUser.name||currentUser.user_id,
+                    to_owner:null,
+                    job_sheet:trackId,
+                    warranty:true,
+                    warranty_status:'PENDING',
+                    notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallIdRaw?' | SE: '+seCallIdRaw:''),
+                    created_by:currentUser.name||'System'
+                  });
+                }catch(postErr){console.error('Warranty eng_movements POST failed:',postErr);}
               }else{
                 // Entry exists — update qty if more parts used (e.g. used 3, was logged 2 before)
                 const ex0=existing[0];
