@@ -19868,18 +19868,21 @@ async function renderPartsCatalog(){
       sb('inventory','GET',null,'?select=part_code,item_name,qty_in_stock,unit_price&limit=2000')
     ]);
     _pcAll=catalog||[];
-    // Build inventory lookup by part_code
+    // Build inventory lookup by part_code (normalize: lowercase, collapse spaces)
+    const norm=s=>(s||'').toLowerCase().replace(/\s+/g,' ').trim();
     const invByCode={};
     (inv||[]).forEach(i=>{
-      if(i.part_code)invByCode[i.part_code.trim().toLowerCase()]={qty:i.qty_in_stock||0,price:i.unit_price||0};
-      if(i.item_name)invByCode[i.item_name.trim().toLowerCase()]=invByCode[i.item_name.trim().toLowerCase()]||{qty:i.qty_in_stock||0,price:i.unit_price||0};
+      const rec={qty:i.qty_in_stock||0,price:i.unit_price||0};
+      if(i.part_code){invByCode[norm(i.part_code)]=rec;}
+      if(i.item_name){const nk=norm(i.item_name);if(!invByCode[nk])invByCode[nk]=rec;}
     });
     _pcAll.forEach(p=>{
-      const key=(p.item_code||'').trim().toLowerCase();
-      const nameKey=(p.part_name||'').trim().toLowerCase();
-      const match=invByCode[key]||invByCode[nameKey];
-      p._qty=match?match.qty:0;
-      p._price=match?match.price:0;
+      const codeKey=norm(p.item_code);
+      const nameKey=norm(p.part_name);
+      // Try exact code → exact name → code without spaces → name without spaces
+      const match=invByCode[codeKey]||invByCode[nameKey]||invByCode[codeKey.replace(/\s/g,'')]||invByCode[nameKey.replace(/\s/g,'')];
+      p._qty=match?match.qty:null; // null = not matched
+      p._price=match?match.price:null;
     });
     _renderPCShell();
     _pcUpdateRows();
@@ -19923,13 +19926,21 @@ function _renderPCShell(){
       <span id="pc-count" style="font-size:12px;color:#6b7280;">${totalParts} results</span>
     </div>
     <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+      <colgroup>
+        <col style="width:180px;">
+        <col style="width:140px;">
+        <col style="width:auto;">
+        <col style="width:110px;">
+        <col style="width:110px;">
+        ${isAdmin?'<col style="width:90px;">':''}
+      </colgroup>
       <thead><tr style="background:#f8fafc;">
-        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;white-space:nowrap;">Part Name</th>
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Part Name</th>
         <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Part No / Code</th>
         <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Compatible Models</th>
-        <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">MRP ₹ <span style="color:#10b981;font-size:9px;">(Inventory)</span></th>
-        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Stock <span style="color:#10b981;font-size:9px;">(Inventory)</span></th>
+        <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">MRP ₹ <span style="color:#10b981;font-size:9px;">(Inv)</span></th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Stock <span style="color:#10b981;font-size:9px;">(Inv)</span></th>
         ${isAdmin?'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Actions</th>':''}
       </tr></thead>
       <tbody id="pc-tbody"></tbody>
@@ -19976,21 +19987,22 @@ function _pcUpdateRows(){
     return;
   }
   tbody.innerHTML=filtered.map(p=>{
-    const qty=p._qty||0;
-    const price=p._price||0;
-    const stockClr=qty>5?'#059669':qty>0?'#d97706':'#dc2626';
-    const stockBg=qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
-    const stockLabel=qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
+    const matched=p._qty!==null;
+    const qty=matched?(p._qty||0):0;
+    const price=matched?(p._price||0):0;
+    const stockClr=!matched?'#9ca3af':qty>5?'#059669':qty>0?'#d97706':'#dc2626';
+    const stockBg=!matched?'#f9fafb':qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
+    const stockLabel=!matched?'not linked':qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
     const models=p.compatible_models||'—';
     return `<tr style="border-top:1px solid #f1f5f9;">
-      <td style="padding:10px 12px;font-weight:600;color:#1e293b;">${escHtml(p.part_name||'')}<br><span style="font-size:11px;color:#9ca3af;font-weight:400;">${escHtml(p.notes||'')}</span></td>
-      <td style="padding:10px 12px;color:#1d4ed8;font-family:monospace;font-weight:600;">${escHtml(p.item_code||'—')}</td>
-      <td style="padding:10px 12px;font-size:12px;color:#374151;max-width:200px;" title="${escHtml(models)}">${escHtml(models)}</td>
-      <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;">${price>0?'₹'+price.toLocaleString('en-IN'):'<span style="color:#9ca3af;font-size:11px;">— not in inventory</span>'}</td>
-      <td style="padding:10px 12px;text-align:center;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
+      <td style="padding:10px 12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.part_name||'')}">${escHtml(p.part_name||'')}<br><span style="font-size:11px;color:#9ca3af;font-weight:400;">${escHtml(p.notes||'')}</span></td>
+      <td style="padding:10px 12px;color:#1d4ed8;font-family:monospace;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.item_code||'—')}</td>
+      <td style="padding:10px 12px;font-size:12px;color:#374151;overflow:hidden;"><div style="max-height:40px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="${escHtml(models)}">${escHtml(models)}</div></td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;white-space:nowrap;">${price>0?'₹'+price.toLocaleString('en-IN'):'<span style="color:#9ca3af;font-size:10px;">—</span>'}</td>
+      <td style="padding:10px 12px;text-align:center;white-space:nowrap;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
       ${isAdmin?`<td style="padding:10px 12px;text-align:center;white-space:nowrap;">
-        <button onclick="editPart('${p.id}')" style="padding:4px 10px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:4px;">✏️</button>
-        <button onclick="deletePart('${p.id}')" style="padding:4px 10px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
+        <button onclick="editPart('${p.id}')" style="padding:4px 8px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:2px;">✏️</button>
+        <button onclick="deletePart('${p.id}')" style="padding:4px 8px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
       </td>`:''}
     </tr>`;
   }).join('');
