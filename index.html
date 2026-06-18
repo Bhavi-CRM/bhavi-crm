@@ -5008,6 +5008,42 @@ async function saveEngUpdate(){
         await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
       }
 
+      // ── AUTO WARRANTY TRACKING — log eng_movements for warranty/AMC/Warranty Repeat calls ──
+      const isWarrantyCall=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
+      const seCallId=(freshT?.se_call_id||'').trim();
+      if(isWarrantyCall && sparesToDeduct.length>0){
+        if(!seCallId){
+          // Warn admin/WC if SE Call ID missing — tracking not possible without it
+          console.warn('Warranty part used but SE Call ID missing on ticket '+id+' — warranty return cannot be auto-tracked');
+        }
+        for(const s of sparesToDeduct){
+          try{
+            const invItem=(await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`));
+            const partId=invItem.length?invItem[0].id:null;
+            if(partId){
+              const trackId=seCallId||id; // Use SE Call ID; fallback to ticket ID if missing
+              // Check if already logged for this SE call+part to avoid duplicate
+              const existing=await sb('eng_movements','GET',null,
+                '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+              if(!existing||!existing.length){
+                await sb('eng_movements','POST',{
+                  type:'USE',
+                  part_id:partId,
+                  qty:s.qty||1,
+                  from_owner:currentUser.name||currentUser.user_id,
+                  to_owner:null,
+                  job_sheet:trackId,
+                  warranty:true,
+                  warranty_status:'PENDING',
+                  notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallId?' | SE: '+seCallId:''),
+                  created_by:currentUser.name||'System'
+                }).catch(()=>{});
+              }
+            }
+          }catch(ex){console.log('Warranty movement log err:',ex);}
+        }
+      }
+
       // ── AUTO WORK LOG on Call Closed ──
       try{
         const closeNow=new Date();
