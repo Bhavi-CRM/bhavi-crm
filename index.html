@@ -5053,13 +5053,21 @@ async function saveEngUpdate(){
     if(status==='Closed'){
       const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
       const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
+      const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
       for(const s of sparesToDeduct){
         try{
           const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
           if(inv.length&&inv[0].qty_in_stock>0){
             const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
-            await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?part_code=eq.${encodeURIComponent(s.code)}`);
-            await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id,done_by:currentUser.name}).catch(()=>{});
+            // For warranty calls: also reduce warranty_qty if available (use warranty stock first)
+            const patchData={qty_in_stock:newQty,updated_at:new Date().toISOString()};
+            if(isWarrantyForDeduct&&(inv[0].warranty_qty||0)>0){
+              patchData.warranty_qty=Math.max(0,(inv[0].warranty_qty||0)-(s.qty||1));
+            }
+            await sb('inventory','PATCH',patchData,`?part_code=eq.${encodeURIComponent(s.code)}`);
+            const idx=(allInventory||[]).findIndex(x=>x.id===inv[0].id);
+            if(idx>=0){allInventory[idx].qty_in_stock=newQty;if(patchData.warranty_qty!=null)allInventory[idx].warranty_qty=patchData.warranty_qty;}
+            await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
           // Also save to inventory_sales for tracking
           await sb('inventory_sales','POST',{
             sale_date:new Date().toLocaleDateString('en-CA'),
@@ -5129,6 +5137,32 @@ async function saveEngUpdate(){
             }
           }catch(ex){console.log('Warranty movement log err:',ex);}
         }
+      }
+
+      // ── AUTO-COMPLETE direct warranty issues (WITH_ENGINEER → RECEIVED) ──
+      if(isWarrantyCall && seTrackKey){
+        try{
+          const withEng=await sb('eng_movements','GET',null,
+            '?type=eq.WARRANTY_DIRECT_IN&warranty=eq.true&warranty_status=eq.WITH_ENGINEER&job_sheet=eq.'+encodeURIComponent(seTrackKey));
+          for(const we of (withEng||[])){
+            await sb('eng_movements','PATCH',{
+              warranty_status:'RECEIVED',
+              warranty_received_at:new Date().toISOString(),
+              warranty_received_qty:we.qty,
+              notes:(we.notes||'')+' | Call closed: '+id
+            },'?id=eq.'+we.id).catch(()=>{});
+            // Reduce warranty_qty in inventory (part was used from warranty stock)
+            try{
+              const invRow=(await sb('inventory','GET',null,'?id=eq.'+we.part_id))[0];
+              if(invRow){
+                const newWQty=Math.max(0,(invRow.warranty_qty||0)-(we.qty||1));
+                await sb('inventory','PATCH',{warranty_qty:newWQty,updated_at:new Date().toISOString()},'?id=eq.'+we.part_id).catch(()=>{});
+                const idx=allInventory.findIndex(x=>x.id===we.part_id);
+                if(idx>=0) allInventory[idx].warranty_qty=newWQty;
+              }
+            }catch(ex2){console.log('warranty_qty reduce err:',ex2);}
+          }
+        }catch(ex){console.log('Direct warranty auto-complete err:',ex);}
       }
 
       // ── AUTO WORK LOG on Call Closed ──
@@ -5552,7 +5586,7 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td><span style="${st}">${i.qty_in_stock}</span></td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';const wQty=i.warranty_qty||0;const purQty=Math.max(0,(i.qty_in_stock||0)-wQty);const stockCell=wQty>0?`<span style="${st}">${i.qty_in_stock}</span><br><span style="font-size:10px;color:#64748b;">🛒 ${purQty} + 🏭 ${wQty}</span>`:`<span style="${st}">${i.qty_in_stock}</span>`;return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="History dekho">${i.item_name}</span></td><td>${bn}</td><td>${i.category||'-'}</td><td>${stockCell}</td><td>${i.min_stock}</td><td>₹${i.unit_price}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td>₹${((i.qty_in_stock||0)*(i.unit_price||0)).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
 function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-price').value='0';document.getElementById('inv-gst').value='18';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');openModal('modal-inventory');}
@@ -6543,6 +6577,7 @@ async function renderEngParts(tab){
           <button class="btn btn-primary" onclick="openEngIssue()">📤 Issue to Engineer</button>
           <button class="btn" style="background:#d97706;color:#fff;" onclick="openEngUse()">🔧 Record Usage</button>
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
+          <button class="btn" style="background:#0369a1;color:#fff;" onclick="openDirectWarrantyIssue()">📦 Direct Warranty Issue</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
         </div>
         <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}</div>
@@ -6864,27 +6899,34 @@ async function renderWarrantyPending(){
       const usedDate=new Date(m.created_at);
       const diffDays=Math.floor((today-usedDate)/(1000*60*60*24));
       const status=m.warranty_status||'PENDING';
-      const isOverdue=(status==='PENDING'||status==='PARTIAL')&&diffDays>=7;
+      const isOverdue=(status==='PENDING'||status==='PARTIAL'||status==='WITH_ENGINEER')&&diffDays>=7;
       const receivedQty=m.warranty_received_qty||0;
       const remainingQty=m.qty-(receivedQty);
       const qtyDisplay=status==='PARTIAL'
         ?'<span style="font-weight:700;">'+m.qty+'</span><br><span style="font-size:10px;color:#d97706;">Rcvd: '+receivedQty+' / Pending: '+remainingQty+'</span>'
         :m.qty;
+      const engineerLabel=m.to_owner&&m.to_owner!=='null'?'<br><span style="font-size:10px;color:#0369a1;">👷 '+m.to_owner+'</span>':'';
       const statusBadge=status==='RECEIVED'
-        ?'<span style="background:#f0fdf4;color:#059669;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">✅ Received</span>'
-        :status==='PARTIAL'
-          ?'<span style="background:#fff7ed;color:#ea580c;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'🔶')+' Partial ('+receivedQty+'/'+m.qty+')'+(isOverdue?' '+diffDays+'d':'')+'</span>'
-          :isOverdue
-            ?'<span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🚨 Overdue ('+diffDays+'d)</span>'
-            :'<span style="background:#fefce8;color:#d97706;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">⏳ Pending ('+diffDays+'d)</span>';
+        ?'<span style="background:#f0fdf4;color:#059669;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">✅ Received / Complete</span>'
+        :status==='WITH_ENGINEER'
+          ?'<span style="background:#e0f2fe;color:#0369a1;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'🔧')+' With Engineer'+(isOverdue?' ('+diffDays+'d)':'')+'</span>'
+          :status==='PARTIAL'
+            ?'<span style="background:#fff7ed;color:#ea580c;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'🔶')+' Partial ('+receivedQty+'/'+m.qty+')'+(isOverdue?' '+diffDays+'d':'')+'</span>'
+            :isOverdue
+              ?'<span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🚨 Overdue ('+diffDays+'d)</span>'
+              :'<span style="background:#fefce8;color:#d97706;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">⏳ Pending Canon ('+diffDays+'d)</span>';
       const receivedAt=m.warranty_received_at?new Date(m.warranty_received_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
-      const rowBg=status==='RECEIVED'?'#f0fdf4':status==='PARTIAL'?'#fff7ed':isOverdue?'#fef2f2':'#fff';
+      const rowBg=status==='RECEIVED'?'#f0fdf4':status==='WITH_ENGINEER'?'#e0f2fe':status==='PARTIAL'?'#fff7ed':isOverdue?'#fef2f2':'#fff';
+      const chk=status!=='RECEIVED'
+        ?'<input type="checkbox" class="wp-chk" value="'+m.id+'" style="width:16px;height:16px;cursor:pointer;">'
+        :'<span style="color:#059669;font-size:14px;">✔</span>';
       return'<tr style="background:'+rowBg+';">'
+        +'<td style="padding:10px 12px;text-align:center;">'+chk+'</td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#64748b;white-space:nowrap;">'+usedDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</td>'
         +'<td style="padding:10px 12px;font-size:12px;font-weight:700;color:#1d4ed8;">'+(m.job_sheet||'—')+'</td>'
         +'<td style="padding:10px 12px;font-size:12px;font-weight:600;">'+partLabel+'</td>'
         +'<td style="padding:10px 12px;font-size:12px;text-align:center;">'+qtyDisplay+'</td>'
-        +'<td style="padding:10px 12px;font-size:12px;">'+(m.from_owner||'—')+'</td>'
+        +'<td style="padding:10px 12px;font-size:12px;">'+(m.from_owner||'—')+engineerLabel+'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge+'</td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#64748b;">'+receivedAt+'</td>'
         +'</tr>';
@@ -6901,9 +6943,14 @@ async function renderWarrantyPending(){
       +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">🚨 Overdue (7+ days)</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">'+overdue+'</div></div>'
       +'</div>'
       +(overdue>0?'<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#dc2626;font-weight:600;">🚨 '+overdue+' warranty part(s) overdue — not received from company within 7 days. Check and follow up.</div>':'')
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+      +'<span style="font-size:12px;color:#64748b;">Select rows to mark as received:</span>'
+      +'<button onclick="markSelectedWarrantyDone()" style="background:#059669;color:#fff;border:none;padding:6px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✅ Mark Selected as Received</button>'
+      +'</div>'
       +'<div class="card" style="padding:0;overflow:auto;">'
       +'<table style="min-width:700px;border-collapse:collapse;width:100%;">'
       +'<thead><tr style="background:#f8fafc;">'
+      +'<th style="padding:10px 12px;width:36px;"></th>'
       +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Date Used</th>'
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">SE Call ID</th>'
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part</th>'
@@ -7101,6 +7148,78 @@ async function saveEngUse(){
   }catch(e){alert('Error: '+e.message);}
 }
 
+function openDirectWarrantyIssue(){
+  document.getElementById('dwi-engineer').innerHTML=epEngOpts();
+  epClearPartSearch('dwi');
+  document.getElementById('dwi-qty').value=1;
+  document.getElementById('dwi-jobsheet').value='';
+  document.getElementById('dwi-notes').value='';
+  showModal('modal-direct-warranty-issue');
+}
+async function saveDirectWarrantyIssue(){
+  const partId=document.getElementById('dwi-part').value;
+  const engineer=document.getElementById('dwi-engineer').value;
+  const qty=parseInt(document.getElementById('dwi-qty').value)||0;
+  const jobSheetRaw=(document.getElementById('dwi-jobsheet').value||'').trim().toUpperCase();
+  const notes=document.getElementById('dwi-notes').value.trim();
+  if(!partId){alert('Please select a part.');return;}
+  if(!engineer){alert('Please select an engineer.');return;}
+  if(qty<=0){alert('Quantity must be at least 1.');return;}
+  if(!jobSheetRaw){alert('SE Call ID is required for warranty tracking.');document.getElementById('dwi-jobsheet').focus();return;}
+  // Extract tracking key: last segment after /
+  const trackKey=jobSheetRaw.split('/').pop().trim();
+  try{
+    // Check duplicate
+    const existing=await sb('eng_movements','GET',null,
+      '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+    if(existing&&existing.length){
+      if(!confirm('A warranty entry already exists for this SE Call ID + Part. Add another entry?'))return;
+    }
+    // Add to inventory stock (Canon part arrives → stock +qty)
+    const invItem=allInventory.find(x=>x.id===partId)||
+      (await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
+    if(invItem){
+      const newQty=(invItem.qty_in_stock||0)+qty;
+      const newWarrantyQty=(invItem.warranty_qty||0)+qty;
+      await sb('inventory','PATCH',{
+        qty_in_stock:newQty,
+        warranty_qty:newWarrantyQty,
+        updated_at:new Date().toISOString()
+      },'?id=eq.'+partId);
+      if(allInventory){const idx=allInventory.findIndex(x=>x.id===partId);if(idx>=0){allInventory[idx].qty_in_stock=newQty;allInventory[idx].warranty_qty=newWarrantyQty;}}
+    }
+    await sb('eng_movements','POST',{
+      type:'WARRANTY_DIRECT_IN',
+      part_id:partId,
+      qty,
+      from_owner:'COMPANY (Canon Warranty)',
+      to_owner:engineer,
+      job_sheet:trackKey,
+      warranty:true,
+      warranty_status:'WITH_ENGINEER',
+      notes:'Direct Canon dispatch to '+engineer+(notes?' | '+notes:''),
+      created_by:currentUser?.name||'Admin'
+    });
+    closeModal('modal-direct-warranty-issue');
+    renderEngParts('warranty-pending');
+    showToastWI('✅ Part added to stock & tracked — will auto-complete when engineer closes the call.');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function markSelectedWarrantyDone(){
+  const checked=[...document.querySelectorAll('.wp-chk:checked')].map(c=>c.value);
+  if(!checked.length){alert('Please select at least one row to mark as received.');return;}
+  if(!confirm('Mark '+checked.length+' selected entry/entries as Received?\n\nNo stock changes — only tracking status will update.'))return;
+  try{
+    for(const id of checked){
+      await sb('eng_movements','PATCH',{
+        warranty_status:'RECEIVED',
+        warranty_received_at:new Date().toISOString()
+      },'?id=eq.'+id);
+    }
+    renderEngParts('warranty-pending');
+    showToastWI('✅ '+checked.length+' entry/entries marked as received. Stock unchanged.');
+  }catch(e){alert('Error: '+e.message);}
+}
 function openEngWarranty(){
   epClearPartSearch('ew');
   document.getElementById('ew-qty').value=1;
@@ -17890,6 +18009,34 @@ function clearAILog(){
   </div>
 </div>
 <!-- Warranty return -->
+<div class="modal-overlay hidden" id="modal-direct-warranty-issue" onclick="if(event.target===this)closeModal('modal-direct-warranty-issue')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">
+    <div class="modal-header" style="background:#e0f2fe;"><h2>📦 Direct Warranty Issue to Engineer</h2><button class="close-btn" onclick="closeModal('modal-direct-warranty-issue')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Part ordered from Canon under warranty — issuing directly to engineer (not going through office stock). Will auto-complete when engineer closes the call.</p>
+      <div class="form-group"><label>Part <span style="color:#ef4444;">*</span></label>
+        <input type="text" id="dwi-search" placeholder="Search by part code or name..." oninput="epPartSearch('dwi',this.value)">
+        <div id="dwi-results" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
+        <input type="hidden" id="dwi-part">
+        <div id="dwi-selected" style="font-size:12px;color:#059669;margin-top:4px;font-weight:600;"></div>
+      </div>
+      <div class="form-group"><label>Engineer <span style="color:#ef4444;">*</span></label>
+        <select id="dwi-engineer"></select>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Qty <span style="color:#ef4444;">*</span></label><input type="number" id="dwi-qty" value="1" min="1"></div>
+        <div class="form-group"><label>SE Call ID <span style="color:#ef4444;">*</span></label><input type="text" id="dwi-jobsheet" placeholder="CSP/20260618/123456" style="text-transform:uppercase;"></div>
+      </div>
+      <div class="form-group"><label>Notes (optional)</label><input type="text" id="dwi-notes" placeholder="Any additional info..."></div>
+      <div style="font-size:11px;color:#78716c;background:#f8fafc;padding:8px;border-radius:6px;">ℹ️ Only digits after last / will be used as tracking key (e.g. 123456)</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-direct-warranty-issue')">Cancel</button>
+      <button class="btn" style="background:#0369a1;color:#fff;" onclick="saveDirectWarrantyIssue()">📦 Save & Track</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="modal-warranty-claim" onclick="if(event.target===this)closeModal('modal-warranty-claim')">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
     <div class="modal-header" style="background:#e0f2fe;"><h2>🛡️ Customer Claims Warranty</h2><button class="close-btn" onclick="closeModal('modal-warranty-claim')">✕</button></div>
