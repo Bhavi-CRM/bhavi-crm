@@ -4133,6 +4133,16 @@ async function viewTicket(id,autoPrint=false){
     ${tl.note?`<div style="font-size:12px;margin-top:4px;padding:5px 8px;background:#fff;border-radius:6px;">${tl.note}</div>`:''}
   </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--text-muted);">No updates yet</div>';
 
+  // Warranty claim banner (shown to all roles if pending)
+  const warrantyClaimBanner=t.warranty_claim_pending?`<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+    <div style="font-weight:700;color:#b45309;font-size:14px;">🛡️ Warranty Claim — Awaiting Approval</div>
+    <div style="font-size:12px;color:#78716c;margin-top:4px;">${escHtml(t.warranty_claim_note||'')} &nbsp;|&nbsp; Submitted by: <b>${escHtml(t.warranty_claim_by||'')}</b></div>
+    ${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn btn-success btn-sm" onclick="approveWarrantyClaim('${t.id}')">✅ Approve — Convert to Warranty</button>
+      <button class="btn btn-danger btn-sm" onclick="rejectWarrantyClaim('${t.id}')">❌ Reject</button>
+    </div>`:'<div style="font-size:12px;color:#d97706;margin-top:6px;">⏳ Waiting for WC/Admin approval.</div>'}
+  </div>`:'';
+
   // Admin actions
   let adminActions='';
   if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){
@@ -4169,6 +4179,7 @@ async function viewTicket(id,autoPrint=false){
   }
 
   document.getElementById('modal-ticket-body').innerHTML=`
+    ${warrantyClaimBanner}
     ${t.warranty_coverage==='Out of Coverage'?`<div class="alert alert-danger">⛔ OUT OF COVERAGE — ${t.coverage_remark||''}</div>`:isWarranty?`<div class="alert alert-success">✅ Under Warranty Coverage</div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;">
       <div><h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">CUSTOMER</h3>
@@ -4713,6 +4724,11 @@ async function openEngUpdate(id){
     <hr class="divider">
     <!-- Point 7: Warranty void for engineer too -->
     ${isW&&!isOOC?`<button class="btn btn-warning btn-sm" style="margin-bottom:12px;" onclick="engVoidWarranty('${t.id}')">⚠️ Mark Out of Coverage</button>`:''}
+    ${t.warranty_claim_pending?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#b45309;font-size:13px;">🛡️ Warranty Claim Pending Approval</div>
+      <div style="font-size:12px;color:#78716c;margin-top:4px;">Claimed by: ${escHtml(t.warranty_claim_by||'')} | Note: ${escHtml(t.warranty_claim_note||'')}</div>
+    </div>`:''}
+    ${!isW&&!t.warranty_claim_pending?`<button class="btn btn-sm" style="margin-bottom:12px;background:#e0f2fe;color:#0369a1;border:1.5px solid #7dd3fc;" onclick="openWarrantyClaim('${t.id}')">🛡️ Customer Claims Warranty</button>`:''}
     ${isW?`<div class="form-group" style="margin-bottom:12px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 12px;">
       <label style="font-weight:700;color:#b45309;font-size:12px;">🔖 Canon SE Call ID <span style="color:#ef4444;">*</span> <span style="font-size:11px;font-weight:400;color:#92400e;">(required for warranty part tracking)</span></label>
       <input type="text" id="upd-se-call-id" value="${escHtml(t.se_call_id||'')}" placeholder="e.g. CSP/20260618/123456" style="margin-top:4px;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;border-color:#f59e0b;">
@@ -4744,6 +4760,53 @@ function setWorkEnd(){
   document.getElementById('upd-out').value=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 
+async function openWarrantyClaim(id){
+  showModal('modal-warranty-claim');
+  document.getElementById('wc-ticket-id').value=id;
+  document.getElementById('wc-invoice').value='';
+  document.getElementById('wc-note').value='';
+}
+async function submitWarrantyClaim(){
+  const id=document.getElementById('wc-ticket-id').value;
+  const invoice=document.getElementById('wc-invoice').value.trim();
+  const note=document.getElementById('wc-note').value.trim();
+  if(!invoice){alert('Invoice number is required.');document.getElementById('wc-invoice').focus();return;}
+  try{
+    const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+    const tl=[...(t?.timeline||[]),{action:'Warranty Claim Submitted',by:currentUser.name,at:new Date().toISOString(),note:'Invoice: '+invoice+(note?' | '+note:'')}];
+    await sb('tickets','PATCH',{warranty_claim_pending:true,warranty_claim_by:currentUser.name,warranty_claim_note:'Invoice: '+invoice+(note?' | '+note:''),warranty_claim_at:new Date().toISOString(),timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    // Send Telegram + Email alert via Edge Function
+    fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({type:'warranty_claim',ticket_id:id,ticket_no:t.ticket_no||id,customer:t.cname||'',model:t.model||'',engineer:currentUser.name,invoice,note,call_type:t.call_type||''})
+    }).catch(()=>{});
+    closeModal('modal-warranty-claim');
+    closeModal('modal-eng-update');
+    if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+    showToastWI('✅ Warranty claim submitted — WC/Admin will review and approve.');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function approveWarrantyClaim(id){
+  if(!confirm('Approve warranty claim? This will convert the call to Warranty type and set charges to zero.'))return;
+  try{
+    const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+    const tl=[...(t?.timeline||[]),{action:'Warranty Claim Approved',by:currentUser.name,at:new Date().toISOString(),note:'Call converted to Warranty by '+currentUser.name}];
+    await sb('tickets','PATCH',{call_type:'Warranty',warranty_coverage:'In Warranty',service_charges:0,final_charges:0,warranty_claim_pending:false,warranty_claim_approved:true,warranty_claim_approved_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    showToastWI('✅ Warranty approved — call converted to Warranty.');
+    closeModal('modal-ticket-detail');renderAllTickets?renderAllTickets():renderDashboard();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function rejectWarrantyClaim(id){
+  const reason=prompt('Reason for rejection (will be noted):');
+  if(reason===null)return;
+  try{
+    const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+    const tl=[...(t?.timeline||[]),{action:'Warranty Claim Rejected',by:currentUser.name,at:new Date().toISOString(),note:reason||'Rejected by WC/Admin'}];
+    await sb('tickets','PATCH',{warranty_claim_pending:false,warranty_claim_approved:false,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    showToastWI('Warranty claim rejected.');
+    closeModal('modal-ticket-detail');renderAllTickets?renderAllTickets():renderDashboard();
+  }catch(e){alert('Error: '+e.message);}
+}
 async function engVoidWarranty(id){
   const r=prompt('Out of Coverage - Reason (mandatory):');
   if(!r||!r.trim()){alert('Reason is mandatory!');return;}
@@ -4869,6 +4932,11 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
+  // Remark mandatory when closing
+  if(status==='Closed'){
+    const rem=(document.getElementById('upd-remarks')?.value||'').trim();
+    if(!rem){alert('❌ Remark is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-remarks')?.focus();return;}
+  }
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
   if(status!==t.status && !allowedEng.includes(status)){
@@ -17820,6 +17888,22 @@ function clearAILog(){
   </div>
 </div>
 <!-- Warranty return -->
+<div class="modal-overlay hidden" id="modal-warranty-claim" onclick="if(event.target===this)closeModal('modal-warranty-claim')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="modal-header" style="background:#e0f2fe;"><h2>🛡️ Customer Claims Warranty</h2><button class="close-btn" onclick="closeModal('modal-warranty-claim')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Customer has shown warranty proof on site. WC/Admin will be notified via Telegram &amp; Email to approve.</p>
+      <input type="hidden" id="wc-ticket-id">
+      <div class="form-group"><label>Invoice / Warranty Card Number <span style="color:#ef4444;">*</span></label><input type="text" id="wc-invoice" placeholder="e.g. INV-2024-XXXXX or Warranty Card No."></div>
+      <div class="form-group"><label>Additional Note (optional)</label><textarea id="wc-note" rows="2" placeholder="Any other details about the warranty claim..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-warranty-claim')">Cancel</button>
+      <button class="btn" style="background:#0369a1;color:#fff;" onclick="submitWarrantyClaim()">📤 Submit Claim</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="modal-eng-warranty" onclick="if(event.target===this)closeModal('modal-eng-warranty')">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
     <div class="modal-header" style="background:#f0fdf4;"><h2>🔄 Warranty Part Received</h2><button class="close-btn" onclick="closeModal('modal-eng-warranty')">✕</button></div>
