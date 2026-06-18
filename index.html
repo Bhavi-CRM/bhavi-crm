@@ -5650,7 +5650,7 @@ async function saveStockAdjust(){
     closeModal('modal-stock');renderInventory();checkPendingPartsAuto();
   }catch(e){alert('Error: '+e.message);}
 }
-async function deleteInv(id){if(!confirm('Delete?'))return;try{await sb('inventory','DELETE',null,`?id=eq.${id}`);renderInventory();}catch(e){alert(e.message);}}
+async function deleteInv(id){if(!confirm('Delete this part?'))return;try{await sb('inventory','DELETE',null,`?id=eq.${id}`);renderInventory();}catch(e){if((e.message||'').includes('23503')||(e.message||'').includes('foreign key')){alert('⚠️ This part cannot be deleted because it has usage/movement history.\n\nYou can:\n• Set stock to 0 using the 📦 adjust button\n• Or keep it and just stop using it');}else{alert('Error: '+e.message);}}}
 
 async function openPartHistory(partCode,partName,invId){
   var ex=document.getElementById('part-history-modal');if(ex)ex.remove();
@@ -5765,13 +5765,23 @@ async function deleteSelectedInv(){
   const ids=getSelectedInvIds();
   if(!ids.length){alert('Please select at least one part');return;}
   if(!confirm(`Delete ${ids.length} selected part(s)?`))return;
-  try{
-    for(const id of ids){
+  let deleted=0,skipped=[];
+  for(const id of ids){
+    try{
       await sb('inventory','DELETE',null,`?id=eq.${id}`);
+      deleted++;
+    }catch(e){
+      if((e.message||'').includes('23503')||(e.message||'').includes('foreign key')){
+        const inv=allInventory.find(i=>i.id==id);
+        skipped.push(inv?.item_name||id);
+      }else{alert('Error: '+e.message);break;}
     }
-    alert(`✅ ${ids.length} parts deleted!`);
-    renderInventory();
-  }catch(e){alert('Error: '+e.message);}
+  }
+  let msg='';
+  if(deleted>0)msg+=`✅ ${deleted} part(s) deleted.`;
+  if(skipped.length)msg+=`\n\n⚠️ ${skipped.length} part(s) have usage history and cannot be deleted:\n`+skipped.slice(0,5).join('\n')+(skipped.length>5?`\n...and ${skipped.length-5} more`:'');
+  if(msg)alert(msg);
+  renderInventory();
 }
 
 function downloadStockOutTemplate(){
