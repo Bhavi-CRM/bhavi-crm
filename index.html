@@ -4713,6 +4713,11 @@ async function openEngUpdate(id){
     <hr class="divider">
     <!-- Point 7: Warranty void for engineer too -->
     ${isW&&!isOOC?`<button class="btn btn-warning btn-sm" style="margin-bottom:12px;" onclick="engVoidWarranty('${t.id}')">⚠️ Mark Out of Coverage</button>`:''}
+    ${isW?`<div class="form-group" style="margin-bottom:12px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 12px;">
+      <label style="font-weight:700;color:#b45309;font-size:12px;">🔖 Canon SE Call ID <span style="color:#ef4444;">*</span> <span style="font-size:11px;font-weight:400;color:#92400e;">(required for warranty part tracking)</span></label>
+      <input type="text" id="upd-se-call-id" value="${escHtml(t.se_call_id||'')}" placeholder="e.g. CSP/20260618/123456" style="margin-top:4px;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;border-color:#f59e0b;">
+      <div style="font-size:11px;color:#78716c;margin-top:3px;">Only the digits after the last / will be used for tracking (e.g. 123456)</div>
+    </div>`:''}
     <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">🔩 Spares / Part Request</h3>
     <div id="spares-list">${currentSpares.map((s,i)=>spareRow(s,i)).join('')}</div>
     <!-- Point 6: Part request button -->
@@ -5010,10 +5015,16 @@ async function saveEngUpdate(){
 
       // ── AUTO WARRANTY TRACKING — log eng_movements for warranty/AMC/Warranty Repeat calls ──
       const isWarrantyCall=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
-      const seCallId=(freshT?.se_call_id||'').trim();
+      // Read SE Call ID from modal field (may have been entered/edited just now)
+      const seCallIdRaw=(document.getElementById('upd-se-call-id')?.value||freshT?.se_call_id||'').trim().toUpperCase();
+      // Save updated SE Call ID to ticket if changed
+      if(seCallIdRaw && seCallIdRaw!==(freshT?.se_call_id||'').trim().toUpperCase()){
+        await sb('tickets','PATCH',{se_call_id:seCallIdRaw},`?id=eq.${id}`).catch(()=>{});
+      }
+      // Extract part after last slash for tracking key: CSP/20260618/123456 → 123456
+      const seTrackKey=seCallIdRaw?seCallIdRaw.split('/').pop().trim():'';
       if(isWarrantyCall && sparesToDeduct.length>0){
-        if(!seCallId){
-          // Warn admin/WC if SE Call ID missing — tracking not possible without it
+        if(!seTrackKey){
           console.warn('Warranty part used but SE Call ID missing on ticket '+id+' — warranty return cannot be auto-tracked');
         }
         for(const s of sparesToDeduct){
@@ -5021,8 +5032,8 @@ async function saveEngUpdate(){
             const invItem=(await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`));
             const partId=invItem.length?invItem[0].id:null;
             if(partId){
-              const trackId=seCallId||id; // Use SE Call ID; fallback to ticket ID if missing
-              // Check if already logged for this SE call+part to avoid duplicate
+              const trackId=seTrackKey||id; // digits after last slash; fallback to ticket ID
+              // Check if already logged for this SE call+part (check by trackId+partId)
               const existing=await sb('eng_movements','GET',null,
                 '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
               if(!existing||!existing.length){
@@ -5035,9 +5046,15 @@ async function saveEngUpdate(){
                   job_sheet:trackId,
                   warranty:true,
                   warranty_status:'PENDING',
-                  notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallId?' | SE: '+seCallId:''),
+                  notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallIdRaw?' | SE: '+seCallIdRaw:''),
                   created_by:currentUser.name||'System'
                 }).catch(()=>{});
+              }else{
+                // Entry exists — update qty if more parts used (e.g. used 3, was logged 2 before)
+                const ex0=existing[0];
+                if((ex0.qty||1)<(s.qty||1)){
+                  await sb('eng_movements','PATCH',{qty:s.qty||1,updated_at:new Date().toISOString()},'?id=eq.'+ex0.id).catch(()=>{});
+                }
               }
             }
           }catch(ex){console.log('Warranty movement log err:',ex);}
