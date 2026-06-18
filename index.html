@@ -19857,276 +19857,96 @@ function insertAIRemark(targetId) {
 // MODULE: PARTS CATALOG (Selling Price + Availability)
 // ═══════════════════════════════════════════════════════════════
 var _pcAll=[], _pcFilter='';
-var _isAdminOrEng=function(){return currentUser&&(currentUser.role==='admin'||currentUser.role==='engineer');};
 
 async function renderPartsCatalog(){
   const pc=document.getElementById('page-content');if(!pc)return;
-  pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading parts catalog...</div>';
+  pc.innerHTML='<div style="padding:30px;text-align:center;color:#6b7280;">⏳ Loading...</div>';
   try{
-    const [catalog,inv]=await Promise.all([
-      sb('parts_catalog','GET',null,'?order=part_name&limit=1000'),
-      sb('inventory','GET',null,'?select=part_code,item_name,qty_in_stock,unit_price&limit=2000')
-    ]);
-    _pcAll=catalog||[];
-    // Build inventory lookup by part_code (normalize: lowercase, collapse spaces)
-    const norm=s=>(s||'').toLowerCase().replace(/\s+/g,' ').trim();
-    const invByCode={};
-    (inv||[]).forEach(i=>{
-      const rec={qty:i.qty_in_stock||0,price:i.unit_price||0};
-      if(i.part_code){invByCode[norm(i.part_code)]=rec;}
-      if(i.item_name){const nk=norm(i.item_name);if(!invByCode[nk])invByCode[nk]=rec;}
-    });
-    _pcAll.forEach(p=>{
-      const codeKey=norm(p.item_code);
-      const nameKey=norm(p.part_name);
-      // Try exact code → exact name → code without spaces → name without spaces
-      const match=invByCode[codeKey]||invByCode[nameKey]||invByCode[codeKey.replace(/\s/g,'')]||invByCode[nameKey.replace(/\s/g,'')];
-      p._qty=match?match.qty:null; // null = not matched
-      p._price=match?match.price:null;
-    });
-    _renderPCShell();
-    _pcUpdateRows();
-  }catch(e){
-    pc.innerHTML='<div style="padding:20px;color:#ef4444;">Error: '+escHtml(e.message)+'</div>';
-  }
+    // Fetch ALL inventory — no limit
+    const inv=await sb('inventory','GET',null,'?select=part_code,item_name,category,qty_in_stock,unit_price,min_stock,warranty_qty&order=item_name&limit=5000');
+    _pcAll=(inv||[]).map(i=>({
+      code:i.part_code||'',
+      name:i.item_name||'',
+      model:i.category||'',
+      stock:i.qty_in_stock||0,
+      wstock:i.warranty_qty||0,
+      price:i.unit_price||0,
+      min:i.min_stock||0
+    }));
+    _pcFilter='';
+    _pcRender();
+  }catch(e){pc.innerHTML='<div style="padding:20px;color:#ef4444;">Error: '+escHtml(e.message)+'</div>';}
 }
 
-// Render page shell ONCE (search input stays, no re-render)
-function _renderPCShell(){
+function _pcRender(){
   const pc=document.getElementById('page-content');if(!pc)return;
-  const isAdmin=currentUser&&currentUser.role==='admin';
-  const totalParts=_pcAll.length;
-  const inStock=_pcAll.filter(r=>r._qty>0).length;
-  const outOfStock=_pcAll.filter(r=>r._qty<=0).length;
-  const cols=isAdmin?6:5;
-
+  const total=_pcAll.length;
+  const inStock=_pcAll.filter(r=>r.stock>0).length;
+  const outStock=_pcAll.filter(r=>r.stock<=0).length;
   pc.innerHTML=`<div style="padding:16px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-    <span style="font-size:22px;">🔩</span>
-    <div><div style="font-size:20px;font-weight:800;">Parts Catalog</div>
-    <div style="font-size:12px;color:#6b7280;">Selling price + stock availability</div></div>
-    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
-      ${isAdmin?`<button onclick="openAddPart()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Add Part</button>`:''}
-      <button onclick="downloadPCTemplate()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📄 Template</button>
-      ${isAdmin?`<button onclick="importPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📥 Import Excel</button>`:''}
-      ${isAdmin&&totalParts?`<button onclick="exportPC()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">📤 Export</button>`:''}
-    </div>
-  </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #1d4ed8;">
-      <div style="font-size:28px;font-weight:800;color:#1d4ed8;" id="pc-total">${totalParts}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Total Parts</div></div>
+      <div style="font-size:28px;font-weight:800;color:#1d4ed8;">${total}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Total Parts</div></div>
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #10b981;">
-      <div style="font-size:28px;font-weight:800;color:#10b981;" id="pc-instock">${inStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">In Stock</div></div>
+      <div style="font-size:28px;font-weight:800;color:#10b981;">${inStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">In Stock</div></div>
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center;border-top:3px solid #ef4444;">
-      <div style="font-size:28px;font-weight:800;color:#ef4444;" id="pc-outstock">${outOfStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Out of Stock</div></div>
+      <div style="font-size:28px;font-weight:800;color:#ef4444;">${outStock}</div><div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;">Out of Stock</div></div>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
     <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;gap:8px;align-items:center;">
-      <input type="text" id="pc-search" value="" placeholder="Search part name, code, model..." oninput="_pcFilter=this.value;_pcUpdateRows();" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
-      <span id="pc-count" style="font-size:12px;color:#6b7280;">${totalParts} results</span>
+      <input type="text" id="pc-search" value="${escHtml(_pcFilter)}" placeholder="🔍 Search part code, name, model..." oninput="_pcFilter=this.value;_pcRows();" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <select id="pc-stock-f" onchange="_pcRows()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+        <option value="">All Stock</option><option value="in">In Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option>
+      </select>
+      <span id="pc-count" style="font-size:12px;color:#6b7280;white-space:nowrap;">${total} parts</span>
     </div>
     <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
-      <colgroup>
-        <col style="width:180px;">
-        <col style="width:140px;">
-        <col style="width:auto;">
-        <col style="width:110px;">
-        <col style="width:110px;">
-        ${isAdmin?'<col style="width:90px;">':''}
-      </colgroup>
+      <colgroup><col style="width:130px;"><col style="width:220px;"><col style="width:auto;"><col style="width:90px;"><col style="width:110px;"></colgroup>
       <thead><tr style="background:#f8fafc;">
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Part Code</th>
         <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Part Name</th>
-        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Part No / Code</th>
-        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Compatible Models</th>
-        <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">MRP ₹ <span style="color:#10b981;font-size:9px;">(Inv)</span></th>
-        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Stock <span style="color:#10b981;font-size:9px;">(Inv)</span></th>
-        ${isAdmin?'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Actions</th>':''}
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Model No</th>
+        <th style="padding:10px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">MRP ₹</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;">Stock</th>
       </tr></thead>
       <tbody id="pc-tbody"></tbody>
-    </table></div></div></div>
-
-  <!-- Add/Edit Part Modal -->
-  <div id="pc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
-    <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
-      <h3 id="pc-modal-title" style="margin:0 0 18px;font-size:17px;">Add Part</h3>
-      <input id="pc-edit-id" type="hidden">
-      <div style="display:grid;gap:12px;">
-        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Part Name *</label>
-          <input id="pc-name" type="text" placeholder="e.g. Canon Ink Tank 790" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
-        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Part No / Item Code</label>
-          <input id="pc-code" type="text" placeholder="e.g. CG2-6007-000" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;">
-          <div style="font-size:11px;color:#10b981;margin-top:3px;">⚡ Must match Part Code in Inventory to auto-link price &amp; stock</div></div>
-        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Compatible Models</label>
-          <input id="pc-models" type="text" placeholder="e.g. MF3010, MF241D, LBP2900" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;"></div>
-        <div><label style="font-size:12px;color:#6b7280;font-weight:600;">Description / Notes</label>
-          <textarea id="pc-notes" rows="2" placeholder="Optional description..." style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;"></textarea></div>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:12px;color:#065f46;">
-          💡 MRP Price and Stock are automatically pulled from <b>Inventory</b> using the Part Code above. No need to enter them here.
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px;">
-        <button onclick="savePart()" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Save Part</button>
-        <button onclick="document.getElementById('pc-modal').style.display='none'" style="padding:10px 20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
-      </div>
-    </div>
-  </div>`;
+    </table></div>
+  </div></div>`;
+  _pcRows();
 }
 
-// Only update tbody + count — search input stays focused
-function _pcUpdateRows(){
-  const isAdmin=currentUser&&currentUser.role==='admin';
+function _pcRows(){
   const q=(_pcFilter||'').toLowerCase();
-  const filtered=q?_pcAll.filter(r=>(r.part_name||'').toLowerCase().includes(q)||(r.item_code||'').toLowerCase().includes(q)||(r.category||'').toLowerCase().includes(q)||(r.compatible_models||'').toLowerCase().includes(q)):_pcAll;
-  const tbody=document.getElementById('pc-tbody');
-  const countEl=document.getElementById('pc-count');
-  if(countEl)countEl.textContent=filtered.length+' results';
-  if(!tbody)return;
-  if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="${isAdmin?6:5}" style="padding:30px;text-align:center;color:#9ca3af;">No parts found${q?' matching "'+escHtml(q)+'"':''}</td></tr>`;
-    return;
-  }
-  tbody.innerHTML=filtered.map(p=>{
-    const matched=p._qty!==null;
-    const qty=matched?(p._qty||0):0;
-    const price=matched?(p._price||0):0;
-    const stockClr=!matched?'#9ca3af':qty>5?'#059669':qty>0?'#d97706':'#dc2626';
-    const stockBg=!matched?'#f9fafb':qty>5?'#f0fdf4':qty>0?'#fffbeb':'#fef2f2';
-    const stockLabel=!matched?'not linked':qty>5?qty+' in stock':qty>0?qty+' (low)':'Out of stock';
-    const models=p.compatible_models||'—';
+  const sf=document.getElementById('pc-stock-f')?.value||'';
+  const filtered=_pcAll.filter(r=>{
+    if(q&&![(r.code),(r.name),(r.model)].some(v=>v.toLowerCase().includes(q)))return false;
+    if(sf==='in'&&r.stock<=0)return false;
+    if(sf==='low'&&!(r.stock>0&&r.stock<=r.min))return false;
+    if(sf==='out'&&r.stock>0)return false;
+    return true;
+  });
+  const tb=document.getElementById('pc-tbody');
+  const ct=document.getElementById('pc-count');
+  if(ct)ct.textContent=filtered.length+' parts';
+  if(!tb)return;
+  if(!filtered.length){tb.innerHTML='<tr><td colspan="5" style="padding:30px;text-align:center;color:#9ca3af;">No parts found</td></tr>';return;}
+  tb.innerHTML=filtered.map(p=>{
+    const sc=p.stock<=0?'#dc2626':p.stock<=p.min?'#d97706':'#059669';
+    const sb2=p.stock<=0?'#fef2f2':p.stock<=p.min?'#fffbeb':'#f0fdf4';
+    const sl=p.stock<=0?'Out of stock':p.stock<=p.min?p.stock+' (low)':p.stock+' in stock';
+    const model=p.model||'—';
     return `<tr style="border-top:1px solid #f1f5f9;">
-      <td style="padding:10px 12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.part_name||'')}">${escHtml(p.part_name||'')}<br><span style="font-size:11px;color:#9ca3af;font-weight:400;">${escHtml(p.notes||'')}</span></td>
-      <td style="padding:10px 12px;color:#1d4ed8;font-family:monospace;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(p.item_code||'—')}</td>
-      <td style="padding:10px 12px;font-size:12px;color:#374151;overflow:hidden;"><div style="max-height:40px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="${escHtml(models)}">${escHtml(models)}</div></td>
-      <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;white-space:nowrap;">${price>0?'₹'+price.toLocaleString('en-IN'):'<span style="color:#9ca3af;font-size:10px;">—</span>'}</td>
-      <td style="padding:10px 12px;text-align:center;white-space:nowrap;"><span style="background:${stockBg};color:${stockClr};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${stockLabel}</span></td>
-      ${isAdmin?`<td style="padding:10px 12px;text-align:center;white-space:nowrap;">
-        <button onclick="editPart('${p.id}')" style="padding:4px 8px;border:1px solid #1d4ed8;color:#1d4ed8;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;margin-right:2px;">✏️</button>
-        <button onclick="deletePart('${p.id}')" style="padding:4px 8px;border:1px solid #ef4444;color:#ef4444;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;">🗑️</button>
-      </td>`:''}
+      <td style="padding:10px 12px;font-family:monospace;color:#1d4ed8;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.code)}">${escHtml(p.code)||'—'}</td>
+      <td style="padding:10px 12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(p.name)}">${escHtml(p.name)}</td>
+      <td style="padding:10px 12px;font-size:12px;color:#374151;overflow:hidden;"><div style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;" title="${escHtml(model)}">${escHtml(model)}</div></td>
+      <td style="padding:10px 12px;text-align:right;font-weight:700;color:#1e293b;">${p.price>0?'₹'+p.price.toLocaleString('en-IN'):'—'}</td>
+      <td style="padding:10px 12px;text-align:center;"><span style="background:${sb2};color:${sc};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${sl}</span></td>
     </tr>`;
   }).join('');
 }
 
-function openAddPart(){
-  document.getElementById('pc-edit-id').value='';
-  document.getElementById('pc-modal-title').textContent='Add New Part';
-  ['pc-name','pc-code','pc-models','pc-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('pc-modal').style.display='flex';
-}
-
-async function editPart(id){
-  const p=_pcAll.find(x=>x.id===id);if(!p)return;
-  document.getElementById('pc-edit-id').value=p.id;
-  document.getElementById('pc-modal-title').textContent='Edit Part';
-  document.getElementById('pc-name').value=p.part_name||'';
-  document.getElementById('pc-code').value=p.item_code||'';
-  document.getElementById('pc-models').value=p.compatible_models||'';
-  document.getElementById('pc-notes').value=p.notes||'';
-  document.getElementById('pc-modal').style.display='flex';
-}
-
-async function savePart(){
-  const name=document.getElementById('pc-name').value.trim();
-  if(!name){alert('Part name required');return;}
-  const data={
-    part_name:name,
-    item_code:document.getElementById('pc-code').value.trim(),
-    compatible_models:document.getElementById('pc-models').value.trim(),
-    notes:document.getElementById('pc-notes').value.trim(),
-    updated_at:new Date().toISOString()
-  };
-  const editId=document.getElementById('pc-edit-id').value;
-  try{
-    if(editId){
-      await sb('parts_catalog','PATCH',data,'?id=eq.'+editId);
-    } else {
-      data.created_at=new Date().toISOString();
-      await sb('parts_catalog','POST',data);
-    }
-    document.getElementById('pc-modal').style.display='none';
-    await renderPartsCatalog();
-  }catch(e){alert('Error: '+e.message);}
-}
-
-async function deletePart(id){
-  if(!confirm('Delete this part?'))return;
-  try{
-    await sb('parts_catalog','DELETE',null,'?id=eq.'+id);
-    _pcAll=_pcAll.filter(x=>x.id!==id);
-    _pcUpdateRows();
-    const t=document.getElementById('pc-total');const i=document.getElementById('pc-instock');const o=document.getElementById('pc-outstock');
-    if(t)t.textContent=_pcAll.length;
-    if(i)i.textContent=_pcAll.filter(r=>r._qty>0).length;
-    if(o)o.textContent=_pcAll.filter(r=>r._qty<=0).length;
-  }catch(e){alert('Error: '+e.message);}
-}
-
-function downloadPCTemplate(){
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
-  const ws=XLSX.utils.aoa_to_sheet([
-    ['part_name','item_code','category','selling_price','stock_qty','compatible_models','notes'],
-    ['Canon Ink Tank 790','CNX-790','Ink',450,10,'G3010,G2010','Original ink tank'],
-    ['Epson Roller Kit','EPR-001','Roller',850,5,'L3110,L3150','Paper feed roller'],
-  ]);
-  ws['!cols']=[{wch:25},{wch:15},{wch:15},{wch:15},{wch:12},{wch:25},{wch:30}];
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Parts Catalog');
-  XLSX.writeFile(wb,'parts_catalog_template.xlsx');
-}
-
-function exportPC(){
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
-  const data=_pcAll.map(p=>({
-    part_name:p.part_name||'',item_code:p.item_code||'',category:p.category||'',
-    selling_price:p.selling_price||0,stock_qty:p._qty||0,
-    compatible_models:p.compatible_models||'',notes:p.notes||''
-  }));
-  const ws=XLSX.utils.json_to_sheet(data);
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Parts Catalog');
-  XLSX.writeFile(wb,'parts_catalog_export.xlsx');
-}
-
-function importPC(){
-  if(typeof XLSX==='undefined'){alert('Excel library load nathi thayun');return;}
-  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,.xls,.csv';
-  inp.onchange=async function(e){
-    const file=e.target.files[0];if(!file)return;
-    const reader=new FileReader();
-    reader.onload=async function(ev){
-      try{
-        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-        if(!rows.length){alert('File ma koi data nathi');return;}
-        let ok=0,fail=0;
-        for(const r of rows){
-          const name=(r.part_name||r['Part Name']||'').trim();
-          if(!name){fail++;continue;}
-          try{
-            await sb('parts_catalog','POST',{
-              part_name:name,
-              item_code:(r.item_code||r['Item Code']||'').trim(),
-              category:(r.category||r['Category']||'General').trim(),
-              selling_price:parseFloat(r.selling_price||r['Selling Price']||0)||0,
-              stock_qty:parseInt(r.stock_qty||r['Stock Qty']||0)||0,
-              compatible_models:(r.compatible_models||r['Compatible Models']||'').trim(),
-              notes:(r.notes||r['Notes']||'').trim(),
-              created_at:new Date().toISOString(),
-              updated_at:new Date().toISOString()
-            });
-            ok++;
-          }catch(ex){fail++;}
-        }
-        alert('✅ Import complete!\nSuccess: '+ok+'\nFailed: '+fail);
-        await renderPartsCatalog();
-      }catch(err){alert('Error reading file: '+err.message);}
-    };
-    reader.readAsArrayBuffer(file);
-  };
-  inp.click();
-}
-
-// ═══════════════════════════════════════════════════════════════
+function importPC(){}
 // MODULE: FAULT FINDER (Knowledge Base)
 // ═══════════════════════════════════════════════════════════════
 var _ffModels=[], _ffFaults=[], _ffAll=[];
