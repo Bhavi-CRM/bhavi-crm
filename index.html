@@ -328,7 +328,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('targets')" id="nav-targets"><span class="icon">🎯</span><span>Targets</span></div>
     <div class="nav-item hidden" onclick="navigate('amc')" id="nav-amc"><span class="icon">🔄</span><span>AMC</span></div>
     <div class="nav-item hidden" onclick="navigate('feedback')" id="nav-feedback"><span class="icon">⭐</span><span>Feedback</span></div>
-    <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit"><span class="icon">💰</span><span>Profit</span></div>
+    <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit" style="display:none!important;"><span class="icon">💰</span><span>Profit</span></div>
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
     <div class="nav-item hidden" onclick="navigate('parts-catalog')" id="nav-parts-catalog"><span class="icon">🔩</span><span>Parts Catalog</span></div>
@@ -2661,7 +2661,7 @@ function setupNav(){
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
-      sv('nav-feedback',true);sv('nav-profit',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
+      sv('nav-feedback',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
