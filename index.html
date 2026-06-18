@@ -2642,7 +2642,7 @@ function setupNav(){
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
       // ENG001 = CSP Manager: extra access
       var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
-      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);}
+      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
