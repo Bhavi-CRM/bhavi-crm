@@ -12458,7 +12458,7 @@ async function loadWalkInReport(){
         html+='<div style="background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--primary);">'
           +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:flex-start;">'
           +'<div>'
-          +'<div style="font-weight:600;font-size:13px;">'+tokenBadge+escHtml(l.customer_name)+' <span style="color:var(--text-muted);font-size:12px;font-weight:400;">'+l.mobile+'</span> '+jobBadge+'</div>'
+          +'<div style="font-weight:600;font-size:13px;">'+tokenBadge+'<span onclick="viewWalkInCustomer(\''+l.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline;">'+escHtml(l.customer_name)+'</span> <span style="color:var(--text-muted);font-size:12px;font-weight:400;">'+l.mobile+'</span> '+jobBadge+'</div>'
           +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🕐 In: <b>'+l.arrival_time+'</b>'+(l.departure_time?' | Out: <b>'+l.departure_time+'</b>':' | <span style="color:#f59e0b;">Still in office</span>')+'</div>'
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
@@ -12486,6 +12486,63 @@ async function loadWalkInReport(){
     });
     res.innerHTML=html;
   }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+function viewWalkInCustomer(id){
+  var logs=window._wirLogs||[];
+  var l=logs.find(function(x){return x.id==id;});
+  if(!l)return;
+  var existing=document.getElementById('wi-cust-modal');
+  if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='wi-cust-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,0.18);">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">'
+    +'<h3 style="font-size:15px;font-weight:800;color:var(--primary);margin:0;">👤 Customer Details</h3>'
+    +'<button onclick="document.getElementById(\'wi-cust-modal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">✕</button>'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:12px;">'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">CUSTOMER NAME</label>'
+    +'<input id="wic-name" value="'+escHtml(l.customer_name||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">MOBILE NO</label>'
+    +'<input id="wic-mobile" value="'+escHtml(l.mobile||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">ADDRESS</label>'
+    +'<input id="wic-address" value="'+escHtml(l.address||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">CITY</label>'
+    +'<input id="wic-city" value="'+escHtml(l.city||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">STATE</label>'
+    +'<input id="wic-state" value="'+escHtml(l.state||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:700;color:#64748b;">PIN CODE</label>'
+    +'<input id="wic-pin" value="'+escHtml(l.pincode||l.pin_code||'')+'" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;" class="no-caps"></div>'
+    +'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;margin-top:20px;">'
+    +'<button onclick="saveWalkInCustomer(\''+id+'\')" class="btn btn-primary" style="flex:1;">💾 Save</button>'
+    +'<button onclick="document.getElementById(\'wi-cust-modal\').remove()" class="btn" style="flex:1;background:#f1f5f9;color:#334155;">Cancel</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(m);
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
+}
+
+async function saveWalkInCustomer(id){
+  var name=(document.getElementById('wic-name')?.value||'').trim();
+  var mobile=(document.getElementById('wic-mobile')?.value||'').trim();
+  var address=(document.getElementById('wic-address')?.value||'').trim();
+  var city=(document.getElementById('wic-city')?.value||'').trim();
+  var state=(document.getElementById('wic-state')?.value||'').trim();
+  var pincode=(document.getElementById('wic-pin')?.value||'').trim();
+  if(!name){alert('Customer name required');return;}
+  try{
+    await sb('walkin_log','PATCH',{customer_name:name,mobile:mobile,address:address,city:city,state:state,pincode:pincode},'?id=eq.'+id);
+    var logs=window._wirLogs||[];
+    var l=logs.find(function(x){return x.id==id;});
+    if(l){l.customer_name=name;l.mobile=mobile;l.address=address;l.city=city;l.state=state;l.pincode=pincode;}
+    document.getElementById('wi-cust-modal')?.remove();
+    loadWalkInReport();
+  }catch(e){alert('Error saving: '+e.message);}
 }
 
 async function downloadWalkInExcel(){
