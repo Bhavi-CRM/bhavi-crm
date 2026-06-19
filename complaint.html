@@ -8,7 +8,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{--primary:#1d4ed8;--primary-light:#3b82f6;--success:#059669;--danger:#dc2626;--orange:#f59e0b;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1e293b;--muted:#64748b;--radius:14px;}
-body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;text-transform:uppercase;}
 .page{display:none;width:100%;max-width:500px;min-height:100vh;background:var(--card);flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,.08);}
 .page.active{display:flex;}
 
@@ -2682,5 +2682,17 @@ function chatModelSelect(brand,modelNo,modelName,brochureUrl){
 
   </div>
 </div>
+<script>
+document.addEventListener('input',function(e){
+  var el=e.target;
+  var skip=['password','email','search','url','number','date','time','month','week','color','range','file','hidden'];
+  if(el.classList&&el.classList.contains('no-caps'))return;
+  if(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!skip.includes((el.type||'').toLowerCase()))){
+    var s=el.selectionStart,en=el.selectionEnd;
+    el.value=el.value.toUpperCase();
+    try{el.setSelectionRange(s,en);}catch(x){}
+  }
+});
+</script>
 </body>
 </html>
