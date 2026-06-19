@@ -1084,6 +1084,7 @@ function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({}
 async function sb(t,m='GET',b=null,q=''){
   const url=`${SB_URL}/rest/v1/${t}${q}`;
   const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':m==='POST'?'return=representation':m==='PATCH'?'return=representation':''};
+  if(m==='GET'){h['Range-Unit']='items';h['Range']='0-9999';}
   const o={method:m,headers:h};if(b)o.body=JSON.stringify(b);
   const r=await fetch(url,o);if(!r.ok){const e=await r.text();throw new Error(e);}
   const tx=await r.text();return tx?JSON.parse(tx):[];
@@ -1166,6 +1167,16 @@ function closeMobileMenu(){
   var ov=document.getElementById('mobile-overlay');
   if(ov)ov.style.display='none';
 }
+document.addEventListener('input',function(e){
+  var el=e.target;
+  var skip=['password','email','search','url','number','date','time','month','week','color','range','file','hidden'];
+  if(el.classList&&el.classList.contains('no-caps'))return;
+  if(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!skip.includes((el.type||'').toLowerCase()))){
+    var s=el.selectionStart,en=el.selectionEnd;
+    el.value=el.value.toUpperCase();
+    try{el.setSelectionRange(s,en);}catch(x){}
+  }
+});
 // Close sidebar on nav item click (mobile)
 document.addEventListener('click',function(e){
   if(e.target.closest('.nav-item')&&window.innerWidth<=768)closeMobileMenu();
