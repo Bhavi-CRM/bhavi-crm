@@ -11862,7 +11862,7 @@ function renderWalkInList(logs){
     return '<div style="background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+borderColor+';">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
       +'<div>'
-      +'<div style="font-weight:600;font-size:14px;">'+tokenBadge+l.customer_name+' <span style="font-size:12px;color:var(--text-muted);">'+l.mobile+'</span> '+jobBadge+'</div>'
+      +'<div style="font-weight:600;font-size:14px;">'+tokenBadge+'<span onclick="viewWalkInCustomerFromHistory(\''+l.id+'\')" style="cursor:pointer;color:var(--primary);text-decoration:underline;">'+l.customer_name+'</span> <span style="font-size:12px;color:var(--text-muted);">'+l.mobile+'</span> '+jobBadge+'</div>'
       +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🕐 In: <b>'+l.arrival_time+'</b>'+(l.departure_time?' &nbsp;|&nbsp; Out: <b>'+l.departure_time+'</b>':' &nbsp;|&nbsp; <span style="color:#f59e0b;">Still in office</span>')+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
@@ -12488,8 +12488,21 @@ async function loadWalkInReport(){
   }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
-function viewWalkInCustomer(id){
-  var logs=window._wirLogs||[];
+function viewWalkInCustomerFromHistory(id){
+  var logs=window._todayWILogs||[];
+  var l=logs.find(function(x){return x.id==id;});
+  if(!l){
+    // fallback: fetch from DB
+    sb('walkin_log','GET',null,'?id=eq.'+id).then(function(r){
+      if(r&&r[0]){if(!window._todayWILogs)window._todayWILogs=[];window._todayWILogs.push(r[0]);viewWalkInCustomer(id,window._todayWILogs);}
+    });
+    return;
+  }
+  viewWalkInCustomer(id,logs);
+}
+
+function viewWalkInCustomer(id,srcLogs){
+  var logs=srcLogs||window._wirLogs||[];
   var l=logs.find(function(x){return x.id==id;});
   if(!l)return;
   var existing=document.getElementById('wi-cust-modal');
@@ -12537,11 +12550,15 @@ async function saveWalkInCustomer(id){
   if(!name){alert('Customer name required');return;}
   try{
     await sb('walkin_log','PATCH',{customer_name:name,mobile:mobile,address:address,city:city,state:state,pincode:pincode},'?id=eq.'+id);
-    var logs=window._wirLogs||[];
-    var l=logs.find(function(x){return x.id==id;});
-    if(l){l.customer_name=name;l.mobile=mobile;l.address=address;l.city=city;l.state=state;l.pincode=pincode;}
+    // Update both possible in-memory lists
+    [window._wirLogs||[], window._todayWILogs||[]].forEach(function(logs){
+      var l=logs.find(function(x){return x.id==id;});
+      if(l){l.customer_name=name;l.mobile=mobile;l.address=address;l.city=city;l.state=state;l.pincode=pincode;}
+    });
     document.getElementById('wi-cust-modal')?.remove();
-    loadWalkInReport();
+    // Refresh whichever view is active
+    if(typeof loadWalkInReport==='function'&&document.getElementById('wir-results'))loadWalkInReport();
+    if(typeof renderWalkIn==='function'&&window._todayWILogs)renderWalkIn();
   }catch(e){alert('Error saving: '+e.message);}
 }
 
