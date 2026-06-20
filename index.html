@@ -3676,13 +3676,61 @@ async function exportFilteredTickets(){
     return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng);
   });
   if(!filtered.length){alert('No records to export.');return;}
-  const headers=['Ticket ID','Customer','Mobile','Brand','Model','Serial','City','Call Type','Service Type','Status','Engineer','Assigned Date','WC Type','Remarks'];
-  const data=filtered.map(t=>[t.id,t.cname,t.mobile,t.brand_name,t.model,t.serial,t.city,t.call_type,t.service_type,t.status,t.assigned_name||'-',t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',t.wc_type||'-',t.remarks||'-']);
+
+  // Helper: duration between two ISO strings → "2h 35m" / "45m"
+  const durHrs=(from,to)=>{if(!from||!to)return null;const m=(new Date(to)-new Date(from))/60000;if(m<0)return null;if(m<60)return Math.round(m)+'m';const h=Math.floor(m/60),mn=Math.round(m%60);return h+'h'+(mn?(' '+mn+'m'):'');};
+
+  // Helper: get timeline entries
+  const getTL=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
+  // Last "Work Started" action time
+  const getWorkStartAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&e.action.includes('Work Start'));return entry?.at||null;};
+  // Last close action time
+  const getClosedAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return entry?.at||null;};
+
+  // Build per-engineer sorted list to compute visit gaps
+  // Group tickets by engineer, sorted by created_at
+  const engMap={};
+  filtered.forEach(t=>{const e=t.assigned_name||'UNASSIGNED';if(!engMap[e])engMap[e]=[];engMap[e].push(t);});
+  Object.values(engMap).forEach(arr=>arr.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)));
+  // Map: ticketId → visit gap (time from previous ticket's close to this ticket's open)
+  const visitGap={};
+  Object.values(engMap).forEach(arr=>{
+    for(let i=1;i<arr.length;i++){
+      const prev=arr[i-1];const cur=arr[i];
+      const prevClosed=getClosedAt(prev);
+      if(prevClosed&&cur.created_at) visitGap[cur.id]=durHrs(prevClosed,cur.created_at);
+    }
+  });
+
+  const fmtDate=iso=>{if(!iso)return '-';const d=new Date(iso);return d.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});};
+  const fmtTime=iso=>{if(!iso)return '-';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});};
+
+  const headers=['Ticket ID','Customer','Mobile','City','Brand','Model','Serial','Call Type','Service Type','WC Type','Engineer','Status',
+    'Open Date','Open Time',
+    'Work Start Date','Work Start Time',
+    'Close Date','Close Time',
+    'Repair Time (Work Start→Close)','Resolution Time (Open→Close)','Visit Gap (from prev close)',
+    'Remarks'];
+  const data=filtered.map(t=>{
+    const closedAt=getClosedAt(t);
+    const workStartAt=getWorkStartAt(t);
+    return [
+      t.id,t.cname,t.mobile,t.city,t.brand_name,t.model,t.serial,
+      t.call_type,t.service_type,t.wc_type||'-',t.assigned_name||'-',t.status,
+      fmtDate(t.created_at), fmtTime(t.created_at),
+      fmtDate(workStartAt),  fmtTime(workStartAt),
+      fmtDate(closedAt),     fmtTime(closedAt),
+      durHrs(workStartAt,closedAt)||'-',
+      durHrs(t.created_at,closedAt)||'-',
+      visitGap[t.id]||'-',
+      t.remarks||'-',
+    ];
+  });
   const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-  ws['!cols']=[{wch:12},{wch:15},{wch:12},{wch:12},{wch:12},{wch:15},{wch:12},{wch:12},{wch:12},{wch:15},{wch:15},{wch:12},{wch:10},{wch:20}];
+  ws['!cols']=[{wch:13},{wch:18},{wch:13},{wch:13},{wch:12},{wch:13},{wch:15},{wch:14},{wch:13},{wch:10},{wch:18},{wch:20},{wch:12},{wch:11},{wch:14},{wch:14},{wch:12},{wch:11},{wch:24},{wch:22},{wch:22},{wch:20}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Tickets');
-  XLSX.writeFile(wb,'pending_calls_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'BhaviCRM_Tickets_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 // MY CALLS
@@ -13859,7 +13907,7 @@ async function openDCPrint(id){
       +'</div>'
       +'<div style="margin-bottom:12px;">'
       +'<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Approximate Value (₹)</label>'
-      +'<input type="text" id="dc-amount" placeholder="e.g. 48000" value="'+(e.dc_amount||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
+      +'<input type="text" id="dc-amount" placeholder="e.g. 48000" value="'+(e.dc_amount||(e.receiver_data&&e.receiver_data.dc_amount)||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'
       +'</div>'
       +'<div style="margin-bottom:16px;">'
       +'<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:6px;">Description</label>'
@@ -13899,7 +13947,7 @@ async function printDCNow(id,dcNo){
   var amount=document.getElementById('dc-amount')?.value.trim()||'';
   var desc=document.getElementById('dc-desc')?.value.trim()||'CAMERA AND LENS AFTER REPAIRING';
 
-  try{await sb('courier_log','PATCH',{person_name:name,place:city,receiver_id:opt.value,receiver_data:{name,address:addr,city,state,pin,phone},dc_amount:amount||null},'?id=eq.'+id);}catch(ex){}
+  try{await sb('courier_log','PATCH',{person_name:name,place:city,receiver_id:opt.value,receiver_data:{name,address:addr,city,state,pin,phone,dc_amount:amount||''}},'?id=eq.'+id);}catch(ex){}
 
   var entries=await sb('courier_log','GET',null,'?id=eq.'+id);
   var e=entries[0];
