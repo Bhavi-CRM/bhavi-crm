@@ -409,7 +409,17 @@ tr:hover td{background:#f8fafc;}
           <div class="autocomplete-wrap"><input type="text" id="call-model" placeholder="Type model..." oninput="filterModelAC(this.value)" autocomplete="off" onkeydown="acKeydown(event,'model-ac')">
           <div class="ac-list" id="model-ac"></div></div>
         </div>
-        <div class="form-group"><label>Serial No <span class="req">*</span></label><input type="text" id="call-serial" onblur="checkReRepair(this.value)"><div id="rerepair-alert" style="display:none;"></div></div>
+        <div class="form-group">
+          <label>Serial No <span class="req">*</span>
+            <span style="font-weight:400;font-size:11px;margin-left:10px;">
+              <label style="cursor:pointer;color:var(--text-muted);">
+                <input type="checkbox" id="sn-available" checked onchange="toggleSnAvailable(this.checked)" style="margin-right:3px;">S/N Available
+              </label>
+            </span>
+          </label>
+          <input type="text" id="call-serial" onblur="checkReRepair(this.value)" placeholder="Serial number">
+          <div id="rerepair-alert" style="display:none;"></div>
+        </div>
         <div class="form-group"><label>Call Type <span class="req">*</span></label>
           <select id="call-type" onchange="handleCallTypeChange()">
             <option value="Warranty">Warranty</option><option value="Non-Warranty">Non-Warranty</option>
@@ -3882,6 +3892,18 @@ async function openNewCall(){
   const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value='';
   document.getElementById('call-type').value='Warranty';document.getElementById('call-service-type').value='On Site';
   document.getElementById('call-priority').value='Normal';document.getElementById('call-rerepair').value='No';
+  // Reset service charges input (may have been disabled by FOC repeat detection on previous call)
+  var scReset=document.getElementById('call-service-charges');
+  if(scReset){scReset.disabled=false;scReset.style.background='';scReset.value='';}
+  var scRow=document.getElementById('call-service-charges-row');
+  if(scRow)scRow.style.display='none';
+  var rrAlert=document.getElementById('rerepair-alert');
+  if(rrAlert){rrAlert.innerHTML='';rrAlert.style.display='none';}
+  // Reset serial availability checkbox
+  var snCb=document.getElementById('sn-available');
+  if(snCb){snCb.checked=true;}
+  var snEl=document.getElementById('call-serial');
+  if(snEl){snEl.readOnly=false;snEl.style.background='';snEl.placeholder='Serial number';}
   document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
   // Populate brand dropdown
   const brandDrop = document.getElementById('call-brand-input');
@@ -3947,13 +3969,15 @@ function handleCallTypeChange(){
 
 async function checkReRepair(serial){
   if(!serial||serial.length<3) return;
+  // Skip repeat check for auto-generated serials (no S/N available)
+  if(serial.startsWith('NO-SN-')){document.getElementById('rerepair-alert').innerHTML='';return;}
   const alertDiv=document.getElementById('rerepair-alert');
   if(!alertDiv) return;
   alertDiv.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:3px 0;">Checking previous calls...</div>';
 
   try{
-    // Check last 30 days for same serial
-    const since=new Date();since.setDate(since.getDate()-30);
+    // Check last 15 days for same serial
+    const since=new Date();since.setDate(since.getDate()-15);
     const sinceStr=since.toISOString();
     const prev=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(serial)}&created_at=gte.${sinceStr}&order=created_at.desc&limit=5`);
 
@@ -3983,7 +4007,7 @@ async function checkReRepair(serial){
       <div style="margin-top:8px;font-size:12px;">
         <b>Service Charges:</b>
         <label style="margin-left:8px;cursor:pointer;">
-          <input type="radio" name="rr-charges" value="foc" checked onchange="setReRepairCharges('foc')"> FOC (Free — within 30 days)
+          <input type="radio" name="rr-charges" value="foc" checked onchange="setReRepairCharges('foc')"> FOC (Free — within 15 days)
         </label>
         <label style="margin-left:12px;cursor:pointer;">
           <input type="radio" name="rr-charges" value="charge" onchange="setReRepairCharges('charge')"> Charges apply
@@ -4000,6 +4024,19 @@ async function checkReRepair(serial){
   }
 }
 
+function toggleSnAvailable(isAvail){
+  var snEl=document.getElementById('call-serial');
+  if(!snEl)return;
+  if(isAvail){
+    // Restore — clear auto-generated if it starts with NO-SN-
+    if((snEl.value||'').startsWith('NO-SN-'))snEl.value='';
+    snEl.readOnly=false;snEl.style.background='';snEl.placeholder='Serial number';
+  }else{
+    // Auto-generate a temp serial
+    var auto='NO-SN-'+Date.now().toString(36).toUpperCase();
+    snEl.value=auto;snEl.readOnly=false;snEl.style.background='#fef9c3';snEl.placeholder='Auto-generated (editable)';
+  }
+}
 function setReRepairCharges(type){
   const scInput=document.getElementById('call-service-charges');
   if(type==='foc'){
