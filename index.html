@@ -4012,7 +4012,6 @@ async function saveCall(){
   _savingCall=true;
   var _saveBtn=document.querySelector('#modal-call .btn-primary');
   if(_saveBtn){_saveBtn.disabled=true;_saveBtn.textContent='Saving...';}
-  try{
   const ev=document.getElementById('call-eng').value;
   const engId=ev?ev.split('|')[0]:'';const engName=ev?ev.split('|')[1]:'';
   const ct=document.getElementById('call-type').value;
@@ -4043,7 +4042,7 @@ async function saveCall(){
     spares:[],timeline:[{action:'Call Logged',by:currentUser.name,at:new Date().toISOString()}],
     updated_at:new Date().toISOString()
   };
-  if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');return;}
+  if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   try{
     if(editingCallId){
       // Point 13: Edit only allows remark — no customer/product change
