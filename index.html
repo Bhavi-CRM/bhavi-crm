@@ -5489,81 +5489,222 @@ function invSalesRender(){
 
 async function openPurchaseEntry(){
   var ex=document.getElementById('purchase-modal');if(ex)ex.remove();
+  // Build datalist for part code autocomplete
+  var dlId='pur-parts-dl';
+  var dlOpts=allInventory.map(i=>`<option value="${escHtml(i.part_code||'')}"></option>`).join('');
   var overlay=document.createElement('div');
   overlay.id='purchase-modal';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
-  const partOpts=allInventory.map(i=>`<option value="${i.part_code||''}" data-name="${i.item_name}" data-price="${i.unit_price||0}">${i.part_code||''} — ${i.item_name}</option>`).join('');
-  overlay.innerHTML=`<div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2>🛒 New Purchase Entry</h2><button class="close-btn" onclick="document.getElementById('purchase-modal').remove()">✕</button></div>
-    <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group"><label>Date <span class="req">*</span></label><input type="date" id="pur-date" value="${new Date().toLocaleDateString('en-CA')}"></div>
-        <div class="form-group"><label>Invoice No</label><input type="text" id="pur-invoice" placeholder="INV-001"></div>
-        <div class="form-group"><label>Supplier / Dealer <span class="req">*</span></label><input type="text" id="pur-supplier" placeholder="Supplier name"></div>
-        <div class="form-group"><label>Part <span class="req">*</span></label>
-          <select id="pur-part" onchange="onPurPartChange(this)">
-            <option value="">-- Select Part --</option>${partOpts}
-          </select>
-        </div>
-        <div class="form-group"><label>Qty <span class="req">*</span></label><input type="number" id="pur-qty" min="1" value="1"></div>
-        <div class="form-group"><label>Unit Cost ₹ <span class="req">*</span></label><input type="number" id="pur-cost" min="0" value="0"></div>
-      </div>
-      <div class="form-group" style="margin-top:10px;"><label>Note</label><input type="text" id="pur-note" placeholder="Optional note"></div>
-      <div style="margin-top:12px;background:var(--bg);border-radius:8px;padding:10px;font-size:13px;">
-        Total: <b id="pur-total">₹0</b>
-      </div>
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+  overlay.innerHTML=`<datalist id="${dlId}">${dlOpts}</datalist>
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:860px;max-height:96vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px 14px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:2;">
+      <div style="font-size:16px;font-weight:800;color:#1e293b;">🛒 Purchase Invoice Entry</div>
+      <button onclick="document.getElementById('purchase-modal').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="document.getElementById('purchase-modal').remove()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePurchaseEntry()">💾 Save Purchase</button>
+    <div style="padding:18px 22px;">
+      <!-- Invoice Header -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:5px;">SUPPLIER / DEALER <span style="color:#ef4444;">*</span></label>
+          <input type="text" id="pur-supplier" placeholder="Supplier name" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:5px;">INVOICE NO <span style="color:#ef4444;">*</span></label>
+          <input type="text" id="pur-invoice" placeholder="e.g. INV-2026-001" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;outline:none;" onblur="checkPurInvoiceDuplicate(this)">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:5px;">DATE <span style="color:#ef4444;">*</span></label>
+          <input type="date" id="pur-date" value="${new Date().toLocaleDateString('en-CA')}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div id="pur-inv-warn" style="display:none;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:12px;"></div>
+      <!-- Parts Table -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;" id="pur-rows-table">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:120px;">Part Code</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Description</th>
+              <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:70px;">QTY</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:95px;">DTP ₹</th>
+              <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:65px;">GST%</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:95px;">MRP ₹</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;width:95px;">Net Total</th>
+              <th style="width:28px;border-bottom:2px solid #e2e8f0;"></th>
+            </tr>
+          </thead>
+          <tbody id="pur-rows-body">
+          </tbody>
+        </table>
+      </div>
+      <button onclick="purAddRow()" style="margin-top:10px;padding:7px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;font-size:13px;cursor:pointer;color:#1d4ed8;font-weight:600;">+ Add Row</button>
+      <!-- Summary -->
+      <div style="margin-top:16px;background:#f8fafc;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;color:#64748b;">Items: <b id="pur-item-count">0</b></div>
+        <div style="font-size:15px;font-weight:800;color:#1e293b;">Grand Total: <span id="pur-grand-total" style="color:#1d4ed8;">₹0</span></div>
+      </div>
+      <div style="margin-top:4px;"><input type="text" id="pur-note" placeholder="Note (optional)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;outline:none;"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid #e2e8f0;background:#fff;position:sticky;bottom:0;">
+      <button onclick="document.getElementById('purchase-modal').remove()" style="padding:9px 20px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;">Cancel</button>
+      <button onclick="savePurchaseInvoice()" style="padding:9px 22px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">💾 Save Invoice</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  document.getElementById('pur-qty').oninput=document.getElementById('pur-cost').oninput=function(){
-    const q=parseInt(document.getElementById('pur-qty').value)||0;
-    const c=parseFloat(document.getElementById('pur-cost').value)||0;
-    document.getElementById('pur-total').textContent='₹'+(q*c).toFixed(0);
-  };
+  // Add 5 rows by default
+  for(var i=0;i<5;i++) purAddRow();
+}
+
+function purAddRow(){
+  var tbody=document.getElementById('pur-rows-body');if(!tbody)return;
+  var idx=tbody.children.length;
+  var dlId='pur-parts-dl';
+  var tr=document.createElement('tr');
+  tr.dataset.row=idx;
+  tr.innerHTML=`
+    <td style="padding:5px 6px;">
+      <input type="text" list="${dlId}" class="pur-code" placeholder="Part code" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;"
+        oninput="purCodeInput(this)" onchange="purCodeInput(this)">
+    </td>
+    <td style="padding:5px 6px;">
+      <input type="text" class="pur-name" placeholder="Description" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;">
+    </td>
+    <td style="padding:5px 6px;">
+      <input type="number" class="pur-qty" value="" min="1" placeholder="0" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:center;"
+        oninput="purUpdateTotals()">
+    </td>
+    <td style="padding:5px 6px;">
+      <input type="number" class="pur-dtp" value="" min="0" placeholder="0" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:right;"
+        oninput="purUpdateTotals()">
+    </td>
+    <td style="padding:5px 6px;">
+      <input type="number" class="pur-gst" value="" min="0" max="100" placeholder="18" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:center;">
+    </td>
+    <td style="padding:5px 6px;">
+      <input type="number" class="pur-mrp" value="" min="0" placeholder="0" data-row="${idx}"
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:right;"
+        oninput="purUpdateTotals()">
+    </td>
+    <td style="padding:5px 6px;text-align:right;">
+      <span class="pur-rowtotal" data-row="${idx}" style="font-size:12px;font-weight:700;color:#1d4ed8;">—</span>
+    </td>
+    <td style="padding:5px 3px;text-align:center;">
+      <button onclick="this.closest('tr').remove();purUpdateTotals();" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;" title="Remove row">×</button>
+    </td>`;
+  tbody.appendChild(tr);
+}
+
+function purCodeInput(inp){
+  var code=(inp.value||'').trim().toUpperCase();
+  var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===code;});
+  var tr=inp.closest('tr');if(!tr)return;
+  if(inv){
+    tr.querySelector('.pur-name').value=inv.item_name||'';
+    tr.querySelector('.pur-dtp').value=inv.purchase_price||inv.unit_price||0;
+    tr.querySelector('.pur-gst').value=inv.gst_pct!=null?inv.gst_pct:18;
+    tr.querySelector('.pur-mrp').value=inv.unit_price||0;
+  }
+  purUpdateTotals();
+}
+
+function purUpdateTotals(){
+  var rows=document.querySelectorAll('#pur-rows-body tr');
+  var grand=0,count=0;
+  rows.forEach(function(tr){
+    var code=(tr.querySelector('.pur-code')?.value||'').trim();
+    var qty=parseFloat(tr.querySelector('.pur-qty')?.value)||0;
+    var dtp=parseFloat(tr.querySelector('.pur-dtp')?.value)||0;
+    var total=qty*dtp;
+    var span=tr.querySelector('.pur-rowtotal');
+    if(span){span.textContent=code&&qty?'₹'+total.toFixed(0):'—';}
+    if(code&&qty){grand+=total;count++;}
+  });
+  var gt=document.getElementById('pur-grand-total');if(gt)gt.textContent='₹'+grand.toFixed(0);
+  var ic=document.getElementById('pur-item-count');if(ic)ic.textContent=count;
+}
+
+async function checkPurInvoiceDuplicate(inp){
+  var inv=(inp.value||'').trim();
+  var warn=document.getElementById('pur-inv-warn');
+  if(!inv||!warn){if(warn)warn.style.display='none';return;}
+  try{
+    var existing=await sb('inventory_purchases','GET',null,'?invoice_no=eq.'+encodeURIComponent(inv)+'&limit=1');
+    if(existing&&existing.length){
+      var e=existing[0];
+      warn.style.display='block';
+      warn.innerHTML='⚠️ Invoice <b>'+escHtml(inv)+'</b> already exists! ('+escHtml(e.supplier||'')+' | '+escHtml(e.purchase_date||'')+') — Are you sure you want to add more items to this invoice?';
+    }else{warn.style.display='none';}
+  }catch(ex){warn.style.display='none';}
+}
+
+async function savePurchaseInvoice(){
+  var date=document.getElementById('pur-date').value;
+  var supplier=(document.getElementById('pur-supplier').value||'').trim();
+  var invoice=(document.getElementById('pur-invoice').value||'').trim();
+  var note=(document.getElementById('pur-note').value||'').trim();
+  if(!date||!supplier||!invoice){alert('Please fill Supplier, Invoice No and Date.');return;}
+  // Collect filled rows
+  var rows=[];
+  document.querySelectorAll('#pur-rows-body tr').forEach(function(tr){
+    var code=(tr.querySelector('.pur-code')?.value||'').trim().toUpperCase();
+    var name=(tr.querySelector('.pur-name')?.value||'').trim();
+    var qty=parseInt(tr.querySelector('.pur-qty')?.value)||0;
+    var dtp=parseFloat(tr.querySelector('.pur-dtp')?.value)||0;
+    var gst=parseFloat(tr.querySelector('.pur-gst')?.value);if(isNaN(gst))gst=18;
+    var mrp=parseFloat(tr.querySelector('.pur-mrp')?.value)||0;
+    if(code&&qty>0) rows.push({code,name,qty,dtp,gst,mrp});
+  });
+  if(!rows.length){alert('Please enter at least one part with a part code and quantity.');return;}
+  try{
+    var btn=document.querySelector('#purchase-modal button[onclick="savePurchaseInvoice()"]');
+    if(btn){btn.disabled=true;btn.textContent='Saving…';}
+    var saved=0;
+    for(var r of rows){
+      var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===r.code;});
+      // Save purchase record
+      await sb('inventory_purchases','POST',{
+        purchase_date:date,part_code:r.code,part_name:r.name||inv?.item_name||r.code,
+        supplier:supplier,qty:r.qty,unit_cost:r.dtp,
+        invoice_no:invoice,total_cost:r.qty*r.dtp,
+        note:note||null,added_by:currentUser.name,
+        created_at:new Date().toISOString()
+      });
+      if(inv){
+        var newQty=(inv.qty_in_stock||0)+r.qty;
+        var patch={qty_in_stock:newQty,updated_at:new Date().toISOString()};
+        // Update prices if entered
+        if(r.dtp>0) patch.purchase_price=r.dtp;
+        if(r.mrp>0) patch.unit_price=r.mrp;
+        if(r.gst>=0) patch.gst_pct=r.gst;
+        await sb('inventory','PATCH',patch,'?id=eq.'+inv.id);
+        inv.qty_in_stock=newQty;
+        if(r.dtp>0) inv.purchase_price=r.dtp;
+        if(r.mrp>0) inv.unit_price=r.mrp;
+        if(r.gst>=0) inv.gst_pct=r.gst;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:r.qty,note:'Purchase INV:'+invoice+' | '+supplier,done_by:currentUser.name}).catch(()=>{});
+      }
+      saved++;
+    }
+    document.getElementById('purchase-modal').remove();
+    alert('✅ Invoice saved! '+saved+' item(s) added to stock. Prices updated.');
+    renderInventory('purchase');
+    checkPendingPartsAuto();
+  }catch(e){alert('Error saving: '+e.message);var btn2=document.querySelector('#purchase-modal button[onclick="savePurchaseInvoice()"]');if(btn2){btn2.disabled=false;btn2.textContent='💾 Save Invoice';}}
 }
 
 function onPurPartChange(sel){
   const opt=sel.options[sel.selectedIndex];
   if(opt&&opt.dataset.price) document.getElementById('pur-cost').value=opt.dataset.price;
-  const q=parseInt(document.getElementById('pur-qty').value)||0;
-  const c=parseFloat(document.getElementById('pur-cost').value)||0;
-  document.getElementById('pur-total').textContent='₹'+(q*c).toFixed(0);
 }
 
 async function savePurchaseEntry(){
-  const date=document.getElementById('pur-date').value;
-  const supplier=document.getElementById('pur-supplier').value.trim();
-  const partSel=document.getElementById('pur-part');
-  const partCode=partSel.value;
-  const partName=partSel.options[partSel.selectedIndex]?.dataset.name||'';
-  const qty=parseInt(document.getElementById('pur-qty').value)||0;
-  const cost=parseFloat(document.getElementById('pur-cost').value)||0;
-  const invoice=document.getElementById('pur-invoice').value.trim();
-  const note=document.getElementById('pur-note').value.trim();
-  if(!date||!supplier||!partCode||!qty||!cost){alert('Please fill all required fields');return;}
-  try{
-    // Save purchase record
-    await sb('inventory_purchases','POST',{
-      purchase_date:date,part_code:partCode,part_name:partName,
-      supplier,qty,unit_cost:cost,invoice_no:invoice||null,
-      total_cost:qty*cost,note:note||null,added_by:currentUser.name,
-      created_at:new Date().toISOString()
-    });
-    // Update stock
-    const inv=allInventory.find(i=>i.part_code===partCode);
-    if(inv){
-      await sb('inventory','PATCH',{qty_in_stock:inv.qty_in_stock+qty,updated_at:new Date().toISOString()},`?id=eq.${inv.id}`);
-      await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty,note:'Purchase from '+supplier+(invoice?' INV:'+invoice:''),done_by:currentUser.name}).catch(()=>{});
-    }
-    document.getElementById('purchase-modal').remove();
-    alert('✅ Purchase saved! Stock updated.');
-    renderInventory('purchase');
-    checkPendingPartsAuto();
-  }catch(e){alert('Error: '+e.message);}
+  // Legacy single-row fallback — redirect to new invoice form
+  openPurchaseEntry();
 }
 
 async function openManualSale(){
@@ -7411,6 +7552,14 @@ async function saveEngWarranty(){
   if(!jobSheetRaw){alert('SE Call ID is required to match the warranty return.');document.getElementById('ew-jobsheet').focus();return;}
   // Use last-segment as matching key; store full ID for display
   const trackKey=jobSheetRaw.split('/').pop().trim();
+  // Duplicate check: warn if WARRANTY_RETURN already exists for same SE Call ID + part
+  try{
+    const dupCheck=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId));
+    if(dupCheck&&dupCheck.length){
+      const d=dupCheck[0];
+      if(!confirm('A warranty return entry already exists for this SE Call ID ('+jobSheetRaw+') and part.\n\nExisting: Qty '+d.qty+' on '+(d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'-')+'.\n\nAdd another return entry anyway?'))return;
+    }
+  }catch(ex){}
   try{
     // Add full received qty to inventory stock
     await invQtyAdjust(partId,qty);
