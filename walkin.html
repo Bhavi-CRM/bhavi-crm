@@ -990,7 +990,12 @@ function submitProductDetails(){
 }
 
 // ─── SUBMIT ───────────────────────────────────────────────────────────────────
+var _submitting=false;
 async function submitEntry(){
+  if(_submitting)return; // Block duplicate taps
+  _submitting=true;
+  // Disable all primary buttons during submission
+  document.querySelectorAll('.btn-primary').forEach(function(b){b.disabled=true;});
   // WC assignment
   var wcId,wcName;
   if(state.directWc){
@@ -1069,7 +1074,11 @@ async function submitEntry(){
         return '<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';
       }).join('');
     goPage('pg-success');
-  }catch(e){alert('Submission failed. Please ask our staff.\nError: '+e.message);}
+  }catch(e){
+    _submitting=false;
+    document.querySelectorAll('.btn-primary').forEach(function(b){b.disabled=false;});
+    alert('Submission failed. Please ask our staff.\nError: '+e.message);
+  }
 }
 
 // ─── START OVER ────────────────────────────────────────────────────────────────

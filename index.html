@@ -12786,6 +12786,7 @@ async function loadWalkInReport(){
           +'</div>'
           +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
           +createJobBtn+depBtn
+          +(currentUser.role!=='engineer'?'<button onclick="deleteWalkInEntry(\''+l.id+'\')" style="background:none;border:1.5px solid #fca5a5;border-radius:6px;padding:3px 8px;font-size:11px;color:#dc2626;cursor:pointer;" title="Delete this entry">🗑️ Delete</button>':'')
           +'</div>'
           +'</div>'
           +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">'
@@ -12883,6 +12884,19 @@ async function saveWalkInCustomer(id){
     if(typeof loadWalkInReport==='function'&&document.getElementById('wir-results'))loadWalkInReport();
     if(typeof renderWalkIn==='function'&&window._todayWILogs)renderWalkIn();
   }catch(e){alert('Error saving: '+e.message);}
+}
+
+async function deleteWalkInEntry(id){
+  if(!confirm('Delete this walk-in entry?\n\nThis cannot be undone. Only delete duplicate or incorrect entries.'))return;
+  try{
+    await sb('walkin_log','DELETE',null,'?id=eq.'+id);
+    // Remove from in-memory lists
+    [window._wirLogs, window._todayWILogs].forEach(function(arr){
+      if(arr){var idx=arr.findIndex(function(x){return x.id==id;});if(idx>=0)arr.splice(idx,1);}
+    });
+    // Refresh view
+    if(document.getElementById('wir-results')&&typeof loadWalkInReport==='function') loadWalkInReport();
+  }catch(e){alert('Error deleting: '+e.message);}
 }
 
 async function downloadWalkInExcel(){
