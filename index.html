@@ -2457,16 +2457,31 @@ async function autoFillCallForm(mob){
   var hint=document.getElementById('call-cust-hint');
   if(!/^\d{10}$/.test(mob)){if(hint)hint.style.display='none';return;}
   try{
+    var cname='',alt='',address='',state='',city='',pin='',area='',source='';
+    // 1. Try customers table
     const res=await sb('customers','GET',null,'?mobile=eq.'+mob+'&limit=1');
     const c=res&&res[0];
-    if(!c){if(hint){hint.style.display='';hint.style.color='#f59e0b';hint.textContent='⚠️ New customer — fill details manually';}return;}
-    // Fill fields
-    const ne=document.getElementById('call-cname');if(ne&&!ne.value)ne.value=c.cname||'';
-    const ae=document.getElementById('call-alt');if(ae&&!ae.value)ae.value=c.alt_mobile||'';
-    const addr=document.getElementById('call-address');if(addr&&!addr.value)addr.value=c.address||'';
-    if(c.state||c.city||c.pin)setAddressDropdowns(c.state||'',c.city||'',c.pin||'',c.area||'');
-    else{const areaEl=document.getElementById('call-area');if(areaEl&&c.area)areaEl.value=c.area;}
-    if(hint){hint.style.display='';hint.style.color='#059669';hint.innerHTML='✅ Customer found: <b>'+escHtml(c.cname||'')+'</b>'+(c.city?' · '+escHtml(c.city):'');}
+    if(c){cname=c.cname||'';alt=c.alt_mobile||'';address=c.address||'';state=c.state||'';city=c.city||'';pin=c.pin||'';area=c.area||'';source=c.cname||'';}
+    // 2. Fallback: walk-in log
+    if(!cname){
+      const wres=await sb('walkin_log','GET',null,'?mobile=eq.'+encodeURIComponent(mob)+'&order=created_at.desc&limit=1').catch(()=>[]);
+      const w=wres&&wres[0];
+      if(w){cname=w.customer_name||'';state=w.state||'';city=w.city||'';pin=w.pin||'';area=w.area||'';address=w.address||'';source=cname;}
+    }
+    // 3. Fallback: previous tickets
+    if(!cname){
+      const tres=await sb('tickets','GET',null,'?mobile=eq.'+encodeURIComponent(mob)+'&order=created_at.desc&limit=1').catch(()=>[]);
+      const t=tres&&tres[0];
+      if(t){cname=t.cname||'';address=t.address||'';city=t.city||'';state=t.state||'';pin=t.pin||'';area=t.area||'';source=cname;}
+    }
+    if(!cname){if(hint){hint.style.display='';hint.style.color='#f59e0b';hint.textContent='⚠️ New customer — fill details manually';}return;}
+    // Fill fields (don't overwrite if already filled)
+    const ne=document.getElementById('call-cname');if(ne&&!ne.value)ne.value=cname;
+    const ae=document.getElementById('call-alt');if(ae&&!ae.value&&alt)ae.value=alt;
+    const addr=document.getElementById('call-address');if(addr&&!addr.value&&address)addr.value=address;
+    if(state||city||pin)setAddressDropdowns(state,city,pin,area);
+    else if(area){const areaEl=document.getElementById('call-area');if(areaEl)areaEl.value=area;}
+    if(hint){hint.style.display='';hint.style.color='#059669';hint.innerHTML='✅ Customer found: <b>'+escHtml(source)+'</b>'+(city?' · '+escHtml(city):'');}
   }catch(e){if(hint){hint.style.display='';hint.style.color='#dc2626';hint.textContent='Error looking up customer';}}
 }
 async function autoFillFromMobile(mobile, fields){
@@ -12248,9 +12263,11 @@ async function createJobFromWalkIn(wiId){
   var firstProd=inwardProds[0]||products[0]||{};
 
   // Set brand
+  var _wiModel=firstProd.model||'';
   if(firstProd.brand){
     var brandDrop=document.getElementById('call-brand-input');
     if(brandDrop&&brandDrop.tagName==='SELECT'){
+      // Try exact match first, then partial (to handle catLabel like "Printer / Scanner" not matching any brand)
       var matchOpt=Array.from(brandDrop.options).find(function(o){return o.text.toLowerCase()===firstProd.brand.toLowerCase();});
       if(matchOpt){
         brandDrop.value=matchOpt.value;
@@ -12258,13 +12275,15 @@ async function createJobFromWalkIn(wiId){
       }
     }
   }
-  // Set model and serial
-  setTimeout(function(){
+  // Set model and serial — use two timeouts to survive any async subcategory onChange clearing
+  var _setWiModel=function(){
     var modelEl=document.getElementById('call-model');
-    if(modelEl&&firstProd.model)modelEl.value=firstProd.model;
+    if(modelEl&&_wiModel)modelEl.value=_wiModel;
     var serialEl=document.getElementById('call-serial');
     if(serialEl&&firstProd.serial)serialEl.value=firstProd.serial;
-  },100);
+  };
+  setTimeout(_setWiModel,50);
+  setTimeout(_setWiModel,300); // second pass catches any delayed subcategory onChange
 
   // Call type from warranty
   var callTypeEl=document.getElementById('call-type');
