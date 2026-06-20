@@ -5135,11 +5135,13 @@ async function saveEngUpdate(){
       }
       // Extract part after last slash for tracking key: CSP/20260618/123456 → 123456
       const seTrackKey=seCallIdRaw?seCallIdRaw.split('/').pop().trim():'';
-      if(isWarrantyCall && sparesToDeduct.length>0){
+      // For warranty calls, track ALL spares (including already-deducted ones from prior closes)
+      const sparesForWarranty=isWarrantyCall?(freshT?.spares||[]).filter(s=>s.code):[];
+      if(isWarrantyCall && sparesForWarranty.length>0){
         if(!seTrackKey){
           console.warn('Warranty part used but SE Call ID missing on ticket '+id+' — warranty return cannot be auto-tracked');
         }
-        for(const s of sparesToDeduct){
+        for(const s of sparesForWarranty){
           try{
             const invItem=(await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`));
             const partId=invItem.length?invItem[0].id:null;
@@ -6963,12 +6965,47 @@ async function renderWarrantyPending(showAll){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
   try{
-    // By default show only pending/active — showAll=true shows completed too
+    // Fetch eng_movements warranty entries
     var q=showAll
       ?"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&order=created_at.desc&limit=500"
       :"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&warranty_status=not.eq.RECEIVED&order=created_at.desc&limit=500";
     const used=await sb('eng_movements','GET',null,q);
-    if(!used||!used.length){
+
+    // Also fetch warranty tickets with spares not yet in eng_movements
+    var ticketWarrantyRows=[];
+    try{
+      const wTickets=await sb('tickets','GET',null,'?call_type=in.(Warranty,Warranty Repeat,AMC)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at&order=created_at.desc&limit=500');
+      wTickets.forEach(function(t){
+        var spares=t.spares||[];
+        if(typeof spares==='string'){try{spares=JSON.parse(spares);}catch(e){spares=[];}}
+        spares.forEach(function(s){
+          if(!s.code)return;
+          // Check if already tracked in eng_movements
+          var trackKey=t.se_call_id?(t.se_call_id.split('/').pop().trim()):'';
+          var alreadyTracked=used.some(function(m){
+            return (m.job_sheet===trackKey||m.job_sheet===t.id)&&(m.part_id&&allInventory.find(function(x){return x.id===m.part_id&&(x.part_code===s.code||x.item_name===s.name);}));
+          });
+          if(!alreadyTracked){
+            ticketWarrantyRows.push({
+              _fromTicket:true,
+              ticket_id:t.id,
+              cname:t.cname,
+              model:t.model,
+              call_type:t.call_type,
+              assigned_name:t.assigned_name,
+              se_call_id:t.se_call_id||'',
+              spare_code:s.code,
+              spare_name:s.name||s.code,
+              qty:s.qty||1,
+              status:t.status,
+              created_at:t.created_at,
+            });
+          }
+        });
+      });
+    }catch(e){}
+
+    if(!used.length && !ticketWarrantyRows.length){
       el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:#64748b;"><div style="font-size:36px;margin-bottom:10px;">✅</div>'
         +'<div style="font-size:15px;font-weight:700;">No pending warranty parts.</div>'
         +'<div style="font-size:13px;margin-top:6px;">All parts have been received back.</div>'
@@ -7012,11 +7049,30 @@ async function renderWarrantyPending(showAll){
         +'<td style="padding:10px 12px;font-size:11px;color:#64748b;">'+receivedAt+'</td>'
         +'</tr>';
     }).join('');
-    const total=used.length;
+
+    // Rows from ticket spares (not yet in eng_movements)
+    var ticketRows=ticketWarrantyRows.map(function(r){
+      var d=new Date(r.created_at);
+      var diffDays=Math.floor((today-d)/(1000*60*60*24));
+      var isOverdue=diffDays>=7;
+      var rowBg=isOverdue?'#fef9f0':'#fffbeb';
+      return '<tr style="background:'+rowBg+';">'
+        +'<td style="padding:10px 12px;font-size:11px;color:#64748b;white-space:nowrap;">'+d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</td>'
+        +'<td style="padding:10px 12px;font-size:12px;font-weight:700;color:#1d4ed8;">'+(r.se_call_id||r.ticket_id)+'<br><span style="font-size:10px;color:#64748b;">'+r.ticket_id+'</span></td>'
+        +'<td style="padding:10px 12px;font-size:12px;font-weight:600;">'+escHtml(r.spare_code)+' — '+escHtml(r.spare_name)+'<br><span style="font-size:10px;color:#64748b;">'+escHtml(r.cname||'')+'  |  '+escHtml(r.model||'')+'</span></td>'
+        +'<td style="padding:10px 12px;font-size:12px;text-align:center;">'+r.qty+'</td>'
+        +'<td style="padding:10px 12px;font-size:12px;">'+(r.assigned_name||'—')+'</td>'
+        +'<td style="padding:10px 12px;"><span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'⏳')+' From Ticket'+(isOverdue?' ('+diffDays+'d)':'')+'</span></td>'
+        +'<td style="padding:10px 12px;font-size:11px;color:#94a3b8;">—</td>'
+        +'</tr>';
+    }).join('');
+
+    const total=used.length+ticketWarrantyRows.length;
     const received=used.filter(function(m){return m.warranty_status==='RECEIVED';}).length;
     const partial=used.filter(function(m){return m.warranty_status==='PARTIAL';}).length;
-    const pending=total-received-partial;
-    const overdue=used.filter(function(m){return(m.warranty_status==='PENDING'||m.warranty_status==='PARTIAL'||!m.warranty_status)&&Math.floor((today-new Date(m.created_at))/(1000*60*60*24))>=7;}).length;
+    const pending=(used.length-received-partial)+ticketWarrantyRows.length;
+    const overdue=used.filter(function(m){return(m.warranty_status==='PENDING'||m.warranty_status==='PARTIAL'||!m.warranty_status)&&Math.floor((today-new Date(m.created_at))/(1000*60*60*24))>=7;}).length
+      +ticketWarrantyRows.filter(function(r){return Math.floor((today-new Date(r.created_at))/(1000*60*60*24))>=7;}).length;
     el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
       +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1;">'
       +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">'+(showAll?'Total':'Pending')+' Parts</div><div class="kpi-value" style="font-size:22px;">'+total+'</div></div>'
@@ -7041,8 +7097,9 @@ async function renderWarrantyPending(showAll){
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Received On</th>'
       +'</tr></thead>'
-      +'<tbody>'+rows+'</tbody>'
-      +'</table></div>';
+      +'<tbody>'+rows+ticketRows+'</tbody>'
+      +'</table></div>'
+      +(ticketWarrantyRows.length?'<div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12px;color:#92400e;">⚠️ <b>'+ticketWarrantyRows.length+' part(s)</b> from warranty tickets are not yet formally tracked in movements. Use <b>Record Usage</b> or <b>Direct Warranty Issue</b> to add them properly for future tracking.</div>':'');
   }catch(e){el.innerHTML='<div class="card"><p style="color:red;">Error: '+e.message+'</p></div>';}
 }
 
