@@ -1111,7 +1111,7 @@ async function sbAll(t,q='',batchSize=1000){
 }
 
 // STATE
-let currentUser=null,currentPage='dashboard',editingCallId=null,editingInvId=null,adjustingInvId=null,updatingTaskId=null,approvalTicketId=null,partReqTicketId=null,sigPendingId=null;
+let currentUser=null,currentPage='dashboard',editingCallId=null,editingInvId=null,adjustingInvId=null,updatingTaskId=null,approvalTicketId=null,partReqTicketId=null,partReqServiceType=null,sigPendingId=null;
 let allTickets=[],allInventory=[],allBrands=[],allSubcats=[],allModels=[],allProblems=[],allEngineers=[],allTasks=[];
 let viewingTicketId=null,currentSpares=[],sigCanvas=null,sigCtx=null,sigDrawing=false;
 let logoData=localStorage.getItem('bhavi_logo')||'';
@@ -4873,7 +4873,7 @@ async function engVoidWarranty(id){
 
 // Point 6: Part request flow
 async function openPartRequest(ticketId,callType,serviceType){
-  partReqTicketId=ticketId;
+  partReqTicketId=ticketId;partReqServiceType=serviceType||'';
   const t=allTickets.find(x=>x.id===ticketId)||(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
   document.getElementById('part-req-info').innerHTML=`<b>${ticketId}</b> | ${t?.cname} | ${t?.model} | ${callType} | ${serviceType}`;
   document.getElementById('req-part-code').value='';document.getElementById('req-part-name').value='';
@@ -4885,15 +4885,29 @@ async function searchPartsAC(q){
   const list=document.getElementById('req-parts-ac');
   if(!q||q.length<2){list.classList.remove('open');return;}
   try{
-    const parts=await sb('inventory','GET',null,`?or=(part_code.ilike.*${q}*,item_name.ilike.*${q}*)&limit=8`);
-    list.innerHTML=parts.map(p=>`<div class="ac-item" onclick="selectReqPart('${p.part_code||''}','${p.item_name.replace(/'/g,"\\'")}',${p.qty_in_stock},${p.unit_price})">${p.part_code||'—'} — ${p.item_name} <span style="float:right;font-size:11px;color:${p.qty_in_stock>0?'var(--success)':'var(--danger)'};">Stock: ${p.qty_in_stock}</span></div>`).join('');
-    list.classList.toggle('open',parts.length>0);
+    const isEng=currentUser.role==='engineer' && partReqServiceType==='On Site';
+    if(isEng){
+      // Engineers: search inventory for names/codes, then cross-check eng_stock
+      const parts=await sb('inventory','GET',null,`?or=(part_code.ilike.*${q}*,item_name.ilike.*${q}*)&limit=8`);
+      if(!parts.length){list.classList.remove('open');return;}
+      const engStock=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(currentUser.name)}`).catch(()=>[]);
+      list.innerHTML=parts.map(p=>{
+        const es=engStock.find(e=>e.part_id===p.id);
+        const bagQty=es?es.qty:0;
+        const color=bagQty>0?'var(--success)':'var(--danger)';
+        return `<div class="ac-item" onclick="selectReqPart('${p.part_code||''}','${p.item_name.replace(/'/g,"\\'")}',${bagQty},${p.unit_price})">${p.part_code||'—'} — ${p.item_name} <span style="float:right;font-size:11px;color:${color};">Your Bag: ${bagQty}</span></div>`;
+      }).join('');
+    }else{
+      const parts=await sb('inventory','GET',null,`?or=(part_code.ilike.*${q}*,item_name.ilike.*${q}*)&limit=8`);
+      list.innerHTML=parts.map(p=>`<div class="ac-item" onclick="selectReqPart('${p.part_code||''}','${p.item_name.replace(/'/g,"\\'")}',${p.qty_in_stock},${p.unit_price})">${p.part_code||'—'} — ${p.item_name} <span style="float:right;font-size:11px;color:${p.qty_in_stock>0?'var(--success)':'var(--danger)'};">Stock: ${p.qty_in_stock}</span></div>`).join('');
+    }
+    list.classList.toggle('open',list.innerHTML.length>0);
   }catch(e){list.classList.remove('open');}
 }
 function selectReqPart(code,name,stock,price){
   document.getElementById('req-part-code').value=code;
   document.getElementById('req-part-name').value=name;
-  document.getElementById('req-part-stock').value=`${stock} in stock`;
+  document.getElementById('req-part-stock').value=`${stock}`;
   document.getElementById('req-parts-ac').classList.remove('open');
 }
 async function savePartRequest(addAnother){
@@ -4905,6 +4919,15 @@ async function savePartRequest(addAnother){
   const stockText=document.getElementById('req-part-stock').value;
   const hasStock=stockText&&!stockText.startsWith('0');
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  // On Site engineer calls: must have the part in their own bag
+  if(currentUser.role==='engineer' && t.service_type==='On Site'){
+    const invItem=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`).catch(()=>[]);
+    if(invItem.length){
+      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(currentUser.name)}&part_id=eq.${invItem[0].id}`).catch(()=>[]);
+      const bagQty=esCheck.length?esCheck[0].qty:0;
+      if(bagQty<qty){alert(`This part is not available in your bag.\nYour bag: ${bagQty} | Required: ${qty}\n\nAsk admin to issue the part to you first.`);return;}
+    }
+  }
   const isOOC=t.warranty_coverage==='Out of Coverage';
 
   // Status based on call type + stock
@@ -5090,21 +5113,30 @@ async function saveEngUpdate(){
       const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
       const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
       const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
+      const closedByEng=currentUser.role==='engineer' && freshT?.service_type==='On Site';
       for(const s of sparesToDeduct){
         try{
           const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
-          if(inv.length&&inv[0].qty_in_stock>0){
-            const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
-            // For warranty calls: also reduce warranty_qty if available (use warranty stock first)
-            const patchData={qty_in_stock:newQty,updated_at:new Date().toISOString()};
-            if(isWarrantyForDeduct&&(inv[0].warranty_qty||0)>0){
-              patchData.warranty_qty=Math.max(0,(inv[0].warranty_qty||0)-(s.qty||1));
+          if(!inv.length)continue;
+          if(closedByEng){
+            // Engineer closes: deduct from engineer's bag (eng_stock), NOT office inventory
+            // Office stock was already reduced when part was issued to the engineer
+            await engStockAdjust(currentUser.name,inv[0].id,-(s.qty||1)).catch(e=>console.log('Eng stock deduct err:',e));
+          }else{
+            // Admin/WC closes: deduct from office inventory directly
+            if(inv[0].qty_in_stock>0){
+              const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
+              const patchData={qty_in_stock:newQty,updated_at:new Date().toISOString()};
+              if(isWarrantyForDeduct&&(inv[0].warranty_qty||0)>0){
+                patchData.warranty_qty=Math.max(0,(inv[0].warranty_qty||0)-(s.qty||1));
+              }
+              await sb('inventory','PATCH',patchData,`?part_code=eq.${encodeURIComponent(s.code)}`);
+              const idx=(allInventory||[]).findIndex(x=>x.id===inv[0].id);
+              if(idx>=0){allInventory[idx].qty_in_stock=newQty;if(patchData.warranty_qty!=null)allInventory[idx].warranty_qty=patchData.warranty_qty;}
+              await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
             }
-            await sb('inventory','PATCH',patchData,`?part_code=eq.${encodeURIComponent(s.code)}`);
-            const idx=(allInventory||[]).findIndex(x=>x.id===inv[0].id);
-            if(idx>=0){allInventory[idx].qty_in_stock=newQty;if(patchData.warranty_qty!=null)allInventory[idx].warranty_qty=patchData.warranty_qty;}
-            await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
-          // Also save to inventory_sales for tracking
+          }
+          // Always record in inventory_sales for tracking
           await sb('inventory_sales','POST',{
             sale_date:new Date().toLocaleDateString('en-CA'),
             part_code:s.code,part_name:s.name||'',
@@ -5112,11 +5144,10 @@ async function saveEngUpdate(){
             customer_name:freshT?.cname||'',
             qty:s.qty||1,unit_price:s.price||0,
             total_amount:(s.qty||1)*(s.price||0),
-            note:'Auto - Ticket '+id,
+            note:'Auto - Ticket '+id+(closedByEng?' (Eng Bag)':''),
             added_by:currentUser.name,
             created_at:new Date().toISOString()
           }).catch(()=>{});
-          }
         }catch(e){console.log('Inv deduct error:',e);}
       }
       // Mark parts as deducted
@@ -7129,6 +7160,7 @@ function epLogRender(){
     WARRANTY_RETURN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🔄 Warranty ✓</span>',
     ENG_RETURN:'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Returned</span>',
     ADJUST:'<span style="background:#fff7ed;color:#c2410c;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">⚙️ Adjusted</span>',
+    WARRANTY_DIRECT_IN:'<span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">🎁 Direct Issue</span>',
   };
   const getPartName=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`${p.part_code} — ${p.item_name}`:p.item_name):'—';};
   const getPartHtml=id=>{const p=allInventory.find(x=>x.id===id);return p?(p.part_code?`<b style="color:var(--primary)">${p.part_code}</b> — ${p.item_name}`:p.item_name):'—';};
@@ -7176,6 +7208,7 @@ function epLogRender(){
         <option value="USE" ${savedType==='USE'?'selected':''}>🔧 Used</option>
         <option value="WARRANTY_RETURN" ${savedType==='WARRANTY_RETURN'?'selected':''}>🔄 Warranty</option>
         <option value="ADJUST" ${savedType==='ADJUST'?'selected':''}>⚙️ Adjusted</option>
+        <option value="WARRANTY_DIRECT_IN" ${savedType==='WARRANTY_DIRECT_IN'?'selected':''}>🎁 Direct Issue</option>
       </select>
       <input id="ep-log-from" type="date" value="${savedFrom}" onchange="epLogRender()" title="From date"
         style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
