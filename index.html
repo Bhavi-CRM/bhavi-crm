@@ -6959,14 +6959,20 @@ function showPartEngBreakdown(partId){
   },0);
 }
 
-async function renderWarrantyPending(){
+async function renderWarrantyPending(showAll){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
   try{
-    // Fetch all warranty USE entries
-    const used=await sb('eng_movements','GET',null,'?type=eq.USE&warranty=eq.true&order=created_at.desc&limit=500');
+    // By default show only pending/active — showAll=true shows completed too
+    var q=showAll
+      ?"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&order=created_at.desc&limit=500"
+      :"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&warranty_status=not.eq.RECEIVED&order=created_at.desc&limit=500";
+    const used=await sb('eng_movements','GET',null,q);
     if(!used||!used.length){
-      el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:#64748b;"><div style="font-size:36px;margin-bottom:10px;">✅</div><div style="font-size:15px;font-weight:700;">No warranty parts recorded yet.</div><div style="font-size:13px;margin-top:6px;">When an engineer uses a part under warranty, it will appear here.</div></div>';
+      el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:#64748b;"><div style="font-size:36px;margin-bottom:10px;">✅</div>'
+        +'<div style="font-size:15px;font-weight:700;">No pending warranty parts.</div>'
+        +'<div style="font-size:13px;margin-top:6px;">All parts have been received back.</div>'
+        +'<div style="margin-top:14px;"><button onclick="renderWarrantyPending(true)" class="btn btn-outline btn-sm">📋 Show All History</button></div></div>';
       return;
     }
     const today=new Date();
@@ -7011,12 +7017,18 @@ async function renderWarrantyPending(){
     const partial=used.filter(function(m){return m.warranty_status==='PARTIAL';}).length;
     const pending=total-received-partial;
     const overdue=used.filter(function(m){return(m.warranty_status==='PENDING'||m.warranty_status==='PARTIAL'||!m.warranty_status)&&Math.floor((today-new Date(m.created_at))/(1000*60*60*24))>=7;}).length;
-    el.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">'
-      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Warranty Parts</div><div class="kpi-value" style="font-size:22px;">'+total+'</div></div>'
+    el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+      +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1;">'
+      +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">'+(showAll?'Total':'Pending')+' Parts</div><div class="kpi-value" style="font-size:22px;">'+total+'</div></div>'
       +'<div class="kpi-card" style="padding:12px;border-color:#d97706;"><div class="kpi-label">⏳ Pending Return</div><div class="kpi-value" style="font-size:22px;color:#d97706;">'+pending+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#ea580c;"><div class="kpi-label">🔶 Partial (Some Rcvd)</div><div class="kpi-value" style="font-size:22px;color:#ea580c;">'+partial+'</div></div>'
-      +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">🚨 Overdue (7+ days)</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">'+overdue+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#ea580c;"><div class="kpi-label">🔶 Partial</div><div class="kpi-value" style="font-size:22px;color:#ea580c;">'+partial+'</div></div>'
+      +'<div class="kpi-card" style="padding:12px;border-color:#dc2626;"><div class="kpi-label">🚨 Overdue 7+ days</div><div class="kpi-value" style="font-size:22px;color:#dc2626;">'+overdue+'</div></div>'
       +'</div>'
+      +'<div style="margin-left:12px;">'
+      +(showAll
+        ?'<button onclick="renderWarrantyPending(false)" class="btn btn-sm" style="background:#f1f5f9;color:#334155;white-space:nowrap;">⏳ Pending Only</button>'
+        :'<button onclick="renderWarrantyPending(true)" class="btn btn-sm" style="background:#f1f5f9;color:#334155;white-space:nowrap;">📋 Show All History</button>')
+      +'</div></div>'
       +(overdue>0?'<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#dc2626;font-weight:600;">🚨 '+overdue+' warranty part(s) overdue — not received from company within 7 days. Check and follow up.</div>':'')
       +'<div class="card" style="padding:0;overflow:auto;">'
       +'<table style="min-width:700px;border-collapse:collapse;width:100%;">'
