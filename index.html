@@ -2645,6 +2645,10 @@ function setupNav(){
     const isEng=role==='engineer';
     const isWC=(role==='admin'&&roleType==='work_controller')||role==='work_controller';
     const isAdmin=(role==='admin'&&roleType!=='work_controller')&&role!=='work_controller';
+    // Cache role flags globally so all page renderers use the same detection
+    window._appIsEng=isEng;
+    window._appIsWC=isWC;
+    window._appIsAdmin=isAdmin;
     
     // Debug log
     console.log('setupNav:', {role, roleType, isEng, isWC, isAdmin, user: currentUser.user_id});
@@ -11616,7 +11620,7 @@ function cleanModelNo(s){
 async function renderWalkIn(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
-  var _isAdm=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+  var _isAdm=window._appIsAdmin===true;
 
   // Load models and brands if not already loaded
   try{
@@ -11839,7 +11843,7 @@ async function loadWIDateView(){
   listEl.innerHTML='<div class="loading">Loading...</div>';
   try{
     var logs=[];
-    var _isAdm=currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+    var _isAdm=window._appIsAdmin===true;
     if(showBoth&&_isAdm){
       // All WCs for selected date
       logs=await sb('walkin_log','GET',null,'?visit_date=eq.'+selDate+'&order=arrival_time.desc');
