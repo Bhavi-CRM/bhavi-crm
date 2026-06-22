@@ -7626,6 +7626,25 @@ async function saveEngIssue(){
     await invQtyAdjust(partId,-qty);
     await engStockAdjust(engineer,partId,qty);
     await sb('eng_movements','POST',{type:'ISSUE',part_id:partId,qty,from_owner:'MAIN',to_owner:engineer,notes,created_by:currentUser?.name||'Admin'});
+
+    // Auto-update "Pending Engineer Stock" tickets for this engineer that need this part
+    try{
+      const invItem=await sb('inventory','GET',null,'?id=eq.'+partId+'&select=part_code&limit=1');
+      if(invItem&&invItem.length){
+        const partCode=invItem[0].part_code;
+        const pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engineer)+'&status=eq.Pending+Engineer+Stock&select=id,spares,timeline,service_type');
+        for(const t of(pendingTickets||[])){
+          const spares=t.spares||[];
+          const hasThisPart=spares.some(function(s){return s.code===partCode;});
+          if(hasThisPart){
+            const newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+            const tl=[...(t.timeline||[]),{action:'Parts Issued by Admin → '+newStatus,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag. Call ready to proceed.'}];
+            await sb('tickets','PATCH',{status:newStatus,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+t.id);
+          }
+        }
+      }
+    }catch(autoE){console.warn('Auto-status update error:',autoE);}
+
     closeModal('modal-eng-issue');renderEngParts('overview');
   }catch(e){alert('Error: '+e.message);}
 }
