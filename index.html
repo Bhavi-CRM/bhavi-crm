@@ -2846,7 +2846,7 @@ async function navigate(page){
 // STATUS SYSTEM
 const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery'];
 function statusBadge(s){
-  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
+  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
 function priorityBadge(p){
@@ -3693,8 +3693,9 @@ function renderTicketTable(filtered){
           <option value="">All Status</option>
           <option>Pending Customer Arrival</option><option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
           <option>Pending Customer Approval</option><option>Customer Approved</option>
-          <option>Customer Reject</option><option>Pending Parts</option>
+          <option>Customer Reject</option><option>Pending Parts</option><option>Pending Engineer Stock</option>
           <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
+          <option>Repaired</option><option>Delivered</option><option>Sent to MSC</option><option>Pending for Delivery</option>
           <option>Call Cancel</option><option>Closed</option>
         </select>
         <select id="ticket-type-filter" onchange="filterTickets()">
