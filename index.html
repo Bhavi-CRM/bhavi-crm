@@ -19460,8 +19460,8 @@ function pendingListRender(){
     +'</div>'
     // Filters (apply only to actionable calls)
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">'
-    +'<input type="text" placeholder="🔍 Search name, area, model, serial..." value="'+escHtml(window._pendingSearch||'')+'"'
-    +' oninput="window._pendingSearch=this.value;pendingListRender();"'
+    +'<input type="text" id="pending-search-input" placeholder="🔍 Search name, area, model, serial..." value="'+escHtml(window._pendingSearch||'')+'"'
+    +' oninput="window._pendingSearch=this.value;pendingListRenderResults();"'
     +' style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
     +'<select onchange="window._pendingWCFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
     +'<option value="">All WC</option>'
@@ -19480,7 +19480,7 @@ function pendingListRender(){
     +'</select>'
     +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
-    +'<span style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
+    +'<span id="pending-count" style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
     // Ready for Pickup section (above main table)
     +pickupSection
@@ -19498,8 +19498,52 @@ function pendingListRender(){
     +(window._routeMode?'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">🧑‍🔧 Assign Eng</th><th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">Seq</th>':'')
     +'<th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Action</th>'
     +'</tr></thead>'
-    +'<tbody>'+rows+'</tbody>'
+    +'<tbody id="pending-tbody">'+rows+'</tbody>'
     +'</table></div></div>';
+}
+
+// Only re-render results (tbody + count) when search box changes — preserves focus
+function pendingListRenderResults(){
+  var all=window._pendingData||[];
+  var wcFilter=window._pendingWCFilter||'CSP';
+  var brandFilter=window._pendingBrandFilter||'';
+  var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
+  var searchQ=(window._pendingSearch||'').toLowerCase();
+  var actionable=all.filter(function(t){return t.status!=='Repaired';});
+  var filtered=actionable.filter(function(t){
+    if(wcFilter && t.wc_type!==wcFilter)return false;
+    if(serviceFilter && t.service_type!==serviceFilter)return false;
+    if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+    if(searchQ){
+      var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
+      if(!txt.includes(searchQ))return false;
+    }
+    return true;
+  });
+  var tbody=document.getElementById('pending-tbody');
+  var countEl=document.getElementById('pending-count');
+  if(!tbody){pendingListRender();return;} // fallback if full render not done yet
+  var now=new Date();
+  var rows='';
+  if(!filtered.length){
+    rows='<tr><td colspan="8" style="padding:24px;text-align:center;color:#6b7280;">No matching calls</td></tr>';
+  }else{
+    filtered.forEach(function(t){
+      var tatB=tatBadge(t.tat_date);
+      var statusColor={'Pending Allocation':'#f59e0b','Assigned':'#3b82f6','In Progress':'#8b5cf6','Pending Parts':'#ef4444','Pending Engineer Stock':'#f97316','Pending Customer Approval':'#f59e0b','Pending Repair Carry In':'#6366f1','Pending Repair On Site':'#6366f1'}[t.status]||'#6b7280';
+      rows+='<tr style="border-bottom:1px solid #f1f5f9;">'
+        +'<td style="padding:10px 12px;"><a href="#" onclick="viewTicket(\''+t.id+'\');return false;" style="font-weight:700;color:#1d4ed8;text-decoration:none;">'+t.id+'</a><br><span style="font-size:11px;color:#6b7280;">'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'')+'</span></td>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.cname||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
+        +'<td style="padding:10px 12px;"><div>'+escHtml(t.area||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.pin||'')+'</div></td>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.model||'-')+'</div><div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'MISSING')+'</div></td>'
+        +'<td style="padding:10px 12px;"><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">'+escHtml(t.status||'')+'</span><br><span style="font-size:11px;color:#6b7280;">'+escHtml(t.assigned_name||'UNASSIGNED')+'</span></td>'
+        +'<td style="padding:10px 12px;">'+tatB+'</td>'
+        +'<td style="padding:10px 12px;text-align:center;"><button onclick="viewTicket(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button></td>'
+        +'</tr>';
+    });
+  }
+  tbody.innerHTML=rows;
+  if(countEl)countEl.textContent=filtered.length+' actionable calls';
 }
 
 async function markDelivered(ticketId){
