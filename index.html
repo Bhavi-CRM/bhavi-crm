@@ -19461,7 +19461,7 @@ function pendingListRender(){
     // Filters (apply only to actionable calls)
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">'
     +'<input type="text" id="pending-search-input" placeholder="🔍 Search name, area, model, serial..." value="'+escHtml(window._pendingSearch||'')+'"'
-    +' oninput="window._pendingSearch=this.value;pendingListRenderResults();"'
+    +' oninput="window._pendingSearch=this.value;window._plSearchCursor=this.selectionStart;pendingListRender();var _se=document.getElementById(\'pending-search-input\');if(_se){_se.focus();_se.setSelectionRange(window._plSearchCursor,window._plSearchCursor);}"'
     +' style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
     +'<select onchange="window._pendingWCFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
     +'<option value="">All WC</option>'
