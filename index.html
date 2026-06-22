@@ -19269,9 +19269,9 @@ function plMove(id,dir){
   var ni=idx+dir;if(ni<0||ni>=arr.length)return;
   var tmp=arr[idx];arr[idx]=arr[ni];arr[ni]=tmp;
   window._pendingData=arr;
+  var scrollY=window.scrollY||document.documentElement.scrollTop||0;
   pendingListRender();
-  var se=document.getElementById('pending-search-input');
-  if(se){se.focus();}
+  window.scrollTo(0,scrollY);
 }
 async function saveRoutePlanInline(){
   var changes=window._routeChanges||{};
@@ -19722,7 +19722,10 @@ function rpMove(id,dir){
   if(idx===-1)return;
   var ni=idx+dir;if(ni<0||ni>=arr.length)return;
   var tmp=arr[idx];arr[idx]=arr[ni];arr[ni]=tmp;
-  window._rpTickets=arr;renderRoutePlanTable();
+  window._rpTickets=arr;
+  var scrollY=window.scrollY||document.documentElement.scrollTop||0;
+  renderRoutePlanTable();
+  window.scrollTo(0,scrollY);
 }
 function rpReorder(id,newSeq){
   var arr=window._rpTickets||[];
