@@ -19268,6 +19268,13 @@ function plMove(id,dir){
   if(idx===-1)return;
   var ni=idx+dir;if(ni<0||ni>=arr.length)return;
   var tmp=arr[idx];arr[idx]=arr[ni];arr[ni]=tmp;
+  // Update sequence_no in memory so route-mode grouping sort respects new order
+  // Re-number sequence within same engineer group
+  var engId=arr[idx].assigned_to;
+  if(engId){
+    var engCalls=arr.filter(function(t){return t.assigned_to===engId;});
+    engCalls.forEach(function(t,i){t.sequence_no=i+1;});
+  }
   window._pendingData=arr;
   var scrollY=window.scrollY||document.documentElement.scrollTop||0;
   pendingListRender();
@@ -19340,6 +19347,32 @@ function pendingListRender(){
     }
     return true;
   });
+
+  // In route mode: group by engineer (sorted by sequence_no), unassigned at bottom
+  if(window._routeMode){
+    var _assigned=filtered.filter(function(t){return t.assigned_to;});
+    var _unassigned=filtered.filter(function(t){return !t.assigned_to;});
+    // Group assigned by engineer name
+    var _engOrder=[];var _engGroups={};
+    _assigned.forEach(function(t){
+      var eid=t.assigned_to;
+      if(!_engGroups[eid]){_engGroups[eid]=[];_engOrder.push(eid);}
+      _engGroups[eid].push(t);
+    });
+    // Sort each group by sequence_no
+    _engOrder.forEach(function(eid){
+      _engGroups[eid].sort(function(a,b){return (a.sequence_no||999)-(b.sequence_no||999);});
+    });
+    // Sort engineer groups alphabetically by name
+    _engOrder.sort(function(a,b){
+      var na=(_engGroups[a][0].assigned_name||'').toLowerCase();
+      var nb=(_engGroups[b][0].assigned_name||'').toLowerCase();
+      return na<nb?-1:na>nb?1:0;
+    });
+    var _sorted=[];
+    _engOrder.forEach(function(eid){_sorted=_sorted.concat(_engGroups[eid]);});
+    filtered=_sorted.concat(_unassigned);
+  }
 
   var now=new Date();
   var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
