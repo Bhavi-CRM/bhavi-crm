@@ -8150,6 +8150,21 @@ async function approveEngReq(reqId,req){
         await invQtyAdjust(p.part_id,-p.qty);
         await engStockAdjust(req.engineer_name,p.part_id,p.qty);
         await sb('eng_movements','POST',{type:'ISSUE',part_id:p.part_id,qty:p.qty,from_owner:'MAIN',to_owner:req.engineer_name,notes:req.engineer_name?'Request by '+req.engineer_name:'',created_by:currentUser?.name||'Admin'});
+        // Auto-update "Pending Engineer Stock" tickets for this engineer
+        try{
+          const invItem=await sb('inventory','GET',null,'?id=eq.'+p.part_id+'&select=part_code&limit=1');
+          if(invItem&&invItem.length){
+            const partCode=invItem[0].part_code;
+            const pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(req.engineer_name)+'&status=eq.Pending+Engineer+Stock&select=id,spares,timeline,service_type');
+            for(const t of(pendingTickets||[])){
+              if((t.spares||[]).some(function(s){return s.code===partCode;})){
+                const ns=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+                const tl=[...(t.timeline||[]),{action:'Parts Approved → '+ns,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag via approved request.'}];
+                await sb('tickets','PATCH',{status:ns,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+t.id);
+              }
+            }
+          }
+        }catch(autoE){console.warn('Auto-status update error:',autoE);}
       }else if(req.type==='RETURN'){
         await engStockAdjust(req.engineer_name,p.part_id,-p.qty);
         await invQtyAdjust(p.part_id,p.qty);
