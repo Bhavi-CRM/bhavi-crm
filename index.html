@@ -4374,7 +4374,16 @@ async function viewTicket(id,autoPrint=false){
         </div>
         <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Delivered')" style="background:#15803d;font-size:13px;padding:8px 18px;">📦 Mark Delivered</button>
       `:''}
-      ${!isPendingArrival&&!isPendingAlloc&&!isPendingApproval&&!isRepaired&&!isClosed?`<span style="font-size:12px;color:var(--text-muted);padding:6px 0;">Status managed by Engineer</span>`:''}
+      ${!isPendingArrival&&!isPendingAlloc&&!isPendingApproval&&!isRepaired&&!isClosed?`
+        <select onchange="if(this.value&&confirm('Change status to: '+this.value+'?')){quickStatusChange('${t.id}',this.value);this.value='';}" style="border:1.5px solid #f59e0b;border-radius:8px;padding:6px 10px;font-size:13px;background:#fffbeb;color:#92400e;font-weight:600;">
+          <option value="">⚙️ Force Status...</option>
+          <option>Assigned</option><option>In Progress</option>
+          <option>Pending Parts</option><option>Pending Engineer Stock</option>
+          <option>Pending Repair On Site</option><option>Pending Repair Carry In</option>
+          <option>Pending Customer Approval</option><option>Customer Approved</option>
+          <option>Repaired</option><option>Closed</option><option>Call Cancel</option>
+        </select>
+      `:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
         <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
