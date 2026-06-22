@@ -19644,19 +19644,21 @@ async function loadRoutePlan(){
   try{
     var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=neq.Closed&status=neq.Call+Cancel&status=neq.Customer+Reject&order=sequence_no.asc,created_at.asc');
     window._rpTickets=tickets||[];window._rpDate=date;window._rpEngId=engId;
-    renderRoutePlanTable();
+    renderRoutePlanTable(true);
   }catch(e){rpc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
-function renderRoutePlanTable(){
+function renderRoutePlanTable(initialLoad){
   var tickets=window._rpTickets||[];
   var date=window._rpDate;
   var rpc=document.getElementById('rp-content');if(!rpc)return;
   if(!tickets.length){rpc.innerHTML='<div class="card" style="text-align:center;padding:30px;color:var(--text-muted);">No active calls for this engineer</div>';return;}
-  // Sort: today-planned first by seq, then others
-  var forDate=tickets.filter(t=>t.planned_date===date).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
-  var other=tickets.filter(t=>t.planned_date!==date);
-  window._rpTickets=[...forDate,...other];
-  tickets=window._rpTickets;
+  // Only sort on initial load — preserve user-reordered sequence on subsequent renders
+  if(initialLoad){
+    var forDate=tickets.filter(t=>t.planned_date===date).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
+    var other=tickets.filter(t=>t.planned_date!==date);
+    window._rpTickets=[...forDate,...other];
+    tickets=window._rpTickets;
+  }
   var dateLabel=new Date(date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   rpc.innerHTML=`<div class="card">
     <div class="section-header" style="margin-bottom:8px;">
@@ -19678,14 +19680,18 @@ function renderRoutePlanTable(){
         var tatHtml='—';
         if(t.tat_date){var diff=new Date(t.tat_date)-new Date();var hrs=Math.round(diff/3600000);tatHtml=hrs<0?'<span style="color:#dc2626;font-weight:700;font-size:11px;">⚠️ Overdue</span>':hrs<4?'<span style="color:#ca8a04;font-weight:700;font-size:11px;">⏰ '+hrs+'h</span>':'<span style="color:#15803d;font-size:11px;">✅ '+hrs+'h</span>';}
         var isPlanned=t.planned_date===date;
-        return '<tr style="'+(isPlanned?'background:#eff6ff;':'')+'">'+
+        var isPendingParts=t.status==='Pending Parts'||t.status==='Pending Engineer Stock';
+        var isPartsArrived=t.status==='Pending Repair On Site';
+        var rowBg=isPendingParts?'background:repeating-linear-gradient(135deg,#f3f4f6,#f3f4f6 6px,#e5e7eb 6px,#e5e7eb 12px);':isPartsArrived?'background:#dcfce7;':isPlanned?'background:#eff6ff;':'';
+        var statusExtra=isPendingParts?' <span title="Parts not ready — do not schedule" style="background:#fee2e2;color:#b91c1c;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">⛔ HOLD</span>':isPartsArrived?' <span style="background:#bbf7d0;color:#15803d;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">✅ READY</span>':'';
+        return '<tr style="'+rowBg+'">'+
           '<td style="text-align:center;"><input type="number" value="'+(i+1)+'" min="1" max="'+tickets.length+'" id="rp-seq-'+t.id+'" style="width:46px;border:1px solid #cbd5e1;border-radius:6px;padding:4px;font-size:13px;text-align:center;" onchange="rpReorder(\''+t.id+'\',this.value)"></td>'+
           '<td><b style="font-size:13px;">'+t.id+'</b>'+(isPlanned?' <span style="background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">PLANNED</span>':'')+'<br><span style="font-size:12px;">'+escHtml(t.cname||'-')+'</span><br><span style="font-size:11px;color:var(--text-muted);">📞 '+(t.mobile||'-')+'</span></td>'+
           '<td style="font-size:12px;">'+(t.area||t.city||'<span style="color:#9ca3af;">—</span>')+'</td>'+
           '<td style="font-size:12px;">'+(t.model||'-')+'</td>'+
           '<td>'+priorityBadge(t.priority||'Normal')+'</td>'+
           '<td>'+tatHtml+'</td>'+
-          '<td>'+statusBadge(t.status)+'</td>'+
+          '<td>'+statusBadge(t.status)+statusExtra+'</td>'+
           '<td style="white-space:nowrap;"><button class="btn-icon" onclick="rpMove(\''+t.id+'\',-1)" title="Up">▲</button><button class="btn-icon" onclick="rpMove(\''+t.id+'\',1)" title="Down">▼</button></td>'+
           '</tr>';
       }).join('')}</tbody>
