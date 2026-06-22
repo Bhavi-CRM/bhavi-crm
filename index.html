@@ -900,14 +900,63 @@ tr:hover td{background:#f8fafc;}
         </div>
       </div>
 
-      <!-- Section 1: Site Visits -->
+      <!-- Section 1: Call Summary -->
       <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #1d4ed8;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <h3 style="font-size:14px;font-weight:700;color:#1d4ed8;">1. 🏢 Site Visits</h3>
-          <span style="font-size:12px;color:#1d4ed8;font-weight:600;">Total: <span id="dr-site-count">0</span></span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:14px;font-weight:700;color:#1d4ed8;">1. 📊 Call Summary</h3>
+          <span style="font-size:11px;color:#1d4ed8;background:#dbeafe;padding:3px 8px;border-radius:6px;cursor:pointer;" onclick="drAutoFillCalls()">🔄 Auto-fill from CRM</span>
         </div>
-        <div id="dr-site-rows"></div>
-        <button class="btn btn-outline btn-sm" onclick="addSiteVisitRow()" style="margin-top:8px;">+ Add Site Visit</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <!-- WARRANTY -->
+          <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #bfdbfe;">
+            <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;letter-spacing:.4px;">WARRANTY</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Installation</label>
+              <input id="dr-w-install" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Breakdown</label>
+              <input id="dr-w-breakdown" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Repeat</label>
+              <input id="dr-w-repeat" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="border-top:1px solid #bfdbfe;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:700;color:#1d4ed8;">Warranty Total</span>
+              <span id="dr-w-total" style="font-size:15px;font-weight:800;color:#1d4ed8;">0</span>
+            </div>
+          </div>
+          <!-- NON-WARRANTY -->
+          <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #fecaca;">
+            <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px;letter-spacing:.4px;">NON-WARRANTY</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Breakdown</label>
+              <input id="dr-nw-breakdown" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Repeat</label>
+              <input id="dr-nw-repeat" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Other / AMC</label>
+              <input id="dr-nw-other" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">Cart/Ink Delivery</label>
+              <input id="dr-nw-delivery" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="border-top:1px solid #fecaca;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:700;color:#dc2626;">Non-W Total</span>
+              <span id="dr-nw-total" style="font-size:15px;font-weight:800;color:#dc2626;">0</span>
+            </div>
+          </div>
+        </div>
+        <!-- Grand Total -->
+        <div style="background:#1d4ed8;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:700;color:#fff;">Total Calls Today</span>
+          <span id="dr-all-total" style="font-size:20px;font-weight:800;color:#fff;">0</span>
+        </div>
       </div>
 
       <!-- Section 2: Office / Remote Work -->
@@ -2477,7 +2526,7 @@ async function autoFillCallForm(mob){
     if(!cname){
       const wres=await sb('walkin_log','GET',null,'?mobile=eq.'+encodeURIComponent(mob)+'&order=created_at.desc&limit=1').catch(()=>[]);
       const w=wres&&wres[0];
-      if(w){cname=w.customer_name||'';state=w.state||'';city=w.city||'';pin=w.pin||'';area=w.area||'';address=w.address||'';source=cname;}
+      if(w){cname=w.customer_name||'';state=w.state||'';city=w.city||'';pin=w.pin||'';area=w.area||'';address=w.address||'';source=w.customer_name||cname;}
     }
     // 3. Fallback: previous tickets
     if(!cname){
@@ -5810,7 +5859,6 @@ async function savePurchaseInvoice(){
       if(inv){
         var newQty=(inv.qty_in_stock||0)+r.qty;
         var patch={qty_in_stock:newQty,updated_at:new Date().toISOString()};
-        // Update prices if entered
         if(r.dtp>0) patch.purchase_price=r.dtp;
         if(r.mrp>0) patch.unit_price=r.mrp;
         if(r.gst>=0) patch.gst_pct=r.gst;
@@ -5820,6 +5868,16 @@ async function savePurchaseInvoice(){
         if(r.mrp>0) inv.unit_price=r.mrp;
         if(r.gst>=0) inv.gst_pct=r.gst;
         await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:r.qty,note:'Purchase INV:'+invoice+' | '+supplier,done_by:currentUser.name}).catch(()=>{});
+      }else{
+        // New part not in inventory — create it
+        var newInvItem={part_code:r.code,item_name:r.name||r.code,qty_in_stock:r.qty,
+          purchase_price:r.dtp||0,unit_price:r.mrp||0,gst_pct:r.gst||18,
+          added_by:currentUser.name,updated_at:new Date().toISOString()};
+        var created=await sb('inventory','POST',newInvItem);
+        if(created&&created[0]){
+          allInventory.push(Object.assign(newInvItem,{id:created[0].id}));
+          await sb('inventory_log','POST',{inventory_id:created[0].id,type:'in',qty:r.qty,note:'New item — Purchase INV:'+invoice+' | '+supplier,done_by:currentUser.name}).catch(()=>{});
+        }
       }
       saved++;
     }
@@ -9781,10 +9839,11 @@ function openDailyReport(){
   })();
   var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
-  // Init site visit rows
-  var sr=document.getElementById('dr-site-rows');
-  if(sr){sr.innerHTML='';addSiteVisitRow();}
-  updateSiteCount();
+  // Reset call summary fields
+  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
+  updateCallTotals();
+  // Auto-fill call counts from CRM
+  drAutoFillCalls();
   // Init office work rows
   var or2=document.getElementById('dr-office-rows');
   if(or2)or2.innerHTML='';
@@ -10010,6 +10069,61 @@ function updatePaymentTotal(){
   if(el)el.textContent='₹'+total.toFixed(0);
 }
 
+function updateCallTotals(){
+  var wI=parseInt(document.getElementById('dr-w-install')?.value)||0;
+  var wB=parseInt(document.getElementById('dr-w-breakdown')?.value)||0;
+  var wR=parseInt(document.getElementById('dr-w-repeat')?.value)||0;
+  var nwB=parseInt(document.getElementById('dr-nw-breakdown')?.value)||0;
+  var nwR=parseInt(document.getElementById('dr-nw-repeat')?.value)||0;
+  var nwO=parseInt(document.getElementById('dr-nw-other')?.value)||0;
+  var nwD=parseInt(document.getElementById('dr-nw-delivery')?.value)||0;
+  var wTotal=wI+wB+wR;
+  var nwTotal=nwB+nwR+nwO+nwD;
+  var allTotal=wTotal+nwTotal;
+  var wt=document.getElementById('dr-w-total');if(wt)wt.textContent=wTotal;
+  var nwt=document.getElementById('dr-nw-total');if(nwt)nwt.textContent=nwTotal;
+  var at=document.getElementById('dr-all-total');if(at)at.textContent=allTotal;
+}
+
+async function drAutoFillCalls(){
+  try{
+    var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
+    var engId=currentUser.eng_id||currentUser.user_id;
+    // Fetch tickets assigned to this engineer updated on this date
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&updated_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
+    if(!tickets||!tickets.length){
+      // Fallback: fetch by created_at
+      tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
+    }
+    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0;
+    (tickets||[]).forEach(function(t){
+      var ct=t.call_type||'';
+      var prob=(t.problem||'').toLowerCase();
+      var status=(t.status||'').toLowerCase();
+      if(status.includes('cancel'))return; // skip cancelled
+      if(ct==='Warranty'){
+        if(prob.includes('install')||prob.includes('new set'))wInstall++;
+        else wBreakdown++;
+      }else if(ct==='Warranty Repeat'){
+        wRepeat++;
+      }else if(ct==='Non-Warranty'){
+        if(prob.includes('deliver')||prob.includes('cart')||prob.includes('ink'))nwDelivery++;
+        else nwBreakdown++;
+      }else if(ct==='Non-Warranty Repeat'){
+        nwRepeat++;
+      }else{
+        // AMC, Other, etc.
+        nwOther++;
+      }
+    });
+    var setVal=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
+    setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);
+    setVal('dr-nw-breakdown',nwBreakdown);setVal('dr-nw-repeat',nwRepeat);
+    setVal('dr-nw-other',nwOther);setVal('dr-nw-delivery',nwDelivery);
+    updateCallTotals();
+  }catch(e){console.log('drAutoFillCalls error:',e);}
+}
+
 async function saveDailyReport(){
   var date=document.getElementById('dr-date').value;
   var petrolKm=parseFloat(document.getElementById('dr-petrol-km').value)||0;
@@ -10017,15 +10131,20 @@ async function saveDailyReport(){
 
   if(!date){alert('Please select a date');return;}
 
-  // Collect site visits
-  var siteVisits=[];
-  document.querySelectorAll('#dr-site-rows .dr-site-row').forEach(function(row){
-    var siteName=row.querySelector('.sv-site-name')?.value?.trim()||'';
-    var area=row.querySelector('.sv-area')?.value?.trim()||'';
-    var problem=row.querySelector('.sv-problem')?.value?.trim()||'';
-    var remark=row.querySelector('.sv-remark')?.value?.trim()||'';
-    if(siteName)siteVisits.push({site_name:siteName,area:area,problem:problem,remark:remark});
-  });
+  // Collect call summary
+  var callSummary={
+    w_install:parseInt(document.getElementById('dr-w-install')?.value)||0,
+    w_breakdown:parseInt(document.getElementById('dr-w-breakdown')?.value)||0,
+    w_repeat:parseInt(document.getElementById('dr-w-repeat')?.value)||0,
+    nw_breakdown:parseInt(document.getElementById('dr-nw-breakdown')?.value)||0,
+    nw_repeat:parseInt(document.getElementById('dr-nw-repeat')?.value)||0,
+    nw_other:parseInt(document.getElementById('dr-nw-other')?.value)||0,
+    nw_delivery:parseInt(document.getElementById('dr-nw-delivery')?.value)||0
+  };
+  callSummary.warranty_total=callSummary.w_install+callSummary.w_breakdown+callSummary.w_repeat;
+  callSummary.nonwarranty_total=callSummary.nw_breakdown+callSummary.nw_repeat+callSummary.nw_other+callSummary.nw_delivery;
+  callSummary.grand_total=callSummary.warranty_total+callSummary.nonwarranty_total;
+  var siteVisits=[]; // kept for backward compat
 
   // Collect office work
   var officeWork=[];
@@ -10061,8 +10180,9 @@ async function saveDailyReport(){
       eng_id:currentUser.eng_id||currentUser.user_id,
       eng_name:currentUser.name,
       report_date:date,
+      call_summary:callSummary,
       site_visits:siteVisits,
-      total_site_visits:siteVisits.length,
+      total_site_visits:callSummary.grand_total,
       office_work:officeWork,
       total_office_work:officeWork.length,
       payment_details:payments,
@@ -10076,6 +10196,7 @@ async function saveDailyReport(){
     showDailyReportShare({
       eng_name:currentUser.name,
       report_date:date,
+      call_summary:callSummary,
       site_visits:siteVisits,
       office_work:officeWork,
       payments:payments,
@@ -10092,7 +10213,7 @@ function formatDailyReportWA(d){
   var DIV='━━━━━━━━━━━━━━━━━━━━━';
   var lines=[];
   var dateStr=d.report_date?new Date(d.report_date).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):d.report_date;
-  var sv=arr(d.site_visits);var ow=arr(d.office_work);var pm=arr(d.payments);var gr=arr(d.google_reviews);
+  var cs=d.call_summary||{};var sv=arr(d.site_visits);var ow=arr(d.office_work);var pm=arr(d.payments);var gr=arr(d.google_reviews);
 
   lines.push(DIV);
   lines.push('📋 *DAILY REPORT*');
@@ -10101,16 +10222,26 @@ function formatDailyReportWA(d){
   lines.push('📅 '+dateStr);
   lines.push('');
 
-  // Site Visits
-  if(sv.length){
-    lines.push('🏢 *SITE VISITS*  ('+sv.length+')');
+  // Call Summary
+  var grandTotal=cs.grand_total||(cs.warranty_total||0)+(cs.nonwarranty_total||0)||0;
+  if(grandTotal>0){
+    lines.push('📊 *CALL SUMMARY*  (Total: '+grandTotal+')');
     lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
-    sv.forEach(function(v,i){
-      lines.push('  '+(i+1)+'. *'+v.site_name+'*'+(v.area?' │ 📍'+v.area:''));
-      if(v.problem)lines.push('      🔧 '+v.problem);
-      if(v.remark) lines.push('      ✅ '+v.remark);
-      if(i<sv.length-1)lines.push('');
-    });
+    var wTotal=cs.warranty_total||((cs.w_install||0)+(cs.w_breakdown||0)+(cs.w_repeat||0));
+    var nwTotal=cs.nonwarranty_total||((cs.nw_breakdown||0)+(cs.nw_repeat||0)+(cs.nw_other||0)+(cs.nw_delivery||0));
+    lines.push('  🔵 *WARRANTY*  ('+wTotal+')');
+    if(cs.w_install>0)lines.push('     • Installation: '+cs.w_install);
+    if(cs.w_breakdown>0)lines.push('     • Breakdown: '+cs.w_breakdown);
+    if(cs.w_repeat>0)lines.push('     • Repeat: '+cs.w_repeat);
+    lines.push('');
+    lines.push('  🔴 *NON-WARRANTY*  ('+nwTotal+')');
+    if(cs.nw_breakdown>0)lines.push('     • Breakdown: '+cs.nw_breakdown);
+    if(cs.nw_repeat>0)lines.push('     • Repeat: '+cs.nw_repeat);
+    if(cs.nw_other>0)lines.push('     • Other / AMC: '+cs.nw_other);
+    if(cs.nw_delivery>0)lines.push('     • Cart/Ink Delivery: '+cs.nw_delivery);
+    lines.push('');
+    lines.push('  ─────────────────────');
+    lines.push('  🔵 Warranty: *'+wTotal+'*   🔴 Non-W: *'+nwTotal+'*   📊 Total: *'+grandTotal+'*');
     lines.push('');
   }
 
@@ -10231,7 +10362,7 @@ async function openPastReports(){
     }
     list.innerHTML=reports.map(function(r){
       var dateStr=new Date(r.report_date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-      var siteCount=(r.site_visits&&r.site_visits.length)||r.total_site_visits||0;
+      var cs2=r.call_summary||{};var siteCount=cs2.grand_total||r.total_site_visits||0;
       var officeCount=(r.office_work&&r.office_work.length)||r.total_office_work||0;
       var amt=r.total_amount||0;
       var reviews=r.total_reviews||0;
@@ -10264,6 +10395,7 @@ function showPastReportShare(id){
   showDailyReportShare({
     eng_name:r.eng_name,
     report_date:r.report_date,
+    call_summary:r.call_summary||{},
     site_visits:parseJ(r.site_visits),
     office_work:parseJ(r.office_work),
     payments:parseJ(r.payment_details),
@@ -12342,14 +12474,16 @@ async function createJobFromWalkIn(wiId){
     }
   }
   // Set model and serial — use two timeouts to survive any async subcategory onChange clearing
+  var _wiModelSet=false;
   var _setWiModel=function(){
     var modelEl=document.getElementById('call-model');
-    if(modelEl&&_wiModel)modelEl.value=_wiModel;
+    // Only set if field is still empty or still showing the walk-in value (don't overwrite user edits)
+    if(modelEl&&_wiModel&&(!modelEl.value||modelEl.value===_wiModel)){modelEl.value=_wiModel;_wiModelSet=true;}
     var serialEl=document.getElementById('call-serial');
-    if(serialEl&&firstProd.serial)serialEl.value=firstProd.serial;
+    if(serialEl&&firstProd.serial&&!serialEl.value)serialEl.value=firstProd.serial;
   };
   setTimeout(_setWiModel,50);
-  setTimeout(_setWiModel,300); // second pass catches any delayed subcategory onChange
+  setTimeout(function(){if(!_wiModelSet)_setWiModel();},300); // second pass only if first didn't stick
 
   // Call type from warranty
   var callTypeEl=document.getElementById('call-type');

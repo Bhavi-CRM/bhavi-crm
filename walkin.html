@@ -1074,6 +1074,8 @@ async function submitEntry(){
         return '<div class="summary-row"><span class="sr-icon">'+r.icon+'</span><span class="sr-label">'+r.label+'</span><span class="sr-val">'+r.val+'</span></div>';
       }).join('');
     goPage('pg-success');
+    _submitting=false; // Reset so start-over works in same session
+    document.querySelectorAll('.btn-primary').forEach(function(b){b.disabled=false;});
   }catch(e){
     _submitting=false;
     document.querySelectorAll('.btn-primary').forEach(function(b){b.disabled=false;});
