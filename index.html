@@ -490,7 +490,13 @@ tr:hover td{background:#f8fafc;}
       <div class="form-grid">
         <div class="form-group"><label>Engineer <small>(Optional)</small></label><select id="call-eng"><option value="">-- Pending Allocation --</option></select></div>
         <div class="form-group"><label>Physical JS No</label><input type="text" id="call-phys-js"></div>
-        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="date" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">End of selected date · Use Set TAT after save for specific time</div></div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Canon Call Received Date &amp; Time <small style="color:var(--text-muted);">(CSP/Warranty)</small></label>
+          <input type="datetime-local" id="call-canon-recv" oninput="autoCalcCallTAT()" style="width:100%;border:1px solid #86efac;border-radius:8px;padding:7px 12px;font-size:13px;outline:none;box-sizing:border-box;">
+          <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours</div>
+          <div id="call-tat-preview" style="display:none;margin-top:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:12px;color:#166534;font-weight:600;"></div>
+          <input type="hidden" id="call-tat-date">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -3935,7 +3941,8 @@ async function openNewCall(){
     await loadMasterData();
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
-  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date','call-canon-recv'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  var _tp=document.getElementById('call-tat-preview');if(_tp){_tp.style.display='none';_tp.textContent='';}
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
@@ -4126,7 +4133,7 @@ async function saveCall(){
     rerepair:document.getElementById('call-rerepair').value||'No',
     rerepair_foc:(()=>{const el=document.querySelector('input[name="rr-charges"]:checked');return el?el.value==='foc':false;})(),
     phys_js:document.getElementById('call-phys-js').value,
-    tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v?new Date(v).toISOString():null;})(),
+    tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v||null;})(),
     assigned_to:engId||null,assigned_name:engName||null,
     status:engId?'Assigned':'Pending Allocation',
     warranty_coverage:isW?'Under Coverage':'NA',
@@ -4279,6 +4286,22 @@ function autoCalcTAT(){
   var nextDT=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
   var tatInput=document.getElementById('tat-set-input');
   if(tatInput)tatInput.value=nextDT;
+}
+function autoCalcCallTAT(){
+  var recv=document.getElementById('call-canon-recv')?.value;
+  var preview=document.getElementById('call-tat-preview');
+  var hidden=document.getElementById('call-tat-date');
+  if(!recv){if(preview)preview.style.display='none';if(hidden)hidden.value='';return;}
+  var d=new Date(recv);
+  d.setTime(d.getTime()+24*3600000); // +24 hours exactly
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var iso=d.toISOString();
+  if(hidden)hidden.value=iso;
+  if(preview){
+    var label=d.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
+    preview.textContent='⏱ TAT Deadline: '+label+' (Canon received + 24h)';
+    preview.style.display='block';
+  }
 }
 async function saveTATDate(ticketId){
   var val=document.getElementById('tat-set-input')?.value;
