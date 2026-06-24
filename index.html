@@ -3779,6 +3779,10 @@ async function exportFilteredTickets(){
   const getWorkStartAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&e.action.includes('Work Start'));return entry?.at||null;};
   // Last close action time
   const getClosedAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return entry?.at||null;};
+  // Visit Start (travel start) time
+  const getVisitStartAt=t=>{const entry=[...getTL(t)].find(e=>e.action&&e.action==='Visit Start');return entry?.at||null;};
+  // Manual time update remark
+  const getManualTimeRemark=t=>{const entry=[...getTL(t)].find(e=>e.action&&e.action==='Manual Time Update');return entry?entry.note||'Yes':'';};
 
   // Build per-engineer sorted list to compute visit gaps
   // Group tickets by engineer, sorted by created_at
@@ -3800,27 +3804,35 @@ async function exportFilteredTickets(){
 
   const headers=['Ticket ID','Customer','Mobile','City','Brand','Model','Serial','Call Type','Service Type','WC Type','Engineer','Status',
     'Open Date','Open Time',
+    'Visit Start (Travel) Date','Visit Start Time',
     'Work Start Date','Work Start Time',
     'Close Date','Close Time',
-    'Repair Time (Work Start→Close)','Resolution Time (Open→Close)','Visit Gap (from prev close)',
+    'Travel Time (Visit→Work Start)','Repair Time (Work Start→Close)','Resolution Time (Open→Close)','Visit Gap (from prev close)',
+    'Manual Time?','Manual Time Remark',
     'Remarks'];
   const data=filtered.map(t=>{
     const closedAt=getClosedAt(t);
     const workStartAt=getWorkStartAt(t);
+    const visitStartAt=getVisitStartAt(t);
+    const manualRemark=getManualTimeRemark(t);
     return [
       t.id,t.cname,t.mobile,t.city,t.brand_name,t.model,t.serial,
       t.call_type,t.service_type,t.wc_type||'-',t.assigned_name||'-',t.status,
       fmtDate(t.created_at), fmtTime(t.created_at),
+      fmtDate(visitStartAt), fmtTime(visitStartAt),
       fmtDate(workStartAt),  fmtTime(workStartAt),
       fmtDate(closedAt),     fmtTime(closedAt),
+      durHrs(visitStartAt,workStartAt)||'-',
       durHrs(workStartAt,closedAt)||'-',
       durHrs(t.created_at,closedAt)||'-',
       visitGap[t.id]||'-',
+      manualRemark?'YES ⚠️':'-',
+      manualRemark||'-',
       t.remarks||'-',
     ];
   });
   const ws=XLSX.utils.aoa_to_sheet([headers,...data]);
-  ws['!cols']=[{wch:13},{wch:18},{wch:13},{wch:13},{wch:12},{wch:13},{wch:15},{wch:14},{wch:13},{wch:10},{wch:18},{wch:20},{wch:12},{wch:11},{wch:14},{wch:14},{wch:12},{wch:11},{wch:24},{wch:22},{wch:22},{wch:20}];
+  ws['!cols']=[{wch:13},{wch:18},{wch:13},{wch:13},{wch:12},{wch:13},{wch:15},{wch:14},{wch:13},{wch:10},{wch:18},{wch:20},{wch:12},{wch:11},{wch:16},{wch:14},{wch:14},{wch:14},{wch:12},{wch:11},{wch:24},{wch:24},{wch:22},{wch:22},{wch:10},{wch:35},{wch:30}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Tickets');
   XLSX.writeFile(wb,'BhaviCRM_Tickets_'+new Date().toISOString().slice(0,10)+'.xlsx');
@@ -4972,8 +4984,12 @@ async function openEngUpdate(id){
 
     <div class="form-grid-3" style="margin-bottom:10px;">
       <div class="form-group"><label>Date</label><input type="date" id="upd-date" value="${t.visit_date||dateNow}"></div>
-      <div class="form-group"><label>Time In</label><input type="time" id="upd-in" value="${t.visit_in||''}"></div>
-      <div class="form-group"><label>Time Out</label><input type="time" id="upd-out" value="${t.visit_out||''}"></div>
+      <div class="form-group"><label>Time In</label><input type="time" id="upd-in" value="${t.visit_in||''}" data-orig="${t.visit_in||''}" oninput="onManualTimeInput()"></div>
+      <div class="form-group"><label>Time Out</label><input type="time" id="upd-out" value="${t.visit_out||''}" data-orig="${t.visit_out||''}" oninput="onManualTimeInput()"></div>
+    </div>
+    <div id="manual-time-remark-box" style="display:none;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
+      <label style="font-weight:700;color:#b45309;font-size:12px;">⚠️ Reason for manual time change <span style="color:#ef4444;">*</span></label>
+      <input type="text" id="manual-time-remark" placeholder="e.g. Network issue — forgot to tap Work Start button" style="margin-top:6px;border-color:#f59e0b;">
     </div>
     <div class="form-grid" style="margin-bottom:10px;">
       <div class="form-group"><label>Meter Start</label><input type="text" id="upd-meter-start" value="${t.meter_start||''}"></div>
@@ -5278,21 +5294,39 @@ async function saveEngUpdate(){
     return;
   }
 
+  // Detect manual time change — require remark if Time In or Time Out was manually edited
+  const inEl=document.getElementById('upd-in');
+  const outEl=document.getElementById('upd-out');
+  const inOrig=inEl?.dataset.orig||'';
+  const outOrig=outEl?.dataset.orig||'';
+  const isManualTime=t.service_type==='On Site'&&((inEl?.value||'')!==inOrig||(outEl?.value||'')!==outOrig);
+  if(isManualTime){
+    const mRem=(document.getElementById('manual-time-remark')?.value||'').trim();
+    if(!mRem){alert('⚠️ Please provide a reason for the manual time change.\n(Time In or Time Out was edited manually)');document.getElementById('manual-time-remark')?.focus();return;}
+  }
+
+  const nowSave=new Date();
+  let tl=[...(t.timeline||[]),{action:'Updated — '+status,by:currentUser.name,at:nowSave.toISOString(),note:document.getElementById('upd-remarks')?.value||''}];
+  if(isManualTime){
+    const mRem=(document.getElementById('manual-time-remark')?.value||'').trim();
+    tl=[...tl,{action:'Manual Time Update',by:currentUser.name,at:nowSave.toISOString(),note:'Reason: '+mRem}];
+  }
+
   const data={
     status,fault_code:document.getElementById('upd-fault')?.value||'',
     cause:document.getElementById('upd-cause')?.value||'',
     work_done:document.getElementById('upd-work')?.value||'',
     visit_date:document.getElementById('upd-date')?.value||'',
-    visit_in:document.getElementById('upd-in')?.value||'',
-    visit_out:document.getElementById('upd-out')?.value||'',
+    visit_in:inEl?.value||'',
+    visit_out:outEl?.value||'',
     meter_start:document.getElementById('upd-meter-start')?.value||'',
     meter_end:document.getElementById('upd-meter-end')?.value||'',
     labor:document.getElementById('upd-labor')?.value||0,
     other_charge:document.getElementById('upd-other')?.value||0,
     eng_remarks:document.getElementById('upd-remarks')?.value||'',
     spares:currentSpares,
-    timeline:[...(t.timeline||[]),{action:'Updated — '+status,by:currentUser.name,at:new Date().toISOString(),note:document.getElementById('upd-remarks')?.value||''}],
-    updated_at:new Date().toISOString()
+    timeline:tl,
+    updated_at:nowSave.toISOString()
   };
   // Auto set Time Out when closing On Site call
   if(status==='Closed' && t.service_type==='On Site'){
@@ -5527,7 +5561,8 @@ function _tgNotifyClose(id,t,data,status,spares){
       +(data.eng_remarks?'💬 <b>Remarks:</b> '+data.eng_remarks+'\n':'')
       +(spareLines?'\n🔩 <b>Parts Changed:</b>\n'+spareLines+'\n':'')
       +(isChargeable&&totalAmt>0?'\n💰 <b>Total Bill: ₹'+totalAmt.toLocaleString('en-IN')+'</b>':'\n🛡️ '+((t.call_type)||'Warranty')+' — No Charge');
-    tgNotify(TG_OWNER_CHAT,msg);
+    if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,msg);
+    if(TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT)tgNotify(TG_OWNER_CHAT,msg);
   }catch(ex){console.log('TG close notify err:',ex);}
 }
 
@@ -9864,10 +9899,27 @@ async function doVisitStart(ticketId){
       created_at:now.toISOString()
     });
 
+    // Save Visit Start to ticket timeline so Excel report can extract travel time
+    const tlVisit=[...(t?.timeline||[]),{action:'Visit Start',by:currentUser.name,at:now.toISOString(),note:'Travel started: '+timeNow}];
+    await sb('tickets','PATCH',{timeline:tlVisit,updated_at:now.toISOString()},`?id=eq.${ticketId}`).catch(()=>{});
+
     alert('🚗 Visit Start! Traveling log started — '+timeNow);
     closeModal('modal-eng-update');
     openEngUpdate(ticketId);
   }catch(e){alert('Error: '+e.message);}
+}
+
+// Show/hide manual time remark box when engineer manually edits Time In or Time Out
+function onManualTimeInput(){
+  var inEl=document.getElementById('upd-in');
+  var outEl=document.getElementById('upd-out');
+  var box=document.getElementById('manual-time-remark-box');
+  if(!box)return;
+  var inOrig=inEl?.dataset.orig||'';
+  var outOrig=outEl?.dataset.orig||'';
+  var changed=(inEl?.value||'')!==inOrig||(outEl?.value||'')!==outOrig;
+  box.style.display=changed?'block':'none';
+  if(!changed)document.getElementById('manual-time-remark').value='';
 }
 
 // Work Start - auto sets Time In + auto work log
