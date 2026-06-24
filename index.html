@@ -1140,7 +1140,7 @@ async function tgNotify(chatId,text){
 }
 async function tgNotifyAll(text){
   if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
-  if(TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT)tgNotify(TG_OWNER_CHAT,text);
+  // Office chat does NOT get tgNotifyAll (new call, inquiry) — only gets assignment + closed/repaired
 }
 async function tgNotifyEngineer(engId,text){
   var chatId=TG_ENG_MAP[engId]||'';
@@ -5497,12 +5497,38 @@ async function saveEngUpdate(){
         closeModal('modal-eng-update');currentSpares=[];
         if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
         showFeedbackSharePrompt(id,t.cname||'Customer',t.mobile||'',currentUser.name||'');
+        _tgNotifyClose(id,t,data,status,currentSpares);
         return;
       }
+    }
+    if(status==='Closed'||status==='Repaired'){
+      _tgNotifyClose(id,t,data,status,currentSpares);
     }
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
+}
+
+function _tgNotifyClose(id,t,data,status,spares){
+  if(!TG_OWNER_CHAT)return;
+  try{
+    var spareLines=(spares||[]).filter(function(s){return s.name;}).map(function(s){
+      var lineTotal=parseFloat(s.price||0)*parseInt(s.qty||1);
+      return '  🔩 '+s.name+(s.qty>1?' ×'+s.qty:'')+(lineTotal>0?' — ₹'+lineTotal.toFixed(0):'');
+    }).join('\n');
+    var isChargeable=!['Warranty','Warranty Repeat','AMC'].includes(t.call_type||'');
+    var totalAmt=parseFloat(data.final_charges||0)||((parseFloat(data.labor||0)+parseFloat(data.other_charge||0))+(spares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0));
+    var msg='✅ <b>Call '+(status==='Repaired'?'Repaired ✔':'Closed ✔')+'</b>\n'
+      +'🎫 <b>'+id+'</b>  |  👷 '+((data._engName)||currentUser&&currentUser.name||'Engineer')+'\n'
+      +'👤 '+(t.cname||'—')+(t.mobile?'  |  📱 '+t.mobile:'')+'\n'
+      +'📍 '+(t.area||t.city||'—')+'\n'
+      +'❗ <b>Problem:</b> '+(t.problem||'—')+'\n'
+      +(data.work_done?'🔧 <b>Work Done:</b> '+data.work_done+'\n':'')
+      +(data.eng_remarks?'💬 <b>Remarks:</b> '+data.eng_remarks+'\n':'')
+      +(spareLines?'\n🔩 <b>Parts Changed:</b>\n'+spareLines+'\n':'')
+      +(isChargeable&&totalAmt>0?'\n💰 <b>Total Bill: ₹'+totalAmt.toLocaleString('en-IN')+'</b>':'\n🛡️ '+((t.call_type)||'Warranty')+' — No Charge');
+    tgNotify(TG_OWNER_CHAT,msg);
+  }catch(ex){console.log('TG close notify err:',ex);}
 }
 
 // INVENTORY
