@@ -490,7 +490,7 @@ tr:hover td{background:#f8fafc;}
       <div class="form-grid">
         <div class="form-group"><label>Engineer <small>(Optional)</small></label><select id="call-eng"><option value="">-- Pending Allocation --</option></select></div>
         <div class="form-group"><label>Physical JS No</label><input type="text" id="call-phys-js"></div>
-        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="datetime-local" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Set TAT from Canon portal call date + SLA</div></div>
+        <div class="form-group"><label>TAT Deadline <small style="color:var(--text-muted);">(CSP/Warranty)</small></label><input type="date" id="call-tat-date"><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">End of selected date · Use Set TAT after save for specific time</div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -4153,7 +4153,7 @@ async function saveCall(){
         window._fromWalkInId=null;
       }
     }
-    closeModal('modal-call');if(currentPage==='walk-in')renderWalkIn();else if(currentPage==='tickets')renderTickets();else renderDashboard();
+    closeModal('modal-call');if(currentPage==='walk-in')renderWalkIn();else if(currentPage==='tickets')renderTickets();else if(currentPage==='pending-list')renderPendingList();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}finally{
     _savingCall=false;
     if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}
@@ -6713,9 +6713,13 @@ async function renderReportFilter(c){
             <select id="f-status" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;width:100%;">
               <option value="">All Status</option>
               <option>Pending Customer Arrival</option><option>Pending Allocation</option>
-              <option>Assigned</option><option>In Progress</option><option>Closed</option>
-              <option>Pending Customer Approval</option><option>Pending Parts</option>
-              <option>Customer Reject</option><option>Call Cancel</option>
+              <option>Assigned</option><option>In Progress</option>
+              <option>Pending Parts</option><option>Pending Engineer Stock</option>
+              <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
+              <option>Pending Customer Approval</option><option>Customer Approved</option>
+              <option>Repaired</option><option>Delivered</option>
+              <option>Sent to MSC</option><option>Pending for Delivery</option>
+              <option>Closed</option><option>Customer Reject</option><option>Call Cancel</option>
             </select>
           </div>
           <div class="form-group">
