@@ -1109,6 +1109,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 // ===== TELEGRAM BOT CONFIG =====
 var TG_TOKEN=(function(){try{return atob('ODkxNzQ3NTMzMzpBQUZmcFZsMk1PR2xMZEhXUWFLNjJzNFZ1QnNaV0h3a1pmYw==');}catch(e){return '';}})();
 var TG_ADMIN_CHAT='8814298497';
+var TG_OWNER_CHAT=''; // Office/second chat — receives ALL same notifications as admin
 var TG_ENG_MAP={'ENG002':'1385145070'};
 async function _tgSbGet(key){try{var r=await sb('telegram_settings','GET',null,'?key=eq.'+encodeURIComponent(key)+'&select=value');return(r&&r[0])?r[0].value:null;}catch(e){return null;}}
 async function _tgSbSet(key,value){
@@ -1126,6 +1127,7 @@ async function loadTGSettings(){
     var map={};rows.forEach(function(r){map[r.key]=r.value;});
     if(map['tg_bot_token'])TG_TOKEN=map['tg_bot_token'];
     if(map['tg_admin_chat'])TG_ADMIN_CHAT=map['tg_admin_chat'];
+    if(map['tg_owner_chat'])TG_OWNER_CHAT=map['tg_owner_chat'];
     if(map['tg_eng_map']){try{var em=JSON.parse(map['tg_eng_map']);TG_ENG_MAP=Object.assign(TG_ENG_MAP,em);}catch(ex){}}
   }catch(e){console.log('loadTGSettings err',e);}
 }
@@ -1138,11 +1140,13 @@ async function tgNotify(chatId,text){
 }
 async function tgNotifyAll(text){
   if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
+  if(TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT)tgNotify(TG_OWNER_CHAT,text);
 }
 async function tgNotifyEngineer(engId,text){
   var chatId=TG_ENG_MAP[engId]||'';
   if(chatId)tgNotify(chatId,text);
   if(TG_ADMIN_CHAT)tgNotify(TG_ADMIN_CHAT,text);
+  if(TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT)tgNotify(TG_OWNER_CHAT,text);
 }
 // ===== END TELEGRAM BOT CONFIG =====
 
@@ -4150,7 +4154,7 @@ async function saveCall(){
       await sb('tickets','POST',data);
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
-      tgNotify(TG_ADMIN_CHAT,'🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
+      tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
       if(engId)tgNotifyEngineer(engId,'🎫 <b>New Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—'));
       // Link job to walk-in entry if created from walk-in
       if(window._fromWalkInId){
@@ -4687,7 +4691,7 @@ async function quickEngChange(id,val){
   var _prevEng=t?.assigned_name||'';
   var _reassign=_prevEng&&_prevEng!==eName?'♻️ Reassigned (was: '+_prevEng+')':'🆕 New Assignment';
   // Admin: full details
-  tgNotify(TG_ADMIN_CHAT,'📋 <b>Ticket '+_reassign+'</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||'')+'\n👷 Assigned to: '+eName);
+  tgNotifyAll('📋 <b>Ticket '+_reassign+'</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||'')+'\n👷 Assigned to: '+eName);
   // Engineer: personal message
   if(eId)tgNotifyEngineer(eId,'📋 <b>Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||''));
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
@@ -8645,6 +8649,15 @@ async function renderTelegramSettings(){
     +'</div>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">@userinfobot thi tamaro Chat ID kadho</p>'
     +'</div>'
+    +'<div class="form-group" style="margin-bottom:16px;">'
+    +'<label style="font-weight:700;">📱 Office / Second Chat ID <small style="font-weight:400;color:#6b7280;">(sathe badha notifications aave)</small></label>'
+    +'<div style="display:flex;gap:8px;margin-top:6px;">'
+    +'<input type="text" id="tg-owner-chat" value="'+(TG_OWNER_CHAT||'')+'" placeholder="Office Telegram Chat ID (e.g. 9574004969 wala)..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
+    +'<button class="btn btn-primary" onclick="saveTGOwner()">Save</button>'
+    +'<button class="btn btn-outline" onclick="_tgTestOwner()">Test</button>'
+    +'</div>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Aa chat ID ne badha j notifications malse — new call, assignment, inquiry, delivery badhuj. @userinfobot thi Chat ID kadho.</p>'
+    +'</div>'
     +'<h4 style="font-size:13px;font-weight:700;margin-bottom:10px;">👷 Engineer Chat IDs</h4>'
     +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     +'<thead><tr style="background:#f1f5f9;">'
@@ -8692,6 +8705,13 @@ async function saveTGAdmin(){
   TG_ADMIN_CHAT=chatId;
   alert('Admin Chat ID saved!');
 }
+async function saveTGOwner(){
+  var chatId=(document.getElementById('tg-owner-chat')?.value||'').trim();
+  await _tgSbSet('tg_owner_chat',chatId);
+  TG_OWNER_CHAT=chatId;
+  alert('Office Chat ID saved! Havar badha notifications aama pan aavse.');
+}
+function _tgTestOwner(){var c=(document.getElementById('tg-owner-chat')||{}).value||'';testTGId(c,'Office');}
 async function saveTGId(dbId,engUid){
   var chatId=(document.getElementById('tgid-'+dbId)?.value||'').trim();
   if(chatId)TG_ENG_MAP[engUid]=chatId;
@@ -19697,7 +19717,7 @@ async function markDelivered(ticketId){
     var t=tRow[0];
     var tl=[...(t.timeline||[]),{action:'Delivered',by:currentUser.name,at:new Date().toISOString(),note:'Customer collected device'}];
     await sb('tickets','PATCH',{status:'Delivered',timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
-    tgNotify(TG_ADMIN_CHAT,'✅ <b>Ticket Delivered</b>\n🎫 #'+ticketId+'\n👤 '+t.cname+' | 📱 '+(t.mobile||'—')+'\n🔧 '+t.model+' | S/N: '+(t.serial||'—')+(t.assigned_name?'\n👷 '+t.assigned_name:''));
+    tgNotifyAll('✅ <b>Ticket Delivered</b>\n🎫 #'+ticketId+'\n👤 '+t.cname+' | 📱 '+(t.mobile||'—')+'\n🔧 '+t.model+' | S/N: '+(t.serial||'—')+(t.assigned_name?'\n👷 '+t.assigned_name:''));
     window._pendingData=(window._pendingData||[]).filter(function(x){return x.id!==ticketId;});
     var idx=(allTickets||[]).findIndex(function(x){return x.id===ticketId;});
     if(idx>=0&&allTickets[idx])allTickets[idx].status='Delivered';
