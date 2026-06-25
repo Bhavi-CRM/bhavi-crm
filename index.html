@@ -4979,16 +4979,30 @@ async function openEngUpdate(id){
       ${isOOC?'<br><span style="color:var(--danger);font-weight:700;">⚠️ Out of Coverage — charges apply</span>':''}
     </div>
     <!-- Visit Start / Work Start Buttons -->
-    ${!t.visit_in && t.service_type==='On Site' ? `
-    <div class="alert alert-info" style="margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <span>⏱️ Visit not started yet</span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
-          <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
+    ${(()=>{
+      if(t.visit_in||t.service_type!=='On Site')return '';
+      const tl=Array.isArray(t.timeline)?t.timeline:(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):[]);
+      const visitStarted=tl.some(e=>e.action==='Visit Start');
+      if(visitStarted){
+        const vsEntry=tl.find(e=>e.action==='Visit Start');
+        const vsTime=vsEntry?.note||vsEntry?.at||'';
+        return `<div class="alert" style="background:#fef3c7;border-color:#fcd34d;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span style="color:#92400e;">🚗 Traveling... <b>${vsTime?('Started: '+vsTime):''}</b></span>
+            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
+          </div>
+        </div>`;
+      }
+      return `<div class="alert alert-info" style="margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span>⏱️ Visit not started yet</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
+            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
+          </div>
         </div>
-      </div>
-    </div>` : ''}
+      </div>`;
+    })()}
     ${t.visit_in && !t.visit_out && t.service_type==='On Site' ? `
     <div class="alert" style="background:#d1fae5;border-color:#6ee7b7;margin-bottom:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -5020,7 +5034,7 @@ async function openEngUpdate(id){
         ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
-      <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
+      <div class="form-group"><label>Action Taken <span style="color:#ef4444;">*</span></label><input type="text" id="upd-work" value="${t.work_done||''}" placeholder="Required before closing..."><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
     </div>
     <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;">
       <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:10px;">📦 MSC Dispatch Details</h3>
@@ -5074,7 +5088,7 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
-    <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-remarks')">✨ AI Remark</button></div>`;
+    <input type="hidden" id="upd-remarks" value="">`;
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -5302,10 +5316,10 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Remark mandatory when closing
+  // Action Taken mandatory when closing
   if(status==='Closed'){
-    const rem=(document.getElementById('upd-remarks')?.value||'').trim();
-    if(!rem){alert('❌ Remark is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-remarks')?.focus();return;}
+    const rem=(document.getElementById('upd-work')?.value||'').trim();
+    if(!rem){alert('❌ Action Taken is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-work')?.focus();return;}
   }
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
@@ -5379,7 +5393,7 @@ async function saveEngUpdate(){
     meter_end:document.getElementById('upd-meter-end')?.value||'',
     labor:document.getElementById('upd-labor')?.value||0,
     other_charge:document.getElementById('upd-other')?.value||0,
-    eng_remarks:document.getElementById('upd-remarks')?.value||'',
+    eng_remarks:document.getElementById('upd-work')?.value||'',
     spares:currentSpares,
     timeline:tl,
     updated_at:nowSave.toISOString()
