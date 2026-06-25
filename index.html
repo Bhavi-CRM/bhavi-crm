@@ -2883,7 +2883,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   if(isAdminOrWC){
     switch(current){
       case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
-      case 'Pending Allocation': return['Assigned','Call Cancel'];
+      case 'Pending Allocation': return['Assigned','Pending Repair Carry In','Pending Repair On Site','Call Cancel'];
       case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
       case 'Pending Engineer Stock': return['In Progress','Assigned']; // Admin issued part to engineer
       case 'Pending Parts': return['In Progress','Assigned']; // Admin got parts and issued
