@@ -3928,25 +3928,56 @@ async function renderMyCalls(){
       </div>`:''}
       <div id="my-target-card"></div>
       <div class="card"><div class="section-header"><h2>My Calls</h2><div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="openPastReports()">🕐 Past Reports</button><button class="btn btn-primary btn-sm" onclick="openDailyReport()">📋 Daily Report</button></div></div>
+        <!-- Search bar -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <input type="text" id="my-calls-search" placeholder="🔍 Search ticket, customer, mobile, model, serial..." style="flex:1;min-width:200px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" oninput="filterMyCalls()">
+          <select id="my-calls-status" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;" onchange="filterMyCalls()">
+            <option value="">All Status</option>
+            <option value="active">Active Only</option>
+            <option value="closed">Closed Only</option>
+          </select>
+        </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Problem</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-          <tbody>${tickets.map(t=>`<tr>
-            <td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
-            <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
-            <td>${t.model||'-'}</td><td>${t.problem||'-'}</td>
-            <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
-            <td>${statusBadge(t.status)}</td>
-            <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-            <td style="white-space:nowrap;">${['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?
-              `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
-              `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
-            </td>
-          </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>'}</tbody>
+          <tbody id="my-calls-tbody">${(()=>{
+            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered'];
+            const sorted=[...tickets].sort((a,b)=>{
+              const aOpen=!closedStatuses.includes(a.status);
+              const bOpen=!closedStatuses.includes(b.status);
+              if(aOpen!==bOpen) return aOpen?-1:1;
+              // Within same group: sort by ticket ID desc (newer first)
+              return (b.id||'').localeCompare(a.id||'');
+            });
+            return sorted.map(t=>`<tr data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${closedStatuses.includes(t.status)?'closed':'active'}">
+              <td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
+              <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
+              <td>${t.model||'-'}</td><td>${t.problem||'-'}</td>
+              <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
+              <td>${statusBadge(t.status)}</td>
+              <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
+              <td style="white-space:nowrap;">${closedStatuses.includes(t.status)?
+                `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
+                `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
+              </td>
+            </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>';
+          })()}</tbody>
         </table></div>
       </div>`;
     // Load target widget async (non-blocking)
     loadMyTargetWidget(tickets);
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
+}
+
+// Filter My Calls table client-side
+function filterMyCalls(){
+  var q=(document.getElementById('my-calls-search')?.value||'').toLowerCase().trim();
+  var statusF=document.getElementById('my-calls-status')?.value||'';
+  var rows=document.querySelectorAll('#my-calls-tbody tr[data-id]');
+  rows.forEach(function(row){
+    var matchQ=!q||row.dataset.id.toLowerCase().includes(q)||row.dataset.cname.includes(q)||row.dataset.mobile.includes(q)||row.dataset.model.includes(q)||row.dataset.serial.includes(q);
+    var matchS=!statusF||(statusF==='active'&&row.dataset.status==='active')||(statusF==='closed'&&row.dataset.status==='closed');
+    row.style.display=(matchQ&&matchS)?'':'none';
+  });
 }
 
 // NEW CALL
