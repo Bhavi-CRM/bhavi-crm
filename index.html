@@ -4033,7 +4033,7 @@ async function openNewCall(){
   if(snCb){snCb.checked=true;}
   var snEl=document.getElementById('call-serial');
   if(snEl){snEl.readOnly=false;snEl.style.background='';snEl.placeholder='Serial number';}
-  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
   // Populate brand dropdown
   const brandDrop = document.getElementById('call-brand-input');
   if(brandDrop && brandDrop.tagName === 'SELECT'){
@@ -4481,7 +4481,7 @@ async function viewTicket(id,autoPrint=false){
       `:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
-        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
+        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
@@ -6485,7 +6485,7 @@ async function openNewTask(){
   document.getElementById('task-priority').value='Normal';
   document.getElementById('task-due').value='';
   document.getElementById('task-due').min=new Date().toISOString().split('T')[0];
-  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
   openModal('modal-task');
 }
 async function saveTask(){const ev=document.getElementById('task-eng').value;const[eId,eName]=ev?ev.split('|'):['',''];const title=document.getElementById('task-title').value.trim();const due=document.getElementById('task-due').value;if(!title||!eId){alert('Fill title and engineer');return;}if(due&&due<new Date().toISOString().split('T')[0]){alert('Due date cannot be past');return;}const year=new Date().getFullYear();const tasks=await sb('tasks','GET',null,`?task_no=like.TSK-${year}*&order=task_no.desc&limit=1`);let num=1;if(tasks.length)num=parseInt(tasks[0].task_no.split('-').pop())+1;try{await sb('tasks','POST',{task_no:`TSK-${year}-${String(num).padStart(3,'0')}`,title,description:document.getElementById('task-desc').value,assigned_to:eId,assigned_name:eName,priority:document.getElementById('task-priority').value,due_date:due||null,ticket_id:document.getElementById('task-ticket').value||null,status:'Open',created_by:currentUser.name,eng_remark:'',timeline:[{action:'Created',by:currentUser.name,at:new Date().toISOString()}]});closeModal('modal-task');renderTasks();}catch(e){alert(e.message);}}
@@ -6977,10 +6977,17 @@ async function downloadFilteredReport(format){
   if(!tickets.length){alert('No data to download. Run search first.');return;}
   
   if(format==='excel'){
+    const _getTL=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
+    const _getVisitStart=t=>{const e=_getTL(t).find(e=>e.action==='Visit Start');return e?.at||null;};
+    const _getWorkStart=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action==='Work Started'||e.action.includes('Work Start')));return e?.at||null;};
+    const _getClosed=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return e?.at||null;};
+    const _fmtISO=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
+    const _durISO=(f,to)=>{if(!f||!to)return '';try{const m=Math.round((new Date(to)-new Date(f))/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
+      const vsISO=_getVisitStart(t),wsISO=_getWorkStart(t),clISO=_getClosed(t);
       return {
         'Ticket No':t.id,'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',
         'Customer':t.cname,'Mobile':t.mobile,'Alt Mobile':t.alt_mobile||'',
@@ -6989,7 +6996,13 @@ async function downloadFilteredReport(format){
         'Call Type':t.call_type,'Service Type':t.service_type,'Coverage':t.warranty_coverage||'',
         'Problem':t.problem,'Action Taken':t.work_done||'','Cause':t.cause||'',
         'Engineer':t.assigned_name||'','Status':t.status,
-        'Visit Date':t.visit_date||'','Time In':t.visit_in||'','Time Out':t.visit_out||'',
+        'Visit Date':t.visit_date||'',
+        'Visit Start Time':_fmtISO(vsISO),
+        'Work Start Time':_fmtISO(wsISO),
+        'Closed Time':_fmtISO(clISO),
+        'Traveling Time':_durISO(vsISO,wsISO),
+        'Repair Time':_durISO(wsISO,clISO),
+        'Time In':t.visit_in||'','Time Out':t.visit_out||'',
         'Meter Start':t.meter_start||'','Meter End':t.meter_end||'',
         'Parts Used':sp.map(s=>s.code+' '+s.name+' x'+s.qty).join('; '),
         'Parts Total':partsTotal.toFixed(2),'Labor':t.labor||0,'Other':t.other_charge||0,
