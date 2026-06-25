@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhavi-crm-v2';
+const CACHE_NAME = 'bhavi-crm-v3';
 const APP_SHELL = [
   './',
   './index.html',
