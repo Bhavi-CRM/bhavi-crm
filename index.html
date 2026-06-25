@@ -1924,8 +1924,24 @@ function downloadReport(type){
   const dateStr=new Date().toLocaleDateString('en-CA');
 
   if(type==='excel'){
+    // Timeline helpers
+    const getTLr=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
+    const getVisitStartISOr=t=>{const e=getTLr(t).find(e=>e.action==='Visit Start');return e?.at||null;};
+    // Duration: ISO start → date+HH:MM end
+    const durFromISOtoHHMM=(isoFrom,dateStr,hhMM)=>{
+      if(!isoFrom||!hhMM||!dateStr)return '';
+      try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    };
+    // Duration: HH:MM to HH:MM on same date
+    const durHHMMtoHHMM=(dateStr,hhFrom,hhTo)=>{
+      if(!hhFrom||!hhTo||!dateStr)return '';
+      try{const from=new Date(dateStr+'T'+hhFrom+':00');const to=new Date(dateStr+'T'+hhTo+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    };
+    const fmtISO=(iso)=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
+
     const data=filtered.map(t=>{
       const {partsTotal,partsNames,svc,other,final,grand}=getTicketFinancials(t);
+      const visitStartISO=getVisitStartISOr(t);
       return{
         'Ticket ID':t.id||'',
         'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
@@ -1947,6 +1963,13 @@ function downloadReport(type){
         'Engineer':t.assigned_name||'Unassigned',
         'Status':t.status||'',
         'Visit Date':t.visit_date||'',
+        'Visit Start':visitStartISO?fmtISO(visitStartISO):'',
+        'Time In':t.visit_in||'',
+        'Travel Time':durFromISOtoHHMM(visitStartISO,t.visit_date,t.visit_in),
+        'Time Out':t.visit_out||'',
+        'Repair Time':durHHMMtoHHMM(t.visit_date,t.visit_in,t.visit_out),
+        'Meter Start':t.meter_start||'',
+        'Meter End':t.meter_end||'',
         'SE Call ID':t.se_call_id||'',
         'Parts Used':partsNames,
         'Parts ₹':partsTotal.toFixed(2),
@@ -1958,11 +1981,12 @@ function downloadReport(type){
       };
     });
     const ws=XLSX.utils.json_to_sheet(data);
-    // Column widths
     ws['!cols']=[
       {wch:16},{wch:12},{wch:20},{wch:14},{wch:14},{wch:14},{wch:12},{wch:25},
       {wch:10},{wch:16},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25},{wch:25},
-      {wch:12},{wch:18},{wch:18},{wch:12},{wch:14},{wch:30},
+      {wch:12},{wch:18},{wch:18},{wch:12},
+      {wch:13},{wch:11},{wch:11},{wch:14},{wch:11},{wch:14},
+      {wch:12},{wch:12},{wch:14},{wch:30},
       {wch:10},{wch:12},{wch:10},{wch:12},{wch:12},{wch:20}
     ];
     const wb=XLSX.utils.book_new();
