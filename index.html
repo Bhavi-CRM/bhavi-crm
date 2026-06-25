@@ -4413,7 +4413,7 @@ async function viewTicket(id,autoPrint=false){
         </div>
         <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Delivered')" style="background:#15803d;font-size:13px;padding:8px 18px;">📦 Mark Delivered</button>
       `:''}
-      ${!isPendingArrival&&!isPendingAlloc&&!isPendingApproval&&!isRepaired&&!isClosed?`
+      ${!isPendingArrival&&!isPendingApproval&&!isRepaired&&!isClosed?`
         <select onchange="if(this.value&&confirm('Change status to: '+this.value+'?')){quickStatusChange('${t.id}',this.value);this.value='';}" style="border:1.5px solid #f59e0b;border-radius:8px;padding:6px 10px;font-size:13px;background:#fffbeb;color:#92400e;font-weight:600;">
           <option value="">⚙️ Force Status...</option>
           <option>Assigned</option><option>In Progress</option>
