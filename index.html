@@ -8862,6 +8862,11 @@ async function renderTelegramSettings(){
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Aa chat ID ne badha j notifications malse — new call, assignment, inquiry, delivery badhuj. @userinfobot thi Chat ID kadho.</p>'
     +'</div>'
     +'<h4 style="font-size:13px;font-weight:700;margin-bottom:10px;">👷 Engineer Chat IDs</h4>'
+    +'<div style="margin-bottom:10px;padding:10px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;font-size:12px;">'
+    +'<b style="color:#1d4ed8;">💡 Engineers who sent /start to the bot:</b><br>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="fetchBotContacts()">🔄 Fetch Recent Bot Contacts</button>'
+    +'<div id="bot-contacts-list" style="margin-top:8px;"></div>'
+    +'</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     +'<thead><tr style="background:#f1f5f9;">'
     +'<th style="padding:10px 12px;text-align:left;">Engineer</th>'
@@ -8869,7 +8874,7 @@ async function renderTelegramSettings(){
     +'<th style="padding:10px 12px;text-align:left;">Telegram Chat ID</th>'
     +'<th style="padding:10px 12px;text-align:left;">Action</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo</p>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo. Ya upar "Fetch" button thi bot na recent contacts joi ne chat ID copy karo.</p>'
     +'</div>'
     +'<div class="card" style="margin-top:14px;padding:14px;background:#f0fdf4;border:1.5px solid #059669;border-radius:10px;">'
     +'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#065f46;">📊 Daily Report (Admin)</h4>'
@@ -8877,6 +8882,34 @@ async function renderTelegramSettings(){
     +'<button class="btn btn-success" onclick="sendDailyTGReport()">📤 Send Report Now</button>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Automatic 8 PM report mate Supabase cron setup karo (instructions niche)</p>'
     +'</div>';
+}
+function copyToClipboard(text){try{navigator.clipboard.writeText(text);}catch(e){}}
+async function fetchBotContacts(){
+  var el=document.getElementById('bot-contacts-list');
+  if(!el)return;
+  if(!TG_TOKEN){el.innerHTML='<span style="color:#dc2626;">❌ Bot Token not set. Save token first.</span>';return;}
+  el.innerHTML='<span style="color:#6b7280;">Loading...</span>';
+  try{
+    var res=await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/getUpdates?limit=100&timeout=0');
+    var json=await res.json();
+    if(!json.ok){el.innerHTML='<span style="color:#dc2626;">❌ Error: '+escHtml(json.description||'Unknown')+'</span>';return;}
+    var seen={};var contacts=[];
+    (json.result||[]).forEach(function(u){
+      var chat=(u.message||u.callback_query?.message||{}).chat||(u.my_chat_member||{}).chat||{};
+      if(!chat.id||chat.type!=='private')return;
+      if(seen[chat.id])return;
+      seen[chat.id]=true;
+      var name=[chat.first_name,chat.last_name].filter(Boolean).join(' ');
+      contacts.push({id:String(chat.id),name:name,username:chat.username||''});
+    });
+    if(!contacts.length){el.innerHTML='<span style="color:#6b7280;">No contacts found. Engineers must send /start to the bot first.</span>';return;}
+    el.innerHTML=contacts.map(function(c){
+      return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">'
+        +'<div style="flex:1;font-size:12px;"><b>'+escHtml(c.name)+'</b>'+(c.username?' @'+escHtml(c.username):'')+'<br><span style="color:#6b7280;font-family:monospace;">'+c.id+'</span></div>'
+        +'<button class="btn btn-outline btn-sm" onclick="copyToClipboard(\''+c.id+'\');alert(\'Chat ID '+c.id+' copied! Paste it in the engineer\'s Chat ID field.\')">📋 Copy ID</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<span style="color:#dc2626;">❌ Error: '+escHtml(e.message)+'</span>';}
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';testTGId(c,'Admin');}
 function _tgTest(chatId,name){testTGId(chatId,name);}
