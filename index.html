@@ -6962,10 +6962,16 @@ async function downloadFilteredReport(format){
   if(!tickets.length){alert('No data to download. Run search first.');return;}
   
   if(format==='excel'){
+    const _getTL=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
+    const _getVS=t=>{const e=_getTL(t).find(e=>e.action==='Visit Start');return e?.at||null;};
+    const _fmtT=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
+    const _dur=(isoFrom,dateStr,hhMM)=>{if(!isoFrom||!hhMM||!dateStr)return '';try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
+    const _dur2=(dateStr,h1,h2)=>{if(!h1||!h2||!dateStr)return '';try{const from=new Date(dateStr+'T'+h1+':00');const to=new Date(dateStr+'T'+h2+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
+      const vsISO=_getVS(t);
       return {
         'Ticket No':t.id,'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',
         'Customer':t.cname,'Mobile':t.mobile,'Alt Mobile':t.alt_mobile||'',
@@ -6974,7 +6980,12 @@ async function downloadFilteredReport(format){
         'Call Type':t.call_type,'Service Type':t.service_type,'Coverage':t.warranty_coverage||'',
         'Problem':t.problem,'Action Taken':t.work_done||'','Cause':t.cause||'',
         'Engineer':t.assigned_name||'','Status':t.status,
-        'Visit Date':t.visit_date||'','Time In':t.visit_in||'','Time Out':t.visit_out||'',
+        'Visit Date':t.visit_date||'',
+        'Visit Start':_fmtT(vsISO),
+        'Time In':t.visit_in||'',
+        'Travel Time':_dur(vsISO,t.visit_date,t.visit_in),
+        'Time Out':t.visit_out||'',
+        'Repair Time':_dur2(t.visit_date,t.visit_in,t.visit_out),
         'Meter Start':t.meter_start||'','Meter End':t.meter_end||'',
         'Parts Used':sp.map(s=>s.code+' '+s.name+' x'+s.qty).join('; '),
         'Parts Total':partsTotal.toFixed(2),'Labor':t.labor||0,'Other':t.other_charge||0,
