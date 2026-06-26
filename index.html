@@ -1927,20 +1927,21 @@ function downloadReport(type){
     // Timeline helpers
     const getTLr=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
     const getVisitStartISOr=t=>{const e=getTLr(t).find(e=>e.action==='Visit Start');return e?.at||null;};
-    const getWorkStartISOr=t=>{const e=[...getTLr(t)].reverse().find(e=>e.action&&(e.action==='Work Started'||e.action.includes('Work Start')));return e?.at||null;};
-    const getClosedISOr=t=>{const e=[...getTLr(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return e?.at||null;};
-    // Duration between two ISO timestamps → "2h 30m" / "45m"
-    const durISO=(isoFrom,isoTo)=>{
-      if(!isoFrom||!isoTo)return '';
-      try{const m=Math.round((new Date(isoTo)-new Date(isoFrom))/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    // Duration: ISO start → date+HH:MM end
+    const durFromISOtoHHMM=(isoFrom,dateStr,hhMM)=>{
+      if(!isoFrom||!hhMM||!dateStr)return '';
+      try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    };
+    // Duration: HH:MM to HH:MM on same date
+    const durHHMMtoHHMM=(dateStr,hhFrom,hhTo)=>{
+      if(!hhFrom||!hhTo||!dateStr)return '';
+      try{const from=new Date(dateStr+'T'+hhFrom+':00');const to=new Date(dateStr+'T'+hhTo+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
     };
     const fmtISO=(iso)=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
 
     const data=filtered.map(t=>{
       const {partsTotal,partsNames,svc,other,final,grand}=getTicketFinancials(t);
       const visitStartISO=getVisitStartISOr(t);
-      const workStartISO=getWorkStartISOr(t);
-      const closedISO=getClosedISOr(t);
       return{
         'Ticket ID':t.id||'',
         'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
@@ -1962,13 +1963,11 @@ function downloadReport(type){
         'Engineer':t.assigned_name||'Unassigned',
         'Status':t.status||'',
         'Visit Date':t.visit_date||'',
-        'Visit Start Time':fmtISO(visitStartISO),
-        'Work Start Time':fmtISO(workStartISO),
-        'Closed Time':fmtISO(closedISO),
-        'Traveling Time':durISO(visitStartISO,workStartISO),
-        'Repair Time':durISO(workStartISO,closedISO),
+        'Visit Start':visitStartISO?fmtISO(visitStartISO):'',
         'Time In':t.visit_in||'',
+        'Travel Time':durFromISOtoHHMM(visitStartISO,t.visit_date,t.visit_in),
         'Time Out':t.visit_out||'',
+        'Repair Time':durHHMMtoHHMM(t.visit_date,t.visit_in,t.visit_out),
         'Meter Start':t.meter_start||'',
         'Meter End':t.meter_end||'',
         'SE Call ID':t.se_call_id||'',
@@ -1986,8 +1985,8 @@ function downloadReport(type){
       {wch:16},{wch:12},{wch:20},{wch:14},{wch:14},{wch:14},{wch:12},{wch:25},
       {wch:10},{wch:16},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25},{wch:25},
       {wch:12},{wch:18},{wch:18},{wch:12},
-      {wch:13},{wch:13},{wch:13},{wch:13},{wch:14},{wch:14},
-      {wch:11},{wch:11},{wch:12},{wch:12},{wch:14},{wch:30},
+      {wch:13},{wch:11},{wch:11},{wch:14},{wch:11},{wch:14},
+      {wch:12},{wch:12},{wch:14},{wch:30},
       {wch:10},{wch:12},{wch:10},{wch:12},{wch:12},{wch:20}
     ];
     const wb=XLSX.utils.book_new();
@@ -4033,7 +4032,7 @@ async function openNewCall(){
   if(snCb){snCb.checked=true;}
   var snEl=document.getElementById('call-serial');
   if(snEl){snEl.readOnly=false;snEl.style.background='';snEl.placeholder='Serial number';}
-  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
   // Populate brand dropdown
   const brandDrop = document.getElementById('call-brand-input');
   if(brandDrop && brandDrop.tagName === 'SELECT'){
@@ -4481,7 +4480,7 @@ async function viewTicket(id,autoPrint=false){
       `:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
-        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('')}
+        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
@@ -4979,30 +4978,16 @@ async function openEngUpdate(id){
       ${isOOC?'<br><span style="color:var(--danger);font-weight:700;">⚠️ Out of Coverage — charges apply</span>':''}
     </div>
     <!-- Visit Start / Work Start Buttons -->
-    ${(()=>{
-      if(t.visit_in||t.service_type!=='On Site')return '';
-      const tl=Array.isArray(t.timeline)?t.timeline:(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):[]);
-      const visitStarted=tl.some(e=>e.action==='Visit Start');
-      if(visitStarted){
-        const vsEntry=tl.find(e=>e.action==='Visit Start');
-        const vsTime=vsEntry?.note||vsEntry?.at||'';
-        return `<div class="alert" style="background:#fef3c7;border-color:#fcd34d;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <span style="color:#92400e;">🚗 Traveling... <b>${vsTime?('Started: '+vsTime):''}</b></span>
-            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
-          </div>
-        </div>`;
-      }
-      return `<div class="alert alert-info" style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <span>⏱️ Visit not started yet</span>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
-            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
-          </div>
+    ${!t.visit_in && t.service_type==='On Site' ? `
+    <div class="alert alert-info" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span>⏱️ Visit not started yet</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
+          <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
         </div>
-      </div>`;
-    })()}
+      </div>
+    </div>` : ''}
     ${t.visit_in && !t.visit_out && t.service_type==='On Site' ? `
     <div class="alert" style="background:#d1fae5;border-color:#6ee7b7;margin-bottom:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -5034,7 +5019,7 @@ async function openEngUpdate(id){
         ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
-      <div class="form-group"><label>Action Taken <span style="color:#ef4444;">*</span></label><input type="text" id="upd-work" value="${t.work_done||''}" placeholder="Required before closing..."><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
+      <div class="form-group"><label>Action Taken</label><input type="text" id="upd-work" value="${t.work_done||''}"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
     </div>
     <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;">
       <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:10px;">📦 MSC Dispatch Details</h3>
@@ -5088,7 +5073,7 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
-    <input type="hidden" id="upd-remarks" value="">`;
+    <div class="form-group" style="margin-top:10px;"><label>Remarks</label><textarea id="upd-remarks" rows="2">${t.eng_remarks||''}</textarea><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-remarks')">✨ AI Remark</button></div>`;
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -5316,10 +5301,10 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Action Taken mandatory when closing
+  // Remark mandatory when closing
   if(status==='Closed'){
-    const rem=(document.getElementById('upd-work')?.value||'').trim();
-    if(!rem){alert('❌ Action Taken is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-work')?.focus();return;}
+    const rem=(document.getElementById('upd-remarks')?.value||'').trim();
+    if(!rem){alert('❌ Remark is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-remarks')?.focus();return;}
   }
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
@@ -5393,7 +5378,7 @@ async function saveEngUpdate(){
     meter_end:document.getElementById('upd-meter-end')?.value||'',
     labor:document.getElementById('upd-labor')?.value||0,
     other_charge:document.getElementById('upd-other')?.value||0,
-    eng_remarks:document.getElementById('upd-work')?.value||'',
+    eng_remarks:document.getElementById('upd-remarks')?.value||'',
     spares:currentSpares,
     timeline:tl,
     updated_at:nowSave.toISOString()
@@ -6485,7 +6470,7 @@ async function openNewTask(){
   document.getElementById('task-priority').value='Normal';
   document.getElementById('task-due').value='';
   document.getElementById('task-due').min=new Date().toISOString().split('T')[0];
-  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
   openModal('modal-task');
 }
 async function saveTask(){const ev=document.getElementById('task-eng').value;const[eId,eName]=ev?ev.split('|'):['',''];const title=document.getElementById('task-title').value.trim();const due=document.getElementById('task-due').value;if(!title||!eId){alert('Fill title and engineer');return;}if(due&&due<new Date().toISOString().split('T')[0]){alert('Due date cannot be past');return;}const year=new Date().getFullYear();const tasks=await sb('tasks','GET',null,`?task_no=like.TSK-${year}*&order=task_no.desc&limit=1`);let num=1;if(tasks.length)num=parseInt(tasks[0].task_no.split('-').pop())+1;try{await sb('tasks','POST',{task_no:`TSK-${year}-${String(num).padStart(3,'0')}`,title,description:document.getElementById('task-desc').value,assigned_to:eId,assigned_name:eName,priority:document.getElementById('task-priority').value,due_date:due||null,ticket_id:document.getElementById('task-ticket').value||null,status:'Open',created_by:currentUser.name,eng_remark:'',timeline:[{action:'Created',by:currentUser.name,at:new Date().toISOString()}]});closeModal('modal-task');renderTasks();}catch(e){alert(e.message);}}
@@ -6977,17 +6962,10 @@ async function downloadFilteredReport(format){
   if(!tickets.length){alert('No data to download. Run search first.');return;}
   
   if(format==='excel'){
-    const _getTL=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
-    const _getVisitStart=t=>{const e=_getTL(t).find(e=>e.action==='Visit Start');return e?.at||null;};
-    const _getWorkStart=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action==='Work Started'||e.action.includes('Work Start')));return e?.at||null;};
-    const _getClosed=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return e?.at||null;};
-    const _fmtISO=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
-    const _durISO=(f,to)=>{if(!f||!to)return '';try{const m=Math.round((new Date(to)-new Date(f))/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
-      const vsISO=_getVisitStart(t),wsISO=_getWorkStart(t),clISO=_getClosed(t);
       return {
         'Ticket No':t.id,'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',
         'Customer':t.cname,'Mobile':t.mobile,'Alt Mobile':t.alt_mobile||'',
@@ -6996,13 +6974,7 @@ async function downloadFilteredReport(format){
         'Call Type':t.call_type,'Service Type':t.service_type,'Coverage':t.warranty_coverage||'',
         'Problem':t.problem,'Action Taken':t.work_done||'','Cause':t.cause||'',
         'Engineer':t.assigned_name||'','Status':t.status,
-        'Visit Date':t.visit_date||'',
-        'Visit Start Time':_fmtISO(vsISO),
-        'Work Start Time':_fmtISO(wsISO),
-        'Closed Time':_fmtISO(clISO),
-        'Traveling Time':_durISO(vsISO,wsISO),
-        'Repair Time':_durISO(wsISO,clISO),
-        'Time In':t.visit_in||'','Time Out':t.visit_out||'',
+        'Visit Date':t.visit_date||'','Time In':t.visit_in||'','Time Out':t.visit_out||'',
         'Meter Start':t.meter_start||'','Meter End':t.meter_end||'',
         'Parts Used':sp.map(s=>s.code+' '+s.name+' x'+s.qty).join('; '),
         'Parts Total':partsTotal.toFixed(2),'Labor':t.labor||0,'Other':t.other_charge||0,
@@ -10453,6 +10425,7 @@ async function saveDailyReport(){
       eng_id:currentUser.eng_id||currentUser.user_id,
       eng_name:currentUser.name,
       report_date:date,
+      call_summary:callSummary,
       site_visits:siteVisits,
       total_site_visits:callSummary.grand_total,
       office_work:officeWork,
