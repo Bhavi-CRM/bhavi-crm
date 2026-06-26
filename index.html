@@ -521,6 +521,18 @@ tr:hover td{background:#f8fafc;}
   </div>
 </div>
 
+<!-- REPORT EDIT REQUEST -->
+<div class="modal-overlay hidden" id="modal-report-edit" onclick="closeModal('modal-report-edit')">
+  <div class="modal modal-lg" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>✏️ Edit Report</h2><button class="close-btn" onclick="closeModal('modal-report-edit')">✕</button></div>
+    <div class="modal-body" id="modal-report-edit-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-report-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReportEdit()">📨 Submit for Approval</button>
+    </div>
+  </div>
+</div>
+
 <!-- ENG UPDATE -->
 <div class="modal-overlay hidden" id="modal-eng-update" onclick="closeModal('modal-eng-update')">
   <div class="modal" onclick="event.stopPropagation()">
@@ -3758,7 +3770,7 @@ function ticketRow(t){
     <td>${t.city||'-'}</td><td>${t.model||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
-    <td>${statusBadge(t.status)}</td>
+    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
@@ -4487,6 +4499,17 @@ async function viewTicket(id,autoPrint=false){
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
+      ${isClosed&&currentUser.role_type==='work_controller'&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
+      ${t.pending_edit&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller'?`
+        <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
+          ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
+          <span style="font-size:12px;color:#92400e;">Reason: ${t.pending_edit.reason}</span><br>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm" onclick="approveReportEdit('${t.id}')">✅ Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectReportEdit('${t.id}')">❌ Reject</button>
+            <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
+          </div>
+        </div>`:''}
     </div>`;
   }
 
@@ -4523,6 +4546,7 @@ async function viewTicket(id,autoPrint=false){
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
+    ${t.pending_edit?`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;">⏳ <b>Report Edit Pending Admin Approval</b> — Requested by ${t.pending_edit.requested_by} at ${new Date(t.pending_edit.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</div>`:''}
     <h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;">TIMELINE</h3>
     ${tlHtml}
     ${adminActions}`;
@@ -9912,6 +9936,158 @@ async function printLabel(){
   </body></html>`);win.document.close();
 }
 
+
+// ── REPORT EDIT REQUEST ─────────────────────────────────────────
+async function openReportEditModal(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t){alert('Ticket not found');return;}
+  if(t.pending_edit){alert('⚠️ An edit is already pending approval for this report.');return;}
+  window._editingTicket=t;
+  const sp=(t.spares||[]).filter(s=>!s.requested);
+  const spText=sp.map(s=>`${s.code||''} ${s.name} x${s.qty} @${s.price||0}`).join('\n');
+  document.getElementById('modal-report-edit-body').innerHTML=`
+    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e;">
+      ⚠️ <b>Report Edit Request for ${t.id}</b> — Changes will be sent to Admin for approval. Original report stays until approved.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CUSTOMER NAME</label><input id="re-cname" class="form-input" value="${(t.cname||'').replace(/"/g,'&quot;')}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">MOBILE</label><input id="re-mobile" class="form-input" value="${t.mobile||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ALT MOBILE</label><input id="re-alt-mobile" class="form-input" value="${t.alt_mobile||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CITY</label><input id="re-city" class="form-input" value="${(t.city||'').replace(/"/g,'&quot;')}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ADDRESS</label><input id="re-address" class="form-input" value="${(t.address||'').replace(/"/g,'&quot;')}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">AREA</label><input id="re-area" class="form-input" value="${(t.area||'').replace(/"/g,'&quot;')}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PIN</label><input id="re-pin" class="form-input" value="${t.pin||''}"></div>
+    </div>
+    <hr class="divider">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CALL TYPE</label>
+        <select id="re-call-type" class="form-input">${['Warranty','Warranty Repeat','AMC','Non-Warranty','Extended Warranty'].map(v=>`<option ${t.call_type===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">SERVICE TYPE</label>
+        <select id="re-service-type" class="form-input">${['On Site','Carry In','Remote'].map(v=>`<option ${t.service_type===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PROBLEM</label>
+        <textarea id="re-problem" class="form-input" rows="2">${(t.problem||'').replace(/</g,'&lt;')}</textarea></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">DESCRIPTION</label>
+        <textarea id="re-description" class="form-input" rows="2">${(t.description||'').replace(/</g,'&lt;')}</textarea></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ACTION TAKEN</label>
+        <textarea id="re-work-done" class="form-input" rows="2">${(t.work_done||'').replace(/</g,'&lt;')}</textarea></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">FAULT CODE</label><input id="re-fault-code" class="form-input" value="${t.fault_code||''}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">REMARKS</label>
+        <textarea id="re-remarks" class="form-input" rows="2">${(t.remarks||'').replace(/</g,'&lt;')}</textarea></div>
+    </div>
+    <hr class="divider">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">VISIT DATE</label><input id="re-visit-date" type="date" class="form-input" value="${t.visit_date||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">TIME IN</label><input id="re-visit-in" type="time" class="form-input" value="${t.visit_in||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">TIME OUT</label><input id="re-visit-out" type="time" class="form-input" value="${t.visit_out||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">METER START</label><input id="re-meter-start" class="form-input" value="${t.meter_start||''}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">METER END</label><input id="re-meter-end" class="form-input" value="${t.meter_end||''}"></div>
+    </div>
+    <hr class="divider">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">LABOR/SERVICE ₹</label><input id="re-labor" type="number" class="form-input" value="${t.labor||0}"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">OTHER CHARGE ₹</label><input id="re-other-charge" type="number" class="form-input" value="${t.other_charge||0}"></div>
+      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PARTS USED (one per line: CODE Name xQty @Price)</label>
+        <textarea id="re-spares" class="form-input" rows="4" placeholder="CG2-6007-000 LCD ASSY x1 @4200">${spText.replace(/</g,'&lt;')}</textarea></div>
+    </div>
+    <hr class="divider">
+    <div><label style="font-size:12px;font-weight:700;color:var(--danger);">REASON FOR EDIT <span style="color:#ef4444;">*</span></label>
+      <textarea id="re-reason" class="form-input" rows="2" placeholder="Explain why this report needs to be corrected..."></textarea></div>`;
+  openModal('modal-report-edit');
+}
+
+async function submitReportEdit(){
+  const t=window._editingTicket;
+  if(!t)return;
+  const reason=(document.getElementById('re-reason')?.value||'').trim();
+  if(!reason){alert('⚠️ Please provide a reason for editing the report.');return;}
+  const fields=[
+    ['cname','re-cname'],['mobile','re-mobile'],['alt_mobile','re-alt-mobile'],
+    ['city','re-city'],['address','re-address'],['area','re-area'],['pin','re-pin'],
+    ['call_type','re-call-type'],['service_type','re-service-type'],
+    ['problem','re-problem'],['description','re-description'],
+    ['work_done','re-work-done'],['fault_code','re-fault-code'],['remarks','re-remarks'],
+    ['visit_date','re-visit-date'],['visit_in','re-visit-in'],['visit_out','re-visit-out'],
+    ['meter_start','re-meter-start'],['meter_end','re-meter-end'],
+    ['labor','re-labor'],['other_charge','re-other-charge'],
+  ];
+  const changes={};
+  fields.forEach(([field,elId])=>{
+    const el=document.getElementById(elId);if(!el)return;
+    const newVal=(el.value||'').trim();const oldVal=String(t[field]||'').trim();
+    if(newVal!==oldVal) changes[field]={old:oldVal,new:newVal};
+  });
+  const sparesText=(document.getElementById('re-spares')?.value||'').trim();
+  const sp=(t.spares||[]).filter(s=>!s.requested);
+  const oldSpText=sp.map(s=>`${s.code||''} ${s.name} x${s.qty} @${s.price||0}`).join('\n').trim();
+  if(sparesText!==oldSpText) changes['spares_text']={old:oldSpText,new:sparesText};
+  if(!Object.keys(changes).length){alert('No changes detected.');return;}
+  const pending_edit={requested_by:currentUser.name||currentUser.email,wc_id:currentUser.user_id,requested_at:new Date().toISOString(),reason,changes};
+  try{
+    await sb('tickets','PATCH',{pending_edit,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
+    const idx=allTickets.findIndex(x=>x.id===t.id);if(idx>=0)allTickets[idx].pending_edit=pending_edit;
+    // Notify admin via bright-action
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_notify',ticketId:t.id,cname:t.cname,model:t.model||'',wc_name:t.wc_name||'',pending_edit})});}catch(e){}
+    closeModal('modal-report-edit');closeModal('modal-ticket');
+    alert('✅ Edit request submitted! Admin will review and approve/reject.');
+  }catch(e){alert('Error submitting: '+e.message);}
+}
+
+function viewEditDiff(ticketId){
+  const t=allTickets.find(x=>x.id===ticketId);
+  if(!t||!t.pending_edit)return;
+  const pe=t.pending_edit;
+  const ch=pe.changes||{};
+  const fieldLabels={cname:'Customer Name',mobile:'Mobile',alt_mobile:'Alt Mobile',city:'City',address:'Address',area:'Area',pin:'Pin',call_type:'Call Type',service_type:'Service Type',problem:'Problem',description:'Description',work_done:'Action Taken',fault_code:'Fault Code',remarks:'Remarks',visit_date:'Visit Date',visit_in:'Time In',visit_out:'Time Out',meter_start:'Meter Start',meter_end:'Meter End',labor:'Labor ₹',other_charge:'Other ₹',spares_text:'Parts Used'};
+  const rows=Object.entries(ch).map(([k,v])=>`<tr><td style="padding:6px 10px;font-weight:600;font-size:12px;color:var(--text-muted);white-space:nowrap;">${fieldLabels[k]||k}</td><td style="padding:6px 10px;font-size:13px;background:#fef2f2;color:#991b1b;">${String(v.old||'—').replace(/</g,'&lt;')}</td><td style="padding:6px 10px;font-size:13px;background:#f0fdf4;color:#166534;">${String(v.new||'—').replace(/</g,'&lt;')}</td></tr>`).join('');
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>Report Edit Diff — ${t.id}</title><style>body{font-family:Arial;padding:20px;font-size:13px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #e5e7eb;padding:6px 10px;}th{background:#f8fafc;}h2{margin-bottom:4px;}p{color:#6b7280;font-size:12px;margin-top:4px;}</style></head><body>
+    <h2>Report Edit Request — ${t.id} | ${t.cname}</h2>
+    <p>Requested by: <b>${pe.requested_by}</b> at ${new Date(pe.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}<br>Reason: <b>${pe.reason}</b></p>
+    <table><thead><tr><th>Field</th><th style="background:#fef2f2;color:#991b1b;">Old Value</th><th style="background:#f0fdf4;color:#166534;">New Value</th></tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`);
+  win.document.close();
+}
+
+async function approveReportEdit(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t||!t.pending_edit){alert('No pending edit found.');return;}
+  if(!confirm(`Approve report edit for ${t.id} — ${t.cname}?`))return;
+  const pe=t.pending_edit;const ch=pe.changes||{};const now=new Date().toISOString();
+  const patch={pending_edit:null,updated_at:now};
+  ['cname','mobile','alt_mobile','city','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
+  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
+  tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
+  patch.timeline=tl;
+  try{
+    await sb('tickets','PATCH',patch,`?id=eq.${ticketId}`);
+    const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0){Object.assign(allTickets[idx],patch);allTickets[idx].pending_edit=null;}
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'approved',cname:t.cname,model:t.model||'',wc_id:pe.wc_id,pe})});}catch(e){}
+    alert('✅ Edit approved! Report has been updated.');
+    closeModal('modal-ticket');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function rejectReportEdit(ticketId){
+  const rejectReason=prompt('Reason for rejection (will be added to history):');
+  if(rejectReason===null)return;
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t||!t.pending_edit){alert('No pending edit found.');return;}
+  const pe=t.pending_edit;const now=new Date().toISOString();
+  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  tl=[...tl,{action:'Report Edit Rejected',by:currentUser.name||'Admin',at:now,note:`Edit by ${pe.requested_by} rejected. Reason: ${rejectReason||'No reason given'}`}];
+  try{
+    await sb('tickets','PATCH',{pending_edit:null,timeline:tl,updated_at:now},`?id=eq.${ticketId}`);
+    const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0){allTickets[idx].pending_edit=null;allTickets[idx].timeline=tl;}
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'rejected',rejectReason,cname:t.cname,wc_id:pe.wc_id,pe})});}catch(e){}
+    alert('❌ Edit request rejected. Original report remains unchanged.');
+    closeModal('modal-ticket');
+  }catch(e){alert('Error: '+e.message);}
+}
+// ────────────────────────────────────────────────────────────────
 
 // Visit Start - starts traveling log
 async function doVisitStart(ticketId){
