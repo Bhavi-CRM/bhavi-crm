@@ -500,7 +500,7 @@ tr:hover td{background:#f8fafc;}
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-call')">Cancel</button>
+      <button class="btn btn-outline" onclick="if(window._reportEditMode){window._reportEditMode=null;window._editingTicket=null;document.getElementById('modal-call-title').textContent='New Call Log';const sb2=document.querySelector('#modal-call .btn-primary');if(sb2)sb2.textContent='💾 Save Call';const rb=document.getElementById('edit-reason-box');if(rb)rb.style.display='none';const ab=document.querySelector('.alert.alert-info');if(ab)ab.style.display='';}closeModal('modal-call')">Cancel</button>
       <button class="btn btn-primary" onclick="saveCall()">💾 Save Call</button>
     </div>
   </div>
@@ -4189,6 +4189,58 @@ function setReRepairCharges(type){
 
 var _savingCall=false;
 async function saveCall(){
+  // ── REPORT EDIT MODE — submit for approval instead of saving ──
+  if(window._reportEditMode){
+    const ticketId=window._reportEditMode;
+    const t=window._editingTicket;
+    if(!t)return;
+    const reason=(document.getElementById('edit-reason-text')?.value||'').trim();
+    if(!reason){alert('⚠️ Please provide a reason for editing the report.');return;}
+    // Collect field values from the form
+    const newVals={
+      model:document.getElementById('call-model')?.value||'',
+      serial:document.getElementById('call-serial')?.value||'',
+      call_type:document.getElementById('call-type')?.value||'',
+      service_type:document.getElementById('call-service-type')?.value||'',
+      cname:document.getElementById('call-cname')?.value||'',
+      mobile:document.getElementById('call-mobile')?.value||'',
+      alt_mobile:document.getElementById('call-alt')?.value||'',
+      problem:document.getElementById('call-problem')?.value||'',
+      description:document.getElementById('call-desc')?.value||'',
+      condition:document.getElementById('call-condition')?.value||'',
+      city:(document.getElementById('call-city')?.value||''),
+      state:(document.getElementById('call-state')?.value||''),
+      pin:(()=>{const pe=document.getElementById('call-pin');return pe?.dataset.pin||pe?.value||'';})(),
+      area:document.getElementById('call-area')?.value||'',
+      address:(()=>{const l1=(document.getElementById('call-address')?.value||'').trim();const l2=(document.getElementById('call-address2')?.value||'').trim();return l1+(l2?', '+l2:'');})(),
+      se_call_id:document.getElementById('call-se-id')?.value||'',
+      labor:document.getElementById('call-service-charges')?.value||'',
+      brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name')?.value||'');})(),
+    };
+    const fieldLabels={model:'Model',serial:'Serial No',call_type:'Call Type',service_type:'Service Type',cname:'Customer Name',mobile:'Mobile',alt_mobile:'Alt Mobile',problem:'Problem',description:'Description',condition:'Condition',city:'City',state:'State',pin:'Pin',area:'Area',address:'Address',se_call_id:'SE Call ID',labor:'Labor ₹',brand_name:'Brand'};
+    const changes={};
+    Object.entries(newVals).forEach(([k,nv])=>{
+      const ov=String(t[k]||'').trim();
+      if(nv.trim()!==ov) changes[k]={old:ov,new:nv.trim()};
+    });
+    if(!Object.keys(changes).length){alert('No changes detected.');return;}
+    const pending_edit={requested_by:currentUser.name||currentUser.email,wc_id:currentUser.user_id,requested_at:new Date().toISOString(),reason,changes};
+    try{
+      await sb('tickets','PATCH',{pending_edit,updated_at:new Date().toISOString()},`?id=eq.${ticketId}`);
+      const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0)allTickets[idx].pending_edit=pending_edit;
+      try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_notify',ticketId,cname:t.cname,model:t.model||'',pending_edit})});}catch(e){}
+      // Reset modal to normal new-call mode
+      window._reportEditMode=null;window._editingTicket=null;
+      document.getElementById('modal-call-title').textContent='New Call Log';
+      const sb2=document.querySelector('#modal-call .btn-primary');if(sb2)sb2.textContent='💾 Save Call';
+      const reasonBox=document.getElementById('edit-reason-box');if(reasonBox)reasonBox.style.display='none';
+      const alertBox=document.querySelector('.alert.alert-info');if(alertBox)alertBox.style.display='';
+      closeModal('modal-call');closeModal('modal-ticket');
+      alert('✅ Edit request submitted! Admin will review and approve/reject.');
+    }catch(e){alert('Error: '+e.message);}
+    return;
+  }
+  // ── normal new call save flow ──
   if(_savingCall)return;
   _savingCall=true;
   var _saveBtn=document.querySelector('#modal-call .btn-primary');
@@ -9944,56 +9996,62 @@ async function openReportEditModal(ticketId){
   if(!t){alert('Ticket not found');return;}
   if(t.pending_edit){alert('⚠️ An edit is already pending approval for this report.');return;}
   window._editingTicket=t;
-  const sp=(t.spares||[]).filter(s=>!s.requested);
-  const spText=sp.map(s=>`${s.code||''} ${s.name} x${s.qty} @${s.price||0}`).join('\n');
-  document.getElementById('modal-report-edit-body').innerHTML=`
-    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e;">
-      ⚠️ <b>Report Edit Request for ${t.id}</b> — Changes will be sent to Admin for approval. Original report stays until approved.
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CUSTOMER NAME</label><input id="re-cname" class="form-input" value="${(t.cname||'').replace(/"/g,'&quot;')}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">MOBILE</label><input id="re-mobile" class="form-input" value="${t.mobile||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ALT MOBILE</label><input id="re-alt-mobile" class="form-input" value="${t.alt_mobile||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CITY</label><input id="re-city" class="form-input" value="${(t.city||'').replace(/"/g,'&quot;')}"></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ADDRESS</label><input id="re-address" class="form-input" value="${(t.address||'').replace(/"/g,'&quot;')}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">AREA</label><input id="re-area" class="form-input" value="${(t.area||'').replace(/"/g,'&quot;')}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PIN</label><input id="re-pin" class="form-input" value="${t.pin||''}"></div>
-    </div>
-    <hr class="divider">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">CALL TYPE</label>
-        <select id="re-call-type" class="form-input">${['Warranty','Warranty Repeat','AMC','Non-Warranty','Extended Warranty'].map(v=>`<option ${t.call_type===v?'selected':''}>${v}</option>`).join('')}</select></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">SERVICE TYPE</label>
-        <select id="re-service-type" class="form-input">${['On Site','Carry In','Remote'].map(v=>`<option ${t.service_type===v?'selected':''}>${v}</option>`).join('')}</select></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PROBLEM</label>
-        <textarea id="re-problem" class="form-input" rows="2">${(t.problem||'').replace(/</g,'&lt;')}</textarea></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">DESCRIPTION</label>
-        <textarea id="re-description" class="form-input" rows="2">${(t.description||'').replace(/</g,'&lt;')}</textarea></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">ACTION TAKEN</label>
-        <textarea id="re-work-done" class="form-input" rows="2">${(t.work_done||'').replace(/</g,'&lt;')}</textarea></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">FAULT CODE</label><input id="re-fault-code" class="form-input" value="${t.fault_code||''}"></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">REMARKS</label>
-        <textarea id="re-remarks" class="form-input" rows="2">${(t.remarks||'').replace(/</g,'&lt;')}</textarea></div>
-    </div>
-    <hr class="divider">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">VISIT DATE</label><input id="re-visit-date" type="date" class="form-input" value="${t.visit_date||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">TIME IN</label><input id="re-visit-in" type="time" class="form-input" value="${t.visit_in||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">TIME OUT</label><input id="re-visit-out" type="time" class="form-input" value="${t.visit_out||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">METER START</label><input id="re-meter-start" class="form-input" value="${t.meter_start||''}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">METER END</label><input id="re-meter-end" class="form-input" value="${t.meter_end||''}"></div>
-    </div>
-    <hr class="divider">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">LABOR/SERVICE ₹</label><input id="re-labor" type="number" class="form-input" value="${t.labor||0}"></div>
-      <div><label style="font-size:11px;font-weight:700;color:var(--text-muted);">OTHER CHARGE ₹</label><input id="re-other-charge" type="number" class="form-input" value="${t.other_charge||0}"></div>
-      <div style="grid-column:1/-1"><label style="font-size:11px;font-weight:700;color:var(--text-muted);">PARTS USED (one per line: CODE Name xQty @Price)</label>
-        <textarea id="re-spares" class="form-input" rows="4" placeholder="CG2-6007-000 LCD ASSY x1 @4200">${spText.replace(/</g,'&lt;')}</textarea></div>
-    </div>
-    <hr class="divider">
-    <div><label style="font-size:12px;font-weight:700;color:var(--danger);">REASON FOR EDIT <span style="color:#ef4444;">*</span></label>
-      <textarea id="re-reason" class="form-input" rows="2" placeholder="Explain why this report needs to be corrected..."></textarea></div>`;
-  openModal('modal-report-edit');
+
+  // ── Use the existing New Call modal in edit mode ──
+  window._reportEditMode=ticketId;
+  // Change title & save button
+  document.getElementById('modal-call-title').textContent='✏️ Edit Report — '+ticketId;
+  const saveBtn=document.querySelector('#modal-call .btn-primary');
+  if(saveBtn){saveBtn.textContent='📨 Submit for Approval';}
+  // Pre-fill all form fields with ticket data
+  const setVal=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  setVal('call-model',t.model||'');
+  setVal('call-serial',t.serial||'');
+  setVal('call-se-id',t.se_call_id||'');
+  setVal('call-cname',t.cname||'');
+  setVal('call-mobile',t.mobile||'');
+  setVal('call-alt',t.alt_mobile||'');
+  setVal('call-problem',t.problem||'');
+  setVal('call-desc',t.description||'');
+  setVal('call-condition',t.condition||'');
+  setVal('call-accessories',t.accessories||'');
+  // Address: split back if combined
+  const addr=(t.address||'').split(', ');
+  setVal('call-address',addr[0]||'');
+  setVal('call-address2',addr.slice(1).join(', ')||'');
+  setVal('call-area',t.area||'');
+  // Call type & service type
+  setVal('call-type',t.call_type||'Warranty');
+  setVal('call-service-type',t.service_type||'On Site');
+  // State & City — set state first, then populate city options
+  const stateEl=document.getElementById('call-state');
+  if(stateEl){stateEl.value=t.state||'Gujarat';onStateChange();}
+  setTimeout(()=>{setVal('call-city',t.city||'');},100);
+  // Pin
+  const pinEl=document.getElementById('call-pin');
+  if(pinEl){pinEl.value=t.pin||'';pinEl.dataset.pin=t.pin||'';}
+  // Brand — find matching option
+  const brandEl=document.getElementById('call-brand-input');
+  if(brandEl&&t.brand_name){
+    Array.from(brandEl.options).forEach(o=>{if(o.text===t.brand_name)o.selected=true;});
+    selectBrandFromDrop(brandEl.value,t.brand_name);
+  }
+  // Service charges
+  setVal('call-service-charges',t.labor||0);
+  // Hide customer search bar & engineer section in edit mode
+  document.querySelector('.alert.alert-info').style.display='none';
+  // Show edit reason box
+  let reasonBox=document.getElementById('edit-reason-box');
+  if(!reasonBox){
+    reasonBox=document.createElement('div');
+    reasonBox.id='edit-reason-box';
+    reasonBox.innerHTML=`<hr style="margin:16px 0;border-color:var(--border);"><div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;"><label style="font-size:12px;font-weight:700;color:#92400e;">REASON FOR EDIT <span style="color:#ef4444;">*</span></label><textarea id="edit-reason-text" style="display:block;width:100%;margin-top:6px;padding:8px 12px;border:1px solid #fbbf24;border-radius:8px;font-size:13px;min-height:60px;" placeholder="Explain why this report needs to be corrected..."></textarea></div>`;
+    document.querySelector('#modal-call .modal-body').appendChild(reasonBox);
+  }else{
+    reasonBox.style.display='block';
+    setVal('edit-reason-text','');
+  }
+  openModal('modal-call');
 }
 
 async function submitReportEdit(){
