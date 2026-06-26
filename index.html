@@ -4499,7 +4499,7 @@ async function viewTicket(id,autoPrint=false){
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
-      ${isClosed&&currentUser.role_type==='work_controller'&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
+      ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
       ${t.pending_edit&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller'?`
         <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
           ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
