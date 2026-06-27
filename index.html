@@ -3249,7 +3249,7 @@ async function loadEngLiveStatus(){
     const ticketIds=[...new Set((openLogs||[]).filter(l=>l.ticket_id).map(l=>l.ticket_id))];
     let ticketMap={};
     if(ticketIds.length){
-      const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,model,problem,status').catch(()=>[]);
+      const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,area,address,pin,model,problem,status').catch(()=>[]);
       tks.forEach(t=>{ticketMap[t.id]=t;});
     }
     const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
@@ -3282,7 +3282,7 @@ async function loadEngLiveStatus(){
         if(ol.ticket_id){
           const tk=ticketMap[ol.ticket_id];
           callHtml=tk?`<a onclick="viewTicket('${tk.id}')" style="color:#1d4ed8;cursor:pointer;font-weight:600;">${tk.id}</a> — ${tk.cname||'-'} | ${tk.model||'-'}`:`<span style="color:#6b7280;">${ol.ticket_id}</span>`;
-          areaHtml=tk?(tk.city||'-'):'-';
+          areaHtml=tk?(()=>{const parts=[];if(tk.area)parts.push(tk.area);else if(tk.city)parts.push(tk.city);if(tk.pin)parts.push(tk.pin);return parts.join(', ')||'-';})():'-';
         } else {callHtml=ol.task_description||'-';areaHtml='-';}
       } else if(ll){
         statusHtml='<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">💤 Free</span>';
@@ -5760,6 +5760,20 @@ async function saveEngUpdate(){
     }
     if(status==='Closed'||status==='Repaired'){
       _tgNotifyClose(id,t,data,status,currentSpares);
+    }
+    // Auto-close open work log when call goes to a paused/pending status
+    const pausedStatuses=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold','Sent to MSC','Repaired'];
+    if(pausedStatuses.includes(status)||status==='Repaired'){
+      try{
+        const pNow=new Date();
+        const pTime=pNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        const pDate=pNow.toLocaleDateString('en-CA');
+        const pEngId=currentUser.eng_id||currentUser.user_id;
+        const pOpenLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(pEngId)+'&log_date=eq.'+pDate+'&ticket_id=eq.'+encodeURIComponent(id)+'&to_time=eq.OPEN');
+        for(const pl of (pOpenLogs||[])){
+          await sb('work_logs','PATCH',{to_time:pTime,updated_at:pNow.toISOString()},'?id=eq.'+pl.id).catch(()=>{});
+        }
+      }catch(pEx){console.log('WorkLog pause-close err:',pEx);}
     }
     closeModal('modal-eng-update');currentSpares=[];
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
