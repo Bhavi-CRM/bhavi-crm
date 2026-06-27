@@ -500,7 +500,7 @@ tr:hover td{background:#f8fafc;}
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-call')">Cancel</button>
+      <button class="btn btn-outline" onclick="if(window._reportEditMode){window._reportEditMode=null;window._editingTicket=null;document.getElementById('modal-call-title').textContent='New Call Log';const sb2=document.querySelector('#modal-call .btn-primary');if(sb2)sb2.textContent='💾 Save Call';const rb=document.getElementById('edit-reason-box');if(rb)rb.style.display='none';const ab=document.querySelector('.alert.alert-info');if(ab)ab.style.display='';}closeModal('modal-call')">Cancel</button>
       <button class="btn btn-primary" onclick="saveCall()">💾 Save Call</button>
     </div>
   </div>
@@ -518,6 +518,18 @@ tr:hover td{background:#f8fafc;}
       </div>
     </div>
     <div class="modal-body" id="modal-ticket-body"></div>
+  </div>
+</div>
+
+<!-- REPORT EDIT REQUEST -->
+<div class="modal-overlay hidden" id="modal-report-edit" onclick="closeModal('modal-report-edit')">
+  <div class="modal modal-lg" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>✏️ Edit Report</h2><button class="close-btn" onclick="closeModal('modal-report-edit')">✕</button></div>
+    <div class="modal-body" id="modal-report-edit-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-report-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReportEdit()">📨 Submit for Approval</button>
+    </div>
   </div>
 </div>
 
@@ -1025,16 +1037,26 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-header"><h2>📥 Export Report</h2><button class="close-btn" onclick="closeModal('modal-report')">✕</button></div>
     <div class="modal-body">
       <!-- Period -->
-      <div class="form-group" style="margin-bottom:10px;">
-        <label>Period</label>
-        <select id="rpt-period" onchange="toggleCustomDates()">
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month" selected>This Month</option>
-          <option value="year">This Year</option>
-          <option value="custom">Custom Range</option>
-          <option value="all">All Time</option>
-        </select>
+      <div class="form-grid" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>Date By</label>
+          <select id="rpt-date-type">
+            <option value="created">Created Date</option>
+            <option value="closed">Closed Date</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Period</label>
+          <select id="rpt-period" onchange="toggleCustomDates()">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="week">This Week</option>
+            <option value="month" selected>This Month</option>
+            <option value="year">This Year</option>
+            <option value="custom">Custom Range</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
       </div>
       <div id="custom-dates" class="form-grid hidden" style="margin-bottom:10px;">
         <div class="form-group"><label>From</label><input type="date" id="rpt-from"></div>
@@ -1858,6 +1880,7 @@ function getReportDates(){
   const now=new Date();
   let from,to=new Date(now);to.setHours(23,59,59,999);
   if(period==='today'){from=new Date(now);from.setHours(0,0,0,0);}
+  else if(period==='yesterday'){from=new Date(now);from.setDate(now.getDate()-1);from.setHours(0,0,0,0);to=new Date(from);to.setHours(23,59,59,999);}
   else if(period==='week'){from=new Date(now);from.setDate(now.getDate()-now.getDay());from.setHours(0,0,0,0);}
   else if(period==='month'){from=new Date(now.getFullYear(),now.getMonth(),1);}
   else if(period==='year'){from=new Date(now.getFullYear(),0,1);}
@@ -1868,14 +1891,23 @@ function getReportDates(){
 
 function applyReportFilters(tickets){
   const {from,to}=getReportDates();
+  const dateType=document.getElementById('rpt-date-type')?.value||'created';
   const status=document.getElementById('rpt-status')?.value||'';
   const service=document.getElementById('rpt-service')?.value||'';
   const calltype=document.getElementById('rpt-calltype')?.value||'';
   const engineer=document.getElementById('rpt-engineer')?.value||'';
   const city=(document.getElementById('rpt-city')?.value||'').toLowerCase().trim();
+  const closedStatuses=['Closed','Delivered','Call Cancel','Customer Reject'];
   return tickets.filter(t=>{
-    const d=t.created_at?new Date(t.created_at):null;
-    if(d&&(d<from||d>to))return false;
+    if(dateType==='closed'){
+      // Filter by closed date — only show closed tickets, use updated_at as proxy
+      if(!closedStatuses.includes(t.status))return false;
+      const d=t.updated_at?new Date(t.updated_at):null;
+      if(d&&(d<from||d>to))return false;
+    }else{
+      const d=t.created_at?new Date(t.created_at):null;
+      if(d&&(d<from||d>to))return false;
+    }
     if(status&&t.status!==status)return false;
     if(service&&t.service_type!==service)return false;
     if(calltype&&t.call_type!==calltype)return false;
@@ -1927,20 +1959,21 @@ function downloadReport(type){
     // Timeline helpers
     const getTLr=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
     const getVisitStartISOr=t=>{const e=getTLr(t).find(e=>e.action==='Visit Start');return e?.at||null;};
-    const getWorkStartISOr=t=>{const e=[...getTLr(t)].reverse().find(e=>e.action&&(e.action==='Work Started'||e.action.includes('Work Start')));return e?.at||null;};
-    const getClosedISOr=t=>{const e=[...getTLr(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return e?.at||null;};
-    // Duration between two ISO timestamps → "2h 30m" / "45m"
-    const durISO=(isoFrom,isoTo)=>{
-      if(!isoFrom||!isoTo)return '';
-      try{const m=Math.round((new Date(isoTo)-new Date(isoFrom))/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    // Duration: ISO start → date+HH:MM end
+    const durFromISOtoHHMM=(isoFrom,dateStr,hhMM)=>{
+      if(!isoFrom||!hhMM||!dateStr)return '';
+      try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
+    };
+    // Duration: HH:MM to HH:MM on same date
+    const durHHMMtoHHMM=(dateStr,hhFrom,hhTo)=>{
+      if(!hhFrom||!hhTo||!dateStr)return '';
+      try{const from=new Date(dateStr+'T'+hhFrom+':00');const to=new Date(dateStr+'T'+hhTo+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}
     };
     const fmtISO=(iso)=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
 
     const data=filtered.map(t=>{
       const {partsTotal,partsNames,svc,other,final,grand}=getTicketFinancials(t);
       const visitStartISO=getVisitStartISOr(t);
-      const workStartISO=getWorkStartISOr(t);
-      const closedISO=getClosedISOr(t);
       return{
         'Ticket ID':t.id||'',
         'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'',
@@ -1962,13 +1995,11 @@ function downloadReport(type){
         'Engineer':t.assigned_name||'Unassigned',
         'Status':t.status||'',
         'Visit Date':t.visit_date||'',
-        'Visit Start Time':fmtISO(visitStartISO),
-        'Work Start Time':fmtISO(workStartISO),
-        'Closed Time':fmtISO(closedISO),
-        'Traveling Time':durISO(visitStartISO,workStartISO),
-        'Repair Time':durISO(workStartISO,closedISO),
+        'Visit Start':visitStartISO?fmtISO(visitStartISO):'',
         'Time In':t.visit_in||'',
+        'Travel Time':durFromISOtoHHMM(visitStartISO,t.visit_date,t.visit_in),
         'Time Out':t.visit_out||'',
+        'Repair Time':durHHMMtoHHMM(t.visit_date,t.visit_in,t.visit_out),
         'Meter Start':t.meter_start||'',
         'Meter End':t.meter_end||'',
         'SE Call ID':t.se_call_id||'',
@@ -1986,8 +2017,8 @@ function downloadReport(type){
       {wch:16},{wch:12},{wch:20},{wch:14},{wch:14},{wch:14},{wch:12},{wch:25},
       {wch:10},{wch:16},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25},{wch:25},
       {wch:12},{wch:18},{wch:18},{wch:12},
-      {wch:13},{wch:13},{wch:13},{wch:13},{wch:14},{wch:14},
-      {wch:11},{wch:11},{wch:12},{wch:12},{wch:14},{wch:30},
+      {wch:13},{wch:11},{wch:11},{wch:14},{wch:11},{wch:14},
+      {wch:12},{wch:12},{wch:14},{wch:30},
       {wch:10},{wch:12},{wch:10},{wch:12},{wch:12},{wch:20}
     ];
     const wb=XLSX.utils.book_new();
@@ -3163,6 +3194,13 @@ async function renderDashboard(){
       </div>
       ${engChartHtml}
       ${chartHtml}
+      ${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<div class="card" id="eng-live-status-card">
+        <div class="section-header" style="margin-bottom:12px;">
+          <h2>👷 Engineer Live Status</h2>
+          <button class="btn btn-primary btn-sm" onclick="loadEngLiveStatus()">🔄 Refresh</button>
+        </div>
+        <div id="eng-live-status-body"><div class="loading">Loading...</div></div>
+      </div>`:''}
       <div class="card">
         <div class="section-header"><h2>Recent Tickets</h2>${currentUser.role==='admin'?'<button class="btn btn-primary btn-sm" onclick="openNewCall()">+ New Call</button>':''}</div>
         <div class="table-wrap"><table>
@@ -3176,6 +3214,8 @@ async function renderDashboard(){
           </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);">No tickets</td></tr>'}</tbody>
         </table></div>
       </div>`;
+    // Load engineer live status for admin
+    if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){loadEngLiveStatus();}
     // Inquiry followup check — only for Admin and ENG002/ENG008
     var canInqAlert=(currentUser.role==='admin'&&currentUser.role_type!=='work_controller')||(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
     if(canInqAlert) try{
@@ -3195,6 +3235,57 @@ async function renderDashboard(){
     var pce=document.getElementById('page-content');
     if(pce)pce.innerHTML='<div class="alert alert-warning" style="margin:20px;">Error loading dashboard:<br><b>'+e.message+'</b><br><br>Check your internet connection and Supabase connectivity.<br><button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-top:10px;">🔄 Retry</button></div>';
   }
+}
+
+// ENGINEER LIVE STATUS
+async function loadEngLiveStatus(){
+  const el=document.getElementById('eng-live-status-body');
+  if(!el)return;
+  el.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    const today=new Date().toLocaleDateString('en-CA');
+    const openLogs=await sb('work_logs','GET',null,'?log_date=eq.'+today+'&to_time=eq.OPEN&order=from_time.asc');
+    const engineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');
+    const ticketIds=[...new Set((openLogs||[]).filter(l=>l.ticket_id).map(l=>l.ticket_id))];
+    let ticketMap={};
+    if(ticketIds.length){
+      const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,model,problem,status').catch(()=>[]);
+      tks.forEach(t=>{ticketMap[t.id]=t;});
+    }
+    const openByEng={};
+    (openLogs||[]).forEach(l=>{if(!openByEng[l.eng_id])openByEng[l.eng_id]=l;});
+    const allTodayLogs=await sb('work_logs','GET',null,'?log_date=eq.'+today+'&order=from_time.desc&limit=500').catch(()=>[]);
+    const lastLogByEng={};
+    (allTodayLogs||[]).forEach(l=>{if(!lastLogByEng[l.eng_id])lastLogByEng[l.eng_id]=l;});
+    if(!engineers.length){el.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:20px;">No engineers found.</p>';return;}
+    const rows=engineers.map(eng=>{
+      const eid=eng.eng_id||eng.user_id;
+      const ol=openByEng[eid];
+      const ll=lastLogByEng[eid];
+      let statusHtml='',callHtml='',areaHtml='';
+      if(ol){
+        const isTravel=ol.log_type==='travel';
+        const isWork=ol.log_type==='work';
+        if(isTravel) statusHtml='<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">🚗 Traveling</span>';
+        else if(isWork) statusHtml='<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">🔧 On Site / Working</span>';
+        else statusHtml='<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">⚙️ Active</span>';
+        if(ol.ticket_id){
+          const tk=ticketMap[ol.ticket_id];
+          callHtml=tk?`<a onclick="viewTicket('${tk.id}')" style="color:#1d4ed8;cursor:pointer;font-weight:600;">${tk.id}</a> — ${tk.cname||'-'} | ${tk.model||'-'}`:`<span style="color:#6b7280;">${ol.ticket_id}</span>`;
+          areaHtml=tk?(tk.city||'-'):'-';
+        } else {callHtml=ol.task_description||'-';areaHtml='-';}
+      } else if(ll){
+        statusHtml='<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">💤 Free</span>';
+        callHtml=`<span style="color:#9ca3af;font-size:12px;">Last: ${ll.task_description||'-'} (${ll.from_time||''}${ll.to_time&&ll.to_time!=='OPEN'?' – '+ll.to_time:''})</span>`;
+        areaHtml='-';
+      } else {
+        statusHtml='<span style="background:#f3f4f6;color:#9ca3af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">📴 Not Started</span>';
+        callHtml='-';areaHtml='-';
+      }
+      return `<tr><td><b>${eng.name}</b></td><td>${statusHtml}</td><td style="font-size:12px;max-width:280px;">${callHtml}</td><td style="font-size:12px;">${areaHtml}</td><td style="font-size:11px;color:#9ca3af;">${ol?'Since '+ol.from_time:ll?'Last: '+ll.from_time:'-'}</td></tr>`;
+    }).join('');
+    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Engineer</th><th>Status</th><th>Current Call</th><th>Area</th><th>Time</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>'}</tbody></table></div>`;
+  }catch(e){el.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
 // KPI DETAIL MODAL
@@ -3759,7 +3850,7 @@ function ticketRow(t){
     <td>${t.city||'-'}</td><td>${t.model||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
-    <td>${statusBadge(t.status)}</td>
+    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
@@ -3965,7 +4056,7 @@ async function renderMyCalls(){
         <div class="table-wrap"><table>
           <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Problem</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
           <tbody id="my-calls-tbody">${(()=>{
-            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered'];
+            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
             const sorted=[...tickets].sort((a,b)=>{
               const aOpen=!closedStatuses.includes(a.status);
               const bOpen=!closedStatuses.includes(b.status);
@@ -4033,7 +4124,7 @@ async function openNewCall(){
   if(snCb){snCb.checked=true;}
   var snEl=document.getElementById('call-serial');
   if(snEl){snEl.readOnly=false;snEl.style.background='';snEl.placeholder='Serial number';}
-  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('call-eng').innerHTML='<option value="">-- Pending Allocation --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
   // Populate brand dropdown
   const brandDrop = document.getElementById('call-brand-input');
   if(brandDrop && brandDrop.tagName === 'SELECT'){
@@ -4178,6 +4269,58 @@ function setReRepairCharges(type){
 
 var _savingCall=false;
 async function saveCall(){
+  // ── REPORT EDIT MODE — submit for approval instead of saving ──
+  if(window._reportEditMode){
+    const ticketId=window._reportEditMode;
+    const t=window._editingTicket;
+    if(!t)return;
+    const reason=(document.getElementById('edit-reason-text')?.value||'').trim();
+    if(!reason){alert('⚠️ Please provide a reason for editing the report.');return;}
+    // Collect field values from the form
+    const newVals={
+      model:document.getElementById('call-model')?.value||'',
+      serial:document.getElementById('call-serial')?.value||'',
+      call_type:document.getElementById('call-type')?.value||'',
+      service_type:document.getElementById('call-service-type')?.value||'',
+      cname:document.getElementById('call-cname')?.value||'',
+      mobile:document.getElementById('call-mobile')?.value||'',
+      alt_mobile:document.getElementById('call-alt')?.value||'',
+      problem:document.getElementById('call-problem')?.value||'',
+      description:document.getElementById('call-desc')?.value||'',
+      condition:document.getElementById('call-condition')?.value||'',
+      city:(document.getElementById('call-city')?.value||''),
+      state:(document.getElementById('call-state')?.value||''),
+      pin:(()=>{const pe=document.getElementById('call-pin');return pe?.dataset.pin||pe?.value||'';})(),
+      area:document.getElementById('call-area')?.value||'',
+      address:(()=>{const l1=(document.getElementById('call-address')?.value||'').trim();const l2=(document.getElementById('call-address2')?.value||'').trim();return l1+(l2?', '+l2:'');})(),
+      se_call_id:document.getElementById('call-se-id')?.value||'',
+      labor:document.getElementById('call-service-charges')?.value||'',
+      brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name')?.value||'');})(),
+    };
+    const fieldLabels={model:'Model',serial:'Serial No',call_type:'Call Type',service_type:'Service Type',cname:'Customer Name',mobile:'Mobile',alt_mobile:'Alt Mobile',problem:'Problem',description:'Description',condition:'Condition',city:'City',state:'State',pin:'Pin',area:'Area',address:'Address',se_call_id:'SE Call ID',labor:'Labor ₹',brand_name:'Brand'};
+    const changes={};
+    Object.entries(newVals).forEach(([k,nv])=>{
+      const ov=String(t[k]||'').trim();
+      if(nv.trim()!==ov) changes[k]={old:ov,new:nv.trim()};
+    });
+    if(!Object.keys(changes).length){alert('No changes detected.');return;}
+    const pending_edit={requested_by:currentUser.name||currentUser.email,wc_id:currentUser.user_id,requested_at:new Date().toISOString(),reason,changes};
+    try{
+      await sb('tickets','PATCH',{pending_edit,updated_at:new Date().toISOString()},`?id=eq.${ticketId}`);
+      const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0)allTickets[idx].pending_edit=pending_edit;
+      try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_notify',ticketId,cname:t.cname,model:t.model||'',pending_edit})});}catch(e){}
+      // Reset modal to normal new-call mode
+      window._reportEditMode=null;window._editingTicket=null;
+      document.getElementById('modal-call-title').textContent='New Call Log';
+      const sb2=document.querySelector('#modal-call .btn-primary');if(sb2)sb2.textContent='💾 Save Call';
+      const reasonBox=document.getElementById('edit-reason-box');if(reasonBox)reasonBox.style.display='none';
+      const alertBox=document.querySelector('.alert.alert-info');if(alertBox)alertBox.style.display='';
+      closeModal('modal-call');closeModal('modal-ticket');
+      alert('✅ Edit request submitted! Admin will review and approve/reject.');
+    }catch(e){alert('Error: '+e.message);}
+    return;
+  }
+  // ── normal new call save flow ──
   if(_savingCall)return;
   _savingCall=true;
   var _saveBtn=document.querySelector('#modal-call .btn-primary');
@@ -4481,13 +4624,24 @@ async function viewTicket(id,autoPrint=false){
       `:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
-        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('')}
+        <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
+      ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
+      ${t.pending_edit&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller'?`
+        <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
+          ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
+          <span style="font-size:12px;color:#92400e;">Reason: ${t.pending_edit.reason}</span><br>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm" onclick="approveReportEdit('${t.id}')">✅ Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectReportEdit('${t.id}')">❌ Reject</button>
+            <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
+          </div>
+        </div>`:''}
     </div>`;
   }
 
@@ -4524,6 +4678,7 @@ async function viewTicket(id,autoPrint=false){
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
+    ${t.pending_edit?`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;">⏳ <b>Report Edit Pending Admin Approval</b> — Requested by ${t.pending_edit.requested_by} at ${new Date(t.pending_edit.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</div>`:''}
     <h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;">TIMELINE</h3>
     ${tlHtml}
     ${adminActions}`;
@@ -4978,37 +5133,27 @@ async function openEngUpdate(id){
       ${t.problem} | ${t.call_type} | ${t.service_type} | ${statusBadge(t.status)}
       ${isOOC?'<br><span style="color:var(--danger);font-weight:700;">⚠️ Out of Coverage — charges apply</span>':''}
     </div>
-    <!-- Visit Start / Work Start Buttons -->
-    ${(()=>{
-      if(t.visit_in||t.service_type!=='On Site')return '';
-      const tl=Array.isArray(t.timeline)?t.timeline:(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):[]);
-      const visitStarted=tl.some(e=>e.action==='Visit Start');
-      if(visitStarted){
-        const vsEntry=tl.find(e=>e.action==='Visit Start');
-        const vsTime=vsEntry?.note||vsEntry?.at||'';
-        return `<div class="alert" style="background:#fef3c7;border-color:#fcd34d;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-            <span style="color:#92400e;">🚗 Traveling... <b>${vsTime?('Started: '+vsTime):''}</b></span>
-            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
-          </div>
+    <!-- Visit Start / Work Start Panel -->
+    ${t.service_type==='On Site' ? (()=>{
+      const tl=(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):(t.timeline||[]));
+      const vsEntry=tl.find(e=>e.action==='Visit Start');
+      const wsEntry=tl.find(e=>e.action&&e.action.includes('Work Start'));
+      const vsTime=vsEntry?new Date(vsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):'';
+      const wsTime=wsEntry?new Date(wsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):t.visit_in||'';
+      if(wsEntry||t.visit_in){
+        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}</div>`;
+      } else if(vsEntry){
+        return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:14px;font-weight:700;">🚗 Visiting — ${vsTime}</span>
+          <button onclick="doWorkStart('${t.id}')" style="background:#fff;color:#059669;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>
+        </div>`;
+      } else {
+        return `<div style="display:flex;gap:10px;margin-bottom:12px;">
+          <button onclick="doVisitStart('${t.id}')" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🚗 Visit Start</button>
+          <button onclick="doWorkStart('${t.id}')" style="flex:1;background:#059669;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🔧 Work Start</button>
         </div>`;
       }
-      return `<div class="alert alert-info" style="margin-bottom:10px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <span>⏱️ Visit not started yet</span>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-warning btn-sm" onclick="doVisitStart('${t.id}')" style="background:#f59e0b;border-color:#d97706;color:#fff;">🚗 Visit Start</button>
-            <button class="btn btn-success btn-sm" onclick="doWorkStart('${t.id}')">🔧 Work Start</button>
-          </div>
-        </div>
-      </div>`;
-    })()}
-    ${t.visit_in && !t.visit_out && t.service_type==='On Site' ? `
-    <div class="alert" style="background:#d1fae5;border-color:#6ee7b7;margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="color:#065f46;">🔧 Work In Progress — Time In: <b>${t.visit_in}</b></span>
-      </div>
-    </div>` : ''}
+    })() : ''}
     ${t.status==='Sent to MSC'?`
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:14px;">
       <h3 style="color:#1d4ed8;font-size:14px;font-weight:700;margin-bottom:8px;">📦 MSC Status</h3>
@@ -5034,7 +5179,7 @@ async function openEngUpdate(id){
         ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
-      <div class="form-group"><label>Action Taken <span style="color:#ef4444;">*</span></label><input type="text" id="upd-work" value="${t.work_done||''}" placeholder="Required before closing..."><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
+      <div class="form-group"><label>Action Taken <span class="req">*</span></label><input type="text" id="upd-work" value="${t.work_done||''}" placeholder="What was done?"><button class="ai-remark-btn" onclick="showAIRemarkPicker('upd-work')">✨ AI</button></div>
     </div>
     <div id="msc-dispatch-section" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:12px;">
       <h3 style="color:#1d4ed8;font-size:13px;font-weight:700;margin-bottom:10px;">📦 MSC Dispatch Details</h3>
@@ -5088,7 +5233,7 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
-    <input type="hidden" id="upd-remarks" value="">`;
+    <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -5316,11 +5461,9 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Action Taken mandatory when closing
-  if(status==='Closed'){
-    const rem=(document.getElementById('upd-work')?.value||'').trim();
-    if(!rem){alert('❌ Action Taken is required before closing the call.\nPlease describe the work done.');document.getElementById('upd-work')?.focus();return;}
-  }
+  // Action Taken mandatory always
+  const workDone=(document.getElementById('upd-work')?.value||'').trim();
+  if(!workDone){alert('❌ Action Taken is required.\nPlease describe what was done.');document.getElementById('upd-work')?.focus();return;}
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
   if(status!==t.status && !allowedEng.includes(status)){
@@ -5393,7 +5536,7 @@ async function saveEngUpdate(){
     meter_end:document.getElementById('upd-meter-end')?.value||'',
     labor:document.getElementById('upd-labor')?.value||0,
     other_charge:document.getElementById('upd-other')?.value||0,
-    eng_remarks:document.getElementById('upd-work')?.value||'',
+    eng_remarks:document.getElementById('upd-remarks')?.value||'',
     spares:currentSpares,
     timeline:tl,
     updated_at:nowSave.toISOString()
@@ -6485,7 +6628,7 @@ async function openNewTask(){
   document.getElementById('task-priority').value='Normal';
   document.getElementById('task-due').value='';
   document.getElementById('task-due').min=new Date().toISOString().split('T')[0];
-  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id||e.user_id}|${e.name}">${e.name}</option>`).join('');
+  document.getElementById('task-eng').innerHTML='<option value="">-- Select --</option>'+allEngineers.map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('');
   openModal('modal-task');
 }
 async function saveTask(){const ev=document.getElementById('task-eng').value;const[eId,eName]=ev?ev.split('|'):['',''];const title=document.getElementById('task-title').value.trim();const due=document.getElementById('task-due').value;if(!title||!eId){alert('Fill title and engineer');return;}if(due&&due<new Date().toISOString().split('T')[0]){alert('Due date cannot be past');return;}const year=new Date().getFullYear();const tasks=await sb('tasks','GET',null,`?task_no=like.TSK-${year}*&order=task_no.desc&limit=1`);let num=1;if(tasks.length)num=parseInt(tasks[0].task_no.split('-').pop())+1;try{await sb('tasks','POST',{task_no:`TSK-${year}-${String(num).padStart(3,'0')}`,title,description:document.getElementById('task-desc').value,assigned_to:eId,assigned_name:eName,priority:document.getElementById('task-priority').value,due_date:due||null,ticket_id:document.getElementById('task-ticket').value||null,status:'Open',created_by:currentUser.name,eng_remark:'',timeline:[{action:'Created',by:currentUser.name,at:new Date().toISOString()}]});closeModal('modal-task');renderTasks();}catch(e){alert(e.message);}}
@@ -6837,6 +6980,13 @@ async function renderReportFilter(c){
         <h3 style="font-weight:700;font-size:14px;margin-bottom:14px;">🔍 Filter Report</h3>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
           <div class="form-group">
+            <label>Date By</label>
+            <select id="f-date-type" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;width:100%;">
+              <option value="created">Created Date</option>
+              <option value="closed">Closed Date</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Date From</label>
             <input type="date" id="f-from" style="border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;outline:none;width:100%;">
           </div>
@@ -6915,13 +7065,22 @@ async function runFilteredReport(){
   const customer=document.getElementById('f-customer').value;
   const city=document.getElementById('f-city').value;
   const service=document.getElementById('f-service').value;
-  
+  const dateType=document.getElementById('f-date-type')?.value||'created';
+
   document.getElementById('filter-results').innerHTML='<div class="loading">Searching...</div>';
-  
+
   try{
     let q='?order=created_at.desc';
-    if(from) q+=`&created_at=gte.${from}T00:00:00`;
-    if(to) q+=`&created_at=lte.${to}T23:59:59`;
+    if(dateType==='closed'){
+      // Filter by updated_at (closed date) — client-side for closed tickets
+      if(from) q+=`&updated_at=gte.${from}T00:00:00`;
+      if(to) q+=`&updated_at=lte.${to}T23:59:59`;
+      // Force status filter to closed statuses if no specific status chosen
+      if(!status) q+=`&status=in.(Closed,Delivered,Call Cancel,Customer Reject)`;
+    } else {
+      if(from) q+=`&created_at=gte.${from}T00:00:00`;
+      if(to) q+=`&created_at=lte.${to}T23:59:59`;
+    }
     if(eng) q+=`&assigned_to=eq.${eng}`;
     if(model) q+=`&model=eq.${encodeURIComponent(model)}`;
     if(type) q+=`&call_type=eq.${encodeURIComponent(type)}`;
@@ -6978,16 +7137,15 @@ async function downloadFilteredReport(format){
   
   if(format==='excel'){
     const _getTL=t=>{let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return tl;};
-    const _getVisitStart=t=>{const e=_getTL(t).find(e=>e.action==='Visit Start');return e?.at||null;};
-    const _getWorkStart=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action==='Work Started'||e.action.includes('Work Start')));return e?.at||null;};
-    const _getClosed=t=>{const e=[..._getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return e?.at||null;};
-    const _fmtISO=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
-    const _durISO=(f,to)=>{if(!f||!to)return '';try{const m=Math.round((new Date(to)-new Date(f))/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
+    const _getVS=t=>{const e=_getTL(t).find(e=>e.action==='Visit Start');return e?.at||null;};
+    const _fmtT=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
+    const _dur=(isoFrom,dateStr,hhMM)=>{if(!isoFrom||!hhMM||!dateStr)return '';try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
+    const _dur2=(dateStr,h1,h2)=>{if(!h1||!h2||!dateStr)return '';try{const from=new Date(dateStr+'T'+h1+':00');const to=new Date(dateStr+'T'+h2+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
-      const vsISO=_getVisitStart(t),wsISO=_getWorkStart(t),clISO=_getClosed(t);
+      const vsISO=_getVS(t);
       return {
         'Ticket No':t.id,'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',
         'Customer':t.cname,'Mobile':t.mobile,'Alt Mobile':t.alt_mobile||'',
@@ -6997,12 +7155,11 @@ async function downloadFilteredReport(format){
         'Problem':t.problem,'Action Taken':t.work_done||'','Cause':t.cause||'',
         'Engineer':t.assigned_name||'','Status':t.status,
         'Visit Date':t.visit_date||'',
-        'Visit Start Time':_fmtISO(vsISO),
-        'Work Start Time':_fmtISO(wsISO),
-        'Closed Time':_fmtISO(clISO),
-        'Traveling Time':_durISO(vsISO,wsISO),
-        'Repair Time':_durISO(wsISO,clISO),
-        'Time In':t.visit_in||'','Time Out':t.visit_out||'',
+        'Visit Start':_fmtT(vsISO),
+        'Time In':t.visit_in||'',
+        'Travel Time':_dur(vsISO,t.visit_date,t.visit_in),
+        'Time Out':t.visit_out||'',
+        'Repair Time':_dur2(t.visit_date,t.visit_in,t.visit_out),
         'Meter Start':t.meter_start||'','Meter End':t.meter_end||'',
         'Parts Used':sp.map(s=>s.code+' '+s.name+' x'+s.qty).join('; '),
         'Parts Total':partsTotal.toFixed(2),'Labor':t.labor||0,'Other':t.other_charge||0,
@@ -7876,35 +8033,18 @@ async function saveEngUse(){
   try{
     await engStockAdjust(engineer,partId,-qty);
     await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jobSheet,warranty,notes,created_by:currentUser?.name||'Admin',warranty_status:warranty?'PENDING':null});
-    // If warranty with SE call ID, auto-link part to the matching ticket
     if(warranty&&jobSheet){
       try{
         const trackKey=jobSheet.split('/').pop().trim().toUpperCase();
         const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id&limit=10').catch(()=>[]);
-        const matchTkt=matchTickets&&matchTickets.find(t=>{
-          const raw=(t.se_call_id||'').trim().toUpperCase();
-          return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
-        });
+        const matchTkt=matchTickets&&matchTickets.find(t=>{const raw=(t.se_call_id||'').trim().toUpperCase();return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);});
         if(matchTkt){
-          const invItem=(allInventory&&allInventory.find(x=>x.id===partId))||
-            (await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
+          const invItem=(allInventory&&allInventory.find(x=>x.id===partId))||(await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
           const existingSpares=matchTkt.spares||[];
           const alreadyHas=existingSpares.some(s=>s.code&&invItem&&s.code===invItem.part_code);
           if(!alreadyHas){
-            const newSpare={
-              code:invItem?.part_code||partId,
-              name:invItem?.name||'Part',
-              qty,
-              price:parseFloat(invItem?.unit_price)||0,
-              gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,
-              requested:true,
-              stock_deducted:false,
-              warranty_supplied:true
-            };
-            await sb('tickets','PATCH',{
-              spares:[...existingSpares,newSpare],
-              updated_at:new Date().toISOString()
-            },'?id=eq.'+matchTkt.id).catch(()=>{});
+            const newSpare={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:true,stock_deducted:false,warranty_supplied:true};
+            await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
           }
         }
       }catch(linkErr){console.log('Auto-link to ticket failed:',linkErr);}
@@ -7976,20 +8116,8 @@ async function saveDirectWarrantyIssue(){
         const existingSpares=matchTkt.spares||[];
         const alreadyHas=existingSpares.some(s=>s.code&&s.code===invItem?.part_code);
         if(!alreadyHas){
-          const newSpare={
-            code:invItem?.part_code||partId,
-            name:invItem?.name||'Part',
-            qty,
-            price:parseFloat(invItem?.unit_price)||0,
-            gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,
-            requested:true,
-            stock_deducted:false,
-            warranty_supplied:true
-          };
-          await sb('tickets','PATCH',{
-            spares:[...existingSpares,newSpare],
-            updated_at:new Date().toISOString()
-          },'?id=eq.'+matchTkt.id).catch(()=>{});
+          const newSpare={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:true,stock_deducted:false,warranty_supplied:true};
+          await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
         }
       }
     }catch(autoErr){console.log('Auto-link to ticket failed:',autoErr);}
@@ -8864,6 +8992,11 @@ async function renderTelegramSettings(){
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Aa chat ID ne badha j notifications malse — new call, assignment, inquiry, delivery badhuj. @userinfobot thi Chat ID kadho.</p>'
     +'</div>'
     +'<h4 style="font-size:13px;font-weight:700;margin-bottom:10px;">👷 Engineer Chat IDs</h4>'
+    +'<div style="margin-bottom:10px;padding:10px 14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;font-size:12px;">'
+    +'<b style="color:#1d4ed8;">💡 Engineers who sent /start to the bot:</b><br>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="fetchBotContacts()">🔄 Fetch Recent Bot Contacts</button>'
+    +'<div id="bot-contacts-list" style="margin-top:8px;"></div>'
+    +'</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     +'<thead><tr style="background:#f1f5f9;">'
     +'<th style="padding:10px 12px;text-align:left;">Engineer</th>'
@@ -8871,7 +9004,7 @@ async function renderTelegramSettings(){
     +'<th style="padding:10px 12px;text-align:left;">Telegram Chat ID</th>'
     +'<th style="padding:10px 12px;text-align:left;">Action</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo</p>'
+    +'<p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Drek engineer @userinfobot thi potano Chat ID kadhe → aama save karo. Ya upar "Fetch" button thi bot na recent contacts joi ne chat ID copy karo.</p>'
     +'</div>'
     +'<div class="card" style="margin-top:14px;padding:14px;background:#f0fdf4;border:1.5px solid #059669;border-radius:10px;">'
     +'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;color:#065f46;">📊 Daily Report (Admin)</h4>'
@@ -8879,6 +9012,34 @@ async function renderTelegramSettings(){
     +'<button class="btn btn-success" onclick="sendDailyTGReport()">📤 Send Report Now</button>'
     +'<p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Automatic 8 PM report mate Supabase cron setup karo (instructions niche)</p>'
     +'</div>';
+}
+function copyToClipboard(text){try{navigator.clipboard.writeText(text);}catch(e){}}
+async function fetchBotContacts(){
+  var el=document.getElementById('bot-contacts-list');
+  if(!el)return;
+  if(!TG_TOKEN){el.innerHTML='<span style="color:#dc2626;">❌ Bot Token not set. Save token first.</span>';return;}
+  el.innerHTML='<span style="color:#6b7280;">Loading...</span>';
+  try{
+    var res=await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/getUpdates?limit=100&timeout=0');
+    var json=await res.json();
+    if(!json.ok){el.innerHTML='<span style="color:#dc2626;">❌ Error: '+escHtml(json.description||'Unknown')+'</span>';return;}
+    var seen={};var contacts=[];
+    (json.result||[]).forEach(function(u){
+      var chat=(u.message||u.callback_query?.message||{}).chat||(u.my_chat_member||{}).chat||{};
+      if(!chat.id||chat.type!=='private')return;
+      if(seen[chat.id])return;
+      seen[chat.id]=true;
+      var name=[chat.first_name,chat.last_name].filter(Boolean).join(' ');
+      contacts.push({id:String(chat.id),name:name,username:chat.username||''});
+    });
+    if(!contacts.length){el.innerHTML='<span style="color:#6b7280;">No contacts found. Engineers must send /start to the bot first.</span>';return;}
+    el.innerHTML=contacts.map(function(c){
+      return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">'
+        +'<div style="flex:1;font-size:12px;"><b>'+escHtml(c.name)+'</b>'+(c.username?' @'+escHtml(c.username):'')+'<br><span style="color:#6b7280;font-family:monospace;">'+c.id+'</span></div>'
+        +'<button class="btn btn-outline btn-sm" onclick="copyToClipboard(\''+c.id+'\');alert(\'Chat ID '+c.id+' copied! Paste it in the engineer\'s Chat ID field.\')">📋 Copy ID</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<span style="color:#dc2626;">❌ Error: '+escHtml(e.message)+'</span>';}
 }
 function _tgTestAdmin(){var c=(document.getElementById('tg-admin-chat')||{}).value||'';testTGId(c,'Admin');}
 function _tgTest(chatId,name){testTGId(chatId,name);}
@@ -9990,6 +10151,164 @@ async function printLabel(){
   </body></html>`);win.document.close();
 }
 
+
+// ── REPORT EDIT REQUEST ─────────────────────────────────────────
+async function openReportEditModal(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t){alert('Ticket not found');return;}
+  if(t.pending_edit){alert('⚠️ An edit is already pending approval for this report.');return;}
+  window._editingTicket=t;
+
+  // ── Use the existing New Call modal in edit mode ──
+  window._reportEditMode=ticketId;
+  // Change title & save button
+  document.getElementById('modal-call-title').textContent='✏️ Edit Report — '+ticketId;
+  const saveBtn=document.querySelector('#modal-call .btn-primary');
+  if(saveBtn){saveBtn.textContent='📨 Submit for Approval';}
+  // Pre-fill all form fields with ticket data
+  const setVal=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  setVal('call-model',t.model||'');
+  setVal('call-serial',t.serial||'');
+  setVal('call-se-id',t.se_call_id||'');
+  setVal('call-cname',t.cname||'');
+  setVal('call-mobile',t.mobile||'');
+  setVal('call-alt',t.alt_mobile||'');
+  setVal('call-problem',t.problem||'');
+  setVal('call-desc',t.description||'');
+  setVal('call-condition',t.condition||'');
+  setVal('call-accessories',t.accessories||'');
+  // Address: split back if combined
+  const addr=(t.address||'').split(', ');
+  setVal('call-address',addr[0]||'');
+  setVal('call-address2',addr.slice(1).join(', ')||'');
+  setVal('call-area',t.area||'');
+  // Call type & service type
+  setVal('call-type',t.call_type||'Warranty');
+  setVal('call-service-type',t.service_type||'On Site');
+  // State & City — set state first, then populate city options
+  const stateEl=document.getElementById('call-state');
+  if(stateEl){stateEl.value=t.state||'Gujarat';onStateChange();}
+  setTimeout(()=>{setVal('call-city',t.city||'');},100);
+  // Pin
+  const pinEl=document.getElementById('call-pin');
+  if(pinEl){pinEl.value=t.pin||'';pinEl.dataset.pin=t.pin||'';}
+  // Brand — find matching option
+  const brandEl=document.getElementById('call-brand-input');
+  if(brandEl&&t.brand_name){
+    Array.from(brandEl.options).forEach(o=>{if(o.text===t.brand_name)o.selected=true;});
+    selectBrandFromDrop(brandEl.value,t.brand_name);
+  }
+  // Service charges
+  setVal('call-service-charges',t.labor||0);
+  // Hide customer search bar & engineer section in edit mode
+  document.querySelector('.alert.alert-info').style.display='none';
+  // Show edit reason box
+  let reasonBox=document.getElementById('edit-reason-box');
+  if(!reasonBox){
+    reasonBox=document.createElement('div');
+    reasonBox.id='edit-reason-box';
+    reasonBox.innerHTML=`<hr style="margin:16px 0;border-color:var(--border);"><div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;"><label style="font-size:12px;font-weight:700;color:#92400e;">REASON FOR EDIT <span style="color:#ef4444;">*</span></label><textarea id="edit-reason-text" style="display:block;width:100%;margin-top:6px;padding:8px 12px;border:1px solid #fbbf24;border-radius:8px;font-size:13px;min-height:60px;" placeholder="Explain why this report needs to be corrected..."></textarea></div>`;
+    document.querySelector('#modal-call .modal-body').appendChild(reasonBox);
+  }else{
+    reasonBox.style.display='block';
+    setVal('edit-reason-text','');
+  }
+  openModal('modal-call');
+}
+
+async function submitReportEdit(){
+  const t=window._editingTicket;
+  if(!t)return;
+  const reason=(document.getElementById('re-reason')?.value||'').trim();
+  if(!reason){alert('⚠️ Please provide a reason for editing the report.');return;}
+  const fields=[
+    ['cname','re-cname'],['mobile','re-mobile'],['alt_mobile','re-alt-mobile'],
+    ['city','re-city'],['address','re-address'],['area','re-area'],['pin','re-pin'],
+    ['call_type','re-call-type'],['service_type','re-service-type'],
+    ['problem','re-problem'],['description','re-description'],
+    ['work_done','re-work-done'],['fault_code','re-fault-code'],['remarks','re-remarks'],
+    ['visit_date','re-visit-date'],['visit_in','re-visit-in'],['visit_out','re-visit-out'],
+    ['meter_start','re-meter-start'],['meter_end','re-meter-end'],
+    ['labor','re-labor'],['other_charge','re-other-charge'],
+  ];
+  const changes={};
+  fields.forEach(([field,elId])=>{
+    const el=document.getElementById(elId);if(!el)return;
+    const newVal=(el.value||'').trim();const oldVal=String(t[field]||'').trim();
+    if(newVal!==oldVal) changes[field]={old:oldVal,new:newVal};
+  });
+  const sparesText=(document.getElementById('re-spares')?.value||'').trim();
+  const sp=(t.spares||[]).filter(s=>!s.requested);
+  const oldSpText=sp.map(s=>`${s.code||''} ${s.name} x${s.qty} @${s.price||0}`).join('\n').trim();
+  if(sparesText!==oldSpText) changes['spares_text']={old:oldSpText,new:sparesText};
+  if(!Object.keys(changes).length){alert('No changes detected.');return;}
+  const pending_edit={requested_by:currentUser.name||currentUser.email,wc_id:currentUser.user_id,requested_at:new Date().toISOString(),reason,changes};
+  try{
+    await sb('tickets','PATCH',{pending_edit,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
+    const idx=allTickets.findIndex(x=>x.id===t.id);if(idx>=0)allTickets[idx].pending_edit=pending_edit;
+    // Notify admin via bright-action
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_notify',ticketId:t.id,cname:t.cname,model:t.model||'',wc_name:t.wc_name||'',pending_edit})});}catch(e){}
+    closeModal('modal-report-edit');closeModal('modal-ticket');
+    alert('✅ Edit request submitted! Admin will review and approve/reject.');
+  }catch(e){alert('Error submitting: '+e.message);}
+}
+
+function viewEditDiff(ticketId){
+  const t=allTickets.find(x=>x.id===ticketId);
+  if(!t||!t.pending_edit)return;
+  const pe=t.pending_edit;
+  const ch=pe.changes||{};
+  const fieldLabels={cname:'Customer Name',mobile:'Mobile',alt_mobile:'Alt Mobile',city:'City',address:'Address',area:'Area',pin:'Pin',call_type:'Call Type',service_type:'Service Type',problem:'Problem',description:'Description',work_done:'Action Taken',fault_code:'Fault Code',remarks:'Remarks',visit_date:'Visit Date',visit_in:'Time In',visit_out:'Time Out',meter_start:'Meter Start',meter_end:'Meter End',labor:'Labor ₹',other_charge:'Other ₹',spares_text:'Parts Used'};
+  const rows=Object.entries(ch).map(([k,v])=>`<tr><td style="padding:6px 10px;font-weight:600;font-size:12px;color:var(--text-muted);white-space:nowrap;">${fieldLabels[k]||k}</td><td style="padding:6px 10px;font-size:13px;background:#fef2f2;color:#991b1b;">${String(v.old||'—').replace(/</g,'&lt;')}</td><td style="padding:6px 10px;font-size:13px;background:#f0fdf4;color:#166534;">${String(v.new||'—').replace(/</g,'&lt;')}</td></tr>`).join('');
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><title>Report Edit Diff — ${t.id}</title><style>body{font-family:Arial;padding:20px;font-size:13px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #e5e7eb;padding:6px 10px;}th{background:#f8fafc;}h2{margin-bottom:4px;}p{color:#6b7280;font-size:12px;margin-top:4px;}</style></head><body>
+    <h2>Report Edit Request — ${t.id} | ${t.cname}</h2>
+    <p>Requested by: <b>${pe.requested_by}</b> at ${new Date(pe.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}<br>Reason: <b>${pe.reason}</b></p>
+    <table><thead><tr><th>Field</th><th style="background:#fef2f2;color:#991b1b;">Old Value</th><th style="background:#f0fdf4;color:#166534;">New Value</th></tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`);
+  win.document.close();
+}
+
+async function approveReportEdit(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t||!t.pending_edit){alert('No pending edit found.');return;}
+  if(!confirm(`Approve report edit for ${t.id} — ${t.cname}?`))return;
+  const pe=t.pending_edit;const ch=pe.changes||{};const now=new Date().toISOString();
+  const patch={pending_edit:null,updated_at:now};
+  ['cname','mobile','alt_mobile','city','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
+  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
+  tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
+  patch.timeline=tl;
+  try{
+    await sb('tickets','PATCH',patch,`?id=eq.${ticketId}`);
+    const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0){Object.assign(allTickets[idx],patch);allTickets[idx].pending_edit=null;}
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'approved',cname:t.cname,model:t.model||'',wc_id:pe.wc_id,pe})});}catch(e){}
+    alert('✅ Edit approved! Report has been updated.');
+    closeModal('modal-ticket');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function rejectReportEdit(ticketId){
+  const rejectReason=prompt('Reason for rejection (will be added to history):');
+  if(rejectReason===null)return;
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t||!t.pending_edit){alert('No pending edit found.');return;}
+  const pe=t.pending_edit;const now=new Date().toISOString();
+  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  tl=[...tl,{action:'Report Edit Rejected',by:currentUser.name||'Admin',at:now,note:`Edit by ${pe.requested_by} rejected. Reason: ${rejectReason||'No reason given'}`}];
+  try{
+    await sb('tickets','PATCH',{pending_edit:null,timeline:tl,updated_at:now},`?id=eq.${ticketId}`);
+    const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0){allTickets[idx].pending_edit=null;allTickets[idx].timeline=tl;}
+    try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'rejected',rejectReason,cname:t.cname,wc_id:pe.wc_id,pe})});}catch(e){}
+    alert('❌ Edit request rejected. Original report remains unchanged.');
+    closeModal('modal-ticket');
+  }catch(e){alert('Error: '+e.message);}
+}
+// ────────────────────────────────────────────────────────────────
 
 // Visit Start - starts traveling log
 async function doVisitStart(ticketId){
@@ -18018,7 +18337,7 @@ async function saveNewInquiry(){
     var assignName=assignSel?assignSel.options[assignSel.selectedIndex]?.text||'':'';
     if(assignName==='-- Unassigned --')assignName='';
     var inqLoc=(document.getElementById('inq-location')?.value||'').trim();
-await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,location:inqLoc||null,updated_at:new Date().toISOString()});
+await sb('auto_inquiries','POST',{customer_name:name,mobile:mobile,address:address,inquiry_type:type,description:desc,followup_date:followup||null,status:'Open',created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||'',assigned_to:assignVal||null,assigned_name:assignName||null,updated_at:new Date().toISOString()});
     document.getElementById('modal-add-inquiry').remove();
     renderInquiries();
     // Telegram: admin + assigned engineer
