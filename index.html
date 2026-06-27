@@ -3252,8 +3252,18 @@ async function loadEngLiveStatus(){
       const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,model,problem,status').catch(()=>[]);
       tks.forEach(t=>{ticketMap[t.id]=t;});
     }
+    const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
+    // Auto-close stale open logs where ticket is already closed, build valid openByEng
     const openByEng={};
-    (openLogs||[]).forEach(l=>{if(!openByEng[l.eng_id])openByEng[l.eng_id]=l;});
+    for(const l of (openLogs||[])){
+      if(l.ticket_id&&ticketMap[l.ticket_id]&&closedTicketStatuses.includes(ticketMap[l.ticket_id].status)){
+        // Stale log — ticket already closed, auto-close it silently
+        const nowTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        sb('work_logs','PATCH',{to_time:nowTime,updated_at:new Date().toISOString()},'?id=eq.'+l.id).catch(()=>{});
+      } else {
+        if(!openByEng[l.eng_id])openByEng[l.eng_id]=l;
+      }
+    }
     const allTodayLogs=await sb('work_logs','GET',null,'?log_date=eq.'+today+'&order=from_time.desc&limit=500').catch(()=>[]);
     const lastLogByEng={};
     (allTodayLogs||[]).forEach(l=>{if(!lastLogByEng[l.eng_id])lastLogByEng[l.eng_id]=l;});
