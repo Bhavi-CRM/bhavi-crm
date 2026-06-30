@@ -1667,7 +1667,7 @@ async function processImport(data){
     +'</div>';
 
   // Refresh ticket data
-  if(success>0) allTickets = await sb('tickets','GET',null,'?order=created_at.desc&limit=300').catch(()=>allTickets);
+  if(success>0) allTickets = await sbAll('tickets','?order=created_at.desc').catch(()=>allTickets);
 }
 
 async function renderWCDailyReports(c){
@@ -2821,8 +2821,9 @@ function setupNav(){
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
-      // ENG001 = CSP Manager: extra access
+      // ENG001 = CSP Manager (Yogesh Suthar): extra access
       var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
+      window._isCspMgr=isCspMgr;
       if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
@@ -3018,9 +3019,9 @@ async function renderDashboard(){
   }
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
-    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc&limit=300';
-    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc&limit=300';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc&limit=300';}}
-    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=300');}
+    let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc';
+    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc';}}
+    try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     const total=allTickets.length;
     const active=allTickets.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)).length;
     const closed=allTickets.filter(t=>t.status==='Closed').length;
@@ -3798,8 +3799,10 @@ async function renderTickets(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     const engId=currentUser.eng_id||currentUser.user_id;
-    let q='?order=created_at.desc&limit=300';
-    if(currentUser.role==='engineer'){
+    let q='?order=created_at.desc';
+    if(currentUser.role==='engineer'&&window._isCspMgr){
+      q='?wc_type=eq.CSP&order=created_at.desc';
+    } else if(currentUser.role==='engineer'){
       q=`?assigned_to=eq.${engId}&order=created_at.desc`;
     } else if(currentUser.role_type==='work_controller'){
       const wcName=(currentUser.name||'').toUpperCase();
@@ -3808,13 +3811,14 @@ async function renderTickets(){
       else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
       if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
     }
-    try{allTickets=await sb('tickets','GET',null,q);}catch(qe){allTickets=await sb('tickets','GET',null,'?order=created_at.desc');}
+    try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     renderTicketTable();
   }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
+const TERMINAL_TICKET_STATUSES=['Closed','Customer Reject','Call Cancel','Delivered'];
 function renderTicketTable(filtered){
-  const tickets=filtered||allTickets;
+  const tickets=filtered||allTickets.filter(t=>!TERMINAL_TICKET_STATUSES.includes(t.status));
   document.getElementById('page-content').innerHTML=`
     <div class="card">
       <div class="section-header"><h2>All Tickets (${tickets.length})</h2>
@@ -3875,10 +3879,12 @@ function filterTickets(){
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
+  const showAll=!!(q||s);
   const f=allTickets.filter(t=>{
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
-    return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng);
+    const mOpen=showAll||!TERMINAL_TICKET_STATUSES.includes(t.status);
+    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng);
   });
   document.getElementById('ticket-tbody').innerHTML=f.map(t=>ticketRow(t)).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
 }
@@ -4595,7 +4601,7 @@ async function viewTicket(id,autoPrint=false){
 
   // Admin actions
   let adminActions='';
-  if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){
+  if(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr){
     const isPendingArrival = t.status==='Pending Customer Arrival';
     const isPendingAlloc = t.status==='Pending Allocation';
     const isPendingApproval = t.status==='Pending Customer Approval';
@@ -6485,7 +6491,7 @@ async function showPartHistoryTab(tab){
     try{
       var partCode=window._phPartCode;
       if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code not found</div>';return;}
-      const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+      const tickets=await sbAll('tickets','?order=created_at.desc');
       const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
       if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Not used in any ticket</div>';return;}
       const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
@@ -6742,7 +6748,7 @@ async function switchReportTab(tab, el){
 
 async function renderReportOverview(c){
   try{
-    const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+    const tickets=await sbAll('tickets','?order=created_at.desc');
     const total=tickets.length,closed=tickets.filter(t=>t.status==='Closed').length;
     const active=tickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
     const warranty=tickets.filter(t=>t.call_type&&t.call_type.includes('Warranty')).length;
@@ -7111,8 +7117,8 @@ async function runFilteredReport(){
     if(status) q+=`&status=eq.${encodeURIComponent(status)}`;
     if(service) q+=`&service_type=eq.${encodeURIComponent(service)}`;
     
-    let tickets=await sb('tickets','GET',null,q);
-    
+    let tickets=await sbAll('tickets',q);
+
     // Client-side filter for customer and city
     if(customer) tickets=tickets.filter(t=>(t.cname||'').toLowerCase().includes(customer.toLowerCase())||(t.mobile||'').includes(customer));
     if(city) tickets=tickets.filter(t=>(t.city||'').toLowerCase().includes(city.toLowerCase()));
@@ -7208,7 +7214,7 @@ async function downloadFilteredReport(format){
 
 async function renderReportRevenue(c){
   try{
-    const tickets=await sb('tickets','GET',null,'?order=created_at.desc&limit=500');
+    const tickets=await sbAll('tickets','?order=created_at.desc');
     const revTickets=tickets.filter(t=>t.status==='Closed'||(t.warranty_coverage==='Out of Coverage'));
     
     // Monthly revenue
@@ -7716,17 +7722,17 @@ async function renderWarrantyPending(showAll){
   try{
     // Fetch eng_movements warranty entries
     var q=showAll
-      ?"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&order=created_at.desc&limit=500"
-      :"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&warranty_status=not.eq.RECEIVED&order=created_at.desc&limit=500";
-    const used=await sb('eng_movements','GET',null,q);
+      ?"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&order=created_at.desc"
+      :"?warranty=eq.true&type=in.(USE,WARRANTY_DIRECT_IN)&warranty_status=not.eq.RECEIVED&order=created_at.desc";
+    const used=await sbAll('eng_movements',q);
 
     // Also fetch WARRANTY_RETURN entries to suppress already-returned From Ticket rows
-    const returned=await sb('eng_movements','GET',null,'?warranty=eq.true&type=eq.WARRANTY_RETURN&order=created_at.desc&limit=500').catch(()=>[]);
+    const returned=await sbAll('eng_movements','?warranty=eq.true&type=eq.WARRANTY_RETURN&order=created_at.desc').catch(()=>[]);
 
     // Also fetch warranty tickets with spares not yet in eng_movements
     var ticketWarrantyRows=[];
     try{
-      const wTickets=await sb('tickets','GET',null,'?call_type=in.(Warranty,Warranty Repeat,AMC)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at&order=created_at.desc&limit=500');
+      const wTickets=await sbAll('tickets','?call_type=in.(Warranty,Warranty Repeat,AMC)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at&order=created_at.desc');
       wTickets.forEach(function(t){
         var spares=t.spares||[];
         if(typeof spares==='string'){try{spares=JSON.parse(spares);}catch(e){spares=[];}}        spares.forEach(function(s){
@@ -11596,7 +11602,7 @@ async function loadAMCList(filter){
   _amcFilter=filter||'all';
   document.getElementById('amc-list').innerHTML='<div style="text-align:center;padding:30px;color:#9ca3af;">Loading...</div>';
   try{
-    var data=await sb('amc_contracts','GET',null,'?order=amc_end.asc&limit=500');
+    var data=await sbAll('amc_contracts','?order=amc_end.asc');
     _amcAll=data||[];
     var today=new Date();today.setHours(0,0,0,0);
     var in30=new Date(today);in30.setDate(in30.getDate()+30);
@@ -11835,11 +11841,11 @@ async function renderFeedback(){
 async function loadFeedback(){
   var month=document.getElementById('fb-month')?.value||'';
   var engId=document.getElementById('fb-eng-filter')?.value||'';
-  var q='?order=created_at.desc&limit=300';
+  var q='?order=created_at.desc';
   if(month)q+='&created_at=gte.'+month+'-01&created_at=lt.'+getNextMonth(month)+'-01';
   if(engId)q+='&eng_id=eq.'+encodeURIComponent(engId);
   try{
-    var rows=await sb('customer_feedback','GET',null,q);
+    var rows=await sbAll('customer_feedback',q);
     var total=(rows||[]).length;
     var avg=total?((rows.reduce(function(s,r){return s+(r.rating||0);},0)/total).toFixed(1)):'-';
     var dist=[0,0,0,0,0];
@@ -12023,7 +12029,7 @@ var _fuAll=[];var _fuFilter='overdue';
 async function loadFollowup(filter){
   _fuFilter=filter||'overdue';
   try{
-    var data=await sb('tickets','GET',null,'?follow_up_date=not.is.null&status=neq.Closed&order=follow_up_date.asc&limit=500');
+    var data=await sbAll('tickets','?follow_up_date=not.is.null&status=neq.Closed&order=follow_up_date.asc');
     _fuAll=data||[];
     var today=new Date().toLocaleDateString('en-CA');
     var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);var tomStr=tomorrow.toLocaleDateString('en-CA');
@@ -20061,7 +20067,7 @@ function pendingListRender(){
   var now=new Date();
   var dateStr=now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   var timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-  var isAdminOrWC=currentUser&&(currentUser.role==='admin'||currentUser.role==='work_controller');
+  var isAdminOrWC=currentUser&&(currentUser.role==='admin'||currentUser.role==='work_controller'||window._isCspMgr);
 
   // TAT badge
   function tatBadge(tat_date){
