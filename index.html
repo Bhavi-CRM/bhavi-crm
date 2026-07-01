@@ -3911,6 +3911,30 @@ async function exportFilteredTickets(){
   const getWorkStartAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&e.action.includes('Work Start'));return entry?.at||null;};
   // Last close action time
   const getClosedAt=t=>{const entry=[...getTL(t)].reverse().find(e=>e.action&&(e.action.toLowerCase().includes('closed')||e.action.toLowerCase().includes('close')));return entry?.at||null;};
+  // Total repair time: sum of all Work Session End durations + final open session to close
+  const getTotalRepairHrs=t=>{
+    const tl=getTL(t);
+    const sessions=tl.filter(e=>e.action==='Work Session End');
+    const done=sessions.reduce((s,e)=>s+(e.duration_min||0),0);
+    const closedAt=getClosedAt(t);
+    const lastWs=[...tl].reverse().find(e=>e.action&&e.action.includes('Work Start'));
+    const lastSessEnd=sessions.length?sessions[sessions.length-1]:null;
+    let extra=0;
+    if(lastWs&&closedAt){
+      const wsTime=new Date(lastWs.at);
+      const clTime=new Date(closedAt);
+      if(lastSessEnd){
+        const sessEndTime=new Date(lastSessEnd.at);
+        if(wsTime>sessEndTime){const m=Math.round((clTime-wsTime)/60000);if(m>0)extra=m;}
+      } else {
+        const m=Math.round((clTime-wsTime)/60000);if(m>0)extra=m;
+      }
+    }
+    const total=done+extra;
+    if(!total)return null;
+    const h=Math.floor(total/60),m=total%60;
+    return h>0?h+'h'+(m?' '+m+'m':''):(m+'m');
+  };
   // Visit Start (travel start) time
   const getVisitStartAt=t=>{const entry=[...getTL(t)].find(e=>e.action&&e.action==='Visit Start');return entry?.at||null;};
   // Manual time update remark
@@ -3955,7 +3979,7 @@ async function exportFilteredTickets(){
       fmtDate(workStartAt),  fmtTime(workStartAt),
       fmtDate(closedAt),     fmtTime(closedAt),
       durHrs(visitStartAt,workStartAt)||'-',
-      durHrs(workStartAt,closedAt)||'-',
+      getTotalRepairHrs(t)||durHrs(workStartAt,closedAt)||'-',
       durHrs(t.created_at,closedAt)||'-',
       visitGap[t.id]||'-',
       manualRemark?'YES ⚠️':'-',
@@ -4059,13 +4083,13 @@ async function renderMyCalls(){
         </div>`).join('')}
       </div>`:''}
       <div id="my-target-card"></div>
-      <div class="card"><div class="section-header"><h2>My Calls</h2><div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="openPastReports()">🕐 Past Reports</button><button class="btn btn-primary btn-sm" onclick="openDailyReport()">📋 Daily Report</button></div></div>
+      <div class="card"><div class="section-header"><h2>My Calls</h2><div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="openPastReports()">🕐 Past Reports</button><button class="btn btn-outline btn-sm" onclick="openDailyReport()">📋 Daily Report</button><button class="btn btn-primary btn-sm" onclick="openEngNewCall()">➕ New Call</button></div></div>
         <!-- Search bar -->
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
           <input type="text" id="my-calls-search" placeholder="🔍 Search ticket, customer, mobile, model, serial..." style="flex:1;min-width:200px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" oninput="filterMyCalls()">
           <select id="my-calls-status" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;" onchange="filterMyCalls()">
+            <option value="active" selected>Active Only</option>
             <option value="">All Status</option>
-            <option value="active">Active Only</option>
             <option value="closed">Closed Only</option>
           </select>
         </div>
@@ -4097,6 +4121,7 @@ async function renderMyCalls(){
       </div>`;
     // Load target widget async (non-blocking)
     loadMyTargetWidget(tickets);
+    filterMyCalls();
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 
@@ -4107,7 +4132,7 @@ function filterMyCalls(){
   var rows=document.querySelectorAll('#my-calls-tbody tr[data-id]');
   rows.forEach(function(row){
     var matchQ=!q||row.dataset.id.toLowerCase().includes(q)||row.dataset.cname.includes(q)||row.dataset.mobile.includes(q)||row.dataset.model.includes(q)||row.dataset.serial.includes(q);
-    var matchS=!statusF||(statusF==='active'&&row.dataset.status==='active')||(statusF==='closed'&&row.dataset.status==='closed');
+    var matchS=q||!statusF||(statusF==='active'&&row.dataset.status==='active')||(statusF==='closed'&&row.dataset.status==='closed');
     row.style.display=(matchQ&&matchS)?'':'none';
   });
 }
@@ -4155,6 +4180,25 @@ async function openNewCall(){
   window._fromWalkInId=null;
   var oldBanner=document.getElementById('wi-source-banner');if(oldBanner)oldBanner.remove();
   openModal('modal-call');
+}
+
+// Engineer creates a new call from site — auto-assigns to self
+async function openEngNewCall(){
+  await openNewCall();
+  // Auto-select current engineer in the engineer dropdown
+  const engEl=document.getElementById('call-eng');
+  if(engEl){
+    const engId=currentUser.eng_id||currentUser.user_id;
+    const engName=currentUser.name||'';
+    for(let i=0;i<engEl.options.length;i++){
+      if(engEl.options[i].value.startsWith(engId+'|')){engEl.selectedIndex=i;break;}
+    }
+    if(engEl.value===''&&engId){
+      const opt=document.createElement('option');
+      opt.value=engId+'|'+engName;opt.textContent=engName;opt.selected=true;
+      engEl.appendChild(opt);
+    }
+  }
 }
 
 // Point 9: Multi-field customer search
@@ -5153,15 +5197,32 @@ async function openEngUpdate(id){
     ${t.service_type==='On Site' ? (()=>{
       const tl=(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):(t.timeline||[]));
       const vsEntry=tl.find(e=>e.action==='Visit Start');
-      const wsEntry=tl.find(e=>e.action&&e.action.includes('Work Start'));
+      const wsEntries=tl.filter(e=>e.action&&e.action.includes('Work Start'));
+      const wsEntry=wsEntries.length?wsEntries[wsEntries.length-1]:null;
       const vsTime=vsEntry?new Date(vsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):'';
       const wsTime=wsEntry?new Date(wsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):t.visit_in||'';
-      if(wsEntry||t.visit_in){
-        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}</div>`;
+      const totalDone=tl.filter(e=>e.action==='Work Session End').reduce((s,e)=>s+(e.duration_min||0),0);
+      const pausedS=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold'];
+      const isPaused=pausedS.includes(t.status);
+      if(isPaused){
+        const sessInfo=wsEntries.length?`<div style="font-size:12px;color:#92400e;margin-bottom:8px;">📋 ${wsEntries.length} session(s) done${totalDone?` — ${Math.floor(totalDone/60)}h ${totalDone%60}m total work time`:''}</div>`:'';
+        return `<div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">⏸️ Call Paused — ${t.status}</div>
+          ${sessInfo}
+          <div style="display:flex;gap:8px;">
+            <button onclick="doVisitStart('${t.id}')" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🚗 Visit Start</button>
+            <button onclick="doWorkStart('${t.id}')" style="flex:1;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🔧 Work Start</button>
+          </div>
+        </div>`;
+      } else if(wsEntry||t.visit_in){
+        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}</div>`;
       } else if(vsEntry){
-        return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <span style="font-size:14px;font-weight:700;">🚗 Visiting — ${vsTime}</span>
-          <button onclick="doWorkStart('${t.id}')" style="background:#fff;color:#059669;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>
+          <div style="display:flex;gap:6px;">
+            <button onclick="doVisitStop('${t.id}')" style="background:#fff;color:#b45309;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;">🛑 Stop</button>
+            <button onclick="doWorkStart('${t.id}')" style="background:#fff;color:#059669;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>
+          </div>
         </div>`;
       } else {
         return `<div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -5776,8 +5837,24 @@ async function saveEngUpdate(){
         const pDate=pNow.toLocaleDateString('en-CA');
         const pEngId=currentUser.eng_id||currentUser.user_id;
         const pOpenLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(pEngId)+'&log_date=eq.'+pDate+'&ticket_id=eq.'+encodeURIComponent(id)+'&to_time=eq.OPEN');
+        let workDur=0;
         for(const pl of (pOpenLogs||[])){
+          if(pl.log_type==='work'&&pl.from_time){
+            const[fH,fM]=pl.from_time.split(':').map(Number);
+            const[tH,tM]=pTime.split(':').map(Number);
+            const d=(tH*60+tM)-(fH*60+fM);
+            if(d>0)workDur+=d;
+          }
           await sb('work_logs','PATCH',{to_time:pTime,updated_at:pNow.toISOString()},'?id=eq.'+pl.id).catch(()=>{});
+        }
+        if(workDur>0){
+          try{
+            const pTk=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));
+            if(pTk&&pTk[0]){
+              const pTl=[...(pTk[0].timeline||[]),{action:'Work Session End',by:currentUser.name,at:pNow.toISOString(),note:`Session ended ${pTime}`,duration_min:workDur}];
+              await sb('tickets','PATCH',{timeline:pTl,updated_at:pNow.toISOString()},'?id=eq.'+encodeURIComponent(id)).catch(()=>{});
+            }
+          }catch(tlEx){}
         }
       }catch(pEx){console.log('WorkLog pause-close err:',pEx);}
     }
@@ -10406,6 +10483,25 @@ async function doVisitStart(ticketId){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// Visit Stop - stops traveling without starting work
+async function doVisitStop(ticketId){
+  const now=new Date();
+  const timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const dateNow=now.toLocaleDateString('en-CA');
+  const memberId=currentUser.eng_id||currentUser.user_id;
+  try{
+    const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&to_time=eq.OPEN&ticket_id=eq.'+encodeURIComponent(ticketId));
+    for(const ol of (openLogs||[])){
+      await sb('work_logs','PATCH',{to_time:timeNow,updated_at:now.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+    }
+    const t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
+    const tlStop=[...(t?.timeline||[]),{action:'Visit Stop',by:currentUser.name,at:now.toISOString(),note:'Travel stopped: '+timeNow}];
+    await sb('tickets','PATCH',{timeline:tlStop,updated_at:now.toISOString()},'?id=eq.'+ticketId).catch(()=>{});
+    alert('🛑 Travel stopped — '+timeNow+'\nCall remains in its current status.');
+    closeModal('modal-eng-update');
+  }catch(e){alert('Error: '+e.message);}
+}
+
 // Show/hide manual time remark box when engineer manually edits Time In or Time Out
 function onManualTimeInput(){
   var inEl=document.getElementById('upd-in');
@@ -10462,8 +10558,11 @@ async function doWorkStart(ticketId){
   // Update ticket
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
-    const tl=[...(t?.timeline||[]),{action:'Work Started',by:currentUser.name,at:now.toISOString(),note:`Time In: ${timeIn}`}];
-    await sb('tickets','PATCH',{visit_date:dateIn,visit_in:timeIn,status:'In Progress',timeline:tl,updated_at:now.toISOString()},`?id=eq.${ticketId}`);
+    const sessionNo=(t?.timeline||[]).filter(e=>e.action&&e.action.includes('Work Start')).length+1;
+    const tl=[...(t?.timeline||[]),{action:'Work Started',by:currentUser.name,at:now.toISOString(),note:`Session ${sessionNo}: Time In: ${timeIn}`}];
+    const wsPatch={status:'In Progress',timeline:tl,updated_at:now.toISOString()};
+    if(!t?.visit_in){wsPatch.visit_date=dateIn;wsPatch.visit_in=timeIn;}
+    await sb('tickets','PATCH',wsPatch,`?id=eq.${ticketId}`);
 
     // ── AUTO WORK LOG ──
     const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
@@ -13905,8 +14004,10 @@ async function renderCourier(){
           <input type="text" id="cr-in-awb" placeholder="Paste AWB number" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>Courier Agency <span class="req">*</span></label>
           <input type="text" id="cr-in-agency" placeholder="e.g. BlueDart, DTDC, FedEx" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
-        <div class="form-group"><label>Sent By (Sender Name)</label>
-          <input type="text" id="cr-in-sender" placeholder="Regular sender name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+        <div class="form-group"><label>Sent By (Sender Name) <span class="req">*</span></label>
+          <input type="text" id="cr-in-sender" placeholder="Sender / party name" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+        <div class="form-group"><label>Sender Mobile <span class="req">*</span></label>
+          <input type="tel" id="cr-in-sender-mobile" placeholder="Sender's mobile number" maxlength="15" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>From Place <span class="req">*</span></label>
           <input type="text" id="cr-in-from" placeholder="City/Location" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>Weight (kg)</label>
@@ -14190,9 +14291,11 @@ async function saveCourierEntry(dir){
   var awb=document.getElementById('cr-'+dir+'-awb').value.trim();
   var agency=document.getElementById('cr-'+dir+'-agency').value.trim();
   var place='',person='',recvId='';
+  var senderMobile='';
   if(isIn){
     place=document.getElementById('cr-in-from').value.trim();
     person=document.getElementById('cr-in-sender').value.trim();
+    senderMobile=document.getElementById('cr-in-sender-mobile').value.trim();
   } else {
     recvId=document.getElementById('cr-out-recv-id')?.value||'';
     var recvData=window._selectedReceiver||null;
@@ -14203,6 +14306,8 @@ async function saveCourierEntry(dir){
   var weight=isIn?document.getElementById('cr-in-weight').value:document.getElementById('cr-out-weight').value;
 
   if(!agency||(isIn&&!awb)||(isIn&&!place)){alert('AWB No and Place are required for Inward entries');return;}
+  if(isIn&&!person){alert('Sender name is required');return;}
+  if(isIn&&!senderMobile){alert('Sender mobile number is required');return;}
   if(!isIn&&!agency){alert('Agency is required');return;}
   var products=getCourierProducts(dir);
   if(!isIn&&!products.length){alert('Please add at least one product for Outward entries');return;}
@@ -14215,6 +14320,7 @@ async function saveCourierEntry(dir){
       awb_no:awb,
       agency:agency,
       person_name:person||null,
+      sender_mobile:senderMobile||null,
       place:place,
       receiver_id:recvId||null,
       receiver_data:isIn?null:(window._selectedReceiver||null),
@@ -14303,7 +14409,7 @@ function renderCourierList(entries){
       // Sub-header info
       +'<div style="padding:6px 14px;background:#FAFAFA;border-bottom:1px solid #F1F5F9;display:flex;flex-wrap:wrap;gap:12px;">'
       +'<span style="font-size:12px;color:#374151;">'+(isIn?'🏠 From: ':'📍 To: ')+'<b>'+e.place+'</b></span>'
-      +(e.person_name?'<span style="font-size:12px;color:#374151;">'+(isIn?'👤 Sender: ':'👤 Receiver: ')+'<b>'+e.person_name+'</b></span>':'')
+      +(e.person_name?'<span style="font-size:12px;color:#374151;">'+(isIn?'👤 Sender: ':'👤 Receiver: ')+'<b>'+e.person_name+'</b>'+(e.sender_mobile?' &nbsp;📞 '+e.sender_mobile:'')+'</span>':'')
       +'<span style="font-size:11px;color:#9CA3AF;">By: '+e.wc_name+'</span>'
       +'</div>'
       // Products table
@@ -14596,21 +14702,21 @@ async function downloadCourierExcel(){
       var products=safeProds(entry.products);
       var d=fmtExcelDate(entry.entry_date);
       if(!products.length){
-        rows.push([d,safeStr(entry.direction),safeStr(entry.awb_no),safeStr(entry.agency),safeStr(entry.person_name),safeStr(entry.place),safeStr(entry.weight),'','','','','','','','',safeStr(entry.wc_name)]);
+        rows.push([d,safeStr(entry.direction),safeStr(entry.awb_no),safeStr(entry.agency),safeStr(entry.person_name),safeStr(entry.sender_mobile),safeStr(entry.place),safeStr(entry.weight),'','','','','','','','',safeStr(entry.wc_name)]);
       }else{
         products.forEach(function(p){
-          rows.push([d,safeStr(entry.direction),safeStr(entry.awb_no),safeStr(entry.agency),safeStr(entry.person_name),safeStr(entry.place),safeStr(entry.weight),safeStr(p.call_id),safeStr(p.model),safeStr(p.serial),safeStr(p.warranty),safeStr(p.faulty_part),safeStr(p.invoice_avail),safeStr(p.invoice_amount),safeAcc(p.accessories),safeStr(entry.wc_name)]);
+          rows.push([d,safeStr(entry.direction),safeStr(entry.awb_no),safeStr(entry.agency),safeStr(entry.person_name),safeStr(entry.sender_mobile),safeStr(entry.place),safeStr(entry.weight),safeStr(p.call_id),safeStr(p.model),safeStr(p.serial),safeStr(p.warranty),safeStr(p.faulty_part),safeStr(p.invoice_avail),safeStr(p.invoice_amount),safeAcc(p.accessories),safeStr(entry.wc_name)]);
         });
       }
     });
     return rows;
   }
 
-  var headers=['Date','Direction','AWB No','Agency','Person','Place','Weight(kg)','Call ID','Model','Serial No','Warranty','Faulty Part','Invoice','Invoice Amt','Accessories','WC'];
+  var headers=['Date','Direction','AWB No','Agency','Person','Mobile','Place','Weight(kg)','Call ID','Model','Serial No','Warranty','Faulty Part','Invoice','Invoice Amt','Accessories','WC'];
 
   function makeSheet(rows){
     var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
-    ws['!cols']=[{wch:12},{wch:10},{wch:18},{wch:14},{wch:18},{wch:14},{wch:8},{wch:14},{wch:16},{wch:16},{wch:14},{wch:10},{wch:8},{wch:10},{wch:35},{wch:18}];
+    ws['!cols']=[{wch:12},{wch:10},{wch:18},{wch:14},{wch:18},{wch:14},{wch:14},{wch:8},{wch:14},{wch:16},{wch:16},{wch:14},{wch:10},{wch:8},{wch:10},{wch:35},{wch:18}];
     return ws;
   }
 
