@@ -17,7 +17,7 @@
 <style>
 :root{--primary:#1d4ed8;--primary-dark:#1e40af;--primary-light:#eff6ff;--success:#0e9f6e;--danger:#f05252;--warning:#ff9800;--sidebar-bg:#1e2a3a;--sidebar-text:#b0bec5;--bg:#f4f6fb;--card:#fff;--border:#e2e8f0;--text:#1a202c;--text-muted:#64748b;--shadow:0 2px 8px rgba(0,0,0,0.08);--radius:10px;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;text-transform:uppercase;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;text-transform:uppercase;overscroll-behavior:none;}
 #sidebar{width:220px;min-width:220px;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100;overflow-y:auto;}
 #sidebar-user{position:sticky;bottom:0;background:var(--sidebar-bg);padding-bottom:8px;}
 #sidebar-logo{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);background:#fff;display:flex;align-items:center;justify-content:center;min-height:70px;position:sticky;top:0;z-index:10;}
@@ -35,7 +35,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);di
 #main{margin-left:220px;flex:1;height:100vh;overflow-y:auto;display:flex;flex-direction:column;}
 #topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
 #topbar h1{font-size:18px;font-weight:700;}
-#page-content{padding:20px;flex:1;}
+#page-content{padding:20px;flex:1;overscroll-behavior:contain;}
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
 .kpi-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border-left:4px solid var(--primary);cursor:pointer;}
@@ -3048,19 +3048,20 @@ async function renderPeonDashboard(){
   pc.innerHTML='<div class="loading">Loading...</div>';
   const peonId=currentUser.user_id||currentUser.eng_id;
   const today=new Date().toLocaleDateString('en-CA');
-  // Fetch today's completed tasks
-  let doneTasks=[];
+  // Fetch today's completed tasks + all task rows
+  let allTodayLogs=[];
   try{
-    const res=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today);
-    doneTasks=(res||[]).map(function(r){return r.task_name;});
+    const res=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&order=done_at.asc');
+    allTodayLogs=res||[];
   }catch(e){console.log('peon tasks fetch:',e);}
+  const doneTasks=allTodayLogs.filter(function(r){return !r.task_name.startsWith('extra_');}).map(function(r){return r.task_name;});
+  const extraLogs=allTodayLogs.filter(function(r){return r.task_name.startsWith('extra_');});
   // Punch status
-  const today2=new Date().toLocaleDateString('en-CA');
   let ps=JSON.parse(localStorage.getItem('punch_'+currentUser.user_id)||'null');
   try{
-    const sbP=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(peonId)+'&punch_in_date=eq.'+today2+'&status=eq.active&limit=1');
+    const sbP=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(peonId)+'&punch_in_date=eq.'+today+'&status=eq.active&limit=1');
     if(sbP&&sbP.length>0){ps={punched_in:true,punch_in_time:sbP[0].punch_in_time,punch_in_date:sbP[0].punch_in_date};localStorage.setItem('punch_'+currentUser.user_id,JSON.stringify(ps));}
-    else if(ps&&ps.punched_in&&ps.punch_in_date!==today2){ps=null;localStorage.removeItem('punch_'+currentUser.user_id);}
+    else if(ps&&ps.punched_in&&ps.punch_in_date!==today){ps=null;localStorage.removeItem('punch_'+currentUser.user_id);}
   }catch(e){}
   const punchHtml=ps&&ps.punched_in
     ?`<div class="punch-bar"><div><div class="punch-time">🔴 On Duty</div><div class="punch-info">Started: ${ps.punch_in_time}</div></div><button class="btn btn-danger" onclick="doPunchOut()">⏹ Punch Out</button></div>`
@@ -3076,6 +3077,14 @@ async function renderPeonDashboard(){
       <div style="flex:1;"><div style="font-size:15px;font-weight:${isDone?'600':'500'};color:${isDone?'#15803d':'var(--text)'};${isDone?'text-decoration:line-through;':''}">${t.label}</div></div>
     </div>`;
   }).join('');
+  const extraHtml=extraLogs.map(function(l){
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:8px;border-radius:10px;background:#eff6ff;border:1.5px solid #bfdbfe;">
+      <span style="font-size:16px;">📝</span>
+      <div style="flex:1;"><div style="font-size:14px;font-weight:600;">${l.task_label||''}</div>
+      <div style="font-size:11px;color:var(--text-muted);">${l.extra_from||''} ${l.extra_to?' → '+l.extra_to:''}</div></div>
+      <button onclick="deletePeonExtra('${l.id}')" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;padding:4px;">✕</button>
+    </div>`;
+  }).join('');
   pc.innerHTML=`
     ${punchHtml}
     <div class="card" style="margin-bottom:14px;">
@@ -3085,55 +3094,98 @@ async function renderPeonDashboard(){
       </div>
       <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#22c55e,#0d9488);border-radius:4px;transition:width .4s;"></div></div>
       ${tasksHtml}
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:10px;">➕ Extra / Custom Work</div>
+      ${extraHtml}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+        <input type="text" id="peon-extra-note" placeholder="Describe the work done..." style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">From:</label>
+          <input type="time" id="peon-extra-from" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
+          <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">To:</label>
+          <input type="time" id="peon-extra-to" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
+          <button onclick="savePeonExtra()" style="background:#2563eb;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+        </div>
+      </div>
     </div>`;
 }
 
 async function togglePeonTask(taskId, taskLabel){
   const peonId=currentUser.user_id||currentUser.eng_id;
   const today=new Date().toLocaleDateString('en-CA');
-  // Check if already done
   let existing=[];
   try{existing=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&task_name=eq.'+encodeURIComponent(taskId));}catch(e){}
   if(existing&&existing.length>0){
-    // Undo — delete it
     try{await sb('peon_task_logs','DELETE',null,'?id=eq.'+existing[0].id);}catch(e){alert('Error: '+e.message);return;}
   }else{
-    // Mark done
     try{await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:taskId,task_label:taskLabel,done_at:new Date().toISOString()},null);}
     catch(e){alert('Error saving: '+e.message);return;}
   }
   renderPeonDashboard();
 }
 
-// PEON ACTIVITY — admin view
+async function savePeonExtra(){
+  const note=document.getElementById('peon-extra-note')?.value.trim();
+  if(!note){alert('Please describe the work done.');return;}
+  const from=document.getElementById('peon-extra-from')?.value||'';
+  const to=document.getElementById('peon-extra-to')?.value||'';
+  const peonId=currentUser.user_id||currentUser.eng_id;
+  const today=new Date().toLocaleDateString('en-CA');
+  try{
+    await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:'extra_'+Date.now(),task_label:note,extra_from:from,extra_to:to,done_at:new Date().toISOString()},null);
+    renderPeonDashboard();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deletePeonExtra(id){
+  if(!confirm('Remove this entry?'))return;
+  try{await sb('peon_task_logs','DELETE',null,'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  renderPeonDashboard();
+}
+
+// PEON ACTIVITY — admin view (shows only peon-role users)
 async function renderPeonActivity(){
   const pc=document.getElementById('page-content');
   if(!pc)return;
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
-    // Date filter
     const selDate=window._peonActDate||new Date().toLocaleDateString('en-CA');
-    const logs=await sb('peon_task_logs','GET',null,'?log_date=eq.'+selDate+'&order=done_at.asc');
-    const punches=await sb('punch_logs','GET',null,'?punch_in_date=eq.'+selDate+'&order=punch_in_time.asc');
+    // Fetch only peon-role users first
+    const peonUsers=await sb('users','GET',null,'?role=eq.peon&is_active=eq.true&order=name');
+    const peonIds=(peonUsers||[]).map(function(u){return u.user_id;});
+    if(!peonIds.length){pc.innerHTML='<div class="alert alert-warning" style="margin:20px;">No peon users found. Create a user with role=peon in Supabase.</div>';return;}
+    const idFilter=peonIds.length===1?'peon_id=eq.'+peonIds[0]:'peon_id=in.('+peonIds.join(',')+')';
+    const [logs,punches]=await Promise.all([
+      sb('peon_task_logs','GET',null,'?log_date=eq.'+selDate+'&'+idFilter+'&order=done_at.asc'),
+      sb('punch_logs','GET',null,'?punch_in_date=eq.'+selDate+'&eng_id=in.('+peonIds.join(',')+')'+'&order=punch_in_time.asc')
+    ]);
     // Group by peon
     const byPeon={};
-    (logs||[]).forEach(function(l){if(!byPeon[l.peon_id])byPeon[l.peon_id]={name:l.peon_name,tasks:[]};byPeon[l.peon_id].tasks.push(l);});
-    // Build punch map
+    peonUsers.forEach(function(u){byPeon[u.user_id]={name:u.name,tasks:[]};});
+    (logs||[]).forEach(function(l){if(byPeon[l.peon_id])byPeon[l.peon_id].tasks.push(l);});
     const punchMap={};(punches||[]).forEach(function(p){punchMap[p.eng_id]=p;});
-    // Also include peons who punched in but have no tasks
-    (punches||[]).forEach(function(p){if(!byPeon[p.eng_id])byPeon[p.eng_id]={name:p.eng_name||p.eng_id,tasks:[]};});
     const peonKeys=Object.keys(byPeon);
-    const bodyHtml=peonKeys.length===0?`<div style="text-align:center;padding:40px;color:var(--text-muted);">No peon activity recorded for this date.</div>`:peonKeys.map(function(pid){
+    const bodyHtml=peonKeys.map(function(pid){
       const pd=byPeon[pid];const punch=punchMap[pid];
-      const doneIds=pd.tasks.map(function(t){return t.task_name;});
+      const stdTasks=pd.tasks.filter(function(t){return !t.task_name.startsWith('extra_');});
+      const extraTasks=pd.tasks.filter(function(t){return t.task_name.startsWith('extra_');});
+      const doneIds=stdTasks.map(function(t){return t.task_name;});
       const taskRows=PEON_TASKS.map(function(t){
         const done=doneIds.includes(t.id);
-        const log=pd.tasks.find(function(l){return l.task_name===t.id;});
+        const log=stdTasks.find(function(l){return l.task_name===t.id;});
         const timeStr=log&&log.done_at?new Date(log.done_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
         return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
           <span style="font-size:15px;">${done?'✅':'⬜'}</span>
           <span style="flex:1;font-size:13px;color:${done?'var(--text)':'var(--text-muted)'};">${t.icon} ${t.label}</span>
           <span style="font-size:11px;color:var(--text-muted);">${timeStr}</span>
+        </div>`;
+      }).join('');
+      const extraRows=extraTasks.map(function(l){
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:14px;">📝</span>
+          <span style="flex:1;font-size:13px;">${l.task_label||''}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${l.extra_from||''}${l.extra_to?' → '+l.extra_to:''}</span>
         </div>`;
       }).join('');
       const pct=Math.round(doneIds.length/PEON_TASKS.length*100);
@@ -3146,15 +3198,16 @@ async function renderPeonActivity(){
         </div>
         <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${pct===100?'#22c55e':'#2563eb'};border-radius:3px;"></div></div>
         ${taskRows}
+        ${extraRows?`<div style="margin-top:10px;padding-top:8px;border-top:2px dashed var(--border);"><div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">📝 EXTRA WORK</div>${extraRows}</div>`:''}
       </div>`;
     }).join('');
     pc.innerHTML=`<div class="section-header" style="margin-bottom:14px;"><h2>🧹 Peon Activity</h2></div>
       <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <label style="font-size:13px;font-weight:600;">Date:</label>
         <input type="date" value="${selDate}" onchange="window._peonActDate=this.value;renderPeonActivity();" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
-        <span style="font-size:12px;color:var(--text-muted);">${peonKeys.length} peon(s) active</span>
+        <span style="font-size:12px;color:var(--text-muted);">${peonIds.length} peon(s)</span>
       </div>
-      ${bodyHtml}`;
+      ${bodyHtml||'<div style="text-align:center;padding:40px;color:var(--text-muted);">No activity recorded for this date.</div>'}`;
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 // ===================== END PEON =====================
@@ -4278,31 +4331,36 @@ async function renderMyCalls(){
             <option value="closed">Closed Only</option>
           </select>
         </div>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Problem</th><th>Type</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-          <tbody id="my-calls-tbody">${(()=>{
+        <div id="my-calls-tbody">${(()=>{
             const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
             const sorted=[...tickets].sort((a,b)=>{
               const aOpen=!closedStatuses.includes(a.status);
               const bOpen=!closedStatuses.includes(b.status);
               if(aOpen!==bOpen) return aOpen?-1:1;
-              // Within same group: sort by ticket ID desc (newer first)
               return (b.id||'').localeCompare(a.id||'');
             });
-            return sorted.map(t=>`<tr data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${closedStatuses.includes(t.status)?'closed':'active'}">
-              <td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
-              <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
-              <td>${t.model||'-'}</td><td>${t.problem||'-'}</td>
-              <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
-              <td>${statusBadge(t.status)}</td>
-              <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
-              <td style="white-space:nowrap;">${closedStatuses.includes(t.status)?
-                `<button class="btn btn-sm btn-outline" onclick="viewTicket('${t.id}')">View</button>`:
-                `<button class="btn btn-sm btn-primary" onclick="openEngUpdate('${t.id}')">Update</button>`}
-              </td>
-            </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted);">No calls</td></tr>';
-          })()}</tbody>
-        </table></div>
+            if(!sorted.length) return '<div style="text-align:center;padding:30px;color:var(--text-muted);">No calls</div>';
+            return sorted.map(t=>{
+              const isClosed=closedStatuses.includes(t.status);
+              return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${isClosed?'var(--border)':'#bfdbfe'};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+                  <div>
+                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}</div>
+                    <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
+                  </div>
+                  <div style="flex-shrink:0;">${statusBadge(t.status)}</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+                  <div>📱 <b style="color:var(--text);">${t.model||'-'}</b></div>
+                  <div>🔢 <b style="color:var(--text);">${t.serial||'-'}</b></div>
+                  <div>📞 <a href="tel:${t.mobile}" style="color:#1d4ed8;font-weight:600;">${t.mobile||'-'}</a>${t.mobile?` <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a>`:''}</div>
+                  <div>📅 ${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</div>
+                  ${t.problem?`<div style="grid-column:1/-1;color:var(--text-muted);">🔧 ${t.problem}</div>`:''}
+                </div>
+                <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
+              </div>`;
+            }).join('');
+          })()}</div>
       </div>`;
     // Load target widget async (non-blocking)
     loadMyTargetWidget(tickets);
@@ -4310,15 +4368,15 @@ async function renderMyCalls(){
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 
-// Filter My Calls table client-side
+// Filter My Calls cards client-side
 function filterMyCalls(){
   var q=(document.getElementById('my-calls-search')?.value||'').toLowerCase().trim();
   var statusF=document.getElementById('my-calls-status')?.value||'';
-  var rows=document.querySelectorAll('#my-calls-tbody tr[data-id]');
-  rows.forEach(function(row){
-    var matchQ=!q||row.dataset.id.toLowerCase().includes(q)||row.dataset.cname.includes(q)||row.dataset.mobile.includes(q)||row.dataset.model.includes(q)||row.dataset.serial.includes(q);
-    var matchS=q||!statusF||(statusF==='active'&&row.dataset.status==='active')||(statusF==='closed'&&row.dataset.status==='closed');
-    row.style.display=(matchQ&&matchS)?'':'none';
+  var cards=document.querySelectorAll('#my-calls-tbody [data-id]');
+  cards.forEach(function(card){
+    var matchQ=!q||card.dataset.id.toLowerCase().includes(q)||card.dataset.cname.includes(q)||card.dataset.mobile.includes(q)||card.dataset.model.includes(q)||card.dataset.serial.includes(q);
+    var matchS=q||!statusF||(statusF==='active'&&card.dataset.status==='active')||(statusF==='closed'&&card.dataset.status==='closed');
+    card.style.display=(matchQ&&matchS)?'':'none';
   });
 }
 
