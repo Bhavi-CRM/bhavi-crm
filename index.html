@@ -338,6 +338,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
+    <div class="nav-item hidden" onclick="navigate('peon-activity')" id="nav-peon-activity"><span class="icon">🧹</span><span>Peon Activity</span></div>
   </div>
   <div class="nav-section" id="nav-automation-section">
     <div class="nav-section-title">Automation</div>
@@ -2786,10 +2787,12 @@ function setupNav(){
     const isEng=role==='engineer';
     const isWC=(role==='admin'&&roleType==='work_controller')||role==='work_controller';
     const isAdmin=(role==='admin'&&roleType!=='work_controller')&&role!=='work_controller';
+    const isPeon=role==='peon';
     // Cache role flags globally so all page renderers use the same detection
     window._appIsEng=isEng;
     window._appIsWC=isWC;
     window._appIsAdmin=isAdmin;
+    window._appIsPeon=isPeon;
     
     // Debug log
     console.log('setupNav:', {role, roleType, isEng, isWC, isAdmin, user: currentUser.user_id});
@@ -2810,7 +2813,22 @@ function setupNav(){
     // Admin section visibility
     var as=document.getElementById('nav-admin-section');
 
-    if(isEng){
+    if(isPeon){
+      // Peon sees only their own task dashboard — hide everything else
+      ['nav-tickets','nav-my-calls','nav-work-log','nav-walk-in','nav-courier','btn-new-call',
+       'nav-inventory','nav-customers','nav-reports','nav-work-log-report','nav-walk-in-report',
+       'nav-courier-report','nav-master','nav-settings','nav-tasks','nav-sales','nav-route-planning',
+       'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report','nav-inquiries',
+       'nav-live-map','nav-ai-agent','nav-ai-analysis','nav-attendance','nav-targets','nav-amc',
+       'nav-feedback','nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
+       'btn-daily-report','btn-weekly-report','nav-eng-parts'
+      ].forEach(function(id){sv(id,false);});
+      if(as)as.style.display='none';
+      var autoSec2=document.getElementById('nav-automation-section');
+      var aiSec2=document.getElementById('nav-ai-section');
+      if(autoSec2)autoSec2.style.display='none';
+      if(aiSec2)aiSec2.style.display='none';
+    }else if(isEng){
       sv('nav-tickets',false);sv('nav-my-calls',true);sv('nav-work-log',true);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
@@ -2844,7 +2862,7 @@ function setupNav(){
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
-      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
+      sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
     // AI Agent nav: show for admin and special engineers
@@ -2906,7 +2924,7 @@ async function navigate(page){
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
   const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -3010,7 +3028,139 @@ async function validateStatusChange(ticketId, fromStatus, toStatus, role){
 }
 
 // DASHBOARD
+// ===================== PEON DASHBOARD =====================
+const PEON_TASKS=[
+  {id:'clean_morning',label:'Office Cleaning (Morning)',icon:'🧹'},
+  {id:'clean_evening',label:'Office Cleaning (Evening)',icon:'🧹'},
+  {id:'water',label:'Water Dispenser Refilling',icon:'💧'},
+  {id:'tea',label:'Tea / Coffee Service',icon:'☕'},
+  {id:'dust',label:'Dusting & Sweeping',icon:'🪣'},
+  {id:'trash',label:'Trash / Waste Disposal',icon:'🗑️'},
+  {id:'washroom',label:'Washroom Cleaning',icon:'🚿'},
+  {id:'visitor',label:'Visitor Hospitality',icon:'🤝'},
+  {id:'kitchen',label:'Kitchen / Pantry Cleaning',icon:'🍽️'},
+  {id:'courier',label:'Courier / Mail Handling',icon:'📬'},
+];
+
+async function renderPeonDashboard(){
+  const pc=document.getElementById('page-content');
+  if(!pc)return;
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  const peonId=currentUser.user_id||currentUser.eng_id;
+  const today=new Date().toLocaleDateString('en-CA');
+  // Fetch today's completed tasks
+  let doneTasks=[];
+  try{
+    const res=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today);
+    doneTasks=(res||[]).map(function(r){return r.task_name;});
+  }catch(e){console.log('peon tasks fetch:',e);}
+  // Punch status
+  const today2=new Date().toLocaleDateString('en-CA');
+  let ps=JSON.parse(localStorage.getItem('punch_'+currentUser.user_id)||'null');
+  try{
+    const sbP=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(peonId)+'&punch_in_date=eq.'+today2+'&status=eq.active&limit=1');
+    if(sbP&&sbP.length>0){ps={punched_in:true,punch_in_time:sbP[0].punch_in_time,punch_in_date:sbP[0].punch_in_date};localStorage.setItem('punch_'+currentUser.user_id,JSON.stringify(ps));}
+    else if(ps&&ps.punched_in&&ps.punch_in_date!==today2){ps=null;localStorage.removeItem('punch_'+currentUser.user_id);}
+  }catch(e){}
+  const punchHtml=ps&&ps.punched_in
+    ?`<div class="punch-bar"><div><div class="punch-time">🔴 On Duty</div><div class="punch-info">Started: ${ps.punch_in_time}</div></div><button class="btn btn-danger" onclick="doPunchOut()">⏹ Punch Out</button></div>`
+    :`<div class="punch-bar"><div><div class="punch-time">🟢 Ready</div><div class="punch-info">Click to start duty</div></div><button class="btn btn-success" onclick="doPunchIn()">▶ Punch In</button></div>`;
+  const doneCount=doneTasks.length;
+  const totalCount=PEON_TASKS.length;
+  const pct=Math.round(doneCount/totalCount*100);
+  const tasksHtml=PEON_TASKS.map(function(t){
+    const isDone=doneTasks.includes(t.id);
+    return `<div onclick="togglePeonTask('${t.id}','${t.label}')" style="display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:10px;border-radius:12px;background:${isDone?'#f0fdf4':'var(--card)'};border:2px solid ${isDone?'#22c55e':'var(--border)'};cursor:pointer;transition:all .2s;user-select:none;">
+      <div style="width:32px;height:32px;border-radius:50%;border:2.5px solid ${isDone?'#22c55e':'#cbd5e1'};background:${isDone?'#22c55e':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:900;">${isDone?'✓':''}</div>
+      <div style="font-size:18px;flex-shrink:0;">${t.icon}</div>
+      <div style="flex:1;"><div style="font-size:15px;font-weight:${isDone?'600':'500'};color:${isDone?'#15803d':'var(--text)'};${isDone?'text-decoration:line-through;':''}">${t.label}</div></div>
+    </div>`;
+  }).join('');
+  pc.innerHTML=`
+    ${punchHtml}
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div><div style="font-size:16px;font-weight:700;">Today's Tasks</div><div style="font-size:12px;color:var(--text-muted);">${new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}</div></div>
+        <div style="text-align:right;"><div style="font-size:22px;font-weight:800;color:${pct===100?'#22c55e':'#2563eb'};">${doneCount}/${totalCount}</div><div style="font-size:11px;color:var(--text-muted);">Completed</div></div>
+      </div>
+      <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin-bottom:16px;"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#22c55e,#0d9488);border-radius:4px;transition:width .4s;"></div></div>
+      ${tasksHtml}
+    </div>`;
+}
+
+async function togglePeonTask(taskId, taskLabel){
+  const peonId=currentUser.user_id||currentUser.eng_id;
+  const today=new Date().toLocaleDateString('en-CA');
+  // Check if already done
+  let existing=[];
+  try{existing=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&task_name=eq.'+encodeURIComponent(taskId));}catch(e){}
+  if(existing&&existing.length>0){
+    // Undo — delete it
+    try{await sb('peon_task_logs','DELETE',null,'?id=eq.'+existing[0].id);}catch(e){alert('Error: '+e.message);return;}
+  }else{
+    // Mark done
+    try{await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:taskId,task_label:taskLabel,done_at:new Date().toISOString()},null);}
+    catch(e){alert('Error saving: '+e.message);return;}
+  }
+  renderPeonDashboard();
+}
+
+// PEON ACTIVITY — admin view
+async function renderPeonActivity(){
+  const pc=document.getElementById('page-content');
+  if(!pc)return;
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    // Date filter
+    const selDate=window._peonActDate||new Date().toLocaleDateString('en-CA');
+    const logs=await sb('peon_task_logs','GET',null,'?log_date=eq.'+selDate+'&order=done_at.asc');
+    const punches=await sb('punch_logs','GET',null,'?punch_in_date=eq.'+selDate+'&order=punch_in_time.asc');
+    // Group by peon
+    const byPeon={};
+    (logs||[]).forEach(function(l){if(!byPeon[l.peon_id])byPeon[l.peon_id]={name:l.peon_name,tasks:[]};byPeon[l.peon_id].tasks.push(l);});
+    // Build punch map
+    const punchMap={};(punches||[]).forEach(function(p){punchMap[p.eng_id]=p;});
+    // Also include peons who punched in but have no tasks
+    (punches||[]).forEach(function(p){if(!byPeon[p.eng_id])byPeon[p.eng_id]={name:p.eng_name||p.eng_id,tasks:[]};});
+    const peonKeys=Object.keys(byPeon);
+    const bodyHtml=peonKeys.length===0?`<div style="text-align:center;padding:40px;color:var(--text-muted);">No peon activity recorded for this date.</div>`:peonKeys.map(function(pid){
+      const pd=byPeon[pid];const punch=punchMap[pid];
+      const doneIds=pd.tasks.map(function(t){return t.task_name;});
+      const taskRows=PEON_TASKS.map(function(t){
+        const done=doneIds.includes(t.id);
+        const log=pd.tasks.find(function(l){return l.task_name===t.id;});
+        const timeStr=log&&log.done_at?new Date(log.done_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:15px;">${done?'✅':'⬜'}</span>
+          <span style="flex:1;font-size:13px;color:${done?'var(--text)':'var(--text-muted)'};">${t.icon} ${t.label}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${timeStr}</span>
+        </div>`;
+      }).join('');
+      const pct=Math.round(doneIds.length/PEON_TASKS.length*100);
+      return `<div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div><div style="font-size:16px;font-weight:700;">🧹 ${pd.name||pid}</div>
+            <div style="font-size:12px;color:var(--text-muted);">Punch: ${punch?(punch.punch_in_time+(punch.punch_out_time?' → '+punch.punch_out_time:'  (still on duty)')):'Not punched in'}</div>
+          </div>
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:800;color:${pct===100?'#22c55e':'#2563eb'};">${doneIds.length}/${PEON_TASKS.length}</div><div style="font-size:11px;color:var(--text-muted);">${pct}% done</div></div>
+        </div>
+        <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${pct===100?'#22c55e':'#2563eb'};border-radius:3px;"></div></div>
+        ${taskRows}
+      </div>`;
+    }).join('');
+    pc.innerHTML=`<div class="section-header" style="margin-bottom:14px;"><h2>🧹 Peon Activity</h2></div>
+      <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label style="font-size:13px;font-weight:600;">Date:</label>
+        <input type="date" value="${selDate}" onchange="window._peonActDate=this.value;renderPeonActivity();" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+        <span style="font-size:12px;color:var(--text-muted);">${peonKeys.length} peon(s) active</span>
+      </div>
+      ${bodyHtml}`;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+// ===================== END PEON =====================
+
 async function renderDashboard(){
+  if(currentUser&&currentUser.role==='peon'){return renderPeonDashboard();}
   const pc=document.getElementById('page-content');
   if(!pc)return;
   if(!currentUser){
