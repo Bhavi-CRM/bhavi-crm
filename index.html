@@ -3062,8 +3062,14 @@ async function renderPeonDashboard(){
   const cfgMap={};taskCfgRows.forEach(function(c){cfgMap[c.task_id]=c;});
   // Custom tasks from DB (not in PEON_TASKS)
   const stdIds=PEON_TASKS.map(function(t){return t.id;});
-  const customTasks=taskCfgRows.filter(function(c){return c.is_custom&&!stdIds.includes(c.task_id);}).map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋'};});
-  const allTasks=[...PEON_TASKS,...customTasks];
+  const customTasks=taskCfgRows.filter(function(c){return c.is_custom&&!stdIds.includes(c.task_id);}).map(function(c){return{id:c.task_id,label:c.task_label,glabel:c.task_glabel||'',icon:c.task_icon||'📋'};});
+  // Merge PEON_TASKS with DB sort_order; sort by DB order if available
+  const cfgSortMap={};taskCfgRows.forEach(function(c){cfgSortMap[c.task_id]=c.sort_order!=null?c.sort_order:999;});
+  const allTasks=[...PEON_TASKS,...customTasks].sort(function(a,b){
+    const sa=cfgSortMap[a.id]!=null?cfgSortMap[a.id]:PEON_TASKS.findIndex(function(t){return t.id===a.id;});
+    const sb2=cfgSortMap[b.id]!=null?cfgSortMap[b.id]:PEON_TASKS.findIndex(function(t){return t.id===b.id;});
+    return sa-sb2;
+  });
   const doneTasks=allTodayLogs.filter(function(r){return !r.task_name.startsWith('extra_');}).map(function(r){return r.task_name;});
   const extraLogs=allTodayLogs.filter(function(r){return r.task_name.startsWith('extra_');});
   // Punch status
@@ -3240,7 +3246,7 @@ async function renderPeonActivity(){
       const stdTasks=pd.tasks.filter(function(t){return !t.task_name.startsWith('extra_');});
       const extraTasks=pd.tasks.filter(function(t){return t.task_name.startsWith('extra_');});
       const doneIds=stdTasks.map(function(t){return t.task_name;});
-      const allAdminTasks=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋'};})];
+      const allAdminTasks=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,glabel:c.task_glabel||'',icon:c.task_icon||'📋'};})];
       const taskRows=allAdminTasks.map(function(t){
         const done=doneIds.includes(t.id);
         const log=stdTasks.find(function(l){return l.task_name===t.id;});
@@ -3274,10 +3280,17 @@ async function renderPeonActivity(){
       </div>`;
     }).join('');
     // allTasksAdmin, cfgMapAdmin, customTasksAdmin already built above before bodyHtml
-    const taskSettingsRows=allTasksAdmin.map(function(t){
+    // Store current task order globally for reorder function
+    window._peonTaskOrder=allTasksAdmin.map(function(t,i){return{id:t.id,label:t.label,icon:t.icon,sort_order:i};});
+    const taskSettingsRows=allTasksAdmin.map(function(t,idx){
       const cfg=cfgMapAdmin[t.id];
       const schedVal=cfg&&cfg.scheduled_time?cfg.scheduled_time:'';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      const isFirst=idx===0;const isLast=idx===allTasksAdmin.length-1;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;flex-direction:column;gap:1px;">
+          <button onclick="movePeonTask('${t.id}',-1)" ${isFirst?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:4px;width:22px;height:20px;font-size:11px;cursor:pointer;color:${isFirst?'#ccc':'var(--text)'};padding:0;line-height:1;">▲</button>
+          <button onclick="movePeonTask('${t.id}',1)" ${isLast?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:4px;width:22px;height:20px;font-size:11px;cursor:pointer;color:${isLast?'#ccc':'var(--text)'};padding:0;line-height:1;">▼</button>
+        </div>
         <span style="font-size:16px;flex-shrink:0;">${t.icon}</span>
         <span style="flex:1;font-size:13px;">${t.label}</span>
         <input type="time" value="${schedVal}" onchange="savePeonTaskTime('${t.id}','${t.label.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);">
@@ -3301,9 +3314,10 @@ async function renderPeonActivity(){
             <div style="font-size:13px;font-weight:700;margin-bottom:8px;">➕ New Custom Task Add Karo</div>
             <div style="display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;gap:8px;">
-                <input type="text" id="peon-new-task-icon" placeholder="Icon (e.g. 🧺)" value="📋" style="width:60px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:18px;text-align:center;background:var(--bg);color:var(--text);">
-                <input type="text" id="peon-new-task-label" placeholder="Task name..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
+                <input type="text" id="peon-new-task-icon" placeholder="Icon" value="📋" style="width:54px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:18px;text-align:center;background:var(--bg);color:var(--text);">
+                <input type="text" id="peon-new-task-label" placeholder="Task name (English)..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
               </div>
+              <input type="text" id="peon-new-task-glabel" placeholder="ગુજરાતી નામ (optional)..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);box-sizing:border-box;">
               <div style="display:flex;gap:8px;align-items:center;">
                 <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">Scheduled Time:</label>
                 <input type="time" id="peon-new-task-time" style="padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
@@ -3330,14 +3344,36 @@ async function savePeonTaskTime(taskId, taskLabel, timeVal){
   }catch(e){console.warn('peon_task_config save:',e.message);}
 }
 
+async function movePeonTask(taskId, dir){
+  const order=window._peonTaskOrder||[];
+  const idx=order.findIndex(function(t){return t.id===taskId;});
+  if(idx<0)return;
+  const swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=order.length)return;
+  // Swap sort_order values
+  const a=order[idx],b=order[swapIdx];
+  const aNew=b.sort_order,bNew=a.sort_order;
+  // Upsert both to DB
+  async function upsertOrder(tid,tlabel,ticon,so){
+    const existing=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(tid));
+    if(existing&&existing.length>0){await sb('peon_task_config','PATCH',{sort_order:so},'?task_id=eq.'+encodeURIComponent(tid));}
+    else{const stdT=PEON_TASKS.find(function(t){return t.id===tid;});await sb('peon_task_config','POST',{task_id:tid,task_label:tlabel,task_icon:ticon||'📋',sort_order:so,is_custom:false,is_active:true},null);}
+  }
+  try{
+    await Promise.all([upsertOrder(a.id,a.label,a.icon,aNew),upsertOrder(b.id,b.label,b.icon,bNew)]);
+    renderPeonActivity();
+  }catch(e){console.warn('move task:',e.message);}
+}
+
 async function addPeonCustomTask(){
   const icon=document.getElementById('peon-new-task-icon')?.value.trim()||'📋';
   const label=document.getElementById('peon-new-task-label')?.value.trim();
+  const glabel=document.getElementById('peon-new-task-glabel')?.value.trim()||'';
   const time=document.getElementById('peon-new-task-time')?.value||null;
   if(!label){alert('Task name required');return;}
   const taskId='custom_'+Date.now();
   try{
-    await sb('peon_task_config','POST',{task_id:taskId,task_label:label,task_icon:icon,scheduled_time:time||null,is_custom:true,sort_order:99,is_active:true},null);
+    await sb('peon_task_config','POST',{task_id:taskId,task_label:label,task_glabel:glabel||null,task_icon:icon,scheduled_time:time||null,is_custom:true,sort_order:99,is_active:true},null);
     alert('✅ Task added: '+label);
     renderPeonActivity();
   }catch(e){alert('Error adding task: '+e.message);}
