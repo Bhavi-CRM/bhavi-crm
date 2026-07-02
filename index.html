@@ -417,7 +417,7 @@ tr:hover td{background:#f8fafc;}
               </label>
             </span>
           </label>
-          <input type="text" id="call-serial" onblur="checkReRepair(this.value)" placeholder="Serial number">
+          <input type="text" id="call-serial" onblur="window._serialHasOpenCall=false;checkReRepair(this.value)" placeholder="Serial number">
           <div id="rerepair-alert" style="display:none;"></div>
         </div>
         <div class="form-group"><label>Call Type <span class="req">*</span></label>
@@ -4256,6 +4256,29 @@ async function checkReRepair(serial){
   alertDiv.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:3px 0;">Checking previous calls...</div>';
 
   try{
+    // ── OPEN CALL BLOCK: check if any active call exists for this serial ──
+    const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered'];
+    const allSame=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(serial)}&order=created_at.desc&limit=10`);
+    const openCalls=(allSame||[]).filter(t=>!closedStatuses.includes(t.status));
+    if(openCalls.length>0){
+      const oc=openCalls[0];
+      alertDiv.innerHTML=`<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:8px;padding:12px;margin-top:4px;">
+        <div style="font-weight:700;font-size:13px;color:#b91c1c;">🚫 Open Call Already Exists!</div>
+        <div style="font-size:12px;color:#7f1d1d;margin-top:6px;">
+          Same Serial No — <b>${oc.id}</b> is <b>${oc.status}</b><br>
+          Customer: ${oc.cname||'-'} | Engineer: ${oc.assigned_name||'Unassigned'}<br>
+          Date: ${oc.created_at?new Date(oc.created_at).toLocaleDateString('en-IN'):'-'}
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button onclick="viewTicket('${oc.id}');closeModal('modal-call')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">👁️ View ${oc.id}</button>
+        </div>
+        <div style="font-size:11px;color:#b91c1c;margin-top:6px;">⚠️ Pehla ae call close karo pachhi j navi call log thay.</div>
+      </div>`;
+      window._serialHasOpenCall=true;
+      return;
+    }
+    window._serialHasOpenCall=false;
+
     // Check last 15 days for same serial
     const since=new Date();since.setDate(since.getDate()-15);
     const sinceStr=since.toISOString();
@@ -4416,6 +4439,19 @@ async function saveCall(){
     updated_at:new Date().toISOString()
   };
   if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
+  // Hard block: re-check open calls for this serial at save time (in case user bypassed the blur check)
+  if(!editingCallId&&!data.serial.startsWith('NO-SN-')){
+    try{
+      const closedSt=['Closed','Customer Reject','Call Cancel','Delivered'];
+      const dupCheck=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(data.serial)}&order=created_at.desc&limit=10`);
+      const openDup=(dupCheck||[]).filter(t=>!closedSt.includes(t.status));
+      if(openDup.length>0){
+        const od=openDup[0];
+        alert(`🚫 Open Call Already Exists!\n\nSerial: ${data.serial}\nTicket: ${od.id} — ${od.status}\nCustomer: ${od.cname||'-'}\n\nPehla ae call close karo pachhi j navi call log kari shako.`);
+        _savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;
+      }
+    }catch(dupEx){}
+  }
   try{
     if(editingCallId){
       // Point 13: Edit only allows remark — no customer/product change
