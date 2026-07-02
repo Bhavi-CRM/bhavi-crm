@@ -3295,7 +3295,7 @@ async function savePeonTaskTime(taskId, taskLabel, timeVal){
       await sb('peon_task_config','POST',{task_id:taskId,task_label:taskLabel,task_icon:stdT?stdT.icon:'📋',scheduled_time:timeVal||null,is_custom:false,sort_order:99,is_active:true},null);
     }
     // Silent save — no alert needed, input already shows new value
-  }catch(e){alert('Error saving time: '+e.message);}
+  }catch(e){console.warn('peon_task_config save:',e.message);}
 }
 
 async function addPeonCustomTask(){
@@ -3308,12 +3308,12 @@ async function addPeonCustomTask(){
     await sb('peon_task_config','POST',{task_id:taskId,task_label:label,task_icon:icon,scheduled_time:time||null,is_custom:true,sort_order:99,is_active:true},null);
     alert('✅ Task added: '+label);
     renderPeonActivity();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){alert('Error adding task: '+e.message);}
 }
 
 async function deletePeonCustomTask(dbId){
   if(!confirm('Remove this custom task?'))return;
-  try{await sb('peon_task_config','PATCH',{is_active:false},'?id=eq.'+dbId);}catch(e){alert('Error: '+e.message);return;}
+  try{await sb('peon_task_config','PATCH',{is_active:false},'?id=eq.'+dbId);}catch(e){console.warn('delete custom task:',e.message);return;}
   renderPeonActivity();
 }
 // ===================== END PEON =====================
