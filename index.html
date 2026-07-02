@@ -1175,7 +1175,7 @@ async function tgNotifyEngineer(engId,text){
 
 function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);if(!u.role_type)u.role_type='work_controller';}return u;}
 async function sb(t,m='GET',b=null,q=''){
-  const url=`${SB_URL}/rest/v1/${t}${q}`;
+  const url=`${SB_URL}/rest/v1/${t}${q||''}`;
   const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':m==='POST'?'return=representation':m==='PATCH'?'return=representation':''};
   if(m==='GET'){h['Range-Unit']='items';h['Range']='0-9999';}
   const o={method:m,headers:h};if(b)o.body=JSON.stringify(b);
@@ -3135,25 +3135,57 @@ async function renderPeonDashboard(){
     </div>`;
 }
 
+function _showPeonTaskModal(taskId, taskLabel, gLabel, icon, onConfirm){
+  var existing=document.getElementById('_peon_modal');if(existing)existing.remove();
+  var nowT=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var m=document.createElement('div');
+  m.id='_peon_modal';
+  m.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML=`<div style="background:#fff;border-radius:18px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+    <div style="font-size:36px;margin-bottom:8px;">${icon}</div>
+    <div style="font-size:17px;font-weight:800;color:#1e293b;margin-bottom:4px;">${taskLabel}</div>
+    <div style="font-size:14px;color:#6b7280;margin-bottom:20px;">${gLabel}</div>
+    <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="font-size:13px;color:#15803d;font-weight:700;margin-bottom:10px;">⏰ કયા સમયે પૂર્ણ કર્યું?</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">(What time did you complete this?)</div>
+      <input type="time" id="_peon_done_time" value="${nowT}" style="width:100%;padding:12px;border:2px solid #22c55e;border-radius:10px;font-size:20px;font-weight:700;text-align:center;color:#15803d;background:#fff;box-sizing:border-box;">
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="document.getElementById('_peon_modal').remove()" style="flex:1;padding:13px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;font-weight:700;background:#fff;color:#64748b;cursor:pointer;">❌ રદ કરો</button>
+      <button id="_peon_confirm_btn" style="flex:2;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:800;background:#22c55e;color:#fff;cursor:pointer;">✅ હા, પૂર્ણ કર્યું!</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  document.getElementById('_peon_confirm_btn').onclick=function(){
+    var t=document.getElementById('_peon_done_time').value;
+    m.remove();
+    onConfirm(t);
+  };
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
+}
+
 async function togglePeonTask(taskId, taskLabel){
   const peonId=currentUser.user_id||currentUser.eng_id;
   const today=new Date().toLocaleDateString('en-CA');
-  // Find Gujarati label from PEON_TASKS
   const taskObj=PEON_TASKS.find(function(t){return t.id===taskId;});
   const gLabel=taskObj&&taskObj.glabel?taskObj.glabel:'';
-  const displayLabel=gLabel?taskLabel+'\n'+gLabel:taskLabel;
+  const icon=taskObj?taskObj.icon:'📋';
   let existing=[];
   try{existing=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&task_name=eq.'+encodeURIComponent(taskId));}catch(e){}
   if(existing&&existing.length>0){
-    if(!confirm('↩️ '+displayLabel+'\n\nઆ કાર્ય પૂર્ણ માર્ક રદ કરવું?'))return;
+    if(!confirm('↩️ '+taskLabel+'\n'+gLabel+'\n\nઆ કાર્ય પૂર્ણ માર્ક રદ કરવું?'))return;
     try{await sb('peon_task_logs','DELETE',null,'?id=eq.'+existing[0].id);}catch(e){alert('Error: '+e.message);return;}
+    renderPeonDashboard();
   }else{
-    if(!confirm('✅ '+displayLabel+'\n\nઆ કાર્ય પૂર્ણ થઈ ગયું છે?'))return;
-    try{await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:taskId,task_label:taskLabel,done_at:new Date().toISOString()},null);}
-    catch(e){alert('Error saving: '+e.message);return;}
-    alert('👍 '+gLabel+'\n\nબહુ સારું! કાર્ય સફળતાપૂર્વક નોંધ થઈ ગયું. ✅');
+    _showPeonTaskModal(taskId,taskLabel,gLabel,icon,async function(timeVal){
+      // Build done_at from selected time
+      var doneAt=new Date();
+      if(timeVal){var[h,mn]=timeVal.split(':');doneAt.setHours(parseInt(h),parseInt(mn),0,0);}
+      try{await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:taskId,task_label:taskLabel,done_at:doneAt.toISOString()},null);}
+      catch(e){alert('Error saving: '+e.message);return;}
+      renderPeonDashboard();
+    });
   }
-  renderPeonDashboard();
 }
 
 async function savePeonExtra(){
