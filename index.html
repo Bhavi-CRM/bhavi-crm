@@ -15844,7 +15844,7 @@ async function renderWorkLogReport(){
     ]);
     var allMembers=[
       ...engineers.map(function(e){return{id:e.eng_id||e.user_id,name:e.name,role:'Engineer'};}),
-      ...wcs.map(function(w){return{id:w.user_id,name:w.name,role:'WC';};}),
+      ...wcs.map(function(w){return{id:w.user_id,name:w.name,role:'WC'};}),
       ...(peons||[]).map(function(p){return{id:p.user_id,name:p.name,role:'Peon'};})
     ];
     var today=new Date().toLocaleDateString('en-CA');
