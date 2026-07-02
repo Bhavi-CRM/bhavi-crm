@@ -33,7 +33,7 @@ body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);di
 #sidebar-user .user-role{font-size:11px;color:#90a4ae;}
 .btn-logout{margin-top:8px;background:rgba(240,82,82,0.15);color:#f05252;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;width:100%;}
 #main{margin-left:220px;flex:1;height:100vh;overflow-y:auto;display:flex;flex-direction:column;}
-#topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+#topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:201;}
 #topbar h1{font-size:18px;font-weight:700;}
 #page-content{padding:20px;flex:1;overscroll-behavior:contain;}
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
@@ -234,11 +234,10 @@ tr:hover td{background:#f8fafc;}
   .table-wrap{overflow-x:auto;}
   table{font-size:11px;min-width:500px;}
   th,td{padding:6px 8px;white-space:nowrap;}
-  #mobile-menu-btn{display:flex!important;}
+  #mobile-menu-btn{display:flex!important;z-index:10;position:relative;}
   #topbar-logo{display:flex!important;align-items:center;}
   #topbar-logo img{max-height:28px;max-width:70px;object-fit:contain;}
-  #wc-daily-btn,#btn-daily-report,#btn-weekly-report,#walkin-quick-btn{display:none!important;}
-  #topbar{overflow:hidden;}
+  #wc-daily-btn,#btn-daily-report,#btn-weekly-report,#walkin-quick-btn,#btn-new-call,#auto-visit-btn{display:none!important;}
   #topbar-logo .tl-text{font-size:10px;font-weight:800;color:var(--primary);line-height:1.2;}
   #topbar h1{font-size:14px!important;}
   #topbar-user{display:none!important;}
@@ -365,7 +364,7 @@ tr:hover td{background:#f8fafc;}
 <div id="main">
   <div id="topbar">
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-      <button id="mobile-menu-btn" onclick="toggleMobileMenu()" style="display:none;background:none;border:none;cursor:pointer;font-size:22px;padding:4px 6px;color:var(--text);flex-shrink:0;">☰</button>
+      <button id="mobile-menu-btn" onclick="toggleMobileMenu()" style="background:none;border:none;cursor:pointer;font-size:22px;padding:4px 6px;color:var(--text);flex-shrink:0;">☰</button>
       <div id="topbar-logo" style="display:none;flex-shrink:0;"></div>
       <h1 id="page-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Dashboard</h1>
     </div>
@@ -1272,7 +1271,7 @@ function toggleMobileMenu(){
   if(!ov){
     ov=document.createElement('div');
     ov.id='mobile-overlay';
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;display:none;';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:198;display:none;';
     ov.onclick=function(){closeMobileMenu();};
     document.body.appendChild(ov);
   }
@@ -2160,7 +2159,7 @@ function toggleMobileMenu(){
   if(!ov){
     ov=document.createElement('div');
     ov.id='mobile-overlay';
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;display:none;';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:198;display:none;';
     ov.onclick=function(){closeMobileMenu();};
     document.body.appendChild(ov);
   }
@@ -13099,7 +13098,7 @@ function toggleMobileMenu(){
   if(!ov){
     ov=document.createElement('div');
     ov.id='mobile-overlay';
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;display:none;';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:198;display:none;';
     ov.onclick=function(){closeMobileMenu();};
     document.body.appendChild(ov);
   }
