@@ -237,6 +237,8 @@ tr:hover td{background:#f8fafc;}
   #mobile-menu-btn{display:flex!important;}
   #topbar-logo{display:flex!important;align-items:center;}
   #topbar-logo img{max-height:28px;max-width:70px;object-fit:contain;}
+  #wc-daily-btn,#btn-daily-report,#btn-weekly-report,#walkin-quick-btn{display:none!important;}
+  #topbar{overflow:hidden;}
   #topbar-logo .tl-text{font-size:10px;font-weight:800;color:var(--primary);line-height:1.2;}
   #topbar h1{font-size:14px!important;}
   #topbar-user{display:none!important;}
@@ -320,6 +322,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('tasks')" id="nav-tasks"><span class="icon">✅</span><span>Tasks</span></div>
     <div class="nav-item" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
     <div class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
+    <div class="nav-item" onclick="openWCDailyReport()" id="nav-wc-report" style="display:none;"><span class="icon">📋</span><span>WC Report</span></div>
     <div class="nav-item" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
     <div class="nav-item" onclick="navigate('walk-in-report')" id="nav-walk-in-report"><span class="icon">🚶</span><span>Walk-in Report</span></div>
     <div class="nav-item" onclick="navigate('courier-report')" id="nav-courier-report"><span class="icon">📦</span><span>Courier Register</span></div>
@@ -2850,6 +2853,7 @@ function setupNav(){
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
+      var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
       var wib=document.getElementById('walkin-quick-btn');
