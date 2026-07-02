@@ -5733,6 +5733,22 @@ async function openEngUpdate(id){
       ${isOOC?'<br><span style="color:var(--danger);font-weight:700;">⚠️ Out of Coverage — charges apply</span>':''}
     </div>
     <!-- Visit Start / Work Start Panel -->
+    ${t.service_type==='Carry In' ? (()=>{
+      const tl=(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):(t.timeline||[]));
+      const wsEntries=tl.filter(e=>e.action&&e.action.includes('Work Start'));
+      const wsEntry=wsEntries.length?wsEntries[wsEntries.length-1]:null;
+      const wsTime=wsEntry?new Date(wsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):t.visit_in||'';
+      const totalDone=tl.filter(e=>e.action==='Work Session End').reduce((s,e)=>s+(e.duration_min||0),0);
+      const pausedS=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold'];
+      const isPaused=pausedS.includes(t.status);
+      if(wsEntry||t.visit_in){
+        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}${totalDone?' | '+Math.floor(totalDone/60)+'h '+totalDone%60+'m total':''}</div>`;
+      } else {
+        return `<div style="margin-bottom:12px;">
+          <button onclick="doWorkStart('${t.id}')" style="width:100%;background:#059669;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🔧 Work Start</button>
+        </div>`;
+      }
+    })() : ''}
     ${t.service_type==='On Site' ? (()=>{
       const tl=(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):(t.timeline||[]));
       const vsEntries=tl.filter(e=>e.action==='Visit Start');
@@ -17567,13 +17583,15 @@ async function loadWorkLogReport(){
         var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
         html+='<div style="margin-bottom:14px;">'
           +'<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;padding:4px 10px;background:#eff6ff;border-radius:6px;display:inline-block;">📅 '+dLabel+'</div>';
+        var todayDate=new Date().toLocaleDateString('en-CA');
         entries.forEach(function(l){
           var isOpen=l.to_time==='OPEN';
+          var isToday=l.log_date===todayDate;
           var isTravel=l.log_type==='travel';
-          var borderColor=isTravel?'#f59e0b':isOpen?'#10b981':'var(--primary)';
-          var timeBg=isTravel?'#fef3c7':isOpen?'#d1fae5':'#ede9fe';
-          var timeColor=isTravel?'#92400e':isOpen?'#065f46':'#4c1d95';
-          var timeLabel=l.from_time+' – '+(isOpen?'Running ⏳':l.to_time);
+          var borderColor=isTravel?'#f59e0b':'var(--primary)';
+          var timeBg=isTravel?'#fef3c7':'#ede9fe';
+          var timeColor=isTravel?'#92400e':'#4c1d95';
+          var timeLabel=isOpen?(isToday?l.from_time+' – Running ⏳':l.from_time):l.from_time+' – '+l.to_time;
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
@@ -17601,7 +17619,7 @@ async function downloadWorkLogExcel(){
     'Name':l.eng_name,
     'Date':fmtWLD(l.log_date),
     'From':l.from_time,
-    'To':l.to_time==='OPEN'?'Running':l.to_time,
+    'To':l.to_time==='OPEN'?'':l.to_time,
     'Task':l.task_description
   };});
   var wsAll=XLSX.utils.json_to_sheet(allData);
@@ -17620,7 +17638,7 @@ async function downloadWorkLogExcel(){
     var data=mLogs.map(function(l){return{
       'Date':fmtWLD(l.log_date),
       'From':l.from_time,
-      'To':l.to_time==='OPEN'?'Running':l.to_time,
+      'To':l.to_time==='OPEN'?'':l.to_time,
       'Task':l.task_description
     };});
     var ws=XLSX.utils.json_to_sheet(data);
