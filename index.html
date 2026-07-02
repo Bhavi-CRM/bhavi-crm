@@ -3755,7 +3755,7 @@ async function loadEngLiveStatus(){
       if(l.ticket_id&&ticketMap[l.ticket_id]&&closedTicketStatuses.includes(ticketMap[l.ticket_id].status)){
         // Stale log — ticket already closed, auto-close it silently
         const nowTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-        sb('work_logs','PATCH',{to_time:nowTime,updated_at:new Date().toISOString()},'?id=eq.'+l.id).catch(()=>{});
+        sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+l.id).catch(()=>{});
       } else {
         if(!openByEng[l.eng_id])openByEng[l.eng_id]=l;
       }
@@ -6202,7 +6202,7 @@ async function saveEngUpdate(){
       // Close any OPEN work log
       const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+closeDate+'&to_time=eq.OPEN');
       for(const ol of (openLogs||[])){
-        await sb('work_logs','PATCH',{to_time:closeTime,updated_at:closeNow.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+        await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
       }
       // No auto traveling — engineer will manually Visit Start next call
     }catch(ex){console.log('WorkLog sig error:',ex);}
@@ -6351,7 +6351,7 @@ async function saveEngUpdate(){
         const openLogs=await sb('work_logs','GET',null,
           '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+closeDate+'&to_time=eq.OPEN');
         for(const ol of (openLogs||[])){
-          await sb('work_logs','PATCH',{to_time:closeTime,updated_at:closeNow.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+          await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
         }
         // No auto traveling — engineer will manually Visit Start next call
       }catch(ex){console.log('WorkLog auto error:',ex);}
@@ -6386,7 +6386,7 @@ async function saveEngUpdate(){
             const d=(tH*60+tM)-(fH*60+fM);
             if(d>0)workDur+=d;
           }
-          await sb('work_logs','PATCH',{to_time:pTime,updated_at:pNow.toISOString()},'?id=eq.'+pl.id).catch(()=>{});
+          await sb('work_logs','PATCH',{to_time:pTime},'?id=eq.'+pl.id).catch(()=>{});
         }
         if(workDur>0){
           try{
@@ -10987,7 +10987,7 @@ async function doVisitStart(ticketId){
       }
       if(ticketClosed||ticketPaused){
         // Auto-close the stale/paused open log before starting new visit
-        try{await sb('work_logs','PATCH',{to_time:timeNow,updated_at:now.toISOString()},'?id=eq.'+ol.id);}catch(ex3){}
+        try{await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+ol.id);}catch(ex3){}
       }else{
         const isWork=ol.log_type==='work';
         alert('⚠️ A '+(isWork?'Work':'Traveling')+' log is already OPEN!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting a new Visit.');
@@ -11033,7 +11033,7 @@ async function doVisitStop(ticketId){
   try{
     const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&to_time=eq.OPEN&ticket_id=eq.'+encodeURIComponent(ticketId));
     for(const ol of (openLogs||[])){
-      await sb('work_logs','PATCH',{to_time:timeNow,updated_at:now.toISOString()},'?id=eq.'+ol.id).catch(()=>{});
+      await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+ol.id).catch(()=>{});
     }
     const t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
     const tlStop=[...(t?.timeline||[]),{action:'Visit Stop',by:currentUser.name,at:now.toISOString(),note:'Travel stopped: '+timeNow}];
@@ -11083,7 +11083,7 @@ async function doWorkStart(ticketId){
         }catch(ex2){}
       }
       if(ticketClosed||ticketPaused){
-        try{await sb('work_logs','PATCH',{to_time:timeIn,updated_at:new Date().toISOString()},'?id=eq.'+ol.id);}catch(ex3){}
+        try{await sb('work_logs','PATCH',{to_time:timeIn},'?id=eq.'+ol.id);}catch(ex3){}
       }else{
         alert('⚠️ A Work call is already in progress!\n\n"'+ol.task_description+'"\n\nPlease close that call first before starting this one.');
         return;
@@ -11114,7 +11114,7 @@ async function doWorkStart(ticketId){
       const prevLogs=await sb('work_logs','GET',null,
         '?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateIn+'&to_time=eq.OPEN');
       if(prevLogs&&prevLogs.length){
-        await sb('work_logs','PATCH',{to_time:timeIn,updated_at:now.toISOString()},'?id=eq.'+prevLogs[0].id);
+        await sb('work_logs','PATCH',{to_time:timeIn},'?id=eq.'+prevLogs[0].id);
       }
     }catch(ex){}
 
