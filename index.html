@@ -3373,19 +3373,25 @@ async function movePeonTask(taskId, dir){
   if(idx<0)return;
   const swapIdx=idx+dir;
   if(swapIdx<0||swapIdx>=order.length)return;
-  // Swap positions in array
-  const newOrder=[...order];
-  const tmp=newOrder[idx];newOrder[idx]=newOrder[swapIdx];newOrder[swapIdx]=tmp;
-  // Save entire new order to DB (upsert all with new sort_order indices)
+  const a=order[idx];const b=order[swapIdx];
+  // Sequential upsert for both swapped tasks
+  async function upsert(t,newSortOrder){
+    let ex=[];
+    try{ex=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(t.id));}catch(e){}
+    if(ex&&ex.length>0){
+      await sb('peon_task_config','PATCH',{sort_order:newSortOrder},'?task_id=eq.'+encodeURIComponent(t.id));
+    }else{
+      await sb('peon_task_config','POST',{task_id:t.id,task_label:t.label,task_icon:t.icon||'📋',sort_order:newSortOrder,is_custom:false,is_active:true},null);
+    }
+  }
   try{
-    await Promise.all(newOrder.map(async function(t,i){
-      const existing=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(t.id));
-      if(existing&&existing.length>0){
-        await sb('peon_task_config','PATCH',{sort_order:i},'?task_id=eq.'+encodeURIComponent(t.id));
-      }else{
-        await sb('peon_task_config','POST',{task_id:t.id,task_label:t.label,task_icon:t.icon||'📋',sort_order:i,is_custom:false,is_active:true},null);
-      }
-    }));
+    const aSort=b.sort_order!=null?b.sort_order:swapIdx;
+    const bSort=a.sort_order!=null?a.sort_order:idx;
+    await upsert(a,aSort);
+    await upsert(b,bSort);
+    // Update in-memory order too
+    window._peonTaskOrder[idx]=Object.assign({},a,{sort_order:aSort});
+    window._peonTaskOrder[swapIdx]=Object.assign({},b,{sort_order:bSort});
     renderPeonActivity();
   }catch(e){console.warn('move task:',e.message);renderPeonActivity();}
 }
@@ -15831,13 +15837,15 @@ async function renderWorkLogReport(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
-    var [engineers, wcs]=await Promise.all([
+    var [engineers, wcs, peons]=await Promise.all([
       sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
-      sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name')
+      sb('users','GET',null,'?or=(role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name'),
+      sb('users','GET',null,'?role=eq.peon&is_active=eq.true&order=name')
     ]);
     var allMembers=[
       ...engineers.map(function(e){return{id:e.eng_id||e.user_id,name:e.name,role:'Engineer'};}),
-      ...wcs.map(function(w){return{id:w.user_id,name:w.name,role:'WC'};})
+      ...wcs.map(function(w){return{id:w.user_id,name:w.name,role:'WC';};}),
+      ...(peons||[]).map(function(p){return{id:p.user_id,name:p.name,role:'Peon'};})
     ];
     var today=new Date().toLocaleDateString('en-CA');
     pc.innerHTML='<div class="card" style="margin-bottom:14px;">'
@@ -17471,6 +17479,49 @@ async function loadWorkLogReport(){
   var res=document.getElementById('wlr-results');
   if(!res)return;
   res.innerHTML='<div class="loading">Loading...</div>';
+  // Check if selected member is a peon
+  var selOption=document.getElementById('wlr-eng')?.selectedOptions?.[0];
+  var selText=selOption?selOption.text:'';
+  var isPeonSel=selText.includes('(Peon)');
+  if(isPeonSel||(!eng&&false)){/* peon handled below */}
+  if(isPeonSel){
+    // Show peon task logs
+    var pq='?order=log_date.desc,done_at.asc';
+    if(from)pq+='&log_date=gte.'+from;
+    if(to)pq+='&log_date=lte.'+to;
+    if(eng)pq+='&peon_id=eq.'+encodeURIComponent(eng);
+    var plogs=await sb('peon_task_logs','GET',null,pq);
+    if(!plogs||!plogs.length){res.innerHTML='<div class="alert alert-info">No task logs found.</div>';return;}
+    var byPeon={};
+    plogs.forEach(function(l){var k=l.peon_name||l.peon_id;if(!byPeon[k])byPeon[k]={};var dt=l.log_date;if(!byPeon[k][dt])byPeon[k][dt]=[];byPeon[k][dt].push(l);});
+    var html='';
+    Object.entries(byPeon).forEach(function([pName,dates]){
+      var initials=pName.split(' ').map(function(x){return x[0]||'';}).join('').slice(0,2).toUpperCase();
+      html+='<div class="card" style="margin-bottom:14px;">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);">'
+        +'<div style="width:38px;height:38px;border-radius:50%;background:#d97706;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;">'+initials+'</div>'
+        +'<div><div style="font-weight:700;font-size:15px;">'+pName+'</div>'
+        +'<div style="font-size:12px;color:var(--text-muted);"><span class="badge" style="background:#fef3c7;color:#92400e;">🧹 Office Boy</span></div></div></div>';
+      Object.entries(dates).sort(function(a,b){return b[0].localeCompare(a[0]);}).forEach(function([date,entries]){
+        var dObj=new Date(date+'T00:00:00');
+        var dLabel=dObj.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+        html+='<div style="margin-bottom:14px;"><div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;padding:4px 10px;background:#fef3c7;border-radius:6px;display:inline-block;">📅 '+dLabel+'</div>';
+        entries.forEach(function(l){
+          var isExtra=l.task_name&&l.task_name.startsWith('extra_');
+          var timeStr=l.done_at?new Date(l.done_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+          var extraTime=l.extra_from?(l.extra_from+(l.extra_to?' → '+l.extra_to:'')):'';
+          html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+(isExtra?'#6366f1':'#d97706')+';">'
+            +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+(isExtra?'#4338ca':'#92400e')+';background:'+(isExtra?'#ede9fe':'#fef3c7')+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+(isExtra?extraTime||'Extra Work':timeStr)+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+(isExtra?'📝 ':'')+( l.task_label||l.task_name)+'</div>'
+            +'</div>';
+        });
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    res.innerHTML=html;
+    return;
+  }
   try{
     var q='?order=log_date.desc,from_time';
     if(from)q+='&log_date=gte.'+from;
