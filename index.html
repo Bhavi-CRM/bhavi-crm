@@ -3191,6 +3191,12 @@ async function renderPeonActivity(){
     (logs||[]).forEach(function(l){if(byPeon[l.peon_id])byPeon[l.peon_id].tasks.push(l);});
     const punchMap={};(punches||[]).forEach(function(p){punchMap[p.eng_id]=p;});
     const peonKeys=Object.keys(byPeon);
+    // Load task config BEFORE building bodyHtml so customTasksAdmin & cfgMapAdmin are available
+    let taskCfg=[];try{taskCfg=await sb('peon_task_config','GET',null,'?is_active=eq.true&order=sort_order.asc');}catch(e){}
+    const cfgMapAdmin={};(taskCfg||[]).forEach(function(c){cfgMapAdmin[c.task_id]=c;});
+    const stdIds2=PEON_TASKS.map(function(t){return t.id;});
+    const customTasksAdmin=(taskCfg||[]).filter(function(c){return c.is_custom&&!stdIds2.includes(c.task_id);});
+    const allTasksAdmin=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋',_customDbId:c.id};})];
     const bodyHtml=peonKeys.map(function(pid){
       const pd=byPeon[pid];const punch=punchMap[pid];
       const stdTasks=pd.tasks.filter(function(t){return !t.task_name.startsWith('extra_');});
@@ -3229,13 +3235,7 @@ async function renderPeonActivity(){
         ${extraRows?`<div style="margin-top:10px;padding-top:8px;border-top:2px dashed var(--border);"><div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">📝 EXTRA WORK</div>${extraRows}</div>`:''}
       </div>`;
     }).join('');
-    // Load task config for admin settings panel
-    let taskCfg=[];try{taskCfg=await sb('peon_task_config','GET',null,'?is_active=eq.true&order=sort_order.asc');}catch(e){}
-    const cfgMapAdmin={};(taskCfg||[]).forEach(function(c){cfgMapAdmin[c.task_id]=c;});
-    const stdIds2=PEON_TASKS.map(function(t){return t.id;});
-    const customTasksAdmin=(taskCfg||[]).filter(function(c){return c.is_custom&&!stdIds2.includes(c.task_id);});
-    // All tasks for admin config = predefined + custom
-    const allTasksAdmin=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋',_customDbId:c.id};})];
+    // allTasksAdmin, cfgMapAdmin, customTasksAdmin already built above before bodyHtml
     const taskSettingsRows=allTasksAdmin.map(function(t){
       const cfg=cfgMapAdmin[t.id];
       const schedVal=cfg&&cfg.scheduled_time?cfg.scheduled_time:'';
