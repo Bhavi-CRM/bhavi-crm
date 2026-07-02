@@ -3240,7 +3240,7 @@ async function renderPeonActivity(){
     const cfgMapAdmin={};(taskCfg||[]).forEach(function(c){cfgMapAdmin[c.task_id]=c;});
     const stdIds2=PEON_TASKS.map(function(t){return t.id;});
     const customTasksAdmin=(taskCfg||[]).filter(function(c){return c.is_custom&&!stdIds2.includes(c.task_id);});
-    const allTasksAdmin=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋',_customDbId:c.id};})];
+    const allTasksAdmin=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,glabel:c.task_glabel||'',icon:c.task_icon||'📋',_customDbId:c.id};})];
     const bodyHtml=peonKeys.map(function(pid){
       const pd=byPeon[pid];const punch=punchMap[pid];
       const stdTasks=pd.tasks.filter(function(t){return !t.task_name.startsWith('extra_');});
@@ -3294,6 +3294,7 @@ async function renderPeonActivity(){
         <span style="font-size:16px;flex-shrink:0;">${t.icon}</span>
         <span style="flex:1;font-size:13px;">${t.label}</span>
         <input type="time" value="${schedVal}" onchange="savePeonTaskTime('${t.id}','${t.label.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);">
+        <button onclick="showPeonTaskEditModal('${t._customDbId||''}','${t.id}','${t.label.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(t.glabel||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${t.icon}')" style="background:none;border:1px solid #93c5fd;border-radius:6px;color:#2563eb;font-size:12px;cursor:pointer;padding:3px 7px;" title="Edit">✏️</button>
         ${t._customDbId?`<button onclick="deletePeonCustomTask('${t._customDbId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 6px;" title="Remove">✕</button>`:''}
       </div>`;
     }).join('');
@@ -3372,19 +3373,73 @@ async function movePeonTask(taskId, dir){
   if(idx<0)return;
   const swapIdx=idx+dir;
   if(swapIdx<0||swapIdx>=order.length)return;
-  // Swap sort_order values
-  const a=order[idx],b=order[swapIdx];
-  const aNew=b.sort_order,bNew=a.sort_order;
-  // Upsert both to DB
-  async function upsertOrder(tid,tlabel,ticon,so){
-    const existing=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(tid));
-    if(existing&&existing.length>0){await sb('peon_task_config','PATCH',{sort_order:so},'?task_id=eq.'+encodeURIComponent(tid));}
-    else{const stdT=PEON_TASKS.find(function(t){return t.id===tid;});await sb('peon_task_config','POST',{task_id:tid,task_label:tlabel,task_icon:ticon||'📋',sort_order:so,is_custom:false,is_active:true},null);}
-  }
+  // Swap positions in array
+  const newOrder=[...order];
+  const tmp=newOrder[idx];newOrder[idx]=newOrder[swapIdx];newOrder[swapIdx]=tmp;
+  // Save entire new order to DB (upsert all with new sort_order indices)
   try{
-    await Promise.all([upsertOrder(a.id,a.label,a.icon,aNew),upsertOrder(b.id,b.label,b.icon,bNew)]);
+    await Promise.all(newOrder.map(async function(t,i){
+      const existing=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(t.id));
+      if(existing&&existing.length>0){
+        await sb('peon_task_config','PATCH',{sort_order:i},'?task_id=eq.'+encodeURIComponent(t.id));
+      }else{
+        await sb('peon_task_config','POST',{task_id:t.id,task_label:t.label,task_icon:t.icon||'📋',sort_order:i,is_custom:false,is_active:true},null);
+      }
+    }));
     renderPeonActivity();
-  }catch(e){console.warn('move task:',e.message);}
+  }catch(e){console.warn('move task:',e.message);renderPeonActivity();}
+}
+
+function showPeonTaskEditModal(dbId, taskId, label, glabel, icon){
+  var m=document.createElement('div');
+  m.id='_peon_edit_modal';
+  m.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML=`<div style="background:#fff;border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="font-size:16px;font-weight:800;margin-bottom:16px;">✏️ Task Edit Karo</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="_pe_icon" value="${icon}" style="width:50px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;font-size:18px;text-align:center;">
+        <input type="text" id="_pe_label" value="${label}" placeholder="English name..." style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;">
+      </div>
+      <input type="text" id="_pe_glabel" value="${glabel}" placeholder="ગુજરાતી નામ..." oninput="autoTranslateToGuEdit()" style="padding:8px 12px;border:1.5px solid #a5f3fc;border-radius:8px;font-size:13px;background:#f0fdff;">
+      <div style="font-size:11px;color:#0891b2;">English field change karva par Gujarati auto-fill thase</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="document.getElementById('_peon_edit_modal').remove()" style="flex:1;padding:11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;background:#fff;cursor:pointer;">Cancel</button>
+      <button onclick="savePeonTaskEdit('${dbId}','${taskId}')" style="flex:2;padding:11px;border:none;border-radius:8px;font-size:14px;font-weight:800;background:#2563eb;color:#fff;cursor:pointer;">💾 Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
+  // Wire auto-translate for edit modal label field
+  document.getElementById('_pe_label').addEventListener('input',function(){
+    clearTimeout(window._guEditTimer);
+    window._guEditTimer=setTimeout(async function(){
+      var text=document.getElementById('_pe_label')?.value.trim();
+      if(!text)return;
+      try{var r=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=gu&dt=t&q='+encodeURIComponent(text));var d=await r.json();var tr=(d&&d[0]&&d[0].map(function(s){return s[0];}).join(''))||'';if(tr){var gf=document.getElementById('_pe_glabel');if(gf&&!gf.dataset.userEdited)gf.value=tr;}}catch(e){}
+    },600);
+  });
+  document.getElementById('_pe_glabel').addEventListener('input',function(){this.dataset.userEdited='1';});
+}
+
+async function savePeonTaskEdit(dbId, taskId){
+  const icon=document.getElementById('_pe_icon')?.value.trim()||'📋';
+  const label=document.getElementById('_pe_label')?.value.trim();
+  const glabel=document.getElementById('_pe_glabel')?.value.trim()||'';
+  if(!label)return;
+  try{
+    if(dbId&&dbId!=='undefined'){
+      await sb('peon_task_config','PATCH',{task_label:label,task_glabel:glabel||null,task_icon:icon},'?id=eq.'+dbId);
+    }else{
+      // predefined task — upsert by task_id
+      const ex=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(taskId));
+      if(ex&&ex.length>0){await sb('peon_task_config','PATCH',{task_glabel:glabel||null,task_icon:icon},'?task_id=eq.'+encodeURIComponent(taskId));}
+      else{await sb('peon_task_config','POST',{task_id:taskId,task_label:label,task_glabel:glabel||null,task_icon:icon,is_custom:false,is_active:true,sort_order:99},null);}
+    }
+    document.getElementById('_peon_edit_modal')?.remove();
+    renderPeonActivity();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 async function addPeonCustomTask(){
