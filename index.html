@@ -3048,12 +3048,22 @@ async function renderPeonDashboard(){
   pc.innerHTML='<div class="loading">Loading...</div>';
   const peonId=currentUser.user_id||currentUser.eng_id;
   const today=new Date().toLocaleDateString('en-CA');
-  // Fetch today's completed tasks + all task rows
-  let allTodayLogs=[];
+  const nowHHMM=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  // Fetch today's logs + task config in parallel
+  let allTodayLogs=[],taskCfgRows=[];
   try{
-    const res=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&order=done_at.asc');
-    allTodayLogs=res||[];
-  }catch(e){console.log('peon tasks fetch:',e);}
+    [allTodayLogs,taskCfgRows]=await Promise.all([
+      sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&order=done_at.asc'),
+      sb('peon_task_config','GET',null,'?is_active=eq.true&order=sort_order.asc')
+    ]);
+    allTodayLogs=allTodayLogs||[];taskCfgRows=taskCfgRows||[];
+  }catch(e){console.log('peon fetch:',e);}
+  // Build config map: task_id → scheduled_time
+  const cfgMap={};taskCfgRows.forEach(function(c){cfgMap[c.task_id]=c;});
+  // Custom tasks from DB (not in PEON_TASKS)
+  const stdIds=PEON_TASKS.map(function(t){return t.id;});
+  const customTasks=taskCfgRows.filter(function(c){return c.is_custom&&!stdIds.includes(c.task_id);}).map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋'};});
+  const allTasks=[...PEON_TASKS,...customTasks];
   const doneTasks=allTodayLogs.filter(function(r){return !r.task_name.startsWith('extra_');}).map(function(r){return r.task_name;});
   const extraLogs=allTodayLogs.filter(function(r){return r.task_name.startsWith('extra_');});
   // Punch status
@@ -3067,14 +3077,23 @@ async function renderPeonDashboard(){
     ?`<div class="punch-bar"><div><div class="punch-time">🔴 On Duty</div><div class="punch-info">Started: ${ps.punch_in_time}</div></div><button class="btn btn-danger" onclick="doPunchOut()">⏹ Punch Out</button></div>`
     :`<div class="punch-bar"><div><div class="punch-time">🟢 Ready</div><div class="punch-info">Click to start duty</div></div><button class="btn btn-success" onclick="doPunchIn()">▶ Punch In</button></div>`;
   const doneCount=doneTasks.length;
-  const totalCount=PEON_TASKS.length;
-  const pct=Math.round(doneCount/totalCount*100);
-  const tasksHtml=PEON_TASKS.map(function(t){
+  const totalCount=allTasks.length;
+  const pct=totalCount?Math.round(doneCount/totalCount*100):0;
+  const tasksHtml=allTasks.map(function(t){
     const isDone=doneTasks.includes(t.id);
-    return `<div onclick="togglePeonTask('${t.id}','${t.label}')" style="display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:10px;border-radius:12px;background:${isDone?'#f0fdf4':'var(--card)'};border:2px solid ${isDone?'#22c55e':'var(--border)'};cursor:pointer;transition:all .2s;user-select:none;">
-      <div style="width:32px;height:32px;border-radius:50%;border:2.5px solid ${isDone?'#22c55e':'#cbd5e1'};background:${isDone?'#22c55e':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:900;">${isDone?'✓':''}</div>
+    const cfg=cfgMap[t.id];
+    const schedTime=cfg&&cfg.scheduled_time?cfg.scheduled_time:'';
+    const isOverdue=schedTime&&!isDone&&nowHHMM>schedTime;
+    let timeTag='';
+    if(schedTime){
+      const [sh,sm]=schedTime.split(':');const hr=parseInt(sh);const ampm=hr>=12?'PM':'AM';const dh=hr>12?hr-12:hr||12;
+      const tLabel=dh+':'+sm+' '+ampm+' સુધીમાં';
+      timeTag=`<div style="font-size:11px;color:${isOverdue?'#ef4444':'#0891b2'};font-weight:600;margin-top:2px;">⏰ ${tLabel}${isOverdue?' — મોડું થઈ ગયું!':''}</div>`;
+    }
+    return `<div onclick="togglePeonTask('${t.id}','${t.label.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:14px;padding:16px 18px;margin-bottom:10px;border-radius:12px;background:${isDone?'#f0fdf4':isOverdue?'#fff1f2':'var(--card)'};border:2px solid ${isDone?'#22c55e':isOverdue?'#fca5a5':'var(--border)'};cursor:pointer;transition:all .2s;user-select:none;">
+      <div style="width:32px;height:32px;border-radius:50%;border:2.5px solid ${isDone?'#22c55e':isOverdue?'#ef4444':'#cbd5e1'};background:${isDone?'#22c55e':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:900;">${isDone?'✓':''}</div>
       <div style="font-size:18px;flex-shrink:0;">${t.icon}</div>
-      <div style="flex:1;"><div style="font-size:15px;font-weight:${isDone?'600':'500'};color:${isDone?'#15803d':'var(--text)'};${isDone?'text-decoration:line-through;':''}">${t.label}</div></div>
+      <div style="flex:1;"><div style="font-size:15px;font-weight:${isDone?'600':'500'};color:${isDone?'#15803d':isOverdue?'#b91c1c':'var(--text)'};${isDone?'text-decoration:line-through;':''}">${t.label}</div>${timeTag}</div>
     </div>`;
   }).join('');
   const extraHtml=extraLogs.map(function(l){
@@ -3117,10 +3136,16 @@ async function togglePeonTask(taskId, taskLabel){
   let existing=[];
   try{existing=await sb('peon_task_logs','GET',null,'?peon_id=eq.'+encodeURIComponent(peonId)+'&log_date=eq.'+today+'&task_name=eq.'+encodeURIComponent(taskId));}catch(e){}
   if(existing&&existing.length>0){
+    // Undo confirmation in Gujarati
+    if(!confirm('↩️ '+taskLabel+'\n\nઆ કાર્ય પૂર્ણ માર્ક રદ કરવું? (Undo?)'))return;
     try{await sb('peon_task_logs','DELETE',null,'?id=eq.'+existing[0].id);}catch(e){alert('Error: '+e.message);return;}
   }else{
+    // Done confirmation in Gujarati
+    if(!confirm('✅ '+taskLabel+'\n\nઆ કાર્ય પૂર્ણ થઈ ગયું છે?\n(Have you completed this task?)'))return;
     try{await sb('peon_task_logs','POST',{peon_id:peonId,peon_name:currentUser.name||'',log_date:today,task_name:taskId,task_label:taskLabel,done_at:new Date().toISOString()},null);}
     catch(e){alert('Error saving: '+e.message);return;}
+    // Success message in Gujarati
+    alert('👍 '+taskLabel+'\n\nબહુ સારું! કાર્ય સફળતાપૂર્વક નોંધ થઈ ગયું. ✅');
   }
   renderPeonDashboard();
 }
@@ -3171,13 +3196,15 @@ async function renderPeonActivity(){
       const stdTasks=pd.tasks.filter(function(t){return !t.task_name.startsWith('extra_');});
       const extraTasks=pd.tasks.filter(function(t){return t.task_name.startsWith('extra_');});
       const doneIds=stdTasks.map(function(t){return t.task_name;});
-      const taskRows=PEON_TASKS.map(function(t){
+      const allAdminTasks=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋'};})];
+      const taskRows=allAdminTasks.map(function(t){
         const done=doneIds.includes(t.id);
         const log=stdTasks.find(function(l){return l.task_name===t.id;});
         const timeStr=log&&log.done_at?new Date(log.done_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+        const schedTime=cfgMapAdmin[t.id]&&cfgMapAdmin[t.id].scheduled_time?cfgMapAdmin[t.id].scheduled_time:'';
         return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
           <span style="font-size:15px;">${done?'✅':'⬜'}</span>
-          <span style="flex:1;font-size:13px;color:${done?'var(--text)':'var(--text-muted)'};">${t.icon} ${t.label}</span>
+          <span style="flex:1;font-size:13px;color:${done?'var(--text)':'var(--text-muted)'};">${t.icon} ${t.label}${schedTime?` <span style="font-size:10px;color:#0891b2;">(${schedTime})</span>`:''}</span>
           <span style="font-size:11px;color:var(--text-muted);">${timeStr}</span>
         </div>`;
       }).join('');
@@ -3188,17 +3215,35 @@ async function renderPeonActivity(){
           <span style="font-size:11px;color:var(--text-muted);">${l.extra_from||''}${l.extra_to?' → '+l.extra_to:''}</span>
         </div>`;
       }).join('');
-      const pct=Math.round(doneIds.length/PEON_TASKS.length*100);
+      const totalAdminTasks=allAdminTasks.length;
+      const pct=totalAdminTasks?Math.round(doneIds.length/totalAdminTasks*100):0;
       return `<div class="card" style="margin-bottom:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div><div style="font-size:16px;font-weight:700;">🧹 ${pd.name||pid}</div>
             <div style="font-size:12px;color:var(--text-muted);">Punch: ${punch?(punch.punch_in_time+(punch.punch_out_time?' → '+punch.punch_out_time:'  (still on duty)')):'Not punched in'}</div>
           </div>
-          <div style="text-align:right;"><div style="font-size:20px;font-weight:800;color:${pct===100?'#22c55e':'#2563eb'};">${doneIds.length}/${PEON_TASKS.length}</div><div style="font-size:11px;color:var(--text-muted);">${pct}% done</div></div>
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:800;color:${pct===100?'#22c55e':'#2563eb'};">${doneIds.length}/${totalAdminTasks}</div><div style="font-size:11px;color:var(--text-muted);">${pct}% done</div></div>
         </div>
         <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${pct===100?'#22c55e':'#2563eb'};border-radius:3px;"></div></div>
         ${taskRows}
         ${extraRows?`<div style="margin-top:10px;padding-top:8px;border-top:2px dashed var(--border);"><div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">📝 EXTRA WORK</div>${extraRows}</div>`:''}
+      </div>`;
+    }).join('');
+    // Load task config for admin settings panel
+    let taskCfg=[];try{taskCfg=await sb('peon_task_config','GET',null,'?is_active=eq.true&order=sort_order.asc');}catch(e){}
+    const cfgMapAdmin={};(taskCfg||[]).forEach(function(c){cfgMapAdmin[c.task_id]=c;});
+    const stdIds2=PEON_TASKS.map(function(t){return t.id;});
+    const customTasksAdmin=(taskCfg||[]).filter(function(c){return c.is_custom&&!stdIds2.includes(c.task_id);});
+    // All tasks for admin config = predefined + custom
+    const allTasksAdmin=[...PEON_TASKS,...customTasksAdmin.map(function(c){return{id:c.task_id,label:c.task_label,icon:c.task_icon||'📋',_customDbId:c.id};})];
+    const taskSettingsRows=allTasksAdmin.map(function(t){
+      const cfg=cfgMapAdmin[t.id];
+      const schedVal=cfg&&cfg.scheduled_time?cfg.scheduled_time:'';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:16px;flex-shrink:0;">${t.icon}</span>
+        <span style="flex:1;font-size:13px;">${t.label}</span>
+        <input type="time" value="${schedVal}" onchange="savePeonTaskTime('${t.id}','${t.label.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);">
+        ${t._customDbId?`<button onclick="deletePeonCustomTask('${t._customDbId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 6px;" title="Remove">✕</button>`:''}
       </div>`;
     }).join('');
     pc.innerHTML=`<div class="section-header" style="margin-bottom:14px;"><h2>🧹 Peon Activity</h2></div>
@@ -3207,8 +3252,63 @@ async function renderPeonActivity(){
         <input type="date" value="${selDate}" onchange="window._peonActDate=this.value;renderPeonActivity();" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
         <span style="font-size:12px;color:var(--text-muted);">${peonIds.length} peon(s)</span>
       </div>
+      <!-- Admin Task Settings -->
+      <details style="margin-bottom:14px;">
+        <summary style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;cursor:pointer;font-weight:700;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;">⚙️ Task Settings — Scheduled Times &amp; Custom Tasks <span style="margin-left:auto;font-size:12px;color:var(--text-muted);">▼ Click to expand</span></summary>
+        <div class="card" style="margin-top:4px;border-top:none;border-radius:0 0 var(--radius) var(--radius);">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">દરેક task ની scheduled time set કરો — peon ને overdue highlight દેખાસે.</div>
+          ${taskSettingsRows}
+          <!-- Add custom task -->
+          <div style="margin-top:14px;padding-top:12px;border-top:2px dashed var(--border);">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px;">➕ New Custom Task Add Karo</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="peon-new-task-icon" placeholder="Icon (e.g. 🧺)" value="📋" style="width:60px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:18px;text-align:center;background:var(--bg);color:var(--text);">
+                <input type="text" id="peon-new-task-label" placeholder="Task name..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">Scheduled Time:</label>
+                <input type="time" id="peon-new-task-time" style="padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);">
+                <button onclick="addPeonCustomTask()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
       ${bodyHtml||'<div style="text-align:center;padding:40px;color:var(--text-muted);">No activity recorded for this date.</div>'}`;
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+
+async function savePeonTaskTime(taskId, taskLabel, timeVal){
+  try{
+    const existing=await sb('peon_task_config','GET',null,'?task_id=eq.'+encodeURIComponent(taskId));
+    if(existing&&existing.length>0){
+      await sb('peon_task_config','PATCH',{scheduled_time:timeVal||null},'?task_id=eq.'+encodeURIComponent(taskId));
+    }else{
+      const stdT=PEON_TASKS.find(function(t){return t.id===taskId;});
+      await sb('peon_task_config','POST',{task_id:taskId,task_label:taskLabel,task_icon:stdT?stdT.icon:'📋',scheduled_time:timeVal||null,is_custom:false,sort_order:99,is_active:true},null);
+    }
+    // Silent save — no alert needed, input already shows new value
+  }catch(e){alert('Error saving time: '+e.message);}
+}
+
+async function addPeonCustomTask(){
+  const icon=document.getElementById('peon-new-task-icon')?.value.trim()||'📋';
+  const label=document.getElementById('peon-new-task-label')?.value.trim();
+  const time=document.getElementById('peon-new-task-time')?.value||null;
+  if(!label){alert('Task name required');return;}
+  const taskId='custom_'+Date.now();
+  try{
+    await sb('peon_task_config','POST',{task_id:taskId,task_label:label,task_icon:icon,scheduled_time:time||null,is_custom:true,sort_order:99,is_active:true},null);
+    alert('✅ Task added: '+label);
+    renderPeonActivity();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deletePeonCustomTask(dbId){
+  if(!confirm('Remove this custom task?'))return;
+  try{await sb('peon_task_config','PATCH',{is_active:false},'?id=eq.'+dbId);}catch(e){alert('Error: '+e.message);return;}
+  renderPeonActivity();
 }
 // ===================== END PEON =====================
 
