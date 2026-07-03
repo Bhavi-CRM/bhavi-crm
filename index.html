@@ -6559,7 +6559,13 @@ async function saveEngUpdate(){
         for(const ol of (openLogs||[])){
           await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
         }
-        // No auto traveling — engineer will manually Visit Start next call
+        // Auto status log entry for Call Closed
+        await sb('work_logs','POST',{
+          eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
+          log_date:closeDate,from_time:closeTime,to_time:closeTime,
+          task_description:'✅ Call Closed — '+ticketLabel,
+          ticket_id:id,log_type:'status',created_at:closeNow.toISOString()
+        }).catch(()=>{});
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
     if(status==='Closed'){
@@ -6603,6 +6609,19 @@ async function saveEngUpdate(){
             }
           }catch(tlEx){}
         }
+        // Auto status log entry for paused/pending status
+        const pEngName=currentUser.name;
+        const pRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+        const pTicket=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=ticket_no,cname').catch(()=>[]))[0];
+        const pLabel=(pTicket?.ticket_no||id)+(pTicket?.cname?' — '+pTicket.cname:'');
+        const statusIcons={'Pending Parts':'⏸️','Pending Customer Approval':'⏳','Pending Engineer Stock':'📦','Pending Spare':'🔧','Hold':'🔒','Sent to MSC':'📤','Repaired':'✅'};
+        const pIcon=statusIcons[status]||'⏸️';
+        await sb('work_logs','POST',{
+          eng_id:pEngId,eng_name:pEngName,member_role:pRole,
+          log_date:pDate,from_time:pTime,to_time:pTime,
+          task_description:pIcon+' '+status+' — '+pLabel,
+          ticket_id:id,log_type:'status',created_at:pNow.toISOString()
+        }).catch(()=>{});
       }catch(pEx){console.log('WorkLog pause-close err:',pEx);}
     }
     closeModal('modal-eng-update');currentSpares=[];
