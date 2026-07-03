@@ -4099,7 +4099,7 @@ function doPunchOut(){
   // Show punch out modal
   showPunchOutModal(ps,key);
 }
-function showPunchOutModal(ps,key){
+async function showPunchOutModal(ps,key){
   // Remove existing
   var ex=document.getElementById('punch-out-modal');
   if(ex)ex.remove();
