@@ -307,9 +307,9 @@ tr:hover td{background:#f8fafc;}
   <div id="sidebar-logo"><div id="sidebar-logo-inner" style="font-size:12px;font-weight:800;color:var(--primary);text-align:center;">BHAVI ELECTRONICS<br><span style="font-size:10px;font-weight:400;color:#90a4ae;">& Automation</span></div></div>
   <div class="nav-section">
     <div class="nav-section-title">Main</div>
+    <div class="nav-item hidden" onclick="navigate('my-calls')" id="nav-my-calls"><span class="icon">📞</span><span>My Calls</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
-    <div class="nav-item hidden" onclick="navigate('my-calls')" id="nav-my-calls"><span class="icon">📞</span><span>My Calls</span></div>
     <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
     <div class="nav-item hidden" onclick="navigate('walk-in')" id="nav-walk-in"><span class="icon">🚶</span><span>Walk-in</span></div>
     <div class="nav-item hidden" onclick="navigate('courier')" id="nav-courier"><span class="icon">📦</span><span>Courier</span></div>
@@ -2690,6 +2690,7 @@ async function doLogin(){
     setTimeout(checkTATReminder, 800);
     scheduleMidnightSeqReset();
     resetExpiredSeqs();
+    if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
@@ -2762,6 +2763,7 @@ async function tryAutoLogin(){
     setTimeout(checkTATReminder, 800);
     scheduleMidnightSeqReset();
     resetExpiredSeqs();
+    if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
@@ -4090,7 +4092,7 @@ async function doSavePunchIn(loc){
   startLocationTracking();
   stopPunchCamera();
   alert('Punch In successful! ✅\nTime: '+ps.punch_in_time);
-  navigate('dashboard');
+  navigate(currentUser&&currentUser.role==='engineer'?'my-calls':'dashboard');
 }
 function doPunchOut(){
   const key=`punch_${currentUser.user_id}`;
@@ -5589,7 +5591,7 @@ async function quickStatusChange(id,status){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
-  const isAdminOrWC=currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller';
+  const isAdminOrWC=currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||window._isCspMgr;
   const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type,t.call_type,t.warranty_coverage);
   if(status!=='Call Cancel'&&!allowed.includes(status)){
     alert(`❌ Cannot change from "${t.status}" to "${status}"\n\nAllowed: ${allowed.length?allowed.join(', '):'No changes allowed at this stage'}`);
@@ -5919,7 +5921,14 @@ async function openEngUpdate(id){
       const totalDone=tl.filter(e=>e.action==='Work Session End').reduce((s,e)=>s+(e.duration_min||0),0);
       const pausedS=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold'];
       const isPaused=pausedS.includes(t.status);
-      if(wsEntry||t.visit_in){
+      if(isPaused){
+        const sessInfo=wsEntries.length?`<div style="font-size:12px;color:#92400e;margin-bottom:8px;">📋 ${wsEntries.length} session(s) done${totalDone?` — ${Math.floor(totalDone/60)}h ${totalDone%60}m total`:''}</div>`:'';
+        return `<div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">⏸️ Call Paused — ${t.status}</div>
+          ${sessInfo}
+          <button onclick="doWorkStart('${t.id}')" style="width:100%;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🔧 Resume Work</button>
+        </div>`;
+      } else if(wsEntry||t.visit_in){
         return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}${totalDone?' | '+Math.floor(totalDone/60)+'h '+totalDone%60+'m total':''}</div>`;
       } else {
         return `<div style="margin-bottom:12px;">
