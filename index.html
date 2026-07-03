@@ -2684,9 +2684,11 @@ async function doLogin(){
     await loadLogoFromDB();
     loadTGSettings();
     setupNav();
-    await navigate('dashboard');
+    await navigate(currentUser.role==='engineer'?'my-calls':'dashboard');
     setTimeout(setupNav, 100);
     setTimeout(checkTATReminder, 800);
+    scheduleMidnightSeqReset();
+    resetExpiredSeqs();
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
@@ -2754,9 +2756,11 @@ async function tryAutoLogin(){
     await loadMasterData();
     await loadLogoFromDB();
     loadTGSettings();
-    await navigate('dashboard');
+    await navigate(currentUser.role==='engineer'?'my-calls':'dashboard');
     setTimeout(setupNav,100);
     setTimeout(checkTATReminder, 800);
+    scheduleMidnightSeqReset();
+    resetExpiredSeqs();
   }catch(e){
     localStorage.removeItem('bhavi_session');
     // Restore login screen
@@ -3937,7 +3941,7 @@ async function doPunchIn(){
   var cancelBtn=document.createElement('button');
   cancelBtn.textContent='Cancel';
   cancelBtn.style.cssText='padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;';
-  cancelBtn.onclick=function(){clearInterval(_pinTimer);stopPunchCamera();overlay.remove();};
+  cancelBtn.onclick=function(){clearInterval(_pinTimer);clearInterval(window._faceAutoInterval);clearInterval(window._autoSubmitTimer);stopPunchCamera();overlay.remove();};
 
   var submitBtn=document.createElement('button');
   submitBtn.id='pin-submit-btn';
@@ -3945,8 +3949,7 @@ async function doPunchIn(){
   submitBtn.disabled=true;
   submitBtn.style.cssText='padding:8px 16px;background:#0e9f6e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;';
   submitBtn.onclick=function(){
-    clearInterval(_pinTimer);
-    // Get stored loc from closure
+    clearInterval(_pinTimer);clearInterval(window._faceAutoInterval);clearInterval(window._autoSubmitTimer);
     doSavePunchIn(window._pinLocCache||null);
     overlay.remove();
   };
@@ -3961,6 +3964,57 @@ async function doPunchIn(){
   // Start camera
   startPunchCamera('pin-video');
 
+  // Face auto-detect (Chrome only — falls back gracefully)
+  window._faceAutoInterval=null;
+  if('FaceDetector' in window){
+    var sEl0=document.getElementById('pin-selfie-status');
+    if(sEl0){sEl0.style.background='#eff6ff';sEl0.style.color='#1d4ed8';sEl0.textContent='🤖 Auto-detecting face...';}
+    var _fd=new FaceDetector({fastMode:true,maxDetectedFaces:1});
+    window._faceAutoInterval=setInterval(async function(){
+      var v=document.getElementById('pin-video');
+      if(!v||!document.getElementById('punch-in-modal')){clearInterval(window._faceAutoInterval);return;}
+      if(window._punchSelfieIn)return; // already captured
+      try{
+        var faces=await _fd.detect(v);
+        if(faces.length>0){
+          clearInterval(window._faceAutoInterval);
+          capturePunchSelfie('pin-video','pin-selfie-preview',
+            document.getElementById('pin-capture-btn'),
+            document.getElementById('pin-retake-btn'),
+            document.getElementById('pin-submit-btn'));
+          var sEl2=document.getElementById('pin-selfie-status');
+          if(sEl2){sEl2.style.background='#d1fae5';sEl2.style.color='#065f46';sEl2.textContent='🤖 Face Detected — Auto Captured ✅';}
+          // Auto-submit if GPS also ready
+          if(window._pinGpsReady){
+            var autoBar=document.getElementById('pin-auto-submit-bar');
+            if(autoBar){autoBar.style.display='block';}
+            var _countdown=3;
+            window._autoSubmitTimer=setInterval(function(){
+              var cb=document.getElementById('pin-countdown');
+              if(cb)cb.textContent=_countdown;
+              if(_countdown<=0){
+                clearInterval(window._autoSubmitTimer);
+                var sm=document.getElementById('punch-in-modal');
+                if(sm){clearInterval(_pinTimer);doSavePunchIn(window._pinLocCache||null);sm.remove();}
+              }
+              _countdown--;
+            },1000);
+          }
+        }
+      }catch(e){}
+    },1200);
+  }else{
+    var sEl1=document.getElementById('pin-selfie-status');
+    if(sEl1){sEl1.style.background='#eff6ff';sEl1.style.color='#1d4ed8';sEl1.textContent='📸 Take Selfie to Punch In';}
+  }
+
+  // Auto-submit countdown bar (hidden by default)
+  var autoBar=document.createElement('div');
+  autoBar.id='pin-auto-submit-bar';
+  autoBar.style.cssText='display:none;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:13px;text-align:center;';
+  autoBar.innerHTML='✅ Face detected! Punching in automatically in <b id="pin-countdown">3</b>s...<br><button onclick="clearInterval(window._autoSubmitTimer);this.closest(\'#pin-auto-submit-bar\').style.display=\'none\';" style="margin-top:6px;padding:4px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;">Cancel Auto-Punch</button>';
+  box.insertBefore(autoBar,btnRow);
+
   // Get GPS (mandatory)
   window._pinLocCache=null;
   window._pinGpsReady=false;
@@ -3972,7 +4026,25 @@ async function doPunchIn(){
       if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
       else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
     }
-    if(loc&&window._punchSelfieIn){var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;}
+    if(loc&&window._punchSelfieIn){
+      var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;
+      // If selfie already captured (face detected), start auto-submit
+      var autoBar2=document.getElementById('pin-auto-submit-bar');
+      if(autoBar2&&autoBar2.style.display==='none'&&window._punchSelfieIn){
+        autoBar2.style.display='block';
+        var _countdown2=3;
+        window._autoSubmitTimer=setInterval(function(){
+          var cb=document.getElementById('pin-countdown');
+          if(cb)cb.textContent=_countdown2;
+          if(_countdown2<=0){
+            clearInterval(window._autoSubmitTimer);
+            var sm=document.getElementById('punch-in-modal');
+            if(sm){clearInterval(_pinTimer);doSavePunchIn(window._pinLocCache||null);sm.remove();}
+          }
+          _countdown2--;
+        },1000);
+      }
+    }
   });
 }
 
@@ -4996,6 +5068,21 @@ function openAdminEdit(id){
     .then(()=>{if(currentPage==='tickets')renderTickets();else renderDashboard();})
     .catch(e=>alert('Error: '+e.message));
 }
+async function resetExpiredSeqs(){
+  try{
+    var today=new Date().toLocaleDateString('en-CA');
+    await sb('tickets','PATCH',{sequence_no:null},'?planned_date=lt.'+today+'&sequence_no=not.is.null&status=neq.Closed&status=neq.Call+Cancel&status=neq.Customer+Reject');
+  }catch(e){console.log('Seq reset error:',e);}
+}
+function scheduleMidnightSeqReset(){
+  var now=new Date();
+  var midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,5);
+  var ms=midnight-now;
+  setTimeout(async function(){
+    await resetExpiredSeqs();
+    scheduleMidnightSeqReset();
+  },ms);
+}
 async function checkTATReminder(){
   if(!currentUser)return;
   var isAdminOrWC=currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller';
@@ -5512,11 +5599,41 @@ async function quickEngChange(id,val){
   // Telegram notifications
   var _prevEng=t?.assigned_name||'';
   var _reassign=_prevEng&&_prevEng!==eName?'♻️ Reassigned (was: '+_prevEng+')':'🆕 New Assignment';
-  // Admin: full details
   tgNotifyAll('📋 <b>Ticket '+_reassign+'</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||'')+'\n👷 Assigned to: '+eName);
-  // Engineer: personal message
   if(eId)tgNotifyEngineer(eId,'📋 <b>Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+(t?.cname||'')+' | 📱 '+(t?.mobile||'')+'\n📍 '+(t?.city||'')+'\n🔧 '+(t?.model||'')+' | S/N: '+(t?.serial||'—')+'\n❗ '+(t?.problem||''));
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
+  // Ask which date to add this call to route plan
+  showAllocateDateModal(id,eId,eName);
+}
+function showAllocateDateModal(ticketId,engId,engName){
+  var ex=document.getElementById('allocate-date-modal');if(ex)ex.remove();
+  var today=new Date().toISOString().slice(0,10);
+  var overlay=document.createElement('div');
+  overlay.id='allocate-date-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">📅 Add to Route Plan</h3>'
+    +'<p style="font-size:13px;color:#6b7280;margin-bottom:16px;">Engineer: <b>'+escHtml(engName)+'</b><br>Ticket: <b>'+escHtml(ticketId)+'</b></p>'
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Select Date for Route Plan</label>'
+    +'<input type="date" id="allocate-date-inp" value="'+today+'" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:14px;box-sizing:border-box;">'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    +'<button onclick="document.getElementById(\'allocate-date-modal\').remove();" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Skip</button>'
+    +'<button onclick="doAllocateToRoute(\''+escHtml(ticketId)+'\',\''+escHtml(engId)+'\',\''+escHtml(engName)+'\')" style="padding:8px 18px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Add to Route</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+}
+async function doAllocateToRoute(ticketId,engId,engName){
+  var date=document.getElementById('allocate-date-inp')?.value;
+  var modal=document.getElementById('allocate-date-modal');if(modal)modal.remove();
+  if(!date)return;
+  try{
+    var existing=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&planned_date=eq.'+date+'&sequence_no=not.is.null&select=sequence_no&order=sequence_no.desc&limit=1');
+    var nextSeq=(existing&&existing.length?Math.max(...existing.map(function(t){return t.sequence_no||0;})):0)+1;
+    await sb('tickets','PATCH',{planned_date:date,sequence_no:nextSeq,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(ticketId));
+    alert('Added to route plan for '+new Date(date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+' — Sequence #'+nextSeq+'\nEngineer will see this call at position '+nextSeq+' in their route for that day.');
+  }catch(e){alert('Error saving route plan: '+e.message);}
 }
 
 // Point 2: Customer Approval flow
@@ -20689,7 +20806,7 @@ async function saveRoutePlanInline(){
   if(!keys.length){alert('No changes to save');return;}
   var btn=document.getElementById('rp-save-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Saving...';}
-  var today=new Date().toISOString().slice(0,10);
+  var today=document.getElementById('rp-inline-date')?.value||new Date().toISOString().slice(0,10);
   var saved=0;
   for(var i=0;i<keys.length;i++){
     var tid=keys[i];var c=changes[tid];
@@ -20909,7 +21026,7 @@ function pendingListRender(){
     +'<div style="display:flex;gap:8px;align-items:center;">'
     +'<button onclick="exportPendingListExcel()" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;">📥 Export Excel</button>'
     +'<button onclick="window._routeMode=!window._routeMode;window._routeChanges={};pendingListRender();" style="background:'+(window._routeMode?'#7c3aed':'#e0e7ff')+';color:'+(window._routeMode?'#fff':'#4338ca')+';border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:700;">🗺️ Route Plan '+(window._routeMode?'ON ✓':'OFF')+'</button>'
-    +(window._routeMode?'<button id="rp-save-btn" onclick="saveRoutePlanInline()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:700;">💾 Save Route Plan</button>':'')
+    +(window._routeMode?'<input type="date" id="rp-inline-date" value="'+new Date().toISOString().slice(0,10)+'" title="Date to add to Route Plan" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"><button id="rp-save-btn" onclick="saveRoutePlanInline()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:700;">💾 Save Route Plan</button>':'')
     +'</div>'
     +'</div>'
     // Filters (apply only to actionable calls)
