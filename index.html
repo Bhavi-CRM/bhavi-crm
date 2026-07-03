@@ -339,6 +339,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('route-planning')" id="nav-route-planning"><span class="icon">🗺️</span><span>Route Planning</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
+    <div class="nav-item" onclick="showPortalQR()" id="nav-customer-portal"><span class="icon">📱</span><span>Customer Portal</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
     <div class="nav-item hidden" onclick="navigate('peon-activity')" id="nav-peon-activity"><span class="icon">🧹</span><span>Peon Activity</span></div>
   </div>
@@ -3619,9 +3620,9 @@ async function renderDashboard(){
       </div>`;
     }
 
-    // Point 4: Punch In/Out bar for engineers
+    // Punch In/Out bar for engineers AND work controllers
     let punchHtml='';
-    if(currentUser.role==='engineer'){
+    if(currentUser.role==='engineer'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'){
       // Check Supabase for today's punch status (cross-device sync)
       const today=new Date().toLocaleDateString('en-CA');
       let ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
@@ -3646,21 +3647,6 @@ async function renderDashboard(){
 
     document.getElementById('page-content').innerHTML=`
       ${punchHtml}
-      <!-- Customer Portal Banner -->
-      <div style="background:linear-gradient(135deg,#1a3fa8,#2563eb);color:#fff;border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 4px 14px rgba(26,63,168,.25);">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:28px;">📱</span>
-          <div>
-            <div style="font-size:14px;font-weight:800;margin-bottom:2px;">Customer Booking Portal</div>
-            <div style="font-size:11px;opacity:.8;">Services &amp; Shop — share with customers</div>
-            <div style="font-size:11px;opacity:.65;margin-top:2px;font-family:monospace;">bhavi-crm.github.io/bhavi-crm/complaint.html</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;flex-shrink:0;">
-          <button onclick="showPortalQR()" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">📷 QR Code</button>
-          <button onclick="navigator.clipboard&&navigator.clipboard.writeText('https://bhavi-crm.github.io/bhavi-crm/complaint.html').then(function(){alert('Link copied!');}).catch(function(){prompt('Copy this link:','https://bhavi-crm.github.io/bhavi-crm/complaint.html');})" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">🔗 Copy Link</button>
-        </div>
-      </div>
       <!-- Dashboard Period Filter Bar -->
       <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
         <span style="font-size:12px;font-weight:700;color:var(--text-muted);margin-right:4px;">Period:</span>
@@ -3863,6 +3849,29 @@ async function doPunchIn(){
     }
   }catch(e){console.log('Punch check error:',e);}
 
+  // WC/Admin — simple punch in without camera/selfie/meter
+  const _isSimpleIn=currentUser&&(currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||currentUser.role==='admin');
+  if(_isSimpleIn){
+    var pinTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    if(!confirm('Punch In?\nTime: '+pinTime))return;
+    const pinDate=new Date().toLocaleDateString('en-CA');
+    const pinPs={punched_in:true,punch_in_time:pinTime,punch_in_date:pinDate,start_meter:'',end_meter:''};
+    localStorage.setItem('punch_'+currentUser.user_id,JSON.stringify(pinPs));
+    try{
+      await sb('punch_logs','POST',{
+        eng_id:currentUser.eng_id||currentUser.user_id,
+        eng_name:currentUser.name,
+        punch_in_time:pinTime,
+        punch_in_date:pinDate,
+        status:'active',
+        punch_in_photo:null,punch_in_lat:null,punch_in_lng:null
+      });
+    }catch(e){console.log('WC punch error:',e);}
+    alert('Punch In done! ✅\nTime: '+pinTime);
+    navigate('dashboard');
+    return;
+  }
+
   // Remove any existing modal
   var exModal=document.getElementById('punch-in-modal');if(exModal)exModal.remove();
   window._punchSelfieIn=null;
@@ -4004,8 +4013,19 @@ async function doPunchIn(){
       }catch(e){}
     },1200);
   }else{
+    // FaceDetector not supported — auto-capture after 3 seconds
     var sEl1=document.getElementById('pin-selfie-status');
-    if(sEl1){sEl1.style.background='#eff6ff';sEl1.style.color='#1d4ed8';sEl1.textContent='📸 Take Selfie to Punch In';}
+    if(sEl1){sEl1.style.background='#eff6ff';sEl1.style.color='#1d4ed8';sEl1.textContent='📸 Auto-capturing in 3s...';}
+    setTimeout(function(){
+      if(!window._punchSelfieIn&&document.getElementById('punch-in-modal')){
+        capturePunchSelfie('pin-video','pin-selfie-preview',
+          document.getElementById('pin-capture-btn'),
+          document.getElementById('pin-retake-btn'),
+          document.getElementById('pin-submit-btn'));
+        var sEl2=document.getElementById('pin-selfie-status');
+        if(sEl2){sEl2.style.background='#d1fae5';sEl2.style.color='#065f46';sEl2.textContent='📸 Photo Captured ✅';}
+      }
+    },3000);
   }
 
   // Auto-submit countdown bar (hidden by default)
@@ -4084,13 +4104,16 @@ function showPunchOutModal(ps,key){
   var ex=document.getElementById('punch-out-modal');
   if(ex)ex.remove();
   
-  // If carry in engineer - simple punch out without meter
-  if(currentUser&&currentUser.eng_type==='carryin'){
-    if(!confirm('Punch Out / Work Over?\nTime: '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})))return;
+  // Carry-in engineers and WC/Admin — simple punch out without meter/selfie
+  const _isSimplePunch=currentUser&&(currentUser.eng_type==='carryin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||currentUser.role==='admin');
+  if(_isSimplePunch){
+    var poutTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    if(!confirm('Punch Out?\nTime: '+poutTime))return;
     ps.punched_in=false;
-    ps.punch_out_time=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    ps.punch_out_time=poutTime;
     localStorage.setItem(key,JSON.stringify(ps));
-    alert('Work Over! ✅\nPunch Out: '+ps.punch_out_time);
+    try{await sb('punch_logs','PATCH',{punch_out_time:poutTime,punch_out_date:new Date().toLocaleDateString('en-CA'),status:'done'},'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&punch_in_date=eq.'+ps.punch_in_date+'&status=eq.active');}catch(e){}
+    alert('Punch Out done! ✅\nTime: '+poutTime);
     navigate('dashboard');
     return;
   }
@@ -5566,7 +5589,7 @@ async function quickStatusChange(id,status){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
-  // FIX: pass callType and warrantyStatus too
+  const isAdminOrWC=currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller';
   const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type,t.call_type,t.warranty_coverage);
   if(status!=='Call Cancel'&&!allowed.includes(status)){
     alert(`❌ Cannot change from "${t.status}" to "${status}"\n\nAllowed: ${allowed.length?allowed.join(', '):'No changes allowed at this stage'}`);
@@ -5574,7 +5597,7 @@ async function quickStatusChange(id,status){
   }
   // Cancel Call needs mandatory remark
   if(status==='Call Cancel'){
-    const reason=prompt('🚫 Call Cancel - Reason (mandatory):');
+    const reason=prompt('🚫 Cancel Reason (mandatory):');
     if(!reason||!reason.trim()){alert('Reason is mandatory!');return;}
     const tl=[...(t.timeline||[]),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
     await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
@@ -5582,11 +5605,49 @@ async function quickStatusChange(id,status){
     if(currentPage==='tickets')renderTickets();else renderDashboard();
     return;
   }
+  // Admin/WC force status change → mandatory remark
+  if(isAdminOrWC){
+    showForceStatusRemarkModal(id,t,status);
+    return;
+  }
   const reason=await validateStatusChange(id,t.status,status,currentUser.role);
   if(reason===null)return;
   const note=reason?`Reason: ${reason}`:'';
   const tl=[...(t.timeline||[]),{action:'Status → '+status,by:currentUser.name,at:new Date().toISOString(),note}];
   await sb('tickets','PATCH',{status,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
+}
+function showForceStatusRemarkModal(id,t,newStatus){
+  var ex=document.getElementById('force-status-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='force-status-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">⚠️ Force Status Change</h3>'
+    +'<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;">'
+    +'<b>'+escHtml(t.id)+'</b> — '+escHtml(t.cname||'')+'<br>'
+    +'<span style="color:#92400e;">'+escHtml(t.status)+'</span> → <span style="color:#1d4ed8;font-weight:700;">'+escHtml(newStatus)+'</span>'
+    +'</div>'
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Reason for status change <span style="color:#dc2626;">*</span></label>'
+    +'<textarea id="force-status-remark" rows="3" placeholder="Why are you changing this status? (mandatory)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;box-sizing:border-box;resize:vertical;outline:none;"></textarea>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    +'<button onclick="document.getElementById(\'force-status-modal\').remove();" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Cancel</button>'
+    +'<button onclick="doForceStatusChange(\''+escHtml(id)+'\',\''+escHtml(newStatus)+'\')" style="padding:8px 18px;background:#dc2626;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Confirm Change</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){var el=document.getElementById('force-status-remark');if(el)el.focus();},100);
+}
+async function doForceStatusChange(id,newStatus){
+  var remark=document.getElementById('force-status-remark')?.value?.trim();
+  if(!remark){alert('Reason is mandatory!');return;}
+  var modal=document.getElementById('force-status-modal');if(modal)modal.remove();
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));t=r[0];}
+  const tl=[...(t?.timeline||[]),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
+  await sb('tickets','PATCH',{status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
