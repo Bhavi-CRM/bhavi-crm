@@ -5598,12 +5598,7 @@ async function quickStatusChange(id,status){
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
   const isAdminOrWC=currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||window._isCspMgr;
-  const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type,t.call_type,t.warranty_coverage);
-  if(status!=='Call Cancel'&&!allowed.includes(status)){
-    alert(`❌ Cannot change from "${t.status}" to "${status}"\n\nAllowed: ${allowed.length?allowed.join(', '):'No changes allowed at this stage'}`);
-    return;
-  }
-  // Cancel Call needs mandatory remark
+  // Cancel Call needs mandatory remark (for everyone)
   if(status==='Call Cancel'){
     const reason=prompt('🚫 Cancel Reason (mandatory):');
     if(!reason||!reason.trim()){alert('Reason is mandatory!');return;}
@@ -5613,9 +5608,14 @@ async function quickStatusChange(id,status){
     if(currentPage==='tickets')renderTickets();else renderDashboard();
     return;
   }
-  // Admin/WC force status change → mandatory remark
+  // Admin/WC force status change → always mandatory remark (bypasses allowed check)
   if(isAdminOrWC){
     showForceStatusRemarkModal(id,t,status);
+    return;
+  }
+  const allowed=getAllowedStatuses(t.status,currentUser.role,t.service_type,t.call_type,t.warranty_coverage);
+  if(!allowed.includes(status)){
+    alert(`❌ Cannot change from "${t.status}" to "${status}"\n\nAllowed: ${allowed.length?allowed.join(', '):'No changes allowed at this stage'}`);
     return;
   }
   const reason=await validateStatusChange(id,t.status,status,currentUser.role);
@@ -5656,6 +5656,23 @@ async function doForceStatusChange(id,newStatus){
   if(!t){const r=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));t=r[0];}
   const tl=[...(t?.timeline||[]),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
   await sb('tickets','PATCH',{status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));
+  // Auto work log entry for admin/WC force status change
+  try{
+    var _fsNow=new Date();
+    var _fsTime=_fsNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var _fsDate=_fsNow.toLocaleDateString('en-CA');
+    var _fsMRole=currentUser.role==='work_controller'||currentUser.role_type==='work_controller'?'WC':'Admin';
+    var _fsLabel=(t?.ticket_no||id)+(t?.cname?' — '+t.cname:'');
+    var _fsStatusIcons={'Closed':'✅','Call Cancel':'🚫','Assigned':'📋','In Progress':'🔧','Pending Parts':'⏸️','Pending Engineer Stock':'📦','Pending Customer Approval':'⏳','Customer Approved':'✅','Customer Reject':'❌','Repaired':'🔨','Sent to MSC':'📤','Delivered':'📦'};
+    await sb('work_logs','POST',{
+      eng_id:currentUser.user_id||currentUser.eng_id,
+      eng_name:currentUser.name,
+      member_role:_fsMRole,
+      log_date:_fsDate,from_time:_fsTime,to_time:_fsTime,
+      task_description:(_fsStatusIcons[newStatus]||'⚙️')+' Force → '+newStatus+' — '+_fsLabel+' ('+remark+')',
+      ticket_id:id,log_type:'status',created_at:_fsNow.toISOString()
+    }).catch(()=>{});
+  }catch(ex){}
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
@@ -17800,10 +17817,11 @@ async function loadWorkLogReport(){
           var isOpen=l.to_time==='OPEN';
           var isToday=l.log_date===todayDate;
           var isTravel=l.log_type==='travel';
-          var borderColor=isTravel?'#f59e0b':'var(--primary)';
-          var timeBg=isTravel?'#fef3c7':'#ede9fe';
-          var timeColor=isTravel?'#92400e':'#4c1d95';
-          var timeLabel=isOpen?(isToday?l.from_time+' – Running ⏳':l.from_time):l.from_time+' – '+l.to_time;
+          var isStatus=l.log_type==='status';
+          var borderColor=isTravel?'#f59e0b':isStatus?'#10b981':'var(--primary)';
+          var timeBg=isTravel?'#fef3c7':isStatus?'#d1fae5':'#ede9fe';
+          var timeColor=isTravel?'#92400e':isStatus?'#065f46':'#4c1d95';
+          var timeLabel=isStatus?l.from_time:(isOpen?(isToday?l.from_time+' – Running ⏳':l.from_time):l.from_time+' – '+l.to_time);
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
