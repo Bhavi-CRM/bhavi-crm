@@ -4657,6 +4657,7 @@ async function renderMyCalls(){
             +'<div style="font-weight:700;font-size:13px;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
             +'<div style="font-size:12px;color:var(--text-muted);">'+(t.cname||'-')+' &nbsp;·&nbsp; '+(t.area||t.city||'-')+'</div>'
             +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'+(t.model||'-')+'</div>'
+            +((t.address||t.area||t.city)?'<div style="font-size:11px;color:#166534;margin-top:2px;">📍 '+[t.address,t.area,t.city].filter(Boolean).join(', ')+'&nbsp;<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([t.address,t.area,t.city,t.state].filter(Boolean).join(', '))+'" target="_blank" style="color:#1d4ed8;font-weight:600;">🗺️ Maps</a></div>':'')
             +(tatHtml?'<div style="margin-top:4px;">'+tatHtml+'</div>':'')
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'
@@ -4714,6 +4715,11 @@ async function renderMyCalls(){
                   <div>📅 ${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</div>
                   ${t.problem?`<div style="grid-column:1/-1;color:var(--text-muted);">🔧 ${t.problem}</div>`:''}
                 </div>
+                ${(t.address||t.area||t.city)?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#166534;">
+                  <div style="font-weight:700;margin-bottom:2px;">📍 Address</div>
+                  <div>${[t.address,t.area,t.city,t.state,t.pin].filter(Boolean).join(', ')}</div>
+                  ${(t.address||t.area||t.city)?`<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([t.address,t.area,t.city,t.state].filter(Boolean).join(', '))}" target="_blank" style="display:inline-block;margin-top:4px;color:#1d4ed8;font-weight:600;font-size:11px;">🗺️ Open in Maps</a>`:''}
+                </div>`:''}
                 <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
               </div>`;
             }).join('');
