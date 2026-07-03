@@ -5952,7 +5952,10 @@ async function openEngUpdate(id){
           <button onclick="doWorkStart('${t.id}')" style="width:100%;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🔧 Resume Work</button>
         </div>`;
       } else if(wsEntry||t.visit_in){
-        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}${totalDone?' | '+Math.floor(totalDone/60)+'h '+totalDone%60+'m total':''}</div>`;
+        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:8px;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}${totalDone?' | '+Math.floor(totalDone/60)+'h '+totalDone%60+'m total':''}</div>
+          <button onclick="showWorkHoldModal('${t.id}')" style="width:100%;background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.6);color:#fff;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">⏸️ Work on Hold</button>
+        </div>`;
       } else {
         return `<div style="margin-bottom:12px;">
           <button onclick="doWorkStart('${t.id}')" style="width:100%;background:#059669;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🔧 Work Start</button>
@@ -5985,7 +5988,10 @@ async function openEngUpdate(id){
           </div>
         </div>`;
       } else if(wsEntry||t.visit_in){
-        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:14px;font-weight:700;text-align:center;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}</div>`;
+        return `<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:8px;">🔧 Work Started — ${wsTime}${wsEntries.length>1?' (Session '+wsEntries.length+')':''}</div>
+          <button onclick="showWorkHoldModal('${t.id}')" style="width:100%;background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.6);color:#fff;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">⏸️ Work on Hold</button>
+        </div>`;
       } else if(vsEntry){
         return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <span style="font-size:14px;font-weight:700;">🚗 Visiting — ${vsTime}</span>
@@ -11288,6 +11294,64 @@ async function doVisitStop(ticketId){
     await sb('tickets','PATCH',{timeline:tlStop,updated_at:now.toISOString()},'?id=eq.'+ticketId).catch(()=>{});
     alert('🛑 Travel stopped — '+timeNow+'\nCall remains in its current status.');
     closeModal('modal-eng-update');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// WORK ON HOLD — pause current work session so engineer can attend another call
+function showWorkHoldModal(ticketId){
+  var ex=document.getElementById('work-hold-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='work-hold-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<div style="font-size:16px;font-weight:800;color:#92400e;margin-bottom:6px;">⏸️ Work on Hold</div>'
+    +'<div style="font-size:13px;color:#6b7280;margin-bottom:16px;">Work log will be paused. You can start another call and come back to resume this one.</div>'
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Reason for hold <span style="color:#dc2626;">*</span></label>'
+    +'<textarea id="work-hold-remark" rows="3" placeholder="e.g. Customer not available, waiting for part, going to urgent call..." style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px;font-size:13px;resize:none;outline:none;box-sizing:border-box;"></textarea>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<button onclick="document.getElementById(\'work-hold-modal\').remove()" style="flex:1;padding:10px;background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Cancel</button>'
+    +'<button onclick="doConfirmWorkHold(\''+ticketId+'\')" style="flex:1;padding:10px;background:#f59e0b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">⏸️ Put on Hold</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){var el=document.getElementById('work-hold-remark');if(el)el.focus();},100);
+}
+async function doConfirmWorkHold(ticketId){
+  var remark=document.getElementById('work-hold-remark')?.value?.trim();
+  if(!remark){alert('Reason is mandatory!');return;}
+  var overlay=document.getElementById('work-hold-modal');if(overlay)overlay.remove();
+  try{
+    var now=new Date();
+    var nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var nowDate=now.toLocaleDateString('en-CA');
+    var memberId=currentUser.eng_id||currentUser.user_id;
+    var memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+    // Close any open work logs for this ticket
+    var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+nowDate+'&to_time=eq.OPEN&ticket_id=eq.'+encodeURIComponent(ticketId));
+    var workDur=0;
+    for(var ol of (openLogs||[])){
+      if(ol.log_type==='work'&&ol.from_time){
+        var[fH,fM]=ol.from_time.split(':').map(Number);var[tH,tM]=nowTime.split(':').map(Number);
+        var d=(tH*60+tM)-(fH*60+fM);if(d>0)workDur+=d;
+      }
+      await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+ol.id).catch(()=>{});
+    }
+    // Add hold status log entry
+    var tk=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(ticketId)))[0];
+    var tkLabel=(tk?.ticket_no||ticketId)+(tk?.cname?' — '+tk.cname:'');
+    await sb('work_logs','POST',{
+      eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
+      log_date:nowDate,from_time:nowTime,to_time:nowTime,
+      task_description:'⏸️ Work on Hold — '+tkLabel+' ('+remark+')',
+      ticket_id:ticketId,log_type:'status',created_at:now.toISOString()
+    }).catch(()=>{});
+    // Add timeline entry (does NOT change status)
+    var tl=[...(tk?.timeline||[]),{action:'Work on Hold',by:currentUser.name,at:now.toISOString(),note:remark+(workDur>0?' | Session: '+Math.floor(workDur/60)+'h '+workDur%60+'m':'')}];
+    await sb('tickets','PATCH',{timeline:tl,updated_at:now.toISOString()},'?id=eq.'+encodeURIComponent(ticketId)).catch(()=>{});
+    alert('Work paused ✅\nYou can now go to another call.\nCome back and tap Work Start to resume.');
+    closeModal('modal-eng-update');
+    if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
   }catch(e){alert('Error: '+e.message);}
 }
 
