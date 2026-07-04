@@ -17185,10 +17185,17 @@ async function viewSiteItems(siteId,siteName){
         +'</td>'
         +'</tr>';
     }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No items added</td></tr>';
-    var payRows=payments.map(function(p){
+    var runningPaid=0;
+    var payRows=payments.slice().reverse().map(function(p){
+      runningPaid+=parseFloat(p.amount||0);
+      var paidBefore=runningPaid-parseFloat(p.amount||0);
+      var printArgs=JSON.stringify({id:p.id,site_name:siteName,quotation_total:grandSell,paid_before:paidBefore,amount:parseFloat(p.amount||0),payment_mode:p.payment_mode||'',payment_date:p.payment_date||'',reference_no:p.reference_no||'',note:p.note||''}).replace(/'/g,'&apos;');
       return'<tr><td>'+fmtDate(p.payment_date)+'</td><td><b style="color:#065f46;">₹'+Number(p.amount).toLocaleString('en-IN')+'</b></td><td>'+p.payment_mode+'</td><td>'+(p.reference_no||'—')+'</td><td>'+(p.note||'—')+'</td>'
-        +'<td><button onclick="deleteSitePayment('+p.id+','+siteId+',\''+escQ(siteName)+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:11px;">🗑️</button></td></tr>';
-    }).join('');
+        +'<td style="white-space:nowrap;">'
+        +'<button onclick=\'printPaymentReceipt('+printArgs+')\' style="background:#d1fae5;border:none;color:#065f46;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:11px;margin-right:3px;">🖨️</button>'
+        +'<button onclick="deleteSitePayment('+p.id+','+siteId+',\''+escQ(siteName)+'\')" style="background:#fee2e2;border:none;color:#dc2626;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:11px;">🗑️</button>'
+        +'</td></tr>';
+    }).reverse().join('');
     modal.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()">'
       +'<div class="modal-header"><h2>📦 '+siteName+' — Items & Payment</h2><button class="close-btn" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>'
       +'<div class="modal-body">'
@@ -17998,6 +18005,7 @@ async function savePayment(){
 function printPaymentReceipt(p){
   var logo=localStorage.getItem('bhavi_logo')||'';
   var bannerSrc=window._bhaviBannerSrc;
+  if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
   var logoHtml=bannerSrc
     ?'<img src="'+bannerSrc+'" style="width:100%;display:block;max-height:120px;object-fit:cover;">'
     :(logo?'<div style="display:flex;align-items:center;gap:12px;padding:6px 0;"><img src="'+logo+'" style="max-height:60px;object-fit:contain;"></div>'
@@ -18031,9 +18039,9 @@ function printPaymentReceipt(p){
     +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>This Payment:</span><span style="color:#059669;font-weight:700;">₹'+Number(p.amount).toLocaleString('en-IN')+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;border-top:1px solid #86efac;padding-top:6px;margin-top:4px;"><span><b>Balance Remaining:</b></span><span style="font-weight:800;color:'+(balance>0?'#dc2626':'#059669')+';">₹'+Number(Math.max(0,balance)).toLocaleString('en-IN')+(balance<=0?' (FULLY PAID)':'')+'</span></div>'
     +'</div>':'')
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;text-align:center;">'
-    +'<div style="border-top:1.5px solid #000;padding-top:6px;font-size:11px;">Customer Signature</div>'
-    +'<div style="border-top:1.5px solid #000;padding-top:6px;font-size:11px;">Authorized Signatory<br><span style="font-size:10px;color:#555;">Bhavi Electronics &amp; Automation</span></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:40px;text-align:center;">'
+    +'<div><div style="height:60px;border:1px dashed #ccc;border-radius:6px;margin-bottom:8px;"></div><div style="border-top:1.5px solid #000;padding-top:6px;font-size:11px;">Customer Signature &amp; Stamp</div></div>'
+    +'<div><div style="height:60px;border:1px dashed #ccc;border-radius:6px;margin-bottom:8px;"></div><div style="border-top:1.5px solid #000;padding-top:6px;font-size:11px;">Authorized Signatory &amp; Stamp<br><span style="font-size:10px;color:#555;">Bhavi Electronics &amp; Automation</span></div></div>'
     +'</div>'
     +'<div style="border-top:2px solid #cc0000;margin-top:16px;padding-top:8px;text-align:center;font-size:10px;color:#555;">Bhavi Electronics &amp; Automation | This is a computer generated receipt.</div>'
     +'<script>window.onload=function(){window.print();};<\/script>'
@@ -18295,11 +18303,11 @@ function printQuotationDoc(){
 </div>
 
 <!-- T&C SELECTOR MODAL -->
-<div class="modal-overlay hidden" id="modal-tc-selector" onclick="if(event.target===this)this.classList.add('hidden')">
+<div class="modal-overlay hidden" id="modal-tc-selector" onclick="if(event.target===this)closeTCSelector()">
   <div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:680px;">
     <div class="modal-header">
       <h2>📋 Terms &amp; Conditions</h2>
-      <button class="close-btn" onclick="document.getElementById('modal-tc-selector').classList.add('hidden')">✕</button>
+      <button class="close-btn" onclick="closeTCSelector()">✕</button>
     </div>
     <div class="modal-body" style="padding:0;">
       <!-- Tabs -->
@@ -18330,7 +18338,7 @@ function printQuotationDoc(){
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="document.getElementById('modal-tc-selector').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-outline" onclick="closeTCSelector()">Cancel</button>
       <button class="btn btn-primary" onclick="applyTCAndOpenQuotation()">📄 Generate Quotation →</button>
     </div>
   </div>
@@ -18745,9 +18753,16 @@ function openTCSelector(items,siteInfo,payInfo){
   document.getElementById('tc-custom-input').value='';
   document.getElementById('tc-list-name-input').value='';
   switchTCTab('select');
+  var siModal=document.getElementById('modal-site-items');
+  if(siModal)siModal.style.display='none';
   document.getElementById('modal-tc-selector').classList.remove('hidden');
 }
 
+function closeTCSelector(){
+  document.getElementById('modal-tc-selector').classList.add('hidden');
+  var siModal=document.getElementById('modal-site-items');
+  if(siModal)siModal.style.display='';
+}
 function switchTCTab(tab){
   document.getElementById('tc-panel-select').style.display=tab==='select'?'':'none';
   document.getElementById('tc-panel-lists').style.display=tab==='lists'?'':'none';
@@ -18866,6 +18881,8 @@ function applyTCAndOpenQuotation(){
   var selected=getSelectedTCTexts();
   var args=window._tcQuotationArgs||{};
   document.getElementById('modal-tc-selector').classList.add('hidden');
+  var siModal=document.getElementById('modal-site-items');
+  if(siModal)siModal.style.display='';
   openQuotationPrint(args.items,args.siteInfo,args.payInfo,selected);
 }
 
