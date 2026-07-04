@@ -13395,7 +13395,10 @@ document.addEventListener('mouseup',function(e){
   }
 },true);
 function closeModal(id){
-  document.getElementById(id).classList.add('hidden');if(id==='modal-eng-update')currentSpares=[];}
+  document.getElementById(id).classList.add('hidden');
+  if(id==='modal-eng-update')currentSpares=[];
+  if(id==='modal-payment'){var si=document.getElementById('modal-site-items');if(si)si.style.display='';}
+}
 function showModal(id){const el=document.getElementById(id);if(el)el.classList.remove('hidden');}
 
 // Mobile menu
@@ -17203,7 +17206,7 @@ async function viewSiteItems(siteId,siteName){
       +'<button class="btn btn-primary btn-sm" onclick="openAddSiteItem(\''+siteId+'\',\''+escQ(siteName)+'\')">➕ Add Item</button>'
       +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="openDispatchModal(\''+siteId+'\',\''+escQ(siteName)+'\')">📤 Dispatch Material</button>'
       +'<button class="btn btn-outline btn-sm" onclick="openTCSelector(window._currentSiteItems,window._currentSiteInfo,{paid:'+totalPaid+'})">📄 Quotation</button>'
-      +'<button class="btn btn-success btn-sm" onclick="openPaymentModal(\''+siteId+'\',\''+escQ(siteName)+'\','+grandSell+','+totalPaid+')">💰 Add Payment</button>'
+      +'<button class="btn btn-success btn-sm" onclick="openSitePaymentModal(\''+siteId+'\',\''+escQ(siteName)+'\','+grandSell+','+totalPaid+')">💰 Add Payment</button>'
       +'<button class="btn btn-outline btn-sm" style="color:#dc2626;" onclick="openTrash()" title="View deleted items this session">🗑️ Trash</button>'
       +'<button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Close</button>'
       +'</div></div>';
@@ -17944,18 +17947,21 @@ async function downloadWorkLogExcel(){
 
   XLSX.writeFile(wb,'work_logs_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
-function openPaymentModal(siteId,siteName,quotationTotal,paidSoFar){
+function openSitePaymentModal(siteId,siteName,quotationTotal,paidSoFar){
   window._paymentSiteId=siteId;
   window._paymentSiteName=siteName;
   window._paymentQuotTotal=quotationTotal||0;
   window._paymentPaidSoFar=paidSoFar||0;
+  // Close the items modal so payment modal appears on top
+  var siModal=document.getElementById('modal-site-items');
+  if(siModal)siModal.style.display='none';
   var today=new Date().toISOString().split('T')[0];
   document.getElementById('pay-date').value=today;
   document.getElementById('pay-amount').value='';
   document.getElementById('pay-mode').value='';
   document.getElementById('pay-ref').value='';
   document.getElementById('pay-note').value='';
-  document.getElementById('payment-site-info').innerHTML='<b>Site:</b> '+(siteName||'')+'<br><b>Quotation Total:</b> ₹'+(quotationTotal||0)+'<br><b>Paid:</b> ₹'+(paidSoFar||0)+'<br><b style="color:#d97706;">Pending: ₹'+((quotationTotal||0)-(paidSoFar||0))+'</b>';
+  document.getElementById('payment-site-info').innerHTML='<b>Site:</b> '+(siteName||'')+'<br><b>Quotation Total:</b> ₹'+Number(quotationTotal||0).toLocaleString('en-IN')+'<br><b>Paid:</b> ₹'+Number(paidSoFar||0).toLocaleString('en-IN')+'<br><b style="color:#d97706;">Pending: ₹'+Number((quotationTotal||0)-(paidSoFar||0)).toLocaleString('en-IN')+'</b>';
   var pm=document.getElementById('modal-payment');
   pm.style.zIndex='99999';
   document.body.appendChild(pm);
@@ -17971,6 +17977,9 @@ async function savePayment(){
   try{
     var saved=await sb('auto_site_payments','POST',{site_id:window._paymentSiteId,amount:parseFloat(amount),payment_mode:mode,payment_date:date,reference_no:ref||null,note:note||null,created_by:currentUser?.user_id||'ENG002'});
     closeModal('modal-payment');
+    // Restore items modal if it was hidden
+    var siModal=document.getElementById('modal-site-items');
+    if(siModal)siModal.style.display='';
     // Auto-print receipt
     printPaymentReceipt({
       id:(saved&&saved[0]&&saved[0].id)||('RCP-'+Date.now()),
