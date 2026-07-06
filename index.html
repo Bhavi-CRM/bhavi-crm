@@ -4015,19 +4015,28 @@ async function doPunchIn(){
       }catch(e){}
     },1200);
   }else{
-    // FaceDetector not supported — auto-capture after 3 seconds
+    // FaceDetector not supported — auto-capture once camera is ready (poll)
     var sEl1=document.getElementById('pin-selfie-status');
-    if(sEl1){sEl1.style.background='#eff6ff';sEl1.style.color='#1d4ed8';sEl1.textContent='📸 Auto-capturing in 3s...';}
-    setTimeout(function(){
-      if(!window._punchSelfieIn&&document.getElementById('punch-in-modal')){
+    if(sEl1){sEl1.style.background='#eff6ff';sEl1.style.color='#1d4ed8';sEl1.textContent='📸 Camera loading...';}
+    var _autoCaptureAttempts=0;
+    var _autoCaptureInterval=setInterval(function(){
+      _autoCaptureAttempts++;
+      if(window._punchSelfieIn||!document.getElementById('punch-in-modal')){clearInterval(_autoCaptureInterval);return;}
+      var v=document.getElementById('pin-video');
+      if(v&&v.readyState>=2&&v.videoWidth>0){
+        clearInterval(_autoCaptureInterval);
         capturePunchSelfie('pin-video','pin-selfie-preview',
           document.getElementById('pin-capture-btn'),
           document.getElementById('pin-retake-btn'),
           document.getElementById('pin-submit-btn'));
         var sEl2=document.getElementById('pin-selfie-status');
         if(sEl2){sEl2.style.background='#d1fae5';sEl2.style.color='#065f46';sEl2.textContent='📸 Photo Captured ✅';}
+      } else if(_autoCaptureAttempts>20){
+        clearInterval(_autoCaptureInterval); // give up after 10s, let user tap manually
+        var sErrEl=document.getElementById('pin-selfie-status');
+        if(sErrEl){sErrEl.style.background='#fef3c7';sErrEl.style.color='#92400e';sErrEl.textContent='📸 Tap "Take Selfie" button';}
       }
-    },3000);
+    },500);
   }
 
   // Auto-submit countdown bar (hidden by default)
@@ -4071,6 +4080,8 @@ async function doPunchIn(){
 }
 
 async function doSavePunchIn(loc){
+  if(!window._punchSelfieIn){alert('📸 Selfie is required! Please take a selfie first.');return;}
+  if(!loc){alert('📍 GPS Location is required! Please allow location access and try again.');return;}
   const key='punch_'+currentUser.user_id;
   const today=new Date().toLocaleDateString('en-CA');
   const now=new Date();
@@ -12150,6 +12161,12 @@ async function startPunchCamera(videoId){
 }
 function capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn){
   var vid=document.getElementById(videoId);if(!vid)return;
+  if(vid.readyState<2||vid.videoWidth===0){
+    var sErr=document.getElementById('pin-selfie-status');
+    if(sErr){sErr.style.background='#fee2e2';sErr.style.color='#991b1b';sErr.textContent='⚠️ Camera loading, try again...';}
+    setTimeout(function(){capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn);},800);
+    return;
+  }
   var canvas=document.createElement('canvas');canvas.width=400;canvas.height=400;
   var ctx=canvas.getContext('2d');
   ctx.translate(400,0);ctx.scale(-1,1);
@@ -12167,6 +12184,12 @@ function capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn){
 }
 function capturePunchOutSelfie(){
   var vid=document.getElementById('pout-selfie-video');if(!vid)return;
+  if(vid.readyState<2||vid.videoWidth===0){
+    var sErr=document.getElementById('pout-selfie-status');
+    if(sErr){sErr.style.background='#fee2e2';sErr.style.color='#991b1b';sErr.textContent='⚠️ Camera loading, try again...';}
+    setTimeout(capturePunchOutSelfie,800);
+    return;
+  }
   var canvas=document.createElement('canvas');canvas.width=400;canvas.height=400;
   var ctx=canvas.getContext('2d');ctx.translate(400,0);ctx.scale(-1,1);
   ctx.drawImage(vid,0,0,400,400);
