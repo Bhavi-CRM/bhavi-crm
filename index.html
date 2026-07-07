@@ -977,8 +977,12 @@ tr:hover td{background:#f8fafc;}
         </div>
         <!-- Grand Total -->
         <div style="background:#1d4ed8;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:13px;font-weight:700;color:#fff;">Total Calls Today</span>
+          <span style="font-size:13px;font-weight:700;color:#fff;">Total Closed Calls Today</span>
           <span id="dr-all-total" style="font-size:20px;font-weight:800;color:#fff;">0</span>
+        </div>
+        <div id="dr-pending-bar" style="display:none;margin-top:8px;background:#fef3c7;border-radius:8px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;font-weight:600;color:#92400e;">⏳ Pending Calls (Hold/Approval/Parts)</span>
+          <span id="dr-pending-count" style="font-size:15px;font-weight:800;color:#92400e;">0</span>
         </div>
       </div>
 
@@ -12035,12 +12039,13 @@ async function drAutoFillCalls(){
       // Fallback: fetch by created_at
       tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
     }
-    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0;
+    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0,pendingCount=0;
     (tickets||[]).forEach(function(t){
       var ct=t.call_type||'';
       var prob=(t.problem||'').toLowerCase();
       var status=(t.status||'').toLowerCase();
       if(status.includes('cancel'))return; // skip cancelled
+      if(!status.includes('close')){pendingCount++;return;} // pending calls counted separately
       if(ct==='Warranty'){
         if(prob.includes('install')||prob.includes('new set'))wInstall++;
         else wBreakdown++;
@@ -12056,6 +12061,10 @@ async function drAutoFillCalls(){
         nwOther++;
       }
     });
+    // Show pending bar
+    var pb=document.getElementById('dr-pending-bar');
+    var pc2=document.getElementById('dr-pending-count');
+    if(pb&&pc2){if(pendingCount>0){pb.style.display='flex';pc2.textContent=pendingCount;}else{pb.style.display='none';}}
     var setVal=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
     setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);
     setVal('dr-nw-breakdown',nwBreakdown);setVal('dr-nw-repeat',nwRepeat);
