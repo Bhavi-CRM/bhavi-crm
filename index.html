@@ -3518,9 +3518,10 @@ async function renderDashboard(){
     const dashTix=_dpr?allTickets.filter(t=>{if(!t.created_at)return false;const d=new Date(t.created_at);return d>=_dpr[0]&&d<=_dpr[1];}):allTickets;
     const _dpLabel=(()=>{if(_dpf==='today')return'Today';if(_dpf==='week')return'This Week';if(_dpf==='month')return'This Month';if(_dpf==='lastmonth')return'Last Month';if(_dpf==='custom'&&_dpFrom&&_dpTo)return _dpFrom+' to '+_dpTo;return'All Time';})();
     const total=dashTix.length;
-    const active=dashTix.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)).length;
-    const closed=dashTix.filter(t=>t.status==='Closed').length;
-    const unalloc=dashTix.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
+    const _doneStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
+    const active=dashTix.filter(t=>!_doneStatuses.includes(t.status)).length;
+    const closed=dashTix.filter(t=>['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status)).length;
+    const unalloc=dashTix.filter(t=>!_doneStatuses.includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
     const pendingApproval=dashTix.filter(t=>t.status==='Pending Customer Approval').length;
     const invoicePending=dashTix.filter(t=>(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'&&!t.invoice_done).length;
 
@@ -3684,7 +3685,7 @@ async function renderDashboard(){
       </div>
       <div class="kpi-prem-grid">
         <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets ('+_dpLabel+')',dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
-        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
         <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets ('+_dpLabel+')',dashTix.filter(function(t){return t.status==='Closed';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
         <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
       </div>
@@ -3763,7 +3764,7 @@ async function loadEngLiveStatus(){
       const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,area,address,pin,model,problem,status').catch(()=>[]);
       tks.forEach(t=>{ticketMap[t.id]=t;});
     }
-    const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
+    const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
     // Auto-close stale open logs where ticket is already closed, build valid openByEng
     const openByEng={};
     for(const l of (openLogs||[])){
@@ -4730,7 +4731,7 @@ async function renderMyCalls(){
           </select>
         </div>
         <div id="my-calls-tbody">${(()=>{
-            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired'];
+            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
             const sorted=[...tickets].sort((a,b)=>{
               const aOpen=!closedStatuses.includes(a.status);
               const bOpen=!closedStatuses.includes(b.status);
@@ -6466,6 +6467,9 @@ async function saveEngUpdate(){
     timeline:tl,
     updated_at:nowSave.toISOString()
   };
+  // Repaired → auto become Pending for Delivery
+  if(status==='Repaired'){data.status='Pending for Delivery';status='Pending for Delivery';}
+
   // Auto set Time Out when closing On Site call
   if(status==='Closed' && t.service_type==='On Site'){
     const now=new Date();
@@ -12047,7 +12051,7 @@ async function drAutoFillCalls(){
       var prob=(t.problem||'').toLowerCase();
       var status=(t.status||'').toLowerCase();
       if(status.includes('cancel'))return; // skip cancelled
-      if(!status.includes('close'))return; // only closed calls count
+      if(!status.includes('close')&&!status.includes('pending for delivery')&&!status.includes('repaired'))return; // only completed calls
       if(ct==='Warranty'){
         if(prob.includes('install')||prob.includes('new set'))wInstall++;
         else wBreakdown++;
