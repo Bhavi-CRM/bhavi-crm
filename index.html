@@ -5462,24 +5462,30 @@ async function generateInvoice(id){
   // service_charges is GST-inclusive — back-calculate base and GST from it
   const laborInclGst=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const other=parseFloat(t.other_charge)||0;
-  const partsTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
+  // Part prices are MRP (GST-inclusive)
   const defaultPartsGst=parseFloat(ci.gst_pct)||18;
   const laborGstPct=parseFloat(ci.labor_gst_pct)||18;
+  const partsMrpTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
+  // Back-calculate parts base (excl. GST) from MRP
+  const partsBase=isWarranty?partsMrpTotal:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;const mrp=(s.qty||1)*(s.price||0);return a+Math.round(mrp/(1+r/100)*100)/100;},0);
+  const partsGstAmt=isWarranty?0:Math.round((partsMrpTotal-partsBase)*100)/100;
+  const partsTotal=partsBase;// excl. GST, for display in sub-total row
   // labor is incl. GST → base = labor/(1+gst%), gstAmt = labor - base
   const labor=isWarranty?laborInclGst:Math.round(laborInclGst/(1+laborGstPct/100)*100)/100;
   const laborGstAmt=isWarranty?0:Math.round((laborInclGst-labor)*100)/100;
-  const partsGstAmt=isWarranty?0:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;return a+Math.round((s.qty||1)*(s.price||0)*r/100*100)/100;},0);
   const totalGst=partsGstAmt+laborGstAmt;
-  const subTotal=partsTotal+labor+other;
-  const grandTotal=subTotal+totalGst;// = partsTotal+laborInclGst+other+partsGstAmt
+  const subTotal=partsBase+labor+other;
+  const grandTotal=partsMrpTotal+laborInclGst+other;// all MRP totals already incl. GST
   const invoiceNo=t.invoice_no||('INV-'+t.id);
   const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
 
+  // Part prices are MRP (GST-inclusive) — back-calculate base and GST
   const partsRows=spares.length?spares.map(function(s,i){
     const partGstR=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;
-    const baseAmt=(s.qty||1)*(s.price||0);
-    const partGstAmt=isWarranty?0:Math.round(baseAmt*partGstR/100*100)/100;
-    return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:center;">${isWarranty?'—':partGstR+'%'}</td><td style="text-align:right;">${isWarranty?'—':'₹'+partGstAmt.toFixed(2)}</td><td style="text-align:right;">₹${(baseAmt+partGstAmt).toFixed(2)}</td></tr>`;
+    const mrpAmt=(s.qty||1)*(s.price||0);// MRP total (incl. GST)
+    const baseAmt=isWarranty?mrpAmt:Math.round(mrpAmt/(1+partGstR/100)*100)/100;
+    const partGstAmt=isWarranty?0:Math.round((mrpAmt-baseAmt)*100)/100;
+    return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:center;">${isWarranty?'—':partGstR+'%'}</td><td style="text-align:right;">${isWarranty?'—':'₹'+partGstAmt.toFixed(2)}</td><td style="text-align:right;">₹${mrpAmt.toFixed(2)}</td></tr>`;
   }).join(''):'<tr><td colspan="8" style="text-align:center;color:#888;padding:12px;">No parts used</td></tr>';
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${invoiceNo}</title>
@@ -5572,7 +5578,7 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
 
   <table class="totals">
     <tbody>
-      ${partsTotal>0?`<tr><td>Parts Sub-Total (excl. GST)</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>`:''}
+      ${partsMrpTotal>0?`<tr><td>Parts Sub-Total${!isWarranty?' (excl. GST)':''}</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>`:''}
       ${partsGstAmt>0?`<tr><td style="color:#7c3aed;">Parts GST</td><td style="text-align:right;color:#7c3aed;">₹${partsGstAmt.toFixed(2)}</td></tr>`:''}
       ${labor>0?`<tr><td>Labor / Service${!isWarranty?' (excl. GST)':''}</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>`:''}
       ${laborGstAmt>0?`<tr><td style="color:#7c3aed;">Labor GST (${laborGstPct}%)</td><td style="text-align:right;color:#7c3aed;">₹${laborGstAmt.toFixed(2)}</td></tr>`:''}
@@ -6125,13 +6131,15 @@ async function openEngUpdate(id){
       <button class="btn btn-outline btn-sm" onclick="openPartRequest('${t.id}','${t.call_type}','${t.service_type}')">📦 Request Part</button>
     </div>
     ${showCharges?`<div class="form-grid">
-      <div class="form-group"><label>Service / Labour ₹</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}"></div>
-      <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}"></div>
+      <div class="form-group"><label>Service / Labour ₹ (incl. GST)</label><input type="number" id="upd-labor" value="${t.labor||t.service_charges||0}" oninput="refreshEstimateTotal()"></div>
+      <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}" oninput="refreshEstimateTotal()"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
+    <div id="estimate-total-bar" style="display:none;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
     <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
+  setTimeout(refreshEstimateTotal,100);
 }
 
 // Point 8: Auto time buttons
@@ -6346,7 +6354,24 @@ async function savePartRequest(addAnother){
 }
 
 function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>₹${(s.qty*(s.price||0)).toFixed(2)}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
-function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');}
+function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');refreshEstimateTotal();}
+function refreshEstimateTotal(){
+  var parts=currentSpares.reduce(function(a,s){return a+(s.qty||1)*(s.price||0);},0);
+  var svc=parseFloat(document.getElementById('upd-labor')?.value)||0;
+  var other=parseFloat(document.getElementById('upd-other')?.value)||0;
+  var total=parts+svc+other;
+  var el=document.getElementById('estimate-total-bar');
+  if(!el)return;
+  if(total>0){
+    el.style.display='';
+    el.innerHTML='<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center;">'
+      +(parts>0?'<span>🔩 Parts: <b>₹'+parts.toFixed(0)+'</b></span>':'')
+      +(svc>0?'<span>🔧 Service: <b>₹'+svc.toFixed(0)+'</b></span>':'')
+      +(other>0?'<span>📎 Other: <b>₹'+other.toFixed(0)+'</b></span>':'')
+      +'<span style="font-size:15px;font-weight:700;color:#0d9488;">= TOTAL: ₹'+total.toFixed(0)+'</span>'
+      +'</div>';
+  }else{el.style.display='none';}
+}
 
 async function saveEngUpdate(){
   const id=viewingTicketId;
