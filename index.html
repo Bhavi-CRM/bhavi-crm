@@ -2855,9 +2855,10 @@ function setupNav(){
       window._isCspMgr=isCspMgr;
       sv('nav-attendance',true);
       if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);sv('nav-amc',true);}
-      // Apply admin-configured nav permissions for engineers
-      var _ep=window._navPerms&&window._navPerms.eng||{};
-      Object.keys(_ep).forEach(function(navId){if(_ep[navId]===false)sv(navId,false);});
+      // Apply per-employee nav permissions
+      var _uid=currentUser.eng_id||currentUser.user_id;
+      var _up=window._navPerms&&window._navPerms.users&&window._navPerms.users[_uid]||null;
+      if(_up&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_up[item.id]===true)sv(item.id,true);else if(_up[item.id]===false)sv(item.id,false);});}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -2870,9 +2871,10 @@ function setupNav(){
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
       var wib=document.getElementById('walkin-quick-btn');
       if(wib)wib.classList.remove('hidden');
-      // Apply admin-configured nav permissions for WC
-      var _wp=window._navPerms&&window._navPerms.wc||{};
-      Object.keys(_wp).forEach(function(navId){if(_wp[navId]===false)sv(navId,false);});
+      // Apply per-employee nav permissions for WC
+      var _wcUid=currentUser.eng_id||currentUser.user_id;
+      var _wcUp=window._navPerms&&window._navPerms.users&&window._navPerms.users[_wcUid]||null;
+      if(_wcUp&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_wcUp[item.id]===true)sv(item.id,true);else if(_wcUp[item.id]===false)sv(item.id,false);});}
     }else{
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -9868,86 +9870,112 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 
 // SETTINGS
 
-// ── NAV PERMISSIONS ──────────────────────────────────────────────
-var _NAV_ENG_ITEMS=[
-  {id:'nav-my-calls',label:'My Calls'},
-  {id:'nav-work-log',label:'Work Log'},
-  {id:'nav-tasks',label:'Tasks'},
-  {id:'nav-inquiries',label:'Inquiries'},
-  {id:'nav-attendance',label:'Attendance'},
-  {id:'nav-auto-inventory',label:'Auto Inventory'},
-  {id:'nav-auto-sites',label:'Auto Sites'},
-  {id:'nav-auto-visits-report',label:'Site Visit Report'},
-  {id:'nav-parts-catalog',label:'Parts Catalog'},
-  {id:'nav-fault-finder',label:'Fault Finder'},
-  {id:'nav-eng-parts',label:'Eng Parts Stock'},
-  {id:'nav-amc',label:'AMC'},
-  {id:'nav-targets',label:'Targets'},
-  {id:'nav-feedback',label:'Feedback'},
-];
-var _NAV_WC_ITEMS=[
-  {id:'nav-tickets',label:'All Tickets'},
-  {id:'nav-work-log',label:'Work Log'},
-  {id:'nav-walk-in',label:'Walk-in Entry'},
-  {id:'nav-walk-in-report',label:'Walk-in Report'},
-  {id:'nav-courier',label:'Courier Register'},
-  {id:'nav-courier-report',label:'Courier Report'},
-  {id:'nav-customers',label:'Customers'},
-  {id:'nav-tasks',label:'Tasks'},
-  {id:'nav-sales',label:'Sales'},
-  {id:'nav-pending-list',label:'Pending List'},
-  {id:'nav-route-planning',label:'Route Planning'},
-  {id:'nav-attendance',label:'Attendance'},
-  {id:'nav-amc',label:'AMC'},
-  {id:'nav-targets',label:'Targets'},
-  {id:'nav-feedback',label:'Feedback'},
-  {id:'nav-inquiries',label:'Inquiries'},
-  {id:'nav-reports',label:'Reports'},
-  {id:'nav-work-log-report',label:'Work Log Report'},
+// ── NAV PERMISSIONS (per-employee) ───────────────────────────────
+// All possible nav items with: id, label, engDefault (true=on by default for eng), wcDefault
+var _NAV_ALL_ITEMS=[
+  {id:'nav-my-calls',      label:'My Calls',          engDef:true,  wcDef:false},
+  {id:'nav-work-log',      label:'Work Log',           engDef:true,  wcDef:true},
+  {id:'nav-tasks',         label:'Tasks',              engDef:true,  wcDef:true},
+  {id:'nav-inquiries',     label:'Inquiries',          engDef:true,  wcDef:true},
+  {id:'nav-attendance',    label:'Attendance',         engDef:true,  wcDef:true},
+  {id:'nav-tickets',       label:'All Tickets',        engDef:false, wcDef:true},
+  {id:'nav-walk-in',       label:'Walk-in Entry',      engDef:false, wcDef:true},
+  {id:'nav-walk-in-report',label:'Walk-in Report',     engDef:false, wcDef:false},
+  {id:'nav-courier',       label:'Courier Register',   engDef:false, wcDef:true},
+  {id:'nav-courier-report',label:'Courier Report',     engDef:false, wcDef:false},
+  {id:'nav-customers',     label:'Customers',          engDef:false, wcDef:true},
+  {id:'nav-sales',         label:'Sales',              engDef:false, wcDef:true},
+  {id:'nav-pending-list',  label:'Pending List',       engDef:false, wcDef:true},
+  {id:'nav-route-planning',label:'Route Planning',     engDef:false, wcDef:true},
+  {id:'nav-auto-inventory',label:'Auto Inventory',     engDef:false, wcDef:false},
+  {id:'nav-auto-sites',    label:'Auto Sites',         engDef:false, wcDef:false},
+  {id:'nav-auto-visits-report',label:'Site Visit Report',engDef:false,wcDef:false},
+  {id:'nav-parts-catalog', label:'Parts Catalog',      engDef:false, wcDef:false},
+  {id:'nav-fault-finder',  label:'Fault Finder',       engDef:false, wcDef:false},
+  {id:'nav-eng-parts',     label:'Eng Parts Stock',    engDef:false, wcDef:false},
+  {id:'nav-amc',           label:'AMC',                engDef:false, wcDef:false},
+  {id:'nav-targets',       label:'Targets',            engDef:false, wcDef:false},
+  {id:'nav-feedback',      label:'Feedback',           engDef:false, wcDef:false},
+  {id:'nav-reports',       label:'Reports',            engDef:false, wcDef:false},
+  {id:'nav-work-log-report',label:'Work Log Report',   engDef:false, wcDef:false},
 ];
 
-window._navPerms={eng:{},wc:{}};
+window._navPerms={users:{}};
 
 async function loadNavPerms(){
   try{
     var r=await sb('company_info','GET',null,'?id=eq.1&select=nav_permissions');
-    if(r&&r[0]&&r[0].nav_permissions){window._navPerms=r[0].nav_permissions;}
+    if(r&&r[0]&&r[0].nav_permissions){window._navPerms=r[0].nav_permissions||{users:{}};}
+    if(!window._navPerms.users)window._navPerms.users={};
   }catch(e){}
 }
 
 async function renderNavPermsTab(){
   await loadNavPerms();
-  var engP=window._navPerms.eng||{};var wcP=window._navPerms.wc||{};
-  function checks(items,role,perms){
-    return items.map(function(item){
-      var checked=perms[item.id]===false?'':' checked';
-      return '<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'
-        +'<input type="checkbox" data-role="'+role+'" data-nav="'+item.id+'"'+checked+' style="width:16px;height:16px;cursor:pointer;">'
-        +item.label+'</label>';
-    }).join('');
-  }
+  var users=[];
+  try{users=await sb('users','GET',null,'?or=(role.eq.engineer,role_type.eq.work_controller,role.eq.work_controller)&is_active=eq.true&order=name&select=user_id,eng_id,name,role,role_type');}catch(e){}
+  var opts=users.map(function(u){
+    var uid=u.eng_id||u.user_id;
+    var roleLabel=u.role==='engineer'?'Eng':'WC';
+    return '<option value="'+uid+'|'+u.role+'|'+(u.role_type||'')+'">'+u.name+' ('+roleLabel+')</option>';
+  }).join('');
   document.getElementById('settings-content').innerHTML=
-    '<div class="card"><div class="section-header"><h3>🔐 Nav Permissions</h3>'
-    +'<button class="btn btn-primary btn-sm" onclick="saveNavPerms()">💾 Save</button></div>'
-    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">Check = visible, Uncheck = hidden for that role</p>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">'
-    +'<div><h4 style="font-size:13px;font-weight:700;margin-bottom:10px;color:#1d4ed8;">👷 Engineers</h4>'+checks(_NAV_ENG_ITEMS,'eng',engP)+'</div>'
-    +'<div><h4 style="font-size:13px;font-weight:700;margin-bottom:10px;color:#7c3aed;">🎯 Work Controllers</h4>'+checks(_NAV_WC_ITEMS,'wc',wcP)+'</div>'
-    +'</div></div>';
+    '<div class="card"><div class="section-header"><h3>🔐 Nav Permissions — Per Employee</h3></div>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:14px;">Select employee → checkboxes show their current access (✅ default ON, others are extras). Check/uncheck → Save.</p>'
+    +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">'
+    +'<select id="np-emp-sel" onchange="loadNavPermsForEmp()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;min-width:220px;"><option value="">-- Select Employee --</option>'+opts+'</select>'
+    +'<button onclick="saveNavPermsForEmp()" class="btn btn-primary btn-sm">💾 Save</button>'
+    +'<button onclick="resetNavPermsForEmp()" class="btn btn-outline btn-sm" style="color:#dc2626;">↩ Reset to Default</button>'
+    +'</div>'
+    +'<div id="np-checks" style="max-width:420px;"></div>'
+    +'</div>';
 }
 
-async function saveNavPerms(){
-  var perms={eng:{},wc:{}};
-  document.querySelectorAll('#settings-content input[data-role]').forEach(function(cb){
-    var role=cb.dataset.role;var nav=cb.dataset.nav;
-    if(!cb.checked)perms[role][nav]=false;
-  });
+function loadNavPermsForEmp(){
+  var sel=document.getElementById('np-emp-sel');if(!sel||!sel.value)return;
+  var parts=sel.value.split('|');var uid=parts[0];var role=parts[1];var roleType=parts[2]||'';
+  var isEng=role==='engineer';
+  var userPerms=window._navPerms.users[uid];// null = use defaults
+  var items=_NAV_ALL_ITEMS.filter(function(item){return isEng?(item.engDef||item.id.startsWith('nav-')):(item.wcDef||item.id.startsWith('nav-'));});
+  // Show all items; if userPerms exists use that, else use role defaults
+  var html=items.map(function(item){
+    var def=isEng?item.engDef:item.wcDef;
+    var checked;
+    if(userPerms){checked=userPerms[item.id]===true;}
+    else{checked=def;}
+    var defTag=def?'<span style="font-size:10px;color:#16a34a;margin-left:4px;">(default)</span>':'<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(extra)</span>';
+    return '<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'
+      +'<input type="checkbox" class="np-cb" data-nav="'+item.id+'"'+(checked?' checked':'')+' style="width:16px;height:16px;cursor:pointer;">'
+      +item.label+defTag+'</label>';
+  }).join('');
+  document.getElementById('np-checks').innerHTML=html||'<div style="color:#64748b;font-size:13px;">No items</div>';
+}
+
+async function saveNavPermsForEmp(){
+  var sel=document.getElementById('np-emp-sel');if(!sel||!sel.value){alert('Select an employee first');return;}
+  var uid=sel.value.split('|')[0];
+  var perms={};
+  document.querySelectorAll('.np-cb').forEach(function(cb){perms[cb.dataset.nav]=cb.checked;});
+  if(!window._navPerms.users)window._navPerms.users={};
+  window._navPerms.users[uid]=perms;
   try{
     await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({id:1,nav_permissions:perms,updated_at:new Date().toISOString()})});
-    window._navPerms=perms;
-    alert('✅ Nav permissions saved! Changes apply on next login.');
+      body:JSON.stringify({id:1,nav_permissions:window._navPerms,updated_at:new Date().toISOString()})});
+    alert('✅ Saved for '+sel.options[sel.selectedIndex].text+'! Changes apply on next login.');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function resetNavPermsForEmp(){
+  var sel=document.getElementById('np-emp-sel');if(!sel||!sel.value){alert('Select an employee first');return;}
+  var uid=sel.value.split('|')[0];
+  if(!confirm('Reset to role defaults?'))return;
+  if(window._navPerms.users)delete window._navPerms.users[uid];
+  try{
+    await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,nav_permissions:window._navPerms,updated_at:new Date().toISOString()})});
+    alert('↩ Reset to default!');loadNavPermsForEmp();
   }catch(e){alert('Error: '+e.message);}
 }
 // ─────────────────────────────────────────────────────────────────
