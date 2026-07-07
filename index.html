@@ -2684,6 +2684,7 @@ async function doLogin(){
     if(pc)pc.innerHTML='<div class="loading">Loading...</div>';
     await loadMasterData();
     await loadLogoFromDB();
+    await loadNavPerms();
     loadTGSettings();
     setupNav();
     await navigate(currentUser.role==='engineer'?'my-calls':'dashboard');
@@ -2853,7 +2854,10 @@ function setupNav(){
       var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
       window._isCspMgr=isCspMgr;
       sv('nav-attendance',true);
-      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);}
+      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);sv('nav-amc',true);}
+      // Apply admin-configured nav permissions for engineers
+      var _ep=window._navPerms&&window._navPerms.eng||{};
+      Object.keys(_ep).forEach(function(navId){if(_ep[navId]===false)sv(navId,false);});
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -2866,6 +2870,9 @@ function setupNav(){
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
       var wib=document.getElementById('walkin-quick-btn');
       if(wib)wib.classList.remove('hidden');
+      // Apply admin-configured nav permissions for WC
+      var _wp=window._navPerms&&window._navPerms.wc||{};
+      Object.keys(_wp).forEach(function(navId){if(_wp[navId]===false)sv(navId,false);});
     }else{
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -9861,6 +9868,90 @@ async function importProblems(){const f=document.getElementById('prob-file')?.fi
 
 // SETTINGS
 
+// ── NAV PERMISSIONS ──────────────────────────────────────────────
+var _NAV_ENG_ITEMS=[
+  {id:'nav-my-calls',label:'My Calls'},
+  {id:'nav-work-log',label:'Work Log'},
+  {id:'nav-tasks',label:'Tasks'},
+  {id:'nav-inquiries',label:'Inquiries'},
+  {id:'nav-attendance',label:'Attendance'},
+  {id:'nav-auto-inventory',label:'Auto Inventory'},
+  {id:'nav-auto-sites',label:'Auto Sites'},
+  {id:'nav-auto-visits-report',label:'Site Visit Report'},
+  {id:'nav-parts-catalog',label:'Parts Catalog'},
+  {id:'nav-fault-finder',label:'Fault Finder'},
+  {id:'nav-eng-parts',label:'Eng Parts Stock'},
+  {id:'nav-amc',label:'AMC'},
+  {id:'nav-targets',label:'Targets'},
+  {id:'nav-feedback',label:'Feedback'},
+];
+var _NAV_WC_ITEMS=[
+  {id:'nav-tickets',label:'All Tickets'},
+  {id:'nav-work-log',label:'Work Log'},
+  {id:'nav-walk-in',label:'Walk-in Entry'},
+  {id:'nav-walk-in-report',label:'Walk-in Report'},
+  {id:'nav-courier',label:'Courier Register'},
+  {id:'nav-courier-report',label:'Courier Report'},
+  {id:'nav-customers',label:'Customers'},
+  {id:'nav-tasks',label:'Tasks'},
+  {id:'nav-sales',label:'Sales'},
+  {id:'nav-pending-list',label:'Pending List'},
+  {id:'nav-route-planning',label:'Route Planning'},
+  {id:'nav-attendance',label:'Attendance'},
+  {id:'nav-amc',label:'AMC'},
+  {id:'nav-targets',label:'Targets'},
+  {id:'nav-feedback',label:'Feedback'},
+  {id:'nav-inquiries',label:'Inquiries'},
+  {id:'nav-reports',label:'Reports'},
+  {id:'nav-work-log-report',label:'Work Log Report'},
+];
+
+window._navPerms={eng:{},wc:{}};
+
+async function loadNavPerms(){
+  try{
+    var r=await sb('company_info','GET',null,'?id=eq.1&select=nav_permissions');
+    if(r&&r[0]&&r[0].nav_permissions){window._navPerms=r[0].nav_permissions;}
+  }catch(e){}
+}
+
+async function renderNavPermsTab(){
+  await loadNavPerms();
+  var engP=window._navPerms.eng||{};var wcP=window._navPerms.wc||{};
+  function checks(items,role,perms){
+    return items.map(function(item){
+      var checked=perms[item.id]===false?'':' checked';
+      return '<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'
+        +'<input type="checkbox" data-role="'+role+'" data-nav="'+item.id+'"'+checked+' style="width:16px;height:16px;cursor:pointer;">'
+        +item.label+'</label>';
+    }).join('');
+  }
+  document.getElementById('settings-content').innerHTML=
+    '<div class="card"><div class="section-header"><h3>🔐 Nav Permissions</h3>'
+    +'<button class="btn btn-primary btn-sm" onclick="saveNavPerms()">💾 Save</button></div>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">Check = visible, Uncheck = hidden for that role</p>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">'
+    +'<div><h4 style="font-size:13px;font-weight:700;margin-bottom:10px;color:#1d4ed8;">👷 Engineers</h4>'+checks(_NAV_ENG_ITEMS,'eng',engP)+'</div>'
+    +'<div><h4 style="font-size:13px;font-weight:700;margin-bottom:10px;color:#7c3aed;">🎯 Work Controllers</h4>'+checks(_NAV_WC_ITEMS,'wc',wcP)+'</div>'
+    +'</div></div>';
+}
+
+async function saveNavPerms(){
+  var perms={eng:{},wc:{}};
+  document.querySelectorAll('#settings-content input[data-role]').forEach(function(cb){
+    var role=cb.dataset.role;var nav=cb.dataset.nav;
+    if(!cb.checked)perms[role][nav]=false;
+  });
+  try{
+    await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,nav_permissions:perms,updated_at:new Date().toISOString()})});
+    window._navPerms=perms;
+    alert('✅ Nav permissions saved! Changes apply on next login.');
+  }catch(e){alert('Error: '+e.message);}
+}
+// ─────────────────────────────────────────────────────────────────
+
 async function renderTelegramSettings(){
   await loadTGSettings();
   var engs=[];
@@ -10063,6 +10154,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('portal',this)">🌐 Portal Services</button>
       <button class="tab" onclick="switchSettings('msc',this)">🏭 MSC Centers</button>
       <button class="tab" onclick="switchSettings('telegram',this)">📱 Telegram</button>
+      <button class="tab" onclick="switchSettings('navperms',this)">🔐 Nav Permissions</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -10074,6 +10166,7 @@ function switchSettings(tab,el){
   else if(tab==='portal') renderPortalServicesTab();
   else if(tab==='msc') renderMSCTab();
   else if(tab==='telegram') renderTelegramSettings();
+  else if(tab==='navperms') renderNavPermsTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
