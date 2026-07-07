@@ -2799,6 +2799,8 @@ function setupNav(){
     const isWC=(role==='admin'&&roleType==='work_controller')||role==='work_controller';
     const isAdmin=(role==='admin'&&roleType!=='work_controller')&&role!=='work_controller';
     const isPeon=role==='peon';
+    // ACCT001 = Chaula Trivedi (Accountant): sees all tickets, can add invoice
+    window._isAcct=(currentUser.user_id==='ACCT001'||currentUser.eng_id==='ACCT001');
     // Cache role flags globally so all page renderers use the same detection
     window._appIsEng=isEng;
     window._appIsWC=isWC;
@@ -4424,11 +4426,14 @@ async function renderTickets(){
     } else if(currentUser.role==='engineer'){
       q=`?assigned_to=eq.${engId}&order=created_at.desc`;
     } else if(currentUser.role_type==='work_controller'){
-      const wcName=(currentUser.name||'').toUpperCase();
-      let wcType='ICP';
-      if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
-      else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
-      if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
+      if(!window._isAcct){
+        const wcName=(currentUser.name||'').toUpperCase();
+        let wcType='ICP';
+        if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
+        else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
+        if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
+      }
+      // ACCT001: no wc_type filter — sees all tickets
     }
     try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     renderTicketTable();
@@ -5382,7 +5387,7 @@ async function viewTicket(id,autoPrint=false){
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
       ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
-      ${(()=>{var isNW=(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat');var canInv=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||currentUser.role==='admin'||window._isCspMgr;if(!isNW||!isClosed||!canInv)return'';var inner='';if(t.invoice_done){inner=`<div style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#15803d;">✅ Invoice Done${t.invoice_no?' — #'+t.invoice_no:''}</div><button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#6b7280;color:#fff;border:none;margin-left:6px;">✏️ Edit</button>`;}else{var canMark=currentUser.role_type==='work_controller'||currentUser.role==='work_controller';inner=canMark?`<button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#f59e0b;color:#fff;border:none;">🧾 Add Invoice No.</button>`:`<div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#92400e;">⚠️ Invoice Pending</div>`;}return`<span id="inv-status-${t.id}">${inner}</span>`;})()}
+      ${(()=>{var isNW=(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat');var canInv=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||currentUser.role==='admin'||window._isCspMgr||window._isAcct;if(!isNW||!isClosed||!canInv)return'';var inner='';if(t.invoice_done){inner=`<div style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#15803d;">✅ Invoice Done${t.invoice_no?' — #'+t.invoice_no:''}</div><button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#6b7280;color:#fff;border:none;margin-left:6px;">✏️ Edit</button>`;}else{var canMark=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||window._isAcct;inner=canMark?`<button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#f59e0b;color:#fff;border:none;">🧾 Add Invoice No.</button>`:`<div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#92400e;">⚠️ Invoice Pending</div>`;}return`<span id="inv-status-${t.id}">${inner}</span>`;})()}
       ${t.pending_edit&&(currentUser.role==='admin'&&currentUser.role_type!=='work_controller'||window._isCspMgr)?`
         <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
           ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
@@ -5454,16 +5459,19 @@ async function generateInvoice(id){
   const coTerms=(ci.terms||'• Warranty on repaired parts: 90 days\n• No warranty on physical/liquid damage\n• Uncollected products after 30 days attract storage charges').split('\n').join('<br>');
   const spares=t.spares||[];
   const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
-  const labor=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
+  // service_charges is GST-inclusive — back-calculate base and GST from it
+  const laborInclGst=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const other=parseFloat(t.other_charge)||0;
   const partsTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
   const defaultPartsGst=parseFloat(ci.gst_pct)||18;
   const laborGstPct=parseFloat(ci.labor_gst_pct)||18;
+  // labor is incl. GST → base = labor/(1+gst%), gstAmt = labor - base
+  const labor=isWarranty?laborInclGst:Math.round(laborInclGst/(1+laborGstPct/100)*100)/100;
+  const laborGstAmt=isWarranty?0:Math.round((laborInclGst-labor)*100)/100;
   const partsGstAmt=isWarranty?0:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;return a+Math.round((s.qty||1)*(s.price||0)*r/100*100)/100;},0);
-  const laborGstAmt=isWarranty?0:(labor>0?Math.round(labor*laborGstPct/100*100)/100:0);
   const totalGst=partsGstAmt+laborGstAmt;
   const subTotal=partsTotal+labor+other;
-  const grandTotal=subTotal+totalGst;
+  const grandTotal=subTotal+totalGst;// = partsTotal+laborInclGst+other+partsGstAmt
   const invoiceNo=t.invoice_no||('INV-'+t.id);
   const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
 
@@ -5566,7 +5574,7 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
     <tbody>
       ${partsTotal>0?`<tr><td>Parts Sub-Total (excl. GST)</td><td style="text-align:right;">₹${partsTotal.toFixed(2)}</td></tr>`:''}
       ${partsGstAmt>0?`<tr><td style="color:#7c3aed;">Parts GST</td><td style="text-align:right;color:#7c3aed;">₹${partsGstAmt.toFixed(2)}</td></tr>`:''}
-      ${labor>0?`<tr><td>Labor / Service (excl. GST)</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>`:''}
+      ${labor>0?`<tr><td>Labor / Service${!isWarranty?' (excl. GST)':''}</td><td style="text-align:right;">₹${labor.toFixed(2)}</td></tr>`:''}
       ${laborGstAmt>0?`<tr><td style="color:#7c3aed;">Labor GST (${laborGstPct}%)</td><td style="text-align:right;color:#7c3aed;">₹${laborGstAmt.toFixed(2)}</td></tr>`:''}
       ${other>0?`<tr><td>Other Charges</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>`:''}
       ${totalGst>0&&!isWarranty?`<tr style="background:#f5f3ff;"><td style="font-weight:700;">Total GST</td><td style="text-align:right;font-weight:700;">₹${totalGst.toFixed(2)}</td></tr>`:''}
@@ -11370,7 +11378,7 @@ function openInvoiceModal(ticketId){
   var total=final>0?final:(svc+parts+other);
   var amtHtml='<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;">'
     +'<div style="font-weight:700;margin-bottom:8px;color:var(--text);">💰 Charge Details</div>'
-    +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Service Charge</span><b>₹'+svc.toFixed(0)+'</b></div>'
+    +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Service Charge (incl. GST)</span><b>₹'+svc.toFixed(0)+'</b></div>'
     +(parts>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Parts Cost</span><b>₹'+parts.toFixed(0)+'</b></div>':'')
     +(other>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Other Charge</span><b>₹'+other.toFixed(0)+'</b></div>':'')
     +'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px;margin-top:4px;"><span style="font-weight:700;">Total</span><b style="color:#0d9488;font-size:15px;">₹'+total.toFixed(0)+'</b></div>'
