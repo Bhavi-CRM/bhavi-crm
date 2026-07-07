@@ -11272,7 +11272,7 @@ async function saveBackdateClose(ticketId){
   var tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
   tl=[...tl,{action:'Closed (Back-Date)',by:currentUser.name,at:now,note:'Back-date close for '+date+'. Engineer: '+engName+'. Reason: '+reason}];
   var patch={
-    status:'Closed',assigned_to:engId,assigned_name:engName,eng_name:engName,
+    status:'Closed',assigned_to:engId,assigned_name:engName,
     work_done:workDone||t.work_done||'',
     visit_date:date,
     timeline:tl,updated_at:now
