@@ -3515,6 +3515,7 @@ async function renderDashboard(){
     const closed=dashTix.filter(t=>t.status==='Closed').length;
     const unalloc=dashTix.filter(t=>!['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
     const pendingApproval=dashTix.filter(t=>t.status==='Pending Customer Approval').length;
+    const invoicePending=dashTix.filter(t=>(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'&&!t.invoice_done).length;
 
     // Premium dashboard charts
     let chartHtml='';
@@ -3612,6 +3613,7 @@ async function renderDashboard(){
             <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#d97706;">${cancelCount}</div><div style="font-size:10px;color:var(--text-muted);">Cancelled</div></div>
             <div style="background:#fef9c3;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#ca8a04;">${custRejectCount}</div><div style="font-size:10px;color:var(--text-muted);">Cust. Reject</div></div>
             <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#1d4ed8;">${resRate}%</div><div style="font-size:10px;color:var(--text-muted);">Resolution</div></div>
+            ${invoicePending>0?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;cursor:pointer;" onclick="navigateTo('tickets');setTimeout(()=>{document.getElementById('ticket-invoice-filter').value='pending';document.getElementById('ticket-status-filter').value='Closed';filterTickets();},400);"><div style="font-size:28px;font-weight:700;color:#92400e;">${invoicePending}</div><div style="font-size:11px;color:#92400e;font-weight:600;">🧾 Invoice Pending (Non-Warranty)</div><div style="font-size:10px;color:#a16207;">Click to view</div></div>`:`<div style="background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;"><div style="font-size:22px;">✅</div><div style="font-size:11px;color:#15803d;font-weight:600;">All Invoices Done</div></div>`}
           </div>
           <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
             <div style="height:100%;width:${resRate}%;background:linear-gradient(90deg,#0d9488,#1d4ed8);border-radius:4px;"></div>
@@ -4467,6 +4469,9 @@ function renderTicketTable(filtered){
         <select id="ticket-eng-filter" onchange="filterTickets()">
           <option value="">All Engineers</option>${allEngineers.map(e=>`<option value="${e.eng_id}">${e.name}</option>`).join('')}
         </select>
+        <select id="ticket-invoice-filter" onchange="filterTickets()">
+          <option value="">All Invoice</option><option value="pending">🧾 Invoice Pending</option><option value="done">✅ Invoice Done</option>
+        </select>
         <button class="btn btn-outline btn-sm" onclick="exportFilteredTickets()">📥 Excel Export</button>
       </div>
       <div class="table-wrap"><table>
@@ -4481,7 +4486,7 @@ function ticketRow(t){
     <td>${t.city||'-'}</td><td>${t.model||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
-    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}</td>
+    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
@@ -4496,12 +4501,15 @@ function filterTickets(){
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
-  const showAll=!!(q||s);
+  const inv=document.getElementById('ticket-invoice-filter')?.value||'';
+  const showAll=!!(q||s||inv);
   const f=allTickets.filter(t=>{
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
     const mOpen=showAll||!TERMINAL_TICKET_STATUSES.includes(t.status);
-    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng);
+    const isNW=t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat';
+    const mInv=!inv||(inv==='pending'&&isNW&&t.status==='Closed'&&!t.invoice_done)||(inv==='done'&&isNW&&t.status==='Closed'&&t.invoice_done);
+    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv;
   });
   document.getElementById('ticket-tbody').innerHTML=f.map(t=>ticketRow(t)).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
 }
@@ -5374,6 +5382,7 @@ async function viewTicket(id,autoPrint=false){
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
       ${isClosed?`<button class="btn btn-sm" onclick="sendFeedbackWA('${t.id}','${(t.cname||'').replace(/'/g,'').replace(/`/g,'')}','${t.mobile||''}','${(t.eng_name||'').replace(/'/g,'')}')" style="background:#f59e0b;color:#fff;border:none;">⭐ Feedback</button>`:''}
       ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
+      ${(()=>{var isNW=(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat');var canInv=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||currentUser.role==='admin'||window._isCspMgr;if(!isNW||!isClosed||!canInv)return'';if(t.invoice_done){return`<div style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#15803d;">✅ Invoice Done${t.invoice_no?' — #'+t.invoice_no:''}</div><button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#6b7280;color:#fff;border:none;margin-left:6px;">✏️ Edit</button>`;}var canMark=currentUser.role_type==='work_controller'||currentUser.role==='work_controller';return canMark?`<button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#f59e0b;color:#fff;border:none;">🧾 Add Invoice No.</button>`:`<div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#92400e;">⚠️ Invoice Pending</div>`;})()}
       ${t.pending_edit&&(currentUser.role==='admin'&&currentUser.role_type!=='work_controller'||window._isCspMgr)?`
         <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
           ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
@@ -11348,6 +11357,43 @@ async function rejectReportEdit(ticketId){
     closeModal('modal-ticket');
   }catch(e){alert('Error: '+e.message);}
 }
+// ──── INVOICE DONE ────────────────────────────────────────────
+function openInvoiceModal(ticketId){
+  var t=allTickets.find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  var existing=t.invoice_no||'';
+  var html='<div style="padding:20px;max-width:400px;">'
+    +'<h3 style="margin:0 0 16px;font-size:16px;font-weight:700;">🧾 Invoice Entry</h3>'
+    +'<div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:600;">Invoice Number <span class="req">*</span></label>'
+    +'<input type="text" id="inv-no-inp" value="'+existing+'" placeholder="e.g. INV-2026-001" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;" /></div>'
+    +'<div style="display:flex;gap:10px;margin-top:8px;">'
+    +'<button class="btn btn-primary btn-sm" style="flex:1;" onclick="saveInvoiceEntry(\''+ticketId+'\')">💾 Save & Mark Done</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'inv-modal\').remove()">Cancel</button>'
+    +'</div></div>';
+  var d=document.createElement('div');d.id='inv-modal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  d.innerHTML='<div style="background:var(--card);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.2);min-width:320px;">'+html+'</div>';
+  d.onclick=function(e){if(e.target===d)d.remove();};
+  document.body.appendChild(d);
+  setTimeout(function(){var el=document.getElementById('inv-no-inp');if(el)el.focus();},100);
+}
+async function saveInvoiceEntry(ticketId){
+  var invNo=(document.getElementById('inv-no-inp')?.value||'').trim();
+  if(!invNo){alert('⚠️ Invoice Number farjiyat chhe!');return;}
+  var now=new Date().toISOString();
+  var t=allTickets.find(function(x){return x.id===ticketId;});
+  var tl=(t&&t.timeline)||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  tl=[...tl,{action:'Invoice Done',by:currentUser.name||'WC',at:now,note:'Invoice No: '+invNo}];
+  try{
+    await sb('tickets','PATCH',{invoice_done:true,invoice_no:invNo,timeline:tl,updated_at:now},'?id=eq.'+ticketId);
+    var idx=allTickets.findIndex(function(x){return x.id===ticketId;});
+    if(idx>=0){allTickets[idx].invoice_done=true;allTickets[idx].invoice_no=invNo;allTickets[idx].timeline=tl;}
+    document.getElementById('inv-modal')?.remove();
+    alert('✅ Invoice #'+invNo+' saved!');
+    closeModal('modal-ticket');viewTicket(ticketId);
+  }catch(e){alert('Error: '+e.message);}
+}
+async function markInvoiceDone(ticketId){openInvoiceModal(ticketId);}
 // ──── BACK-DATE CLOSE ────────────────────────────────────────────
 function openBackdateClose(ticketId){
   var t=allTickets.find(function(x){return x.id===ticketId;});
