@@ -12033,19 +12033,21 @@ async function drAutoFillCalls(){
   try{
     var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
     var engId=currentUser.eng_id||currentUser.user_id;
-    // Fetch tickets assigned to this engineer updated on this date
+    // Closed calls: fetch by updated_at (closed today)
     var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&updated_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
     if(!tickets||!tickets.length){
-      // Fallback: fetch by created_at
       tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
     }
-    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0,pendingCount=0;
+    // Pending calls: engineer visited today (visit_date=today) but still pending
+    var pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&visit_date=eq.'+date+'&select=status').catch(()=>[]);
+    var pendingCount=(pendingTickets||[]).filter(function(t){var s=(t.status||'').toLowerCase();return!s.includes('close')&&!s.includes('cancel');}).length;
+    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0;
     (tickets||[]).forEach(function(t){
       var ct=t.call_type||'';
       var prob=(t.problem||'').toLowerCase();
       var status=(t.status||'').toLowerCase();
       if(status.includes('cancel'))return; // skip cancelled
-      if(!status.includes('close')){pendingCount++;return;} // pending calls counted separately
+      if(!status.includes('close'))return; // only closed calls count
       if(ct==='Warranty'){
         if(prob.includes('install')||prob.includes('new set'))wInstall++;
         else wBreakdown++;
