@@ -2853,7 +2853,7 @@ function setupNav(){
       var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
       window._isCspMgr=isCspMgr;
       sv('nav-attendance',true);
-      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);}
+      if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
