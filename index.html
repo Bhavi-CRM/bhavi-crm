@@ -982,7 +982,7 @@ tr:hover td{background:#f8fafc;}
         </div>
         <div id="dr-pending-bar" style="display:none;margin-top:8px;background:#fef3c7;border-radius:8px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:12px;font-weight:600;color:#92400e;">⏳ Pending Calls (Hold/Approval/Parts)</span>
-          <span id="dr-pending-count" style="font-size:15px;font-weight:800;color:#92400e;">0</span>
+          <input id="dr-pending-count" type="number" min="0" value="0" style="width:60px;border:1px solid #f59e0b;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:800;color:#92400e;text-align:center;outline:none;background:#fff;">
         </div>
       </div>
 
@@ -12066,7 +12066,7 @@ async function drAutoFillCalls(){
     // Show pending bar
     var pb=document.getElementById('dr-pending-bar');
     var pc2=document.getElementById('dr-pending-count');
-    if(pb&&pc2){if(pendingCount>0){pb.style.display='flex';pc2.textContent=pendingCount;}else{pb.style.display='none';}}
+    if(pb&&pc2){pb.style.display='flex';pc2.value=pendingCount;}
     var setVal=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
     setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);
     setVal('dr-nw-breakdown',nwBreakdown);setVal('dr-nw-repeat',nwRepeat);
@@ -12095,6 +12095,7 @@ async function saveDailyReport(){
   callSummary.warranty_total=callSummary.w_install+callSummary.w_breakdown+callSummary.w_repeat;
   callSummary.nonwarranty_total=callSummary.nw_breakdown+callSummary.nw_repeat+callSummary.nw_other+callSummary.nw_delivery;
   callSummary.grand_total=callSummary.warranty_total+callSummary.nonwarranty_total;
+  callSummary.pending_calls=parseInt(document.getElementById('dr-pending-count')?.value)||0;
   var siteVisits=[]; // kept for backward compat
 
   // Collect office work
