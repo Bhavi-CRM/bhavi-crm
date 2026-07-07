@@ -426,6 +426,7 @@ tr:hover td{background:#f8fafc;}
         </div>
         <div class="form-group"><label>Call Type <span class="req">*</span></label>
           <select id="call-type" onchange="handleCallTypeChange()">
+            <option value="">-- Select Call Type --</option>
             <option value="Warranty">Warranty</option><option value="Non-Warranty">Non-Warranty</option>
             <option value="AMC">AMC</option><option value="Warranty Repeat">Warranty Repeat</option>
             <option value="Non-Warranty Repeat">Non-Warranty Repeat</option><option value="Other">Other</option>
@@ -437,8 +438,8 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>SE Call ID</label><input type="text" id="call-se-id"></div>
         <div class="form-group"><label>Priority</label><select id="call-priority"><option value="Normal">Normal</option><option value="High">High 🟡</option><option value="Urgent">Urgent 🔴</option></select></div>
         <div class="form-group" id="call-service-charges-row" style="display:none;">
-          <label>💰 Service / Labour Charges (₹)</label>
-          <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="0">
+          <label>💰 Service / Labour Charges (₹) <span class="req">*</span></label>
+          <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="Required — enter amount">
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts will appear here once added above</div>
         </div>
       </div>
@@ -4769,7 +4770,7 @@ async function openNewCall(){
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
   const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value='';
-  document.getElementById('call-type').value='Warranty';document.getElementById('call-service-type').value='On Site';
+  document.getElementById('call-type').value='';document.getElementById('call-service-type').value='On Site';
   document.getElementById('call-priority').value='Normal';document.getElementById('call-rerepair').value='No';
   // Reset service charges input (may have been disabled by FOC repeat detection on previous call)
   var scReset=document.getElementById('call-service-charges');
@@ -5056,6 +5057,8 @@ async function saveCall(){
     spares:[],timeline:[{action:'Call Logged',by:currentUser.name,at:new Date().toISOString()}],
     updated_at:new Date().toISOString()
   };
+  if(!ct){alert('⚠️ Call Type is required! Please select Warranty / Non-Warranty / AMC etc.');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
+  if((ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other')&&!serviceCharges&&serviceCharges!==0&&!(document.getElementById('call-service-charges')?.value)){alert('⚠️ Service Charge is required for Non-Warranty calls!');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   // Hard block: re-check open calls for this serial at save time (in case user bypassed the blur check)
   if(!editingCallId&&!data.serial.startsWith('NO-SN-')){
@@ -5352,6 +5355,7 @@ async function viewTicket(id,autoPrint=false){
         </select>
       `:''}
       ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
+      ${(currentUser.role==='admin'||window._isCspMgr)&&!isClosed?`<button class="btn btn-sm" onclick="openBackdateClose('${t.id}')" style="background:#374151;color:#fff;border:none;">📅 Back-Date Close</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
         <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
@@ -11128,6 +11132,7 @@ async function openReportEditModal(ticketId){
     reasonBox.style.display='block';
     setVal('edit-reason-text','');
   }
+  closeModal('modal-ticket');
   openModal('modal-call');
 }
 
@@ -11220,6 +11225,66 @@ async function rejectReportEdit(ticketId){
     try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'rejected',rejectReason,cname:t.cname,wc_id:pe.wc_id,pe})});}catch(e){}
     alert('❌ Edit request rejected. Original report remains unchanged.');
     closeModal('modal-ticket');
+  }catch(e){alert('Error: '+e.message);}
+}
+// ──── BACK-DATE CLOSE ────────────────────────────────────────────
+function openBackdateClose(ticketId){
+  var t=allTickets.find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  var ex=document.getElementById('modal-backdate-close');if(ex)ex.remove();
+  var today=new Date().toLocaleDateString('en-CA');
+  var ol=document.createElement('div');
+  ol.id='modal-backdate-close';
+  ol.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  ol.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:400px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.35);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">📅 Back-Date Close Call</h3>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">'+t.id+' — '+t.cname+' | '+t.model+'</p>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Close Date <span style="color:#dc2626;">*</span></label>'
+    +'<input type="date" id="bdc-date" value="'+today+'" max="'+today+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Engineer <span style="color:#dc2626;">*</span></label>'
+    +'<select id="bdc-eng" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">'
+    +'<option value="">-- Select Engineer --</option>'
+    +(allEngineers||[]).map(function(e){return'<option value="'+e.eng_id+'|'+e.name+'"'+(t.assigned_to===e.eng_id?' selected':'')+'>'+e.name+'</option>';}).join('')
+    +'</select></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Reason / Remark <span style="color:#dc2626;">*</span></label>'
+    +'<textarea id="bdc-reason" rows="2" placeholder="e.g. Call was completed but not closed in system..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;resize:vertical;"></textarea></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Work Done</label>'
+    +'<input type="text" id="bdc-work" value="'+(t.work_done||'')+'" placeholder="Describe work done..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:4px;">'
+    +'<button onclick="saveBackdateClose(\''+ticketId+'\')" style="flex:1;padding:10px;background:#374151;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">✅ Close Call</button>'
+    +'<button onclick="document.getElementById(\'modal-backdate-close\').remove()" style="flex:1;padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(ol);
+}
+
+async function saveBackdateClose(ticketId){
+  var date=document.getElementById('bdc-date')?.value||'';
+  var engVal=document.getElementById('bdc-eng')?.value||'';
+  var reason=(document.getElementById('bdc-reason')?.value||'').trim();
+  var workDone=(document.getElementById('bdc-work')?.value||'').trim();
+  if(!date){alert('Please select a close date');return;}
+  if(!engVal){alert('Please select the engineer');return;}
+  if(!reason){alert('⚠️ Reason is required!');return;}
+  var engId=engVal.split('|')[0];var engName=engVal.split('|')[1];
+  var t=allTickets.find(function(x){return x.id===ticketId;});
+  if(!t){alert('Ticket not found');return;}
+  var now=new Date().toISOString();
+  var tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  tl=[...tl,{action:'Closed (Back-Date)',by:currentUser.name,at:now,note:'Back-date close for '+date+'. Engineer: '+engName+'. Reason: '+reason}];
+  var patch={
+    status:'Closed',assigned_to:engId,assigned_name:engName,eng_name:engName,
+    work_done:workDone||t.work_done||'',
+    visit_date:date,closed_at:date+'T23:59:00.000Z',
+    timeline:tl,updated_at:now
+  };
+  try{
+    await sb('tickets','PATCH',patch,'?id=eq.'+ticketId);
+    var idx=allTickets.findIndex(function(x){return x.id===ticketId;});
+    if(idx>=0)Object.assign(allTickets[idx],patch);
+    document.getElementById('modal-backdate-close').remove();
+    closeModal('modal-ticket');
+    alert('✅ Call closed successfully with back-date: '+date);
+    if(typeof renderTickets==='function')renderTickets();
   }catch(e){alert('Error: '+e.message);}
 }
 // ────────────────────────────────────────────────────────────────
