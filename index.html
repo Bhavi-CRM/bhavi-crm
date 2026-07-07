@@ -11274,7 +11274,7 @@ async function saveBackdateClose(ticketId){
   var patch={
     status:'Closed',assigned_to:engId,assigned_name:engName,eng_name:engName,
     work_done:workDone||t.work_done||'',
-    visit_date:date,closed_at:date+'T23:59:00.000Z',
+    visit_date:date,
     timeline:tl,updated_at:now
   };
   try{
