@@ -2851,6 +2851,7 @@ function setupNav(){
       // ENG001 = CSP Manager (Yogesh Suthar): extra access
       var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
       window._isCspMgr=isCspMgr;
+      sv('nav-attendance',true);
       if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
@@ -20792,7 +20793,7 @@ async function renderAttendanceReport(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
     +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="att-from" value="'+firstOfMonth+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="att-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-group" style="margin-bottom:0;"><label>Employee</label><select id="att-emp" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"><option value="">All</option></select></div>'
+    +((currentUser.role==='admin'||window._isCspMgr)?'<div class="form-group" style="margin-bottom:0;"><label>Employee</label><select id="att-emp" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"><option value="">All</option></select></div>':'')
     +'<button class="btn btn-primary btn-sm" onclick="loadAttendanceReport()" style="margin-bottom:0;height:36px;">🔍 Search</button>'
     +'<button class="btn btn-outline btn-sm" onclick="attQuick(\'week\')" style="margin-bottom:0;height:36px;">This Week</button>'
     +'<button class="btn btn-outline btn-sm" onclick="attQuick(\'month\')" style="margin-bottom:0;height:36px;">This Month</button>'
@@ -20827,10 +20828,13 @@ async function loadAttendanceReport(){
   var sumDiv=document.getElementById('att-summary');
   if(!wrap)return;
   wrap.innerHTML='<div class="loading">Loading...</div>';
+  var isAdminView=currentUser.role==='admin'||window._isCspMgr;
+  var myId=currentUser.eng_id||currentUser.user_id;
   var q='?order=punch_in_date.desc,created_at.desc';
   if(from)q+='&punch_in_date=gte.'+from;
   if(to)q+='&punch_in_date=lte.'+to;
-  if(emp)q+='&eng_id=eq.'+encodeURIComponent(emp);
+  if(isAdminView){if(emp)q+='&eng_id=eq.'+encodeURIComponent(emp);}
+  else{q+='&eng_id=eq.'+encodeURIComponent(myId);}
   try{
     var logs=await sb('punch_logs','GET',null,q);
     window._attLogs=logs;
@@ -20847,17 +20851,40 @@ async function loadAttendanceReport(){
       +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>';
     // Table
     if(!logs.length){wrap.innerHTML='<div class="alert alert-info">No records found</div>';return;}
-    var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px;">'
+    var isAdmin=currentUser.role==='admin'||window._isCspMgr;
+    var isEmp=!isAdmin&&currentUser.role==='engineer';
+    var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1000px;">'
       +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
       +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
       +'<th style="padding:8px;">Punch Out</th><th style="padding:8px;">Out Selfie</th>'
-      +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th></tr></thead><tbody>';
+      +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
     logs.forEach(function(l){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
       var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>':'-';
-      var statusBadge2=l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
+      var pe=l.pending_edit;if(typeof pe==='string'){try{pe=JSON.parse(pe);}catch(e){pe=null;}}
+      var statusBadge2=pe?'<span class="badge badge-pending">🕐 Edit Req</span>':l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
+      var actionBtn='';
+      if(isAdmin){
+        actionBtn='<button onclick="openAttEditModal(\''+l.id+'\')" style="padding:4px 10px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">✏️ Edit</button>';
+      }else{
+        var myId=currentUser.eng_id||currentUser.user_id;
+        if(l.eng_id===myId&&!pe){
+          actionBtn='<button onclick="openAttEditRequestModal(\''+l.id+'\')" style="padding:4px 10px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">📝 Request Edit</button>';
+        }else if(pe){actionBtn='<span style="font-size:11px;color:#92400e;">⏳ Pending</span>';}
+      }
+      var pendingBanner='';
+      if(pe&&isAdmin){
+        pendingBanner='<tr style="background:#fef3c7;">'
+          +'<td colspan="11" style="padding:8px 12px;font-size:12px;">'
+          +'<b>📝 Edit Request from '+l.eng_name+'</b> — Reason: <i>'+pe.reason+'</i><br>'
+          +(pe.new_in?'New Punch In: <b>'+pe.new_in+'</b> ':'')
+          +(pe.new_out?'New Punch Out: <b>'+pe.new_out+'</b>':'')
+          +' &nbsp;<button onclick="approveAttEdit(\''+l.id+'\')" style="padding:4px 10px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;margin-left:8px;">✅ Approve</button>'
+          +' <button onclick="rejectAttEdit(\''+l.id+'\')" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">❌ Reject</button>'
+          +'</td></tr>';
+      }
       html+='<tr style="border-bottom:1px solid var(--border);">'
         +'<td style="padding:8px;font-weight:600;">'+l.eng_name+'</td>'
         +'<td style="padding:8px;white-space:nowrap;">'+l.punch_in_date+'</td>'
@@ -20869,7 +20896,9 @@ async function loadAttendanceReport(){
         +'<td style="padding:8px;text-align:center;font-weight:600;color:#065f46;">'+fmtM(l.working_minutes)+'</td>'
         +'<td style="padding:8px;text-align:center;color:'+(l.overtime_minutes>0?'#dc2626':'#64748b')+';">'+fmtM(l.overtime_minutes)+'</td>'
         +'<td style="padding:8px;">'+statusBadge2+'</td>'
-        +'</tr>';
+        +'<td style="padding:8px;text-align:center;">'+actionBtn+'</td>'
+        +'</tr>'
+        +pendingBanner;
     });
     html+='</tbody></table>';
     wrap.innerHTML=html;
@@ -20883,6 +20912,144 @@ function showPhotoFull(encodedSrc){
   ol.onclick=function(){ol.remove();};
   ol.innerHTML='<img src="'+src+'" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">';
   document.body.appendChild(ol);
+}
+
+// ---- Attendance Edit (Admin direct) ----
+function openAttEditModal(logId){
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  if(!l){alert('Record not found');return;}
+  var ex=document.getElementById('att-edit-modal');if(ex)ex.remove();
+  var ol=document.createElement('div');
+  ol.id='att-edit-modal';
+  ol.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  function t24(t){if(!t)return'';var s=t.trim();var isPM=/pm/i.test(s);var isAM=/am/i.test(s);var c=s.replace(/[^0-9:]/g,'');var p=c.split(':');var h=parseInt(p[0])||0;var m=parseInt(p[1])||0;if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  ol.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">✏️ Edit Attendance</h3>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">'+l.eng_name+' — '+l.punch_in_date+'</p>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Punch In Time</label>'
+    +'<input type="time" id="att-edit-in" value="'+t24(l.punch_in_time)+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Punch Out Time</label>'
+    +'<input type="time" id="att-edit-out" value="'+t24(l.punch_out_time)+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Remark</label>'
+    +'<input type="text" id="att-edit-remark" placeholder="Admin correction reason..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:4px;">'
+    +'<button onclick="saveAttEdit(\''+logId+'\')" style="flex:1;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">💾 Save</button>'
+    +'<button onclick="document.getElementById(\'att-edit-modal\').remove()" style="flex:1;padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(ol);
+}
+
+async function saveAttEdit(logId){
+  var inT=document.getElementById('att-edit-in')?.value||'';
+  var outT=document.getElementById('att-edit-out')?.value||'';
+  var remark=document.getElementById('att-edit-remark')?.value||'Admin correction';
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  if(!l){alert('Record not found');return;}
+  var wMins=0;var otMins=0;
+  if(inT&&outT){
+    function toM(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
+    wMins=toM(outT)-toM(inT);if(wMins<0)wMins+=1440;
+    var ss=null;try{var sRes=await sb('shift_settings','GET',null,'?emp_id=eq.'+encodeURIComponent(l.eng_id)+'&limit=1');if(sRes&&sRes.length)ss=sRes[0];}catch(e){}
+    var shiftDur=ss?(toM(ss.shift_end)-toM(ss.shift_start)):480;
+    otMins=Math.max(0,wMins-shiftDur);
+  }
+  var fmt12=function(t){if(!t)return'';var p=t.split(':');var h=parseInt(p[0]);var m=p[1];var ampm=h>=12?'PM':'AM';h=h%12||12;return h+':'+m+' '+ampm;};
+  try{
+    await sb('punch_logs','PATCH',{
+      punch_in_time:inT?fmt12(inT):l.punch_in_time,
+      punch_out_time:outT?fmt12(outT):l.punch_out_time,
+      working_minutes:wMins,overtime_minutes:otMins,
+      admin_remark:remark,status:'verified',is_late:false,
+      pending_edit:null,updated_at:new Date().toISOString()
+    },'?id=eq.'+logId);
+    var idx=(window._attLogs||[]).findIndex(function(x){return x.id===logId;});
+    if(idx>=0){Object.assign(window._attLogs[idx],{punch_in_time:inT?fmt12(inT):l.punch_in_time,punch_out_time:outT?fmt12(outT):l.punch_out_time,working_minutes:wMins,overtime_minutes:otMins,status:'verified',is_late:false,pending_edit:null});}
+    document.getElementById('att-edit-modal').remove();
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ---- Attendance Edit Request (Employee) ----
+function openAttEditRequestModal(logId){
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  if(!l){alert('Record not found');return;}
+  var ex=document.getElementById('att-req-modal');if(ex)ex.remove();
+  var ol=document.createElement('div');
+  ol.id='att-req-modal';
+  ol.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  function t24(t){if(!t)return'';var s=t.trim();var isPM=/pm/i.test(s);var isAM=/am/i.test(s);var c=s.replace(/[^0-9:]/g,'');var p=c.split(':');var h=parseInt(p[0])||0;var m=parseInt(p[1])||0;if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+  ol.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">📝 Request Attendance Edit</h3>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">'+l.punch_in_date+' — Fill only what needs to be changed</p>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">New Punch In Time <span style="color:#64748b;">(leave blank if correct)</span></label>'
+    +'<input type="time" id="att-req-in" value="'+t24(l.punch_in_time)+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">New Punch Out Time <span style="color:#64748b;">(leave blank if correct)</span></label>'
+    +'<input type="time" id="att-req-out" value="'+t24(l.punch_out_time)+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Reason <span style="color:#dc2626;">*</span></label>'
+    +'<input type="text" id="att-req-reason" placeholder="e.g. Forgot to punch out, system error..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" required></div>'
+    +'<div style="display:flex;gap:8px;margin-top:4px;">'
+    +'<button onclick="submitAttEditRequest(\''+logId+'\')" style="flex:1;padding:10px;background:#f59e0b;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">📤 Send Request</button>'
+    +'<button onclick="document.getElementById(\'att-req-modal\').remove()" style="flex:1;padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(ol);
+}
+
+async function submitAttEditRequest(logId){
+  var inT=document.getElementById('att-req-in')?.value||'';
+  var outT=document.getElementById('att-req-out')?.value||'';
+  var reason=document.getElementById('att-req-reason')?.value?.trim()||'';
+  if(!reason){alert('Please enter a reason');return;}
+  var fmt12=function(t){if(!t)return'';var p=t.split(':');var h=parseInt(p[0]);var m=p[1];var ampm=h>=12?'PM':'AM';h=h%12||12;return h+':'+m+' '+ampm;};
+  var pe={requested_by:currentUser.name,reason:reason,at:new Date().toISOString(),new_in:inT?fmt12(inT):'',new_out:outT?fmt12(outT):''};
+  try{
+    await sb('punch_logs','PATCH',{pending_edit:pe,updated_at:new Date().toISOString()},'?id=eq.'+logId);
+    var idx=(window._attLogs||[]).findIndex(function(x){return x.id===logId;});
+    if(idx>=0)window._attLogs[idx].pending_edit=pe;
+    document.getElementById('att-req-modal').remove();
+    alert('✅ Edit request sent! Admin will review and approve.');
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function approveAttEdit(logId){
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  if(!l){alert('Record not found');return;}
+  var pe=l.pending_edit;if(typeof pe==='string'){try{pe=JSON.parse(pe);}catch(e){pe=null;}}
+  if(!pe){alert('No pending request');return;}
+  if(!confirm('Approve edit request from '+l.eng_name+'?'))return;
+  var wMins=0;var otMins=0;
+  var newIn=pe.new_in||l.punch_in_time;var newOut=pe.new_out||l.punch_out_time;
+  if(newIn&&newOut){
+    function toM2(t){var s=t.trim();var isPM=/pm/i.test(s);var isAM=/am/i.test(s);var c=s.replace(/[^0-9:]/g,'');var p=c.split(':');var h=parseInt(p[0])||0;var m=parseInt(p[1])||0;if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;return h*60+m;}
+    wMins=toM2(newOut)-toM2(newIn);if(wMins<0)wMins+=1440;
+    var ss=null;try{var sRes=await sb('shift_settings','GET',null,'?emp_id=eq.'+encodeURIComponent(l.eng_id)+'&limit=1');if(sRes&&sRes.length)ss=sRes[0];}catch(e){}
+    var shiftDur=ss?(toM2(ss.shift_end)-toM2(ss.shift_start)):480;
+    otMins=Math.max(0,wMins-shiftDur);
+  }
+  try{
+    await sb('punch_logs','PATCH',{
+      punch_in_time:newIn,punch_out_time:newOut,
+      working_minutes:wMins,overtime_minutes:otMins,
+      status:'verified',is_late:false,pending_edit:null,
+      admin_remark:'Approved: '+pe.reason,updated_at:new Date().toISOString()
+    },'?id=eq.'+logId);
+    var idx=(window._attLogs||[]).findIndex(function(x){return x.id===logId;});
+    if(idx>=0)Object.assign(window._attLogs[idx],{punch_in_time:newIn,punch_out_time:newOut,working_minutes:wMins,overtime_minutes:otMins,status:'verified',is_late:false,pending_edit:null});
+    alert('✅ Attendance edit approved!');
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function rejectAttEdit(logId){
+  var reason=prompt('Reason for rejection:');
+  if(reason===null)return;
+  try{
+    await sb('punch_logs','PATCH',{pending_edit:null,admin_remark:'Rejected: '+(reason||'No reason'),updated_at:new Date().toISOString()},'?id=eq.'+logId);
+    var idx=(window._attLogs||[]).findIndex(function(x){return x.id===logId;});
+    if(idx>=0)window._attLogs[idx].pending_edit=null;
+    alert('❌ Edit request rejected.');
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 async function downloadAttendanceExcel(){
