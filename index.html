@@ -1218,7 +1218,7 @@ let punchStatus=JSON.parse(localStorage.getItem('punch_status')||'null');
 // LOGO
 function applyLogo(data){
   if(data!==undefined)logoData=data;
-  else logoData=localStorage.getItem('bhavi_logo')||'';
+  else logoData=localStorage.getItem('bhavi_logo')||_DEFAULT_LOGO;
   const html=logoData?`<img src="${logoData}" style="max-width:180px;max-height:64px;object-fit:contain;">`:'<div style="text-align:center;"><div style="font-size:13px;font-weight:800;color:var(--primary);line-height:1.2;">BHAVI ELECTRONICS</div><div style="font-size:10px;font-weight:400;color:#90a4ae;">&amp; Automation</div></div>';
   const si=document.getElementById('sidebar-logo-inner');if(si)si.innerHTML=html;
   const li=document.getElementById('login-logo-img');if(li)li.innerHTML=logoData?`<img src="${logoData}" style="max-height:50px;">` :'🔧';
@@ -5448,7 +5448,7 @@ async function generateInvoice(id){
   catch(e){t=allTickets.find(x=>x.id===id);}
   if(!t)return;
 
-  const logo=localStorage.getItem('bhavi_logo')||'';
+  const logo=localStorage.getItem('bhavi_logo')||_DEFAULT_LOGO;
   const ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
   const coName=ci.name||'Bhavi Electronics';
   const coPhone=ci.phone||'';
@@ -18312,7 +18312,7 @@ async function savePayment(){
   }catch(e){alert('Error saving payment: '+e.message);}
 }
 function printPaymentReceipt(p){
-  var logo=localStorage.getItem('bhavi_logo')||'';
+  var logo=localStorage.getItem('bhavi_logo')||_DEFAULT_LOGO;
   var bannerSrc=window._bhaviBannerSrc;
   if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
   var logoHtml=bannerSrc
@@ -18358,7 +18358,7 @@ function printPaymentReceipt(p){
   var w=window.open('','_blank');if(w){w.document.write(html);w.document.close();}
 }
 function printDC(){
-  var logo=localStorage.getItem('bhavi_logo')||'';
+  var logo=localStorage.getItem('bhavi_logo')||_DEFAULT_LOGO;
   // Extract full banner from the courier DC function
   var bannerSrc=window._bhaviBannerSrc;
   if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
@@ -18413,7 +18413,7 @@ function printDC(){
   var w=window.open('','_blank');w.document.write(html);w.document.close();
 }
 function printQuotationDoc(){
-  var logo=localStorage.getItem('bhavi_logo')||'';
+  var logo=localStorage.getItem('bhavi_logo')||_DEFAULT_LOGO;
   // Extract full banner from the courier DC function
   var bannerSrc=window._bhaviBannerSrc;
   if(!bannerSrc){try{var src=printDCNow.toString();var m=src.match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/);if(m){window._bhaviBannerSrc=bannerSrc=m[0];}}catch(ex){}}
