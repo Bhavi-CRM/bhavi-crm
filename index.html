@@ -2913,11 +2913,27 @@ function setupNav(){
       if(autoSec)autoSec.style.display='';
       if(aiSec)aiSec.style.display='';
     }
-  // Auto-restart location tracking if engineer is punched in
-  if(isEng&&!_locInterval){
+  // Auto-restart location tracking if engineer or WC is punched in
+  if((isEng||isWC)&&!_locInterval){
     var pKey='punch_'+currentUser.user_id;
     var pData=JSON.parse(localStorage.getItem(pKey)||'null');
-    if(pData&&pData.punched_in)startLocationTracking();
+    if(pData&&pData.punched_in){
+      startLocationTracking();
+      // Save immediate location point so admin sees current position right away
+      setTimeout(function(){saveLocationEvent('track');},2000);
+    } else {
+      // Check DB in case localStorage is missing (e.g. fresh login on another device)
+      var todayCheck=new Date().toLocaleDateString('en-CA');
+      sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&punch_in_date=eq.'+todayCheck+'&status=eq.active&limit=1').then(function(res){
+        if(res&&res.length>0){
+          var ex=res[0];
+          var ps={punched_in:true,punch_in_time:ex.punch_in_time,punch_in_date:ex.punch_in_date,start_meter:ex.start_meter||''};
+          localStorage.setItem(pKey,JSON.stringify(ps));
+          startLocationTracking();
+          setTimeout(function(){saveLocationEvent('track');},2000);
+        }
+      }).catch(function(){});
+    }
   }
   }catch(e){console.error('setupNav:',e);}
 }
@@ -6551,6 +6567,7 @@ async function saveEngUpdate(){
     updated_at:nowSave.toISOString()
   };
   // Repaired → auto become Pending for Delivery
+  const origStatus=status;
   if(status==='Repaired'){data.status='Pending for Delivery';status='Pending for Delivery';}
 
   // Auto set Time Out when closing On Site call
@@ -6738,12 +6755,12 @@ async function saveEngUpdate(){
     if(status==='Closed'){
       saveLocationEvent('ticket_close',id);
     }
-    if(status==='Closed'||status==='Repaired'){
-      _tgNotifyClose(id,t,data,status,currentSpares);
+    if(status==='Closed'||origStatus==='Repaired'){
+      _tgNotifyClose(id,t,data,origStatus,currentSpares);
     }
     // Auto-close open work log when call goes to a paused/pending status
     const pausedStatuses=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold','Sent to MSC','Repaired'];
-    if(pausedStatuses.includes(status)||status==='Repaired'){
+    if(pausedStatuses.includes(origStatus)||pausedStatuses.includes(status)){
       try{
         const pNow=new Date();
         const pTime=pNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
