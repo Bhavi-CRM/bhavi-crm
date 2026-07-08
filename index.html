@@ -3893,8 +3893,8 @@ async function doPunchIn(){
     }
   }catch(e){console.log('Punch check error:',e);}
 
-  // WC/Admin — simple punch in without camera/selfie/meter
-  const _isSimpleIn=currentUser&&(currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||currentUser.role==='admin');
+  // Admin only — simple punch in without camera/selfie/meter (WC now uses camera+GPS like engineers)
+  const _isSimpleIn=currentUser&&(currentUser.role==='admin');
   if(_isSimpleIn){
     var pinTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!confirm('Punch In?\nTime: '+pinTime))return;
@@ -4163,8 +4163,8 @@ async function showPunchOutModal(ps,key){
   var ex=document.getElementById('punch-out-modal');
   if(ex)ex.remove();
   
-  // Carry-in engineers and WC/Admin — simple punch out without meter/selfie
-  const _isSimplePunch=currentUser&&(currentUser.eng_type==='carryin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||currentUser.role==='admin');
+  // Carry-in engineers and Admin only — simple punch out without meter/selfie (WC now uses camera+GPS)
+  const _isSimplePunch=currentUser&&(currentUser.eng_type==='carryin'||currentUser.role==='admin');
   if(_isSimplePunch){
     var poutTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!confirm('Punch Out?\nTime: '+poutTime))return;
