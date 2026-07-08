@@ -3784,7 +3784,7 @@ async function loadEngLiveStatus(){
     if(!engineers.length){el.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:20px;">No engineers found.</p>';return;}
 
     // Fetch latest GPS location for each engineer (last 2 hours, most recent first)
-    const twoHrsAgo=new Date(Date.now()-2*60*60*1000).toISOString();
+    const twoHrsAgo=new Date(Date.now()-8*60*60*1000).toISOString();
     const engIds=engineers.map(e=>e.eng_id||e.user_id).filter(Boolean);
     let latestLocByEng={};
     try{
@@ -12696,12 +12696,17 @@ async function renderLiveMap(){
     // Latest position — larger named marker
     if(eng.latest){
       var latestTime=new Date(eng.latest.recorded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-      var divIcon=L.divIcon({className:'',html:'<div style="background:'+color+';color:#fff;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);">👷 '+eng.name+'</div>',iconAnchor:[0,0]});
+      var minsAgo=Math.round((Date.now()-new Date(eng.latest.recorded_at))/60000);
+      var liveLabel=minsAgo<=5?'🟢 LIVE':minsAgo<=30?'🟡 '+minsAgo+'m ago':'🔴 '+minsAgo+'m ago';
+      var divIcon=L.divIcon({className:'',html:'<div style="background:'+color+';color:#fff;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3);">👷 '+eng.name+' · '+latestTime+'</div>',iconAnchor:[0,0]});
       L.marker([eng.latest.lat,eng.latest.lng],{icon:divIcon}).addTo(map)
-        .bindPopup('<b>'+eng.name+'</b><br>Last seen: '+latestTime+'<br>'+eng.points.length+' location points');
+        .bindPopup('<b>'+eng.name+'</b><br>Last seen: '+latestTime+' ('+liveLabel+')<br>📍 '+eng.points.length+' points tracked');
+      eng.liveLabel=liveLabel;
+      eng.latestTime=latestTime;
     }
 
-    legendHtml+='<span style="background:'+color+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">👷 '+eng.name+' &nbsp;🛣️ '+eng.totalKm+' km</span>';
+    var liveChip=eng.liveLabel||'';
+    legendHtml+='<span style="background:'+color+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;" onclick="window._liveMap&&window._liveMap.setView(['+( eng.latest?eng.latest.lat+','+eng.latest.lng:'23.0225,72.5714')+'],15)">👷 '+eng.name+' &nbsp;🛣️ '+eng.totalKm+' km'+(eng.latestTime?' &nbsp;🕐 '+eng.latestTime+(eng.liveLabel?' · '+eng.liveLabel:''):'')+'</span>';
   });
 
   if(bounds.length)map.fitBounds(bounds,{padding:[30,30]});
