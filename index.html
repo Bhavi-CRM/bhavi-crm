@@ -1407,11 +1407,11 @@ async function renderDailyReports(c){
         return '<tr>'
           +'<td><b>'+r.report_date+'</b></td>'
           +'<td>'+r.eng_name+'</td>'
-          +'<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.warranty_installation||0)+'</td>'
-          +'<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.warranty_breakdown||0)+'</td>'
-          +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_breakdown||0)+'</td>'
-          +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_other||0)+'</td>'
-          +'<td style="text-align:center;font-weight:700;">'+(r.total_calls||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.warranty_installation||(r.call_summary&&(r.call_summary.w_install||0))||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.warranty_breakdown||(r.call_summary&&((r.call_summary.w_breakdown||0)+(r.call_summary.w_repeat||0)))||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_breakdown||(r.call_summary&&((r.call_summary.nw_breakdown||0)+(r.call_summary.nw_repeat||0)))||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_other||(r.call_summary&&((r.call_summary.nw_other||0)+(r.call_summary.nw_delivery||0)))||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;">'+(r.total_calls||(r.call_summary&&r.call_summary.grand_total)||0)+'</td>'
           +'<td style="text-align:center;">'+(r.petrol_km||0)+' km</td>'
           +'<td style="font-weight:700;color:#065f46;">₹'+(r.total_amount||0)+'</td>'
           +'<td><button class="btn btn-outline btn-sm" onclick="viewDailyReport('+idx+')">👁 View</button></td>'
@@ -2941,11 +2941,12 @@ async function loadMasterData(){
 // NAVIGATE
 async function navigate(page){
   if(!currentUser){
-    // Not logged in — show login screen, do not render any page
     var ls=document.getElementById('login-screen');
     if(ls)ls.style.display='flex';
     return;
   }
+  // Clear live map auto-refresh when leaving the page
+  if(page!=='live-map'&&window._liveMapRefresh){clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
   currentPage=page;
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3685,10 +3686,10 @@ async function renderDashboard(){
         <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:600;background:#f1f5f9;padding:3px 10px;border-radius:99px;">Showing: ${_dpLabel} — ${dashTix.length} tickets</span>
       </div>
       <div class="kpi-prem-grid">
-        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets ('+_dpLabel+')',window._dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
-        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets ('+_dpLabel+')',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
-        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets ('+_dpLabel+')',window._dashTix.filter(function(t){return ['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
-        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
+        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets (${_dpLabel})',window._dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets (${_dpLabel})',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
+        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets (${_dpLabel})',window._dashTix.filter(function(t){return ['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
+        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets (${_dpLabel})',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
       </div>
       ${engChartHtml}
       ${chartHtml}
@@ -3781,10 +3782,21 @@ async function loadEngLiveStatus(){
     const lastLogByEng={};
     (allTodayLogs||[]).forEach(l=>{if(!lastLogByEng[l.eng_id])lastLogByEng[l.eng_id]=l;});
     if(!engineers.length){el.innerHTML='<p style="color:var(--text-muted);text-align:center;padding:20px;">No engineers found.</p>';return;}
+
+    // Fetch latest GPS location for each engineer (last 2 hours, most recent first)
+    const twoHrsAgo=new Date(Date.now()-2*60*60*1000).toISOString();
+    const engIds=engineers.map(e=>e.eng_id||e.user_id).filter(Boolean);
+    let latestLocByEng={};
+    try{
+      const locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+today+'&recorded_at=gte.'+twoHrsAgo+'&order=recorded_at.desc&limit=200');
+      (locs||[]).forEach(function(l){if(!latestLocByEng[l.eng_id])latestLocByEng[l.eng_id]=l;});
+    }catch(e2){console.log('Location fetch error:',e2);}
+
     const rows=engineers.map(eng=>{
       const eid=eng.eng_id||eng.user_id;
       const ol=openByEng[eid];
       const ll=lastLogByEng[eid];
+      const loc=latestLocByEng[eid];
       let statusHtml='',callHtml='',areaHtml='';
       if(ol){
         const isTravel=ol.log_type==='travel';
@@ -3805,9 +3817,17 @@ async function loadEngLiveStatus(){
         statusHtml='<span style="background:#f3f4f6;color:#9ca3af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">📴 Not Started</span>';
         callHtml='-';areaHtml='-';
       }
-      return `<tr><td><b>${eng.name}</b></td><td>${statusHtml}</td><td style="font-size:12px;max-width:280px;">${callHtml}</td><td style="font-size:12px;">${areaHtml}</td><td style="font-size:11px;color:#9ca3af;">${ol?'Since '+ol.from_time:ll?'Last: '+ll.from_time:'-'}</td></tr>`;
+      // GPS location cell
+      let locHtml='-';
+      if(loc){
+        const locTime=new Date(loc.recorded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+        const minsAgo=Math.round((Date.now()-new Date(loc.recorded_at))/60000);
+        const freshLabel=minsAgo<=5?'<span style="color:#065f46;font-size:10px;"> (live)</span>':minsAgo<=30?'<span style="color:#92400e;font-size:10px;"> ('+minsAgo+'m ago)</span>':'<span style="color:#6b7280;font-size:10px;"> ('+minsAgo+'m ago)</span>';
+        locHtml=`<a href="https://maps.google.com/?q=${loc.lat},${loc.lng}" target="_blank" style="color:#1d4ed8;font-weight:600;font-size:12px;">📍 Open Map</a>${freshLabel}<br><span style="font-size:10px;color:#9ca3af;">${locTime}${loc.accuracy?' ±'+loc.accuracy+'m':''}</span>`;
+      }
+      return `<tr><td><b>${eng.name}</b></td><td>${statusHtml}</td><td style="font-size:12px;max-width:220px;">${callHtml}</td><td style="font-size:12px;">${areaHtml}</td><td style="font-size:11px;color:#9ca3af;">${ol?'Since '+ol.from_time:ll?'Last: '+ll.from_time:'-'}</td><td style="font-size:12px;">${locHtml}</td></tr>`;
     }).join('');
-    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Engineer</th><th>Status</th><th>Current Call</th><th>Area</th><th>Time</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>'}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Engineer</th><th>Status</th><th>Current Call</th><th>Area</th><th>Time</th><th>📍 Location</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>'}</tbody></table></div>`;
   }catch(e){el.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 
@@ -3922,7 +3942,7 @@ async function doPunchIn(){
   // Status chips (GPS + Selfie)
   var statusRow=document.createElement('div');
   statusRow.style.cssText='display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;';
-  statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS...</span>'
+  statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS (move outdoors for best accuracy)...</span>'
     +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>';
   box.appendChild(statusRow);
 
@@ -4076,8 +4096,11 @@ async function doPunchIn(){
     window._pinGpsReady=!!loc;
     var gEl=document.getElementById('pin-gps-status');
     if(gEl){
-      if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
-      else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
+      if(loc){
+        var accLabel=loc.accuracy<=50?'✅ High Accuracy (±'+loc.accuracy+'m)':loc.accuracy<=200?'⚠️ Medium (±'+loc.accuracy+'m)':'⚠️ Low Accuracy (±'+loc.accuracy+'m — Move outdoors)';
+        var accBg=loc.accuracy<=200?'#d1fae5':'#fef3c7';var accClr=loc.accuracy<=200?'#065f46':'#92400e';
+        gEl.style.background=accBg;gEl.style.color=accClr;gEl.textContent='📍 GPS: '+accLabel;
+      }else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
     }
     if(loc&&window._punchSelfieIn){
       var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;
@@ -4118,7 +4141,8 @@ async function doSavePunchIn(loc){
       status:'active',
       punch_in_photo:window._punchSelfieIn||null,
       punch_in_lat:loc?loc.lat:null,
-      punch_in_lng:loc?loc.lng:null
+      punch_in_lng:loc?loc.lng:null,
+      punch_in_accuracy:loc?loc.accuracy:null
     });
   }catch(e){console.log('Punch log save error:',e);}
   saveLocationEvent('punch_in');
@@ -4653,6 +4677,23 @@ async function renderMyCalls(){
         if(confirm('⚠️ 10 PM passed! Punch Out is mandatory.\nWould you like to punch out now?'))doPunchOut();
       },500);
     }
+    // If localStorage says not punched in, check Supabase (cross-device sync)
+    if(!ps||!ps.punched_in){
+      try{
+        const todayChk=new Date().toLocaleDateString('en-CA');
+        const sbChk=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&punch_in_date=eq.'+todayChk+'&status=eq.active&limit=1');
+        if(sbChk&&sbChk.length>0){
+          const sbPs={punched_in:true,punch_in_time:sbChk[0].punch_in_time,punch_in_date:sbChk[0].punch_in_date,start_meter:sbChk[0].start_meter||''};
+          localStorage.setItem('punch_'+currentUser.user_id,JSON.stringify(sbPs));
+          Object.assign(ps||(ps={}),sbPs);
+          // Start tracking if not already running
+          if(!window._locInterval)startLocationTracking();
+        }
+      }catch(e2){console.log('Punch sync error:',e2);}
+    } else if(!window._locInterval){
+      // Already punched in per localStorage — ensure tracking is running
+      startLocationTracking();
+    }
     const punchHtml=ps&&ps.punched_in?
       `<div class="punch-bar"><div><div class="punch-time">🔴 On Duty since ${ps.punch_in_time}</div><div class="punch-info">Start Meter: ${ps.start_meter||'-'}</div></div><button class="btn btn-danger" onclick="doPunchOut()">⏹ Punch Out</button></div>`:
       `<div class="punch-bar"><div><div class="punch-time">🟢 Not Punched In</div></div><button class="btn btn-success" onclick="doPunchIn()">▶ Punch In</button></div>`;
@@ -4883,6 +4924,26 @@ function selectCustomerForCall(serial,cname,mobile,address,model,alt,pin,city,ar
   document.getElementById('call-model').value=model;
   document.getElementById('call-alt').value=alt;
   setAddressDropdowns(state||'Gujarat', city, pin, area);
+  // Auto-fill brand and sub-category from model
+  if(model&&allModels&&allModels.length){
+    var mObj=allModels.find(function(m){return m.model_no===model;});
+    if(mObj&&mObj.brand_id){
+      var bDrop=document.getElementById('call-brand-input');
+      if(bDrop){
+        var bOpt=Array.from(bDrop.options).find(function(o){return o.value===mObj.brand_id;});
+        if(bOpt){bDrop.value=bOpt.value;selectBrandFromDrop(bOpt.value,bOpt.text);}
+      }
+      // restore model after selectBrandFromDrop clears it
+      setTimeout(function(){
+        document.getElementById('call-model').value=model;
+        // set subcat if available
+        if(mObj.subcategory_id){
+          var sEl=document.getElementById('call-subcat-input');
+          if(sEl){var sOpt=Array.from(sEl.options).find(function(o){return o.value===mObj.subcategory_id;});if(sOpt){sEl.value=sOpt.value;document.getElementById('call-subcat-id').value=sOpt.value;}}
+        }
+      },50);
+    }
+  }
   document.getElementById('customer-search-results').innerHTML=`<div style="color:var(--success);font-size:13px;margin-top:6px;">✅ Selected: <b>${cname}</b> | ${mobile}</div>`;
   if(serial&&!serial.startsWith('NO-SN-'))setTimeout(()=>checkReRepair(serial),200);
 }
@@ -12370,14 +12431,33 @@ function showPastReportShare(id){
 }
 
 // ===== LOCATION TRACKING =====
-function getLocation(){
+function getLocation(minAccuracy, retries){
+  // minAccuracy: acceptable accuracy in metres (default 200). retries: attempts left (default 3)
+  minAccuracy = minAccuracy || 200;
+  retries = (retries === undefined) ? 3 : retries;
   return new Promise(function(resolve){
     if(!navigator.geolocation){resolve(null);return;}
-    navigator.geolocation.getCurrentPosition(
-      function(p){resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)});},
-      function(){resolve(null);},
-      {timeout:12000,maximumAge:0,enableHighAccuracy:true}
-    );
+    var attempts=0;
+    function tryOnce(){
+      attempts++;
+      navigator.geolocation.getCurrentPosition(
+        function(p){
+          var loc={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:Math.round(p.coords.accuracy)};
+          if(loc.accuracy<=minAccuracy||attempts>=retries){
+            resolve(loc); // good enough or out of retries
+          } else {
+            // inaccurate — wait 1s and try again for a better fix
+            setTimeout(tryOnce, 1000);
+          }
+        },
+        function(){
+          if(attempts<retries){setTimeout(tryOnce,1000);}
+          else{resolve(null);}
+        },
+        {timeout:12000,maximumAge:0,enableHighAccuracy:true}
+      );
+    }
+    tryOnce();
   });
 }
 
@@ -12419,7 +12499,7 @@ function startLocationTracking(){
     );
   }
 
-  // Save a point every 15 seconds using last known position (fast, no extra GPS call)
+  // Save a point every 10 seconds using last known position (fast, no extra GPS call)
   saveLocationEvent('track',null,null);
   _locInterval=setInterval(function(){
     if(_lastKnownLoc){
@@ -12427,7 +12507,7 @@ function startLocationTracking(){
     }else{
       saveLocationEvent('track');
     }
-  },15*1000);
+  },10*1000);
 
   // Warn when tab goes hidden — browsers throttle/stop GPS when minimized
   document.addEventListener('visibilitychange',_handleVisibility);
@@ -12559,6 +12639,7 @@ async function renderLiveMap(){
   var mapEl=document.getElementById('lm-map');
   if(!mapEl)return;
   if(window._liveMap){try{window._liveMap.remove();}catch(e){}}
+  if(window._liveMapRefresh){clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
   var map=L.map('lm-map').setView([23.0225,72.5714],11);
   window._liveMap=map;
   var streetLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19});
@@ -12632,6 +12713,17 @@ async function renderLiveMap(){
   else{pc.innerHTML+='';map.setView([23.0225,72.5714],11);}
 
   document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — No location data found</span>';
+  // Auto-refresh every 30s when viewing today's map
+  if(window._liveMapRefresh)clearInterval(window._liveMapRefresh);
+  if(selDate===today){
+    window._liveMapRefresh=setInterval(function(){
+      if(document.getElementById('lm-map'))renderLiveMap();
+      else{clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
+    },15000);
+    // Show auto-refresh indicator
+    var leg=document.getElementById('lm-legend');
+    if(leg)leg.innerHTML+='<span style="font-size:11px;color:#6b7280;padding:4px 10px;background:#f1f5f9;border-radius:99px;">🔄 Auto-refresh every 15s</span>';
+  }
 
   // Summary table
   var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary — '+selDate+'</h2></div>'
@@ -21171,7 +21263,7 @@ async function loadAttendanceReport(){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
       var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
-      var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>':'-';
+      var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>'+(l.punch_in_accuracy?' <span style="font-size:10px;color:'+(l.punch_in_accuracy<=200?'#065f46':'#dc2626')+';">±'+l.punch_in_accuracy+'m</span>':''):'-';
       var pe=l.pending_edit;if(typeof pe==='string'){try{pe=JSON.parse(pe);}catch(e){pe=null;}}
       var statusBadge2=pe?'<span class="badge badge-pending">🕐 Edit Req</span>':l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
       var actionBtn='';
