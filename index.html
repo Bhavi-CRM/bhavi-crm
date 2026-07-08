@@ -2919,7 +2919,7 @@ function setupNav(){
     var pData=JSON.parse(localStorage.getItem(pKey)||'null');
     if(pData&&pData.punched_in){
       startLocationTracking();
-      // Save immediate location point so admin sees current position right away
+      startWorkLogReminder();
       setTimeout(function(){saveLocationEvent('track');},2000);
     } else {
       // Check DB in case localStorage is missing (e.g. fresh login on another device)
@@ -2930,6 +2930,7 @@ function setupNav(){
           var ps={punched_in:true,punch_in_time:ex.punch_in_time,punch_in_date:ex.punch_in_date,start_meter:ex.start_meter||''};
           localStorage.setItem(pKey,JSON.stringify(ps));
           startLocationTracking();
+          startWorkLogReminder();
           setTimeout(function(){saveLocationEvent('track');},2000);
         }
       }).catch(function(){});
@@ -4165,6 +4166,7 @@ async function doSavePunchIn(loc){
   }catch(e){console.log('Punch log save error:',e);}
   saveLocationEvent('punch_in');
   startLocationTracking();
+  startWorkLogReminder();
   stopPunchCamera();
   alert('Punch In successful! ✅\nTime: '+ps.punch_in_time);
   navigate(currentUser&&currentUser.role==='engineer'?'my-calls':'dashboard');
@@ -4451,6 +4453,7 @@ async function savePunchOut(key){
 
   saveLocationEvent('punch_out');
   stopLocationTracking();
+  stopWorkLogReminder();
   stopPunchCamera();
   var pm=document.getElementById('punch-out-modal');if(pm)pm.remove();
 
@@ -12548,6 +12551,50 @@ function _handleVisibility(){
       }
     }
   }
+}
+
+// ===== WORK LOG REMINDER =====
+var _wlReminderInterval=null;
+function startWorkLogReminder(){
+  if(_wlReminderInterval)return;
+  // Check every 30 minutes if a work log was added
+  _wlReminderInterval=setInterval(function(){
+    checkWorkLogReminder();
+  },30*60*1000);
+  // Also check once after 2 minutes on startup (in case already overdue)
+  setTimeout(checkWorkLogReminder,2*60*1000);
+}
+async function checkWorkLogReminder(){
+  if(!currentUser)return;
+  var pKey='punch_'+(currentUser.user_id||currentUser.eng_id||'');
+  var pData=JSON.parse(localStorage.getItem(pKey)||'null');
+  if(!pData||!pData.punched_in)return;
+  try{
+    var engId=currentUser.eng_id||currentUser.user_id;
+    var today=new Date().toLocaleDateString('en-CA');
+    var thirtyMinAgo=new Date(Date.now()-30*60*1000).toISOString();
+    var recentLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+today+'&created_at=gte.'+thirtyMinAgo+'&limit=1');
+    if(!recentLogs||recentLogs.length===0){
+      showWorkLogReminder();
+    }
+  }catch(e){}
+}
+function showWorkLogReminder(){
+  if(document.getElementById('wl-reminder-popup'))return;
+  var pop=document.createElement('div');
+  pop.id='wl-reminder-popup';
+  pop.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1d4ed8;color:#fff;padding:14px 18px;border-radius:14px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,0.35);text-align:center;max-width:300px;width:90%;';
+  pop.innerHTML='📋 <b>Work Log Reminder</b><br><span style="font-weight:400;font-size:12px;">Last 30 min ma koi work log nathi. Please work log add karo.</span>'
+    +'<div style="display:flex;gap:8px;margin-top:10px;">'
+    +'<button onclick="navigate(\'work-log\');document.getElementById(\'wl-reminder-popup\').remove();" style="flex:1;background:#fff;color:#1d4ed8;border:none;border-radius:8px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;">📝 Add Log</button>'
+    +'<button onclick="document.getElementById(\'wl-reminder-popup\').remove();" style="flex:1;background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:8px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;">Dismiss</button>'
+    +'</div>';
+  document.body.appendChild(pop);
+  // Auto-remove after 60 seconds
+  setTimeout(function(){var el=document.getElementById('wl-reminder-popup');if(el)el.remove();},60000);
+}
+function stopWorkLogReminder(){
+  if(_wlReminderInterval){clearInterval(_wlReminderInterval);_wlReminderInterval=null;}
 }
 
 function stopLocationTracking(){
