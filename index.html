@@ -619,14 +619,14 @@ tr:hover td{background:#f8fafc;}
 <!-- SIGNATURE -->
 <div class="modal-overlay hidden" id="modal-signature" onclick="closeModal('modal-signature')">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header"><h2 id="sig-modal-title">Customer Signature</h2><button class="close-btn" onclick="closeModal('modal-signature')">✕</button></div>
+    <div class="modal-header"><h2 id="sig-modal-title">Customer Signature</h2><button class="close-btn" onclick="skipSig()">✕</button></div>
     <div class="modal-body">
       <div style="font-size:13px;margin-bottom:10px;color:var(--text-muted);">Sign below to confirm service</div>
       <div class="sig-pad-wrap"><canvas id="sig-canvas" width="420" height="160"></canvas></div>
       <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="clearSig()">🔄 Clear</button>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-signature')">Cancel</button>
+      <button class="btn btn-outline" onclick="skipSig()">Skip Signature</button>
       <button class="btn btn-success" onclick="saveSig()">✅ Save</button>
     </div>
   </div>
@@ -6561,28 +6561,6 @@ async function saveEngUpdate(){
     }
   }
 
-  // Signature required on close
-  if(status==='Closed'&&!t.customer_signature){
-    closeModal('modal-eng-update');
-    await sb('tickets','PATCH',data,`?id=eq.${id}`);
-    currentSpares=[];
-    // ── AUTO WORK LOG close on signature flow too ──
-    try{
-      const closeNow=new Date();
-      const closeTime=closeNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-      const closeDate=closeNow.toLocaleDateString('en-CA');
-      const memberId=currentUser.eng_id||currentUser.user_id;
-      // Close any OPEN work log
-      const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+closeDate+'&to_time=eq.OPEN');
-      for(const ol of (openLogs||[])){
-        await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
-      }
-      // No auto traveling — engineer will manually Visit Start next call
-    }catch(ex){console.log('WorkLog sig error:',ex);}
-    openSignature(id);
-    if(currentPage==='my-calls')renderMyCalls();
-    return;
-  }
   try{
     await sb('tickets','PATCH',data,`?id=eq.${id}`);
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
@@ -6738,13 +6716,6 @@ async function saveEngUpdate(){
     }
     if(status==='Closed'){
       saveLocationEvent('ticket_close',id);
-      if(t.service_type==='On Site'){
-        closeModal('modal-eng-update');currentSpares=[];
-        if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
-        showFeedbackSharePrompt(id,t.cname||'Customer',t.mobile||'',currentUser.name||'');
-        _tgNotifyClose(id,t,data,status,currentSpares);
-        return;
-      }
     }
     if(status==='Closed'||status==='Repaired'){
       _tgNotifyClose(id,t,data,status,currentSpares);
@@ -10707,7 +10678,9 @@ function openSignature(id){
 }
 function initSig(){sigCanvas=document.getElementById('sig-canvas');sigCtx=sigCanvas.getContext('2d');sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.strokeStyle='#1d4ed8';sigCtx.lineWidth=2;sigCtx.lineCap='round';sigCanvas.onmousedown=e=>{sigDrawing=true;const r=sigCanvas.getBoundingClientRect();sigCtx.beginPath();sigCtx.moveTo(e.clientX-r.left,e.clientY-r.top);};sigCanvas.onmousemove=e=>{if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();sigCtx.lineTo(e.clientX-r.left,e.clientY-r.top);sigCtx.stroke();};sigCanvas.onmouseup=()=>sigDrawing=false;sigCanvas.ontouchstart=e=>{e.preventDefault();sigDrawing=true;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.beginPath();sigCtx.moveTo(t.clientX-r.left,t.clientY-r.top);};sigCanvas.ontouchmove=e=>{e.preventDefault();if(!sigDrawing)return;const r=sigCanvas.getBoundingClientRect();const t=e.touches[0];sigCtx.lineTo(t.clientX-r.left,t.clientY-r.top);sigCtx.stroke();};sigCanvas.ontouchend=()=>sigDrawing=false;}
 function clearSig(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);}}
-async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');if(t&&t.service_type==='On Site'&&t.status==='Closed'){showFeedbackSharePrompt(sigPendingId,t.cname||'Customer',t.mobile||'',currentUser.name||'');}else{alert('Signature saved! ✅');}}catch(e){alert(e.message);}}
+async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');
+alert('Signature saved! ✅');}catch(e){alert(e.message);}}
+async function skipSig(){closeModal('modal-signature');if(!sigPendingId)return;try{const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(sigPendingId)))[0];const skipNow=new Date();const skipTime=skipNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const skipDate=skipNow.toLocaleDateString('en-CA');const skipEngId=currentUser.eng_id||currentUser.user_id;const skipLabel=(t?.ticket_no||sigPendingId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(skipEngId)+'&log_date=eq.'+skipDate+'&to_time=eq.OPEN');for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:skipTime},'?id=eq.'+ol.id).catch(()=>{});}if(t&&t.status==='Closed'){await sb('work_logs','POST',{eng_id:skipEngId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',log_date:skipDate,from_time:skipTime,to_time:skipTime,task_description:'✅ Call Closed — '+skipLabel,ticket_id:sigPendingId,log_type:'status',created_at:skipNow.toISOString()}).catch(()=>{});}}catch(ex){console.log('skipSig worklog err:',ex);}}
 
 // JOB SHEET PRINT - Point 12: no meter photos, has signature
 async function printJobSheet(){
@@ -16390,9 +16363,9 @@ async function renderWorkLog(){
   const d=new Date();
   const dateStr=dd+suffix+' '+months[d.getMonth()]+' '+d.getFullYear()+', '+wdays[d.getDay()];
   const slots=[];
-  for(var h=7;h<=21;h++){['00','30'].forEach(function(m){slots.push((h<10?'0':'')+h+':'+m);});}
+  for(var h=7;h<=21;h++){['00','15','30','45'].forEach(function(m){slots.push((h<10?'0':'')+h+':'+m);});}
   const now=new Date();
-  const hh=now.getHours();const mm2=now.getMinutes()<30?'00':'30';
+  const hh=now.getHours();const rawMin=now.getMinutes();const mm2=rawMin<15?'00':rawMin<30?'15':rawMin<45?'30':'45';
   const curr=(hh<10?'0':'')+hh+':'+mm2;
   const sidx=slots.indexOf(curr);
   const fromDef=sidx>=0?curr:slots[0];
