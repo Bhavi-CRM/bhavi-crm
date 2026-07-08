@@ -6718,7 +6718,7 @@ async function saveEngUpdate(){
         const closeDate=closeNow.toLocaleDateString('en-CA');
         const memberId=currentUser.eng_id||currentUser.user_id;
         const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
-        const ticketLabel=(t?.ticket_no||id)+(t?.cname?' — '+t.cname:'');
+        const ticketLabel=(t?.ticket_no||id)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');
 
         // Close any open work log for this ticket
         const openLogs=await sb('work_logs','GET',null,
@@ -6727,10 +6727,11 @@ async function saveEngUpdate(){
           await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
         }
         // Auto status log entry for Call Closed
+        const _clModel=t?.model?(' | '+t.model):'';
         await sb('work_logs','POST',{
           eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
           log_date:closeDate,from_time:closeTime,to_time:closeTime,
-          task_description:'✅ Call Closed — '+ticketLabel,
+          task_description:'✅ Call Closed — '+ticketLabel+_clModel,
           ticket_id:id,log_type:'status',created_at:closeNow.toISOString()
         }).catch(()=>{});
       }catch(ex){console.log('WorkLog auto error:',ex);}
@@ -6779,8 +6780,8 @@ async function saveEngUpdate(){
         // Auto status log entry for paused/pending status
         const pEngName=currentUser.name;
         const pRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
-        const pTicket=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=ticket_no,cname').catch(()=>[]))[0];
-        const pLabel=(pTicket?.ticket_no||id)+(pTicket?.cname?' — '+pTicket.cname:'');
+        const pTicket=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=ticket_no,cname,model').catch(()=>[]))[0];
+        const pLabel=(pTicket?.ticket_no||id)+(pTicket?.cname?' — '+pTicket.cname:'')+(pTicket?.model?' | '+pTicket.model:'');
         const statusIcons={'Pending Parts':'⏸️','Pending Customer Approval':'⏳','Pending Engineer Stock':'📦','Pending Spare':'🔧','Hold':'🔒','Sent to MSC':'📤','Repaired':'✅'};
         const pIcon=statusIcons[status]||'⏸️';
         await sb('work_logs','POST',{
@@ -11619,7 +11620,7 @@ async function doVisitStart(ticketId){
 
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
-    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'');
+    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');
 
     // Add Traveling log (OPEN)
     await sb('work_logs','POST',{
@@ -11786,7 +11787,7 @@ async function doWorkStart(ticketId){
 
     // ── AUTO WORK LOG ──
     const memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
-    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'');
+    const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');
 
     // Close any OPEN log (traveling) with current time
     try{
