@@ -1191,12 +1191,18 @@ async function sb(t,m='GET',b=null,q=''){
   const tx=await r.text();return tx?JSON.parse(tx):[];
 }
 
-// Paginated fetch — bypasses 1000-row server limit by fetching in batches
+// Paginated fetch — bypasses 1000-row server limit by fetching in batches.
+// IMPORTANT: Supabase enforces its own server-side max-rows cap (commonly 1000)
+// on every request independent of what Range/batchSize we ask for. A batch
+// coming back smaller than our requested batchSize does NOT mean we've reached
+// the end of the data - it can just mean the server truncated it. The only
+// reliable end-of-data signal is an empty batch, and the next offset must
+// advance by what we actually received, not by our requested batchSize.
 async function sbAll(t,q='',batchSize=1000){
   let all=[],offset=0;
   const base=q.includes('?')?q:'?'+q;
   const sep=base.includes('?')?'&':'?';
-  while(true){
+  for(let guard=0;guard<500;guard++){ // safety cap against a runaway loop
     const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Range-Unit':'items','Range':offset+'-'+(offset+batchSize-1)};
     const url=`${SB_URL}/rest/v1/${t}${base}`;
     const r=await fetch(url,{method:'GET',headers:h});
@@ -1205,8 +1211,7 @@ async function sbAll(t,q='',batchSize=1000){
     const batch=tx?JSON.parse(tx):[];
     if(!batch.length)break;
     all=all.concat(batch);
-    if(batch.length<batchSize)break;
-    offset+=batchSize;
+    offset+=batch.length;
   }
   return all;
 }
@@ -12538,7 +12543,10 @@ function startLocationTracking(){
   // Clear stale location so we get a fresh GPS fix on restart
   _lastKnownLoc=null;
   _lastLocSaveTime=Date.now(); // reset the staleness clock so the watchdog doesn't fire immediately
-  // Save a point every 5 seconds using last known position (fast, no extra GPS call)
+  // Save immediately on start (app open / punch-in / resume), then every 2 minutes
+  // using last known position (fast, no extra GPS call). Frequent (5s) pings were
+  // dropped in favour of a lower steady rate to cut down on GPS/network load;
+  // opening the app still gets you an instant fix via the line above.
   saveLocationEvent('track',null,null);
   _locInterval=setInterval(function(){
     if(_lastKnownLoc){
@@ -12546,7 +12554,7 @@ function startLocationTracking(){
     }else{
       saveLocationEvent('track');
     }
-  },5*1000);
+  },2*60*1000);
 
   // Warn when tab goes hidden — browsers throttle/stop GPS when minimized
   document.addEventListener('visibilitychange',_handleVisibility);
@@ -12581,8 +12589,9 @@ function _handleVisibility(){
 }
 
 // Runs every 15s regardless of visibility events. If punched in but no
-// successful location save has happened for >30s (watch/interval frozen,
-// killed, or never actually restarted), force a fresh restart.
+// successful location save has happened for a few cycles of the 2-minute
+// interval (watch/interval frozen, killed, or never actually restarted),
+// force a fresh restart.
 function _startGpsWatchdog(){
   if(_gpsWatchdog)return;
   _gpsWatchdog=setInterval(function(){
@@ -12592,7 +12601,7 @@ function _startGpsWatchdog(){
     if(!pData||!pData.punched_in)return;
     if(document.hidden)return; // nothing we can do while backgrounded; catch it on resume instead
     var staleFor=Date.now()-_lastLocSaveTime;
-    if(!_watchId||!_locInterval||staleFor>30000){
+    if(!_watchId||!_locInterval||staleFor>6*60*1000){
       console.log('GPS watchdog: tracking stale ('+Math.round(staleFor/1000)+'s) — restarting');
       if(_watchId){navigator.geolocation.clearWatch(_watchId);_watchId=null;}
       if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
