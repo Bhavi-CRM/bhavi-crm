@@ -11852,7 +11852,7 @@ function openDailyReport(){
     try{
       var today=new Date().toLocaleDateString('en-CA');
       var engId=currentUser.eng_id||currentUser.user_id;
-      var locs=await sb('engineer_locations','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&session_date=eq.'+today+'&order=recorded_at.asc&limit=500');
+      var locs=await sbAll('engineer_locations','?eng_id=eq.'+encodeURIComponent(engId)+'&session_date=eq.'+today+'&order=recorded_at.asc',2000);
       if(locs&&locs.length>1){
         function hkm(la1,ln1,la2,ln2){var R=6371;var dL=(la2-la1)*Math.PI/180;var dN=(ln2-ln1)*Math.PI/180;var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
         var km=0;for(var i=1;i<locs.length;i++){var d=hkm(locs[i-1].lat,locs[i-1].lng,locs[i].lat,locs[i].lng);if(d>=0.1&&d<5)km+=d;}
@@ -12746,7 +12746,7 @@ async function renderLiveMap(){
   var selDate=document.getElementById('lm-date')?.value||today;
   var locs=[];
   try{
-    locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+selDate+'&order=recorded_at.asc&limit=5000');
+    locs=await sbAll('engineer_locations','?session_date=eq.'+selDate+'&order=recorded_at.asc',2000);
   }catch(e){pc.innerHTML+='<div class="alert alert-warning">Table not found — please run the SQL script</div>';return;}
 
   if(typeof L==='undefined'){pc.innerHTML+='<div class="alert alert-warning">Map library failed to load — please check your internet connection</div>';return;}
