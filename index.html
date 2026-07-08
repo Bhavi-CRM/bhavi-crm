@@ -3519,6 +3519,7 @@ async function renderDashboard(){
     const _dpLabel=(()=>{if(_dpf==='today')return'Today';if(_dpf==='week')return'This Week';if(_dpf==='month')return'This Month';if(_dpf==='lastmonth')return'Last Month';if(_dpf==='custom'&&_dpFrom&&_dpTo)return _dpFrom+' to '+_dpTo;return'All Time';})();
     const total=dashTix.length;
     const _doneStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
+    window._dashTix=dashTix;
     const active=dashTix.filter(t=>!_doneStatuses.includes(t.status)).length;
     const closed=dashTix.filter(t=>['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status)).length;
     const unalloc=dashTix.filter(t=>!_doneStatuses.includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
@@ -3621,7 +3622,7 @@ async function renderDashboard(){
             <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#d97706;">${cancelCount}</div><div style="font-size:10px;color:var(--text-muted);">Cancelled</div></div>
             <div style="background:#fef9c3;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#ca8a04;">${custRejectCount}</div><div style="font-size:10px;color:var(--text-muted);">Cust. Reject</div></div>
             <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#1d4ed8;">${resRate}%</div><div style="font-size:10px;color:var(--text-muted);">Resolution</div></div>
-            ${invoicePending>0?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;cursor:pointer;" onclick="navigateTo('tickets');setTimeout(()=>{document.getElementById('ticket-invoice-filter').value='pending';document.getElementById('ticket-status-filter').value='Closed';filterTickets();},400);"><div style="font-size:28px;font-weight:700;color:#92400e;">${invoicePending}</div><div style="font-size:11px;color:#92400e;font-weight:600;">🧾 Invoice Pending (Non-Warranty)</div><div style="font-size:10px;color:#a16207;">Click to view</div></div>`:`<div style="background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;"><div style="font-size:22px;">✅</div><div style="font-size:11px;color:#15803d;font-weight:600;">All Invoices Done</div></div>`}
+            ${invoicePending>0?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;cursor:pointer;" onclick="navigateTo('tickets');setTimeout(()=>{var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='Closed';filterTickets();},900);"><div style="font-size:28px;font-weight:700;color:#92400e;">${invoicePending}</div><div style="font-size:11px;color:#92400e;font-weight:600;">🧾 Invoice Pending (Non-Warranty)</div><div style="font-size:10px;color:#a16207;">Click to view</div></div>`:`<div style="background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;"><div style="font-size:22px;">✅</div><div style="font-size:11px;color:#15803d;font-weight:600;">All Invoices Done</div></div>`}
           </div>
           <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
             <div style="height:100%;width:${resRate}%;background:linear-gradient(90deg,#0d9488,#1d4ed8);border-radius:4px;"></div>
@@ -3684,9 +3685,9 @@ async function renderDashboard(){
         <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:600;background:#f1f5f9;padding:3px 10px;border-radius:99px;">Showing: ${_dpLabel} — ${dashTix.length} tickets</span>
       </div>
       <div class="kpi-prem-grid">
-        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets ('+_dpLabel+')',dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
-        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
-        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets ('+_dpLabel+')',dashTix.filter(function(t){return t.status==='Closed';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
+        <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets ('+_dpLabel+')',window._dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets ('+_dpLabel+')',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
+        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets ('+_dpLabel+')',window._dashTix.filter(function(t){return ['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
         <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets ('+_dpLabel+')',dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
       </div>
       ${engChartHtml}
@@ -4754,6 +4755,7 @@ async function renderMyCalls(){
                   <div>🔢 <b style="color:var(--text);">${t.serial||'-'}</b></div>
                   <div>📞 <a href="tel:${t.mobile}" style="color:#1d4ed8;font-weight:600;">${t.mobile||'-'}</a>${t.mobile?` <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a>`:''}</div>
                   <div>📅 ${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</div>
+                  ${t.alt_mobile?`<div style="grid-column:1/-1;">📞 Alt: <a href="tel:${t.alt_mobile}" style="color:#1d4ed8;font-weight:600;">${t.alt_mobile}</a> <a href="https://wa.me/91${(t.alt_mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a></div>`:''}
                   ${t.problem?`<div style="grid-column:1/-1;color:var(--text-muted);">🔧 ${t.problem}</div>`:''}
                 </div>
                 ${(t.address||t.area||t.city)?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#166534;">
@@ -4855,16 +4857,17 @@ function searchCustomerLive(q){
   if(!q||q.length<2){document.getElementById('customer-search-results').innerHTML='';return;}
   customerSearchTimeout=setTimeout(async()=>{
     try{
-      const[byMobile,byName,bySerial]=await Promise.all([
+      const[byMobile,byName,bySerial,byAlt]=await Promise.all([
         sb('customers','GET',null,`?mobile=ilike.*${q}*&limit=3`),
         sb('customers','GET',null,`?cname=ilike.*${q}*&limit=3`),
-        sb('customers','GET',null,`?serial=ilike.*${q}*&limit=3`)
+        sb('customers','GET',null,`?serial=ilike.*${q}*&limit=3`),
+        sb('customers','GET',null,`?alt_mobile=ilike.*${q}*&limit=3`)
       ]);
-      const all=[...byMobile,...byName,...bySerial];
-      const unique=all.filter((c,i,arr)=>arr.findIndex(x=>x.serial===c.serial)===i).slice(0,5);
+      const all=[...byMobile,...byName,...bySerial,...byAlt];
+      const unique=all.filter((c,i,arr)=>arr.findIndex(x=>x.mobile===c.mobile&&x.cname===c.cname)===i).slice(0,5);
       if(!unique.length){document.getElementById('customer-search-results').innerHTML='<div style="font-size:12px;color:var(--text-muted);">No customer found</div>';return;}
       document.getElementById('customer-search-results').innerHTML=unique.map(c=>`
-        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-top:6px;cursor:pointer;font-size:13px;" onclick="selectCustomerForCall('${c.serial}','${(c.cname||'').replace(/'/g,"\\'")}','${c.mobile||''}','${(c.address||'').replace(/'/g,"\\'")}','${c.model||''}','${c.alt_mobile||''}','${c.pin||''}','${c.city||''}','${c.area||''}')">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-top:6px;cursor:pointer;font-size:13px;" onclick="selectCustomerForCall('${c.serial}','${(c.cname||'').replace(/'/g,"\\'")}','${c.mobile||''}','${(c.address||'').replace(/'/g,"\\'")}','${c.model||''}','${c.alt_mobile||''}','${c.pin||''}','${c.city||''}','${c.area||''}','${c.state||''}')">
           <b>${c.cname}</b> | 📞 ${c.mobile} | Serial: ${c.serial} | Model: ${c.model||'-'}
           <span style="float:right;color:var(--primary);font-size:12px;">Click to select →</span>
         </div>`).join('');
@@ -12138,6 +12141,13 @@ async function saveDailyReport(){
       report_date:date,
       site_visits:siteVisits,
       total_site_visits:callSummary.grand_total,
+      warranty_installation:callSummary.w_install||0,
+      warranty_breakdown:(callSummary.w_breakdown||0)+(callSummary.w_repeat||0),
+      outwarranty_breakdown:(callSummary.nw_breakdown||0)+(callSummary.nw_repeat||0),
+      outwarranty_other:(callSummary.nw_other||0)+(callSummary.nw_delivery||0),
+      total_calls:callSummary.grand_total||0,
+      pending_calls:callSummary.pending_calls||0,
+      call_summary:callSummary,
       office_work:officeWork,
       total_office_work:officeWork.length,
       payment_details:payments,
