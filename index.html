@@ -3622,7 +3622,7 @@ async function renderDashboard(){
             <div style="background:#fff7ed;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#d97706;">${cancelCount}</div><div style="font-size:10px;color:var(--text-muted);">Cancelled</div></div>
             <div style="background:#fef9c3;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#ca8a04;">${custRejectCount}</div><div style="font-size:10px;color:var(--text-muted);">Cust. Reject</div></div>
             <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#1d4ed8;">${resRate}%</div><div style="font-size:10px;color:var(--text-muted);">Resolution</div></div>
-            ${invoicePending>0?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;cursor:pointer;" onclick="navigateTo('tickets');setTimeout(()=>{var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='Closed';filterTickets();},900);"><div style="font-size:28px;font-weight:700;color:#92400e;">${invoicePending}</div><div style="font-size:11px;color:#92400e;font-weight:600;">🧾 Invoice Pending (Non-Warranty)</div><div style="font-size:10px;color:#a16207;">Click to view</div></div>`:`<div style="background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;"><div style="font-size:22px;">✅</div><div style="font-size:11px;color:#15803d;font-weight:600;">All Invoices Done</div></div>`}
+            ${invoicePending>0?`<div style="background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;cursor:pointer;" onclick="window._pendingInvFilter=true;navigate('tickets');"><div style="font-size:28px;font-weight:700;color:#92400e;">${invoicePending}</div><div style="font-size:11px;color:#92400e;font-weight:600;">🧾 Invoice Pending (Non-Warranty)</div><div style="font-size:10px;color:#a16207;">Click to view</div></div>`:`<div style="background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:10px;text-align:center;grid-column:span 2;"><div style="font-size:22px;">✅</div><div style="font-size:11px;color:#15803d;font-weight:600;">All Invoices Done</div></div>`}
           </div>
           <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
             <div style="height:100%;width:${resRate}%;background:linear-gradient(90deg,#0d9488,#1d4ed8);border-radius:4px;"></div>
@@ -4507,6 +4507,7 @@ function ticketRow(t){
     </td></tr>`;
 }
 function filterTickets(){
+  if(window._pendingInvFilter){window._pendingInvFilter=false;var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='Closed';}
   const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
   const s=document.getElementById('ticket-status-filter')?.value||'';
   const tp=document.getElementById('ticket-type-filter')?.value||'';
@@ -4881,12 +4882,9 @@ function selectCustomerForCall(serial,cname,mobile,address,model,alt,pin,city,ar
   document.getElementById('call-address').value=address;
   document.getElementById('call-model').value=model;
   document.getElementById('call-alt').value=alt;
-  if(state) setAddressDropdowns(state, city, pin, area);
-  else {
-    const pinEl=document.getElementById('call-pin');if(pinEl){pinEl.value=pin;pinEl.dataset.pin=pin;}
-    const areaEl=document.getElementById('call-area');if(areaEl&&area)areaEl.value=area;
-  }
+  setAddressDropdowns(state||'Gujarat', city, pin, area);
   document.getElementById('customer-search-results').innerHTML=`<div style="color:var(--success);font-size:13px;margin-top:6px;">✅ Selected: <b>${cname}</b> | ${mobile}</div>`;
+  if(serial&&!serial.startsWith('NO-SN-'))setTimeout(()=>checkReRepair(serial),200);
 }
 function clearCustomerSearch(){document.getElementById('search-customer-q').value='';document.getElementById('customer-search-results').innerHTML='';}
 
