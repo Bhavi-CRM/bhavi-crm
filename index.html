@@ -4698,12 +4698,34 @@ async function renderMyCalls(){
       `<div class="punch-bar"><div><div class="punch-time">🔴 On Duty since ${ps.punch_in_time}</div><div class="punch-info">Start Meter: ${ps.start_meter||'-'}</div></div><button class="btn btn-danger" onclick="doPunchOut()">⏹ Punch Out</button></div>`:
       `<div class="punch-bar"><div><div class="punch-time">🟢 Not Punched In</div></div><button class="btn btn-success" onclick="doPunchIn()">▶ Punch In</button></div>`;
 
+    // Return to Office button state — check today's work logs
+    let rtoHtml='';
+    if(ps&&ps.punched_in){
+      try{
+        const todayLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+todayStr+'&order=from_time.desc&limit=50');
+        const rtoOpen=(todayLogs||[]).find(l=>l.to_time==='OPEN'&&(l.task_description||'').includes('Return to Office'));
+        const rtoDone=(todayLogs||[]).find(l=>l.to_time!=='OPEN'&&(l.task_description||'').includes('Return to Office'));
+        if(rtoOpen){
+          rtoHtml=`<div id="rto-bar" style="background:#1e3a5f;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
+            <div style="color:#93c5fd;font-size:13px;font-weight:600;">🚗 Traveling to Office... (since ${rtoOpen.from_time})</div>
+            <button onclick="reachedOffice('${rtoOpen.id}')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Reached Office</button>
+          </div>`;
+        } else if(!rtoDone){
+          rtoHtml=`<div id="rto-bar" style="background:#f0fdf4;border:1.5px solid #86efac;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
+            <div style="color:#166534;font-size:13px;font-weight:600;">🏠 Heading back to office?</div>
+            <button onclick="startReturnToOffice()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏠 Return to Office</button>
+          </div>`;
+        }
+      }catch(e2){}
+    }
+
     // Point 10: My stats chart
     const daily={};tickets.forEach(t=>{if(!t.created_at)return;const d=new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});if(!daily[d])daily[d]=0;daily[d]++;});
     const last7=Object.entries(daily).slice(-7);const maxD=Math.max(...last7.map(([,v])=>v),1);
 
     document.getElementById('page-content').innerHTML=`
       ${punchHtml}
+      ${rtoHtml}
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Total</div><div class="kpi-value">${tickets.length}</div></div>
         <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${tickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length}</div></div>
@@ -5786,7 +5808,7 @@ async function doForceStatusChange(id,newStatus){
       member_role:_fsMRole,
       log_date:_fsDate,from_time:_fsTime,to_time:_fsTime,
       task_description:(_fsStatusIcons[newStatus]||'⚙️')+' Force → '+newStatus+' — '+_fsLabel+' ('+remark+')',
-      ticket_id:id,log_type:'status',created_at:_fsNow.toISOString()
+      ticket_id:id,log_type:'work',created_at:_fsNow.toISOString()
     }).catch(()=>{});
   }catch(ex){}
   closeModal('modal-ticket');
@@ -6710,7 +6732,7 @@ async function saveEngUpdate(){
           eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
           log_date:closeDate,from_time:closeTime,to_time:closeTime,
           task_description:'✅ Call Closed — '+ticketLabel+_clModel,
-          ticket_id:id,log_type:'status',created_at:closeNow.toISOString()
+          ticket_id:id,log_type:'work',created_at:closeNow.toISOString()
         }).catch(()=>{});
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
@@ -6759,7 +6781,7 @@ async function saveEngUpdate(){
           eng_id:pEngId,eng_name:pEngName,member_role:pRole,
           log_date:pDate,from_time:pTime,to_time:pTime,
           task_description:pIcon+' '+status+' — '+pLabel,
-          ticket_id:id,log_type:'status',created_at:pNow.toISOString()
+          ticket_id:id,log_type:'work',created_at:pNow.toISOString()
         }).catch(()=>{});
       }catch(pEx){console.log('WorkLog pause-close err:',pEx);}
     }
@@ -10680,7 +10702,7 @@ function initSig(){sigCanvas=document.getElementById('sig-canvas');sigCtx=sigCan
 function clearSig(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);}}
 async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');
 alert('Signature saved! ✅');}catch(e){alert(e.message);}}
-async function skipSig(){closeModal('modal-signature');if(!sigPendingId)return;try{const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(sigPendingId)))[0];const skipNow=new Date();const skipTime=skipNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const skipDate=skipNow.toLocaleDateString('en-CA');const skipEngId=currentUser.eng_id||currentUser.user_id;const skipLabel=(t?.ticket_no||sigPendingId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(skipEngId)+'&log_date=eq.'+skipDate+'&to_time=eq.OPEN');for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:skipTime},'?id=eq.'+ol.id).catch(()=>{});}if(t&&t.status==='Closed'){await sb('work_logs','POST',{eng_id:skipEngId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',log_date:skipDate,from_time:skipTime,to_time:skipTime,task_description:'✅ Call Closed — '+skipLabel,ticket_id:sigPendingId,log_type:'status',created_at:skipNow.toISOString()}).catch(()=>{});}}catch(ex){console.log('skipSig worklog err:',ex);}}
+async function skipSig(){closeModal('modal-signature');if(!sigPendingId)return;try{const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(sigPendingId)))[0];const skipNow=new Date();const skipTime=skipNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const skipDate=skipNow.toLocaleDateString('en-CA');const skipEngId=currentUser.eng_id||currentUser.user_id;const skipLabel=(t?.ticket_no||sigPendingId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(skipEngId)+'&log_date=eq.'+skipDate+'&to_time=eq.OPEN');for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:skipTime},'?id=eq.'+ol.id).catch(()=>{});}if(t&&t.status==='Closed'){await sb('work_logs','POST',{eng_id:skipEngId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',log_date:skipDate,from_time:skipTime,to_time:skipTime,task_description:'✅ Call Closed — '+skipLabel,ticket_id:sigPendingId,log_type:'work',created_at:skipNow.toISOString()}).catch(()=>{});}}catch(ex){console.log('skipSig worklog err:',ex);}}
 
 // JOB SHEET PRINT - Point 12: no meter photos, has signature
 async function printJobSheet(){
@@ -11685,7 +11707,7 @@ async function doConfirmWorkHold(ticketId){
       eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
       log_date:nowDate,from_time:nowTime,to_time:nowTime,
       task_description:'⏸️ Work on Hold — '+tkLabel+' ('+remark+')',
-      ticket_id:ticketId,log_type:'status',created_at:now.toISOString()
+      ticket_id:ticketId,log_type:'work',created_at:now.toISOString()
     }).catch(()=>{});
     // Add timeline entry (does NOT change status)
     var tl=[...(tk?.timeline||[]),{action:'Work on Hold',by:currentUser.name,at:now.toISOString(),note:remark+(workDur>0?' | Session: '+Math.floor(workDur/60)+'h '+workDur%60+'m':'')}];
@@ -16421,6 +16443,43 @@ async function renderWorkLog(){
     +'</div>';
 }
 
+async function startReturnToOffice(){
+  const engId=currentUser.eng_id||currentUser.user_id;
+  const now=new Date();
+  const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const nowDate=now.toLocaleDateString('en-CA');
+  // Close any other open travel/work log first
+  try{
+    const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+nowDate+'&to_time=eq.OPEN');
+    for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+ol.id).catch(()=>{});}
+  }catch(e){}
+  try{
+    await sb('work_logs','POST',{
+      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+      log_date:nowDate,from_time:nowTime,to_time:'OPEN',
+      task_description:'🏠 Return to Office',log_type:'travel',created_at:now.toISOString()
+    });
+    renderMyCalls();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function reachedOffice(logId){
+  const now=new Date();
+  const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const nowDate=now.toLocaleDateString('en-CA');
+  const engId=currentUser.eng_id||currentUser.user_id;
+  try{
+    await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
+    // Write "Reached Office" status entry
+    await sb('work_logs','POST',{
+      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+      log_date:nowDate,from_time:nowTime,to_time:nowTime,
+      task_description:'🏢 Reached Office',log_type:'work',created_at:now.toISOString()
+    }).catch(()=>{});
+    renderMyCalls();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 async function saveWorkLog(){
   var from=document.getElementById('wl-from').value;
   var to=document.getElementById('wl-to').value;
@@ -18290,7 +18349,7 @@ async function loadWorkLogReport(){
           var isOpen=l.to_time==='OPEN';
           var isToday=l.log_date===todayDate;
           var isTravel=l.log_type==='travel';
-          var isStatus=l.log_type==='status';
+          var isStatus=l.log_type==='status'||(l.log_type==='work'&&l.from_time===l.to_time&&l.from_time&&l.to_time!=='OPEN');
           var borderColor=isTravel?'#f59e0b':isStatus?'#10b981':'var(--primary)';
           var timeBg=isTravel?'#fef3c7':isStatus?'#d1fae5':'#ede9fe';
           var timeColor=isTravel?'#92400e':isStatus?'#065f46':'#4c1d95';
