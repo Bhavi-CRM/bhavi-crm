@@ -6465,7 +6465,7 @@ function refreshEstimateTotal(){
 async function saveEngUpdate(){
   const id=viewingTicketId;
   const statusEl=document.getElementById('upd-status');if(!statusEl)return;
-  const status=statusEl.value;
+  let status=statusEl.value;
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
 
   // Strict: cannot update terminal status
