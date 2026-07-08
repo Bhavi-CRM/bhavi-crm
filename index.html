@@ -12448,11 +12448,21 @@ function showPastReportShare(id){
 }
 
 // ===== LOCATION TRACKING =====
+var _getLocationPromise=null; // de-dupe: never let two retry chains run at once (see below)
+
 function getLocation(minAccuracy, retries){
   // minAccuracy: acceptable accuracy in metres (default 200). retries: attempts left (default 3)
+  // If a getLocation() call is already in flight (e.g. the 5s save-interval ticked again
+  // before the previous accuracy-retry chain finished), reuse it instead of starting a
+  // second concurrent chain. Without this, every failed/slow fix (common indoors, or with
+  // weak GPS signal) spawns another overlapping getCurrentPosition() retry loop on top of
+  // the last one, and they never get cancelled — the pile-up of concurrent requests is what
+  // silently exhausts the phone's location stack and stops tracking for good until the app
+  // is fully restarted. This was introduced when retries were added for accuracy.
+  if(_getLocationPromise)return _getLocationPromise;
   minAccuracy = minAccuracy || 200;
   retries = (retries === undefined) ? 3 : retries;
-  return new Promise(function(resolve){
+  _getLocationPromise=new Promise(function(resolve){
     if(!navigator.geolocation){resolve(null);return;}
     var attempts=0;
     function tryOnce(){
@@ -12467,7 +12477,9 @@ function getLocation(minAccuracy, retries){
             setTimeout(tryOnce, 1000);
           }
         },
-        function(){
+        function(e){
+          console.log('GPS error:',e&&e.code,e&&e.message);
+          if(e&&e.code===1)_showGpsBlockedWarning();
           if(attempts<retries){setTimeout(tryOnce,1000);}
           else{resolve(null);}
         },
@@ -12475,7 +12487,8 @@ function getLocation(minAccuracy, retries){
       );
     }
     tryOnce();
-  });
+  }).finally(function(){_getLocationPromise=null;});
+  return _getLocationPromise;
 }
 
 async function saveLocationEvent(eventType, ticketId, locOverride){
