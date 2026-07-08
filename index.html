@@ -12530,18 +12530,24 @@ function startLocationTracking(){
 function _handleVisibility(){
   if(document.hidden&&_watchId&&!_visibilityWarned){
     _visibilityWarned=true;
-    // Show floating warning banner
-    var w=document.getElementById('gps-bg-warn');
-    if(!w){
-      w=document.createElement('div');
-      w.id='gps-bg-warn';
-      w.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.3);text-align:center;max-width:320px;';
-      w.innerHTML='⚠️ GPS Background Warning<br><span style="font-weight:400;font-size:11px;">GPS stops when the browser is minimized. Keep the browser open for accurate route tracking.</span>';
-      document.body.appendChild(w);
-      setTimeout(function(){if(w&&w.parentNode)w.parentNode.removeChild(w);},8000);
+  }
+  if(!document.hidden){
+    _visibilityWarned=false;
+    // Page became visible (phone unlocked / tab switched back) — immediately save location
+    if(_watchId||_locInterval){
+      setTimeout(function(){
+        saveLocationEvent('track',null,_lastKnownLoc||null);
+      },500);
+    } else {
+      // Tracking stopped (phone was locked) — restart if still punched in
+      var pKey='punch_'+(currentUser&&(currentUser.user_id||currentUser.eng_id)||'');
+      var pData=JSON.parse(localStorage.getItem(pKey)||'null');
+      if(pData&&pData.punched_in&&(window._appIsEng||window._appIsWC)){
+        startLocationTracking();
+        setTimeout(function(){saveLocationEvent('track',null,null);},1000);
+      }
     }
   }
-  if(!document.hidden){_visibilityWarned=false;}
 }
 
 function stopLocationTracking(){
