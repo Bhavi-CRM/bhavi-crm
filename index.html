@@ -5432,7 +5432,7 @@ async function viewTicket(id,autoPrint=false){
     const isPendingArrival = t.status==='Pending Customer Arrival';
     const isPendingAlloc = t.status==='Pending Allocation';
     const isPendingApproval = t.status==='Pending Customer Approval';
-    const isRepaired = t.status==='Repaired';
+    const isRepaired = t.status==='Repaired'||t.status==='Pending for Delivery';
     const isCancelable = ['Pending Customer Arrival','Pending Allocation','Assigned'].includes(t.status);
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       ${isPendingArrival?`
