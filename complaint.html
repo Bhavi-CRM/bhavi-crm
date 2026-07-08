@@ -1456,7 +1456,7 @@ function renderShopGrid(){
   grid.innerHTML=_shopProds.map(function(p,i){
     var inCart=_cart.find(function(c){return c.id===p.id;});
     return '<div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;cursor:pointer;" onclick="viewProduct('+i+')">'
-      +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:130px;object-fit:cover;">'
+      +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;height:130px;object-fit:contain;background:#f8fafc;">'
         :'<div style="width:100%;height:90px;background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;font-size:36px;">📦</div>')
       +'<div style="padding:10px;flex:1;display:flex;flex-direction:column;">'
       +'<div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:3px;">'+escHtml(p.name)+'</div>'
@@ -1475,7 +1475,7 @@ function viewProduct(idx){
   var ov=document.createElement('div');ov.id='prod-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
   ov.innerHTML='<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;margin-top:8px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
-    +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:240px;object-fit:cover;">'
+    +(p.image_url?'<img src="'+escHtml(p.image_url)+'" style="width:100%;max-height:240px;object-fit:contain;background:#f8fafc;">'
       :'<div style="width:100%;height:100px;background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;font-size:48px;">📦</div>')
     +'<div style="padding:18px;">'
     +'<h2 style="margin:0 0 3px;font-size:17px;font-weight:800;">'+escHtml(p.name)+'</h2>'
