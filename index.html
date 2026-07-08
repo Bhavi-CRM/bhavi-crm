@@ -3804,8 +3804,10 @@ async function loadEngLiveStatus(){
     const engIds=engineers.map(e=>e.eng_id||e.user_id).filter(Boolean);
     let latestLocByEng={};
     try{
-      const locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+today+'&recorded_at=gte.'+twoHrsAgo+'&order=recorded_at.desc&limit=200');
-      (locs||[]).forEach(function(l){if(!latestLocByEng[l.eng_id])latestLocByEng[l.eng_id]=l;});
+      const locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+today+'&order=recorded_at.desc&limit=500');
+      (locs||[]).forEach(function(l){
+        if(l.eng_id&&!latestLocByEng[l.eng_id])latestLocByEng[l.eng_id]=l;
+      });
     }catch(e2){console.log('Location fetch error:',e2);}
 
     const rows=engineers.map(eng=>{
@@ -12511,7 +12513,7 @@ function startLocationTracking(){
     );
   }
 
-  // Save a point every 10 seconds using last known position (fast, no extra GPS call)
+  // Save a point every 5 seconds using last known position (fast, no extra GPS call)
   saveLocationEvent('track',null,null);
   _locInterval=setInterval(function(){
     if(_lastKnownLoc){
@@ -12519,7 +12521,7 @@ function startLocationTracking(){
     }else{
       saveLocationEvent('track');
     }
-  },10*1000);
+  },5*1000);
 
   // Warn when tab goes hidden — browsers throttle/stop GPS when minimized
   document.addEventListener('visibilitychange',_handleVisibility);
@@ -12643,7 +12645,7 @@ async function renderLiveMap(){
   var selDate=document.getElementById('lm-date')?.value||today;
   var locs=[];
   try{
-    locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+selDate+'&order=recorded_at.asc&limit=2000');
+    locs=await sb('engineer_locations','GET',null,'?session_date=eq.'+selDate+'&order=recorded_at.asc&limit=5000');
   }catch(e){pc.innerHTML+='<div class="alert alert-warning">Table not found — please run the SQL script</div>';return;}
 
   if(typeof L==='undefined'){pc.innerHTML+='<div class="alert alert-warning">Map library failed to load — please check your internet connection</div>';return;}
@@ -12730,17 +12732,8 @@ async function renderLiveMap(){
   else{pc.innerHTML+='';map.setView([23.0225,72.5714],11);}
 
   document.getElementById('lm-legend').innerHTML=legendHtml||'<span style="color:var(--text-muted);font-size:13px;">'+selDate+' — No location data found</span>';
-  // Auto-refresh every 30s when viewing today's map
-  if(window._liveMapRefresh)clearInterval(window._liveMapRefresh);
-  if(selDate===today){
-    window._liveMapRefresh=setInterval(function(){
-      if(document.getElementById('lm-map'))renderLiveMap();
-      else{clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
-    },15000);
-    // Show auto-refresh indicator
-    var leg=document.getElementById('lm-legend');
-    if(leg)leg.innerHTML+='<span style="font-size:11px;color:#6b7280;padding:4px 10px;background:#f1f5f9;border-radius:99px;">🔄 Auto-refresh every 15s</span>';
-  }
+  // Clear any previous auto-refresh (removed — manual refresh button is enough)
+  if(window._liveMapRefresh){clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
 
   // Summary table
   var summaryHtml='<div class="card"><div class="section-header"><h2>📊 Day Summary — '+selDate+'</h2></div>'
