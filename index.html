@@ -4704,13 +4704,12 @@ async function renderMyCalls(){
       try{
         const todayLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+todayStr+'&order=from_time.desc&limit=50');
         const rtoOpen=(todayLogs||[]).find(l=>l.to_time==='OPEN'&&(l.task_description||'').includes('Return to Office'));
-        const rtoDone=(todayLogs||[]).find(l=>l.to_time!=='OPEN'&&(l.task_description||'').includes('Return to Office'));
         if(rtoOpen){
           rtoHtml=`<div id="rto-bar" style="background:#1e3a5f;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
             <div style="color:#93c5fd;font-size:13px;font-weight:600;">🚗 Traveling to Office... (since ${rtoOpen.from_time})</div>
             <button onclick="reachedOffice('${rtoOpen.id}')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Reached Office</button>
           </div>`;
-        } else if(!rtoDone){
+        } else {
           rtoHtml=`<div id="rto-bar" style="background:#f0fdf4;border:1.5px solid #86efac;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
             <div style="color:#166534;font-size:13px;font-weight:600;">🏠 Heading back to office?</div>
             <button onclick="startReturnToOffice()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏠 Return to Office</button>
