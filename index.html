@@ -3026,14 +3026,17 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
       case 'Assigned': {
         const isCarryIn=(serviceType||'').toLowerCase().includes('carry');
         // Carry In: no Closed (must go Repaired → Delivered). On-Site: engineer goes to repair, no MSC.
-        return isCarryIn?['In Progress','Repaired','Sent to MSC']:['In Progress','Closed'];
+        // Call Cancel is always available to the engineer directly — e.g. customer not
+        // available at site, or charges not approved — no admin approval needed, just a
+        // mandatory reason (enforced via the required Action Taken field).
+        return isCarryIn?['In Progress','Repaired','Sent to MSC','Call Cancel']:['In Progress','Closed','Call Cancel'];
       }
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
-        if(isRepeat) return['Closed'];
+        if(isRepeat) return['Closed','Call Cancel'];
         // Carry In: Repaired + Sent to MSC. On-Site: only Closed (engineer repairs on location).
-        return isCarryIn?['Repaired','Sent to MSC']:['Closed'];
+        return isCarryIn?['Repaired','Sent to MSC','Call Cancel']:['Closed','Call Cancel'];
       }
 
       case 'Pending Parts':
@@ -3042,9 +3045,9 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         return[];
 
       case 'Pending Repair Carry In':
-        return['Repaired','Sent to MSC'];
+        return['Repaired','Sent to MSC','Call Cancel'];
       case 'Pending Repair On Site':
-        return['Closed','Sent to MSC'];
+        return['Closed','Sent to MSC','Call Cancel'];
 
       case 'Customer Approved':
         // OW approved — check parts
@@ -6556,7 +6559,9 @@ async function saveEngUpdate(){
   }
 
   const nowSave=new Date();
-  let tl=[...(t.timeline||[]),{action:'Updated — '+status,by:currentUser.name,at:nowSave.toISOString(),note:document.getElementById('upd-remarks')?.value||''}];
+  let tl=[...(t.timeline||[]),status==='Call Cancel'
+    ?{action:'Call Cancelled by Engineer',by:currentUser.name,at:nowSave.toISOString(),note:'Reason: '+workDone}
+    :{action:'Updated — '+status,by:currentUser.name,at:nowSave.toISOString(),note:document.getElementById('upd-remarks')?.value||''}];
   if(isManualTime){
     const mRem=(document.getElementById('manual-time-remark')?.value||'').trim();
     tl=[...tl,{action:'Manual Time Update',by:currentUser.name,at:nowSave.toISOString(),note:'Reason: '+mRem}];
