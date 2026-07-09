@@ -4188,8 +4188,10 @@ async function showPunchOutModal(ps,key){
   var ex=document.getElementById('punch-out-modal');
   if(ex)ex.remove();
   
-  // Carry-in engineers and Admin only — simple punch out without meter/selfie (WC now uses camera+GPS)
-  const _isSimplePunch=currentUser&&(currentUser.eng_type==='carryin'||currentUser.role==='admin');
+  // Admin only — simple punch out without meter/selfie/GPS. Everyone else (including
+  // carry-in engineers and WC) must go through the mandatory selfie+GPS flow below,
+  // same policy as Punch In. Admin doesn't punch in/out for attendance/tracking purposes.
+  const _isSimplePunch=currentUser&&currentUser.role==='admin';
   if(_isSimplePunch){
     var poutTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!confirm('Punch Out?\nTime: '+poutTime))return;
@@ -21367,9 +21369,11 @@ async function renderAttendanceReport(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
   var firstOfMonth=today.substring(0,8)+'01';
+  var isAdminHdr=currentUser.role==='admin'||window._isCspMgr;
   pc.innerHTML='<div class="card">'
-    +'<div class="section-header"><h2>🗓️ Attendance Report</h2>'
-    +'<button class="btn btn-primary btn-sm" onclick="downloadAttendanceExcel()">⬇ Download Excel</button></div>'
+    +'<div class="section-header"><h2>🗓️ Attendance Report</h2><div style="display:flex;gap:8px;">'
+    +(isAdminHdr?'<button class="btn btn-outline btn-sm" onclick="openAttAddModal()">➕ Add Attendance</button>':'')
+    +'<button class="btn btn-primary btn-sm" onclick="downloadAttendanceExcel()">⬇ Download Excel</button></div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
     +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="att-from" value="'+firstOfMonth+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="att-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
@@ -21436,13 +21440,14 @@ async function loadAttendanceReport(){
     var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1000px;">'
       +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
       +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
-      +'<th style="padding:8px;">Punch Out</th><th style="padding:8px;">Out Selfie</th>'
+      +'<th style="padding:8px;">Punch Out</th><th style="padding:8px;">Out Selfie</th><th style="padding:8px;">Out Location</th>'
       +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
     logs.forEach(function(l){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
       var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>'+(l.punch_in_accuracy?' <span style="font-size:10px;color:'+(l.punch_in_accuracy<=200?'#065f46':'#dc2626')+';">±'+l.punch_in_accuracy+'m</span>':''):'-';
+      var locOut=(l.punch_out_lat&&l.punch_out_lng)?'<a href="https://maps.google.com/?q='+l.punch_out_lat+','+l.punch_out_lng+'" target="_blank" style="color:#7c3aed;font-size:11px;">📍 Map</a>':'-';
       var pe=l.pending_edit;if(typeof pe==='string'){try{pe=JSON.parse(pe);}catch(e){pe=null;}}
       var statusBadge2=pe?'<span class="badge badge-pending">🕐 Edit Req</span>':l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
       var actionBtn='';
@@ -21457,7 +21462,7 @@ async function loadAttendanceReport(){
       var pendingBanner='';
       if(pe&&isAdmin){
         pendingBanner='<tr style="background:#fef3c7;">'
-          +'<td colspan="11" style="padding:8px 12px;font-size:12px;">'
+          +'<td colspan="12" style="padding:8px 12px;font-size:12px;">'
           +'<b>📝 Edit Request from '+l.eng_name+'</b> — Reason: <i>'+pe.reason+'</i><br>'
           +(pe.new_in?'New Punch In: <b>'+pe.new_in+'</b> ':'')
           +(pe.new_out?'New Punch Out: <b>'+pe.new_out+'</b>':'')
@@ -21473,6 +21478,7 @@ async function loadAttendanceReport(){
         +'<td style="padding:8px;text-align:center;">'+locIn+'</td>'
         +'<td style="padding:8px;white-space:nowrap;">'+(l.punch_out_time||'<span style="color:#dc2626;">—</span>')+'</td>'
         +'<td style="padding:8px;text-align:center;">'+photoOut+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+locOut+'</td>'
         +'<td style="padding:8px;text-align:center;font-weight:600;color:#065f46;">'+fmtM(l.working_minutes)+'</td>'
         +'<td style="padding:8px;text-align:center;color:'+(l.overtime_minutes>0?'#dc2626':'#64748b')+';">'+fmtM(l.overtime_minutes)+'</td>'
         +'<td style="padding:8px;">'+statusBadge2+'</td>'
@@ -21492,6 +21498,87 @@ function showPhotoFull(encodedSrc){
   ol.onclick=function(){ol.remove();};
   ol.innerHTML='<img src="'+src+'" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">';
   document.body.appendChild(ol);
+}
+
+// ---- Attendance Add (Admin manual backfill — e.g. app/GPS issue prevented a real punch in/out) ----
+async function openAttAddModal(){
+  var ex=document.getElementById('att-add-modal');if(ex)ex.remove();
+  var ol=document.createElement('div');
+  ol.id='att-add-modal';
+  ol.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  var today=new Date().toLocaleDateString('en-CA');
+  ol.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<h3 style="font-weight:700;font-size:16px;margin-bottom:4px;">➕ Add Attendance</h3>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:16px;">Manual entry — use only when a real punch in/out failed to save (app/GPS issue etc.)</p>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Employee</label>'
+    +'<select id="att-add-emp" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"><option value="">Loading...</option></select></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Date</label>'
+    +'<input type="date" id="att-add-date" value="'+today+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Punch In Time</label>'
+    +'<input type="time" id="att-add-in" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Punch Out Time <span style="color:#64748b;">(optional)</span></label>'
+    +'<input type="time" id="att-add-out" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;outline:none;"></div>'
+    +'<div class="form-group"><label style="font-size:12px;font-weight:600;">Reason (required)</label>'
+    +'<input type="text" id="att-add-remark" placeholder="e.g. App GPS issue - manually added" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:4px;">'
+    +'<button onclick="saveAttAdd()" style="flex:1;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">💾 Save</button>'
+    +'<button onclick="document.getElementById(\'att-add-modal\').remove()" style="flex:1;padding:10px;background:#f1f5f9;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(ol);
+  try{
+    var allUsers=await sb('users','GET',null,'?order=name');
+    // Exclude true admins only — WC accounts can be stored as role='admin' with
+    // role_type='work_controller', and those must still appear here.
+    var emps=(allUsers||[]).filter(function(e){return !(e.role==='admin'&&e.role_type!=='work_controller');});
+    var sel=document.getElementById('att-add-emp');
+    if(sel){
+      sel.innerHTML='<option value="">Select employee...</option>';
+      emps.forEach(function(e){var o=document.createElement('option');o.value=e.user_id;o.textContent=e.name;o.dataset.name=e.name;sel.appendChild(o);});
+    }
+  }catch(e){}
+}
+async function saveAttAdd(){
+  var empSel=document.getElementById('att-add-emp');
+  var empId=empSel?.value||'';
+  var empName=empSel?empSel.options[empSel.selectedIndex]?.dataset.name:'';
+  var date=document.getElementById('att-add-date')?.value||'';
+  var inT=document.getElementById('att-add-in')?.value||'';
+  var outT=document.getElementById('att-add-out')?.value||'';
+  var remark=document.getElementById('att-add-remark')?.value?.trim()||'';
+  if(!empId){alert('Select an employee');return;}
+  if(!date){alert('Select a date');return;}
+  if(!inT){alert('Punch In time is required');return;}
+  if(!remark){alert('Reason is required — this is a manual admin entry');return;}
+  try{
+    var existing=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(empId)+'&punch_in_date=eq.'+date+'&limit=1');
+    if(existing&&existing.length){alert('A record already exists for '+empName+' on '+date+'. Use Edit instead.');return;}
+  }catch(e){}
+  var fmt12=function(t){if(!t)return'';var p=t.split(':');var h=parseInt(p[0]);var m=p[1];var ampm=h>=12?'PM':'AM';h=h%12||12;return h+':'+m+' '+ampm;};
+  var wMins=0,otMins=0;
+  if(inT&&outT){
+    function toM(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
+    wMins=toM(outT)-toM(inT);if(wMins<0)wMins+=1440;
+    var ss=null;try{var sRes=await sb('shift_settings','GET',null,'?emp_id=eq.'+encodeURIComponent(empId)+'&limit=1');if(sRes&&sRes.length)ss=sRes[0];}catch(e){}
+    var shiftDur=ss?(toM(ss.shift_end)-toM(ss.shift_start)):480;
+    otMins=Math.max(0,wMins-shiftDur);
+  }
+  try{
+    await sb('punch_logs','POST',{
+      eng_id:empId,
+      eng_name:empName,
+      punch_in_time:fmt12(inT),
+      punch_in_date:date,
+      punch_out_time:outT?fmt12(outT):null,
+      punch_out_date:outT?date:null,
+      status:outT?'verified':'active',
+      working_minutes:wMins,overtime_minutes:otMins,
+      admin_remark:remark,
+      punch_in_photo:null,punch_in_lat:null,punch_in_lng:null,
+      punch_out_photo:null,punch_out_lat:null,punch_out_lng:null
+    });
+    document.getElementById('att-add-modal').remove();
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ---- Attendance Edit (Admin direct) ----
