@@ -12467,7 +12467,7 @@ function getLocation(minAccuracy, retries){
   if(_getLocationPromise)return _getLocationPromise;
   minAccuracy = minAccuracy || 200;
   retries = (retries === undefined) ? 3 : retries;
-  _getLocationPromise=new Promise(function(resolve){
+  var chain=new Promise(function(resolve){
     if(!navigator.geolocation){resolve(null);return;}
     var attempts=0;
     function tryOnce(){
@@ -12492,7 +12492,16 @@ function getLocation(minAccuracy, retries){
       );
     }
     tryOnce();
-  }).finally(function(){_getLocationPromise=null;});
+  });
+  // Hard safety-net timeout independent of the browser's own per-attempt timeout.
+  // Some Android/Chrome versions can fail to fire either the success or error
+  // callback at all (a known platform quirk, more likely indoors with a cold GPS
+  // fix) - without this, that single hang would permanently wedge the shared
+  // lock above and silently break every future GPS request in the session,
+  // including the Punch In modal's, with the submit button just staying
+  // disabled forever and no visible error.
+  var hardTimeout=new Promise(function(resolve){setTimeout(function(){resolve(null);},45000);});
+  _getLocationPromise=Promise.race([chain,hardTimeout]).finally(function(){_getLocationPromise=null;});
   return _getLocationPromise;
 }
 
