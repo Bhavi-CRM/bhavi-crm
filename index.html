@@ -5463,7 +5463,7 @@ async function viewTicket(id,autoPrint=false){
   const warrantyClaimBanner=t.warranty_claim_pending?`<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
     <div style="font-weight:700;color:#b45309;font-size:14px;">🛡️ Warranty Claim — Awaiting Approval</div>
     <div style="font-size:12px;color:#78716c;margin-top:4px;">${escHtml(t.warranty_claim_note||'')} &nbsp;|&nbsp; Submitted by: <b>${escHtml(t.warranty_claim_by||'')}</b></div>
-    ${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<div style="display:flex;gap:8px;margin-top:10px;">
+    ${(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)?`<div style="display:flex;gap:8px;margin-top:10px;">
       <button class="btn btn-success btn-sm" onclick="approveWarrantyClaim('${t.id}')">✅ Approve — Convert to Warranty</button>
       <button class="btn btn-danger btn-sm" onclick="rejectWarrantyClaim('${t.id}')">❌ Reject</button>
     </div>`:'<div style="font-size:12px;color:#d97706;margin-top:6px;">⏳ Waiting for WC/Admin approval.</div>'}
@@ -6318,7 +6318,7 @@ async function approveWarrantyClaim(id){
     const tl=[...(t?.timeline||[]),{action:'Warranty Claim Approved',by:currentUser.name,at:new Date().toISOString(),note:'Call converted to Warranty by '+currentUser.name}];
     await sb('tickets','PATCH',{call_type:'Warranty',warranty_coverage:'In Warranty',service_charges:0,final_charges:0,warranty_claim_pending:false,warranty_claim_approved:true,warranty_claim_approved_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     showToastWI('✅ Warranty approved — call converted to Warranty.');
-    closeModal('modal-ticket-detail');renderAllTickets?renderAllTickets():renderDashboard();
+    closeModal('modal-ticket');renderAllTickets?renderAllTickets():renderDashboard();
   }catch(e){alert('Error: '+e.message);}
 }
 async function rejectWarrantyClaim(id){
@@ -6329,7 +6329,7 @@ async function rejectWarrantyClaim(id){
     const tl=[...(t?.timeline||[]),{action:'Warranty Claim Rejected',by:currentUser.name,at:new Date().toISOString(),note:reason||'Rejected by WC/Admin'}];
     await sb('tickets','PATCH',{warranty_claim_pending:false,warranty_claim_approved:false,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     showToastWI('Warranty claim rejected.');
-    closeModal('modal-ticket-detail');renderAllTickets?renderAllTickets():renderDashboard();
+    closeModal('modal-ticket');renderAllTickets?renderAllTickets():renderDashboard();
   }catch(e){alert('Error: '+e.message);}
 }
 async function engVoidWarranty(id){
@@ -12147,10 +12147,28 @@ async function drAutoFillCalls(){
   try{
     var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
     var engId=currentUser.eng_id||currentUser.user_id;
-    // Closed calls: fetch by updated_at (closed today)
-    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&updated_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
+    // Closed calls: fetch by updated_at (touched today) — but see filter below,
+    // touched-today is only a candidate net, not proof the call was actually
+    // closed/repaired today.
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&updated_at=lte.'+date+'T23:59:59&select=call_type,problem,status,timeline').catch(()=>[]);
     if(!tickets||!tickets.length){
-      tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status').catch(()=>[]);
+      tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status,timeline').catch(()=>[]);
+    }
+    // A ticket's updated_at bumps on ANY edit (e.g. WC adding an invoice number
+    // to an old call weeks later) — that must not make it count as "closed
+    // today". Only count if the engineer's own most recent Closed/Repaired
+    // timeline event actually happened today. A later re-assign + re-close
+    // creates a fresh timeline entry with today's date, so that correctly
+    // still counts.
+    function closedRepairedToday(t){
+      var keyword=t.status==='Closed'?'Closed':(t.status==='Pending for Delivery'?'Repaired':null);
+      if(!keyword)return false;
+      var tl=t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+      if(!Array.isArray(tl))return false;
+      var lastMatch=null;
+      tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf(keyword)!==-1&&entry.at)lastMatch=entry;});
+      if(!lastMatch)return false;
+      return new Date(lastMatch.at).toLocaleDateString('en-CA')===date;
     }
     // Pending calls: engineer visited today (visit_date=today) but still pending
     var pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&visit_date=eq.'+date+'&select=status').catch(()=>[]);
@@ -12162,6 +12180,7 @@ async function drAutoFillCalls(){
       var status=(t.status||'').toLowerCase();
       if(status.includes('cancel'))return; // skip cancelled
       if(!status.includes('close')&&!status.includes('pending for delivery')&&!status.includes('repaired'))return; // only completed calls
+      if(!closedRepairedToday(t))return; // only count if actually closed/repaired today, not just edited today
       if(ct==='Warranty'){
         if(prob.includes('install')||prob.includes('new set'))wInstall++;
         else wBreakdown++;
@@ -14004,7 +14023,8 @@ document.addEventListener('mouseup',function(e){
   }
 },true);
 function closeModal(id){
-  document.getElementById(id).classList.add('hidden');
+  var el=document.getElementById(id);
+  if(el)el.classList.add('hidden');
   if(id==='modal-eng-update')currentSpares=[];
   if(id==='modal-payment'){var si=document.getElementById('modal-site-items');if(si)si.style.display='';}
 }
@@ -21405,6 +21425,38 @@ function clearTrash(){
 }
 
 // ===== ATTENDANCE REPORT =====
+// Shared by the on-screen table and the Excel export so the two can never
+// drift apart — one source of truth for Office Hours / Late-Early / Adjust Hours.
+function attToMin(t){
+  if(!t)return null;
+  var s=String(t).trim();var isPM=/pm/i.test(s);var isAM=/am/i.test(s);
+  var clean=s.replace(/[^0-9:]/g,'');var p=clean.split(':');
+  var h=parseInt(p[0]);var m=parseInt(p[1])||0;
+  if(isNaN(h))return null;
+  if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;
+  return h*60+m;
+}
+// Returns {officeMin, shortfall, adjustMin} or null if not computable (missing
+// shift settings or punch times) — never guesses a number when data is absent.
+// Extra time worked outside shift hours (evening stay-back or early arrival)
+// offsets late-in/early-out on the SAME day only, up to the shortfall amount.
+function computeAttExtras(l, shiftMap){
+  var shift=shiftMap[l.eng_id];
+  if(!shift||!shift.shift_start||!shift.shift_end||!l.punch_in_time||!l.punch_out_time)return null;
+  var shiftStart=attToMin(shift.shift_start),shiftEnd=attToMin(shift.shift_end);
+  var actIn=attToMin(l.punch_in_time),actOut=attToMin(l.punch_out_time);
+  if(shiftStart==null||shiftEnd==null||actIn==null||actOut==null||shiftEnd<=shiftStart)return null;
+  var shiftMinsRow=shiftEnd-shiftStart;
+  var lateIn=Math.max(0,actIn-shiftStart);
+  var earlyOut=Math.max(0,shiftEnd-actOut);
+  var shortfall=lateIn+earlyOut;
+  var surplus=Math.max(0,actOut-shiftEnd)+Math.max(0,shiftStart-actIn);
+  var adjustMin=Math.min(shortfall,surplus);
+  var officeMin=Math.max(0,Math.min(shiftMinsRow,shiftMinsRow-(shortfall-adjustMin)));
+  return {officeMin:officeMin,shortfall:shortfall,adjustMin:adjustMin};
+}
+function fmtAttMin(m){return Math.floor(m/60)+'h '+(m%60)+'m';}
+
 async function renderAttendanceReport(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
@@ -21462,6 +21514,10 @@ async function loadAttendanceReport(){
   try{
     var logs=await sb('punch_logs','GET',null,q);
     window._attLogs=logs;
+    // Shift settings per employee — needed for Office Hours / Late-Early / Adjust Hours columns
+    var allShifts=await sb('shift_settings','GET',null,'').catch(function(){return[];});
+    var shiftMap={};(allShifts||[]).forEach(function(s){shiftMap[s.emp_id]=s;});
+    window._attShiftMap=shiftMap; // reused by downloadAttendanceExcel
     // Summary KPIs
     var totalDays=logs.length;
     var totalWorkMins=logs.reduce(function(a,l){return a+(l.working_minutes||0);},0);
@@ -21481,13 +21537,23 @@ async function loadAttendanceReport(){
       +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
       +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
       +'<th style="padding:8px;">Punch Out</th><th style="padding:8px;">Out Selfie</th><th style="padding:8px;">Out Location</th>'
-      +'<th style="padding:8px;">Work Time</th><th style="padding:8px;">Overtime</th><th style="padding:8px;">Status</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
+      +'<th style="padding:8px;">Actual Work (incl. OT)</th><th style="padding:8px;">Overtime</th>'
+      +'<th style="padding:8px;">Office Hours</th><th style="padding:8px;">Late/Early Punch</th><th style="padding:8px;">Adjust Hours</th>'
+      +'<th style="padding:8px;">Status</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
     logs.forEach(function(l){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
       var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>'+(l.punch_in_accuracy?' <span style="font-size:10px;color:'+(l.punch_in_accuracy<=200?'#065f46':'#dc2626')+';">±'+l.punch_in_accuracy+'m</span>':''):'-';
       var locOut=(l.punch_out_lat&&l.punch_out_lng)?'<a href="https://maps.google.com/?q='+l.punch_out_lat+','+l.punch_out_lng+'" target="_blank" style="color:#7c3aed;font-size:11px;">📍 Map</a>':'-';
+      // Office Hours / Late-Early Punch / Adjust Hours — see computeAttExtras()
+      var officeHoursHtml='-',lateEarlyHtml='-',adjustHtml='-';
+      var extras=computeAttExtras(l,shiftMap);
+      if(extras){
+        officeHoursHtml=fmtAttMin(extras.officeMin);
+        lateEarlyHtml=extras.shortfall>0?('<span style="color:#dc2626;">'+fmtAttMin(extras.shortfall)+'</span>'):'-';
+        adjustHtml=extras.adjustMin>0?('<span style="color:#059669;">'+fmtAttMin(extras.adjustMin)+'</span>'):'-';
+      }
       var pe=l.pending_edit;if(typeof pe==='string'){try{pe=JSON.parse(pe);}catch(e){pe=null;}}
       var statusBadge2=pe?'<span class="badge badge-pending">🕐 Edit Req</span>':l.is_late?'<span class="badge badge-pending">⚠️ Late</span>':l.status==='verified'?'<span class="badge badge-closed">✅ OK</span>':'<span class="badge badge-open">Active</span>';
       var actionBtn='';
@@ -21502,7 +21568,7 @@ async function loadAttendanceReport(){
       var pendingBanner='';
       if(pe&&isAdmin){
         pendingBanner='<tr style="background:#fef3c7;">'
-          +'<td colspan="12" style="padding:8px 12px;font-size:12px;">'
+          +'<td colspan="15" style="padding:8px 12px;font-size:12px;">'
           +'<b>📝 Edit Request from '+l.eng_name+'</b> — Reason: <i>'+pe.reason+'</i><br>'
           +(pe.new_in?'New Punch In: <b>'+pe.new_in+'</b> ':'')
           +(pe.new_out?'New Punch Out: <b>'+pe.new_out+'</b>':'')
@@ -21521,6 +21587,9 @@ async function loadAttendanceReport(){
         +'<td style="padding:8px;text-align:center;">'+locOut+'</td>'
         +'<td style="padding:8px;text-align:center;font-weight:600;color:#065f46;">'+fmtM(l.working_minutes)+'</td>'
         +'<td style="padding:8px;text-align:center;color:'+(l.overtime_minutes>0?'#dc2626':'#64748b')+';">'+fmtM(l.overtime_minutes)+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+officeHoursHtml+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+lateEarlyHtml+'</td>'
+        +'<td style="padding:8px;text-align:center;">'+adjustHtml+'</td>'
         +'<td style="padding:8px;">'+statusBadge2+'</td>'
         +'<td style="padding:8px;text-align:center;">'+actionBtn+'</td>'
         +'</tr>'
@@ -21763,14 +21832,27 @@ async function downloadAttendanceExcel(){
   var logs=window._attLogs||[];
   if(!logs.length){alert('Please search first');return;}
   function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
-  var data=logs.map(function(l){return{
-    'Employee':l.eng_name,'Date':l.punch_in_date,
-    'Punch In':l.punch_in_time||'-','Punch Out':l.punch_out_time||'-',
-    'Work Time':fmtM(l.working_minutes),'Overtime':fmtM(l.overtime_minutes),
-    'Start Meter':l.start_meter||'-','End Meter':l.end_meter||'-',
-    'In Location':(l.punch_in_lat&&l.punch_in_lng)?l.punch_in_lat+','+l.punch_in_lng:'-',
-    'Status':l.is_late?'Late':l.status||'-'
-  };});
+  // Reuse the shift map from the last on-screen load if available, else fetch fresh
+  var shiftMap=window._attShiftMap;
+  if(!shiftMap){
+    var allShifts=await sb('shift_settings','GET',null,'').catch(function(){return[];});
+    shiftMap={};(allShifts||[]).forEach(function(s){shiftMap[s.emp_id]=s;});
+  }
+  var data=logs.map(function(l){
+    var extras=computeAttExtras(l,shiftMap);
+    return{
+      'Employee':l.eng_name,'Date':l.punch_in_date,
+      'Punch In':l.punch_in_time||'-','Punch Out':l.punch_out_time||'-',
+      'Actual Work (incl. OT)':fmtM(l.working_minutes),'Overtime':fmtM(l.overtime_minutes),
+      'Office Hours':extras?fmtAttMin(extras.officeMin):'-',
+      'Late/Early Punch':extras&&extras.shortfall>0?fmtAttMin(extras.shortfall):'-',
+      'Adjust Hours':extras&&extras.adjustMin>0?fmtAttMin(extras.adjustMin):'-',
+      'Start Meter':l.start_meter||'-','End Meter':l.end_meter||'-',
+      'In Location':(l.punch_in_lat&&l.punch_in_lng)?l.punch_in_lat+','+l.punch_in_lng:'-',
+      'Out Location':(l.punch_out_lat&&l.punch_out_lng)?l.punch_out_lat+','+l.punch_out_lng:'-',
+      'Status':l.is_late?'Late':l.status||'-'
+    };
+  });
   if(typeof XLSX==='undefined'){alert('Excel library failed to load');return;}
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Attendance');
