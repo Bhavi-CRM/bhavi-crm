@@ -12830,8 +12830,24 @@ async function renderLiveMap(){
     engMap[l.eng_id].latest=l;
   });
 
-  var colors=['#1d4ed8','#e74c3c','#27ae60','#f39c12','#8e44ad','#16a085','#d35400','#2c3e50'];
-  var colorIdx=0;
+  // Fixed color per engineer (by first name) so the same person always gets the
+  // same color and two people never accidentally clash on a given day.
+  var namedColors={
+    'yogesh':'#2563eb',   // Blue
+    'shailesh':'#dc2626', // Red
+    'hiren':'#16a34a',    // Green
+    'jay':'#ec4899',      // Pink
+    'gaurav':'#111827',   // Black
+    'dharmesh':'#fb923c', // Light Orange
+    'anjana':'#6b7280'    // Gray
+  };
+  var fallbackColors=['#7c3aed','#0891b2','#ca8a04','#4338ca','#92400e','#0e7490','#a21caf'];
+  var fallbackIdx=0;
+  function colorForEng(name){
+    var first=(name||'').trim().split(' ')[0].toLowerCase();
+    if(namedColors[first])return namedColors[first];
+    var c=fallbackColors[fallbackIdx%fallbackColors.length];fallbackIdx++;return c;
+  }
   var bounds=[];
   var legendHtml='';
 
@@ -12844,7 +12860,7 @@ async function renderLiveMap(){
 
   Object.keys(engMap).forEach(function(eid){
     var eng=engMap[eid];
-    var color=colors[colorIdx%colors.length];colorIdx++;
+    var color=colorForEng(eng.name);
 
     // Calculate total KM: only count if moved >100m (ignore GPS drift) and <5km (ignore GPS error jumps)
     var totalKm=0;
