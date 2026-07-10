@@ -4158,7 +4158,10 @@ async function doSavePunchIn(loc){
   const today=new Date().toLocaleDateString('en-CA');
   const now=new Date();
   const ps={punched_in:true,punch_in_time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),punch_in_date:today,start_meter:'',end_meter:''};
-  localStorage.setItem(key,JSON.stringify(ps));
+  // Save to server FIRST — only mark punched-in locally and celebrate once it's
+  // actually confirmed in the database. Previously this always showed "success"
+  // even when the save silently failed (e.g. a schema mismatch), so engineers
+  // and admin both believed punch-in worked when nothing had actually saved.
   try{
     await sb('punch_logs','POST',{
       eng_id:currentUser.eng_id||currentUser.user_id,
@@ -4171,7 +4174,12 @@ async function doSavePunchIn(loc){
       punch_in_lng:loc?loc.lng:null,
       punch_in_accuracy:loc?loc.accuracy:null
     });
-  }catch(e){console.log('Punch log save error:',e);}
+  }catch(e){
+    console.log('Punch log save error:',e);
+    alert('❌ Punch In FAILED to save!\n\n'+(e.message||'Unknown error')+'\n\nPlease try again, or contact Admin if this keeps happening.');
+    return;
+  }
+  localStorage.setItem(key,JSON.stringify(ps));
   saveLocationEvent('punch_in');
   startLocationTracking();
   startWorkLogReminder();
@@ -4459,7 +4467,11 @@ async function savePunchOut(key){
     }
     // Clear localStorage
     localStorage.removeItem(key);
-  }catch(e){console.log('Punch out save error:',e);}
+  }catch(e){
+    console.log('Punch out save error:',e);
+    alert('❌ Punch Out FAILED to save!\n\n'+(e.message||'Unknown error')+'\n\nPlease try again, or contact Admin if this keeps happening.');
+    return;
+  }
 
   saveLocationEvent('punch_out');
   stopLocationTracking();
@@ -6286,7 +6298,7 @@ async function submitWarrantyClaim(){
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
     const tl=[...(t?.timeline||[]),{action:'Warranty Claim Submitted',by:currentUser.name,at:new Date().toISOString(),note:'Invoice: '+invoice+(note?' | '+note:'')}];
-    await sb('tickets','PATCH',{warranty_claim_pending:true,warranty_claim_by:currentUser.name,warranty_claim_note:'Invoice: '+invoice+(note?' | '+note:''),warranty_claim_at:new Date().toISOString(),timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    await sb('tickets','PATCH',{warranty_claim_pending:true,warranty_claim_by:currentUser.name,warranty_claim_note:'Invoice: '+invoice+(note?' | '+note:''),timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     // Send Telegram + Email alert via Edge Function
     fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
