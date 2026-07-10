@@ -21460,14 +21460,13 @@ function fmtAttMin(m){return Math.floor(m/60)+'h '+(m%60)+'m';}
 async function renderAttendanceReport(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
-  var firstOfMonth=today.substring(0,8)+'01';
   var isAdminHdr=currentUser.role==='admin'||window._isCspMgr;
   pc.innerHTML='<div class="card">'
     +'<div class="section-header"><h2>🗓️ Attendance Report</h2><div style="display:flex;gap:8px;">'
     +(isAdminHdr?'<button class="btn btn-outline btn-sm" onclick="openAttAddModal()">➕ Add Attendance</button>':'')
     +'<button class="btn btn-primary btn-sm" onclick="downloadAttendanceExcel()">⬇ Download Excel</button></div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
-    +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="att-from" value="'+firstOfMonth+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="att-from" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
     +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="att-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
     +((currentUser.role==='admin'||window._isCspMgr)?'<div class="form-group" style="margin-bottom:0;"><label>Employee</label><select id="att-emp" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"><option value="">All</option></select></div>':'')
     +'<button class="btn btn-primary btn-sm" onclick="loadAttendanceReport()" style="margin-bottom:0;height:36px;">🔍 Search</button>'
@@ -21497,6 +21496,7 @@ function attQuick(type){
 }
 
 async function loadAttendanceReport(){
+  var today=new Date().toLocaleDateString('en-CA');
   var from=document.getElementById('att-from')?.value||'';
   var to=document.getElementById('att-to')?.value||'';
   var emp=document.getElementById('att-emp')?.value||'';
@@ -21518,21 +21518,78 @@ async function loadAttendanceReport(){
     var allShifts=await sb('shift_settings','GET',null,'').catch(function(){return[];});
     var shiftMap={};(allShifts||[]).forEach(function(s){shiftMap[s.emp_id]=s;});
     window._attShiftMap=shiftMap; // reused by downloadAttendanceExcel
-    // Summary KPIs
+
+    // "Today, all employees" roster mode — when admin views a single day with no
+    // employee filter, show every active employee as a row (present or not),
+    // not just the ones who happened to punch in already. Absent-so-far
+    // employees show blank/'-' and fill in live as they punch in/out.
+    var isRosterMode=isAdminView&&!emp&&from&&from===to;
+    var rosterRows=[];
+    if(isRosterMode){
+      try{
+        var allUsers=await sb('users','GET',null,'?is_active=eq.true&order=name');
+        var punchedIds={};logs.forEach(function(l){punchedIds[l.eng_id]=true;});
+        (allUsers||[]).filter(function(u){return!(u.role==='admin'&&u.role_type!=='work_controller');})
+          .forEach(function(u){
+            var uid=u.eng_id||u.user_id;
+            if(!punchedIds[uid])rosterRows.push({_notPunched:true,eng_id:uid,eng_name:u.name,punch_in_date:from});
+          });
+      }catch(e){}
+    }
+    var effectiveEmpId=isAdminView?emp:myId;
+    var showLeaves=effectiveEmpId&&from&&to&&from!==to;
+
+    // Summary KPIs — computed from the REAL punch_logs rows only (never the
+    // roster placeholders), so Days Present etc. stay accurate.
     var totalDays=logs.length;
     var totalWorkMins=logs.reduce(function(a,l){return a+(l.working_minutes||0);},0);
     var totalOTMins=logs.reduce(function(a,l){return a+(l.overtime_minutes||0);},0);
     var lateCount=logs.filter(function(l){return l.is_late;}).length;
+    var totalOfficeMins=0,totalShortfallMins=0,totalAdjustMins=0;
+    logs.forEach(function(l){
+      var ex=computeAttExtras(l,shiftMap);
+      if(ex){totalOfficeMins+=ex.officeMin;totalShortfallMins+=ex.shortfall;totalAdjustMins+=ex.adjustMin;}
+    });
     function fmtH(m){return Math.floor(m/60)+'h '+(m%60)+'m';}
+
+    // Leaves — only meaningful for a single employee over a multi-day range.
+    // Counts calendar days in [from, min(to, today)] that aren't that
+    // employee's weekly off and have no punch_logs row.
+    var leavesCount=null;
+    if(showLeaves){
+      var empShift=shiftMap[effectiveEmpId];
+      var offDays=(empShift&&empShift.weekly_off&&empShift.weekly_off!=='None')?empShift.weekly_off.split(','):['Sunday'];
+      var presentDates={};logs.forEach(function(l){if(l.eng_id===effectiveEmpId)presentDates[l.punch_in_date]=true;});
+      var rangeEnd=to<today?to:today;
+      var dNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      var cursor=new Date(from+'T00:00:00');var endD=new Date(rangeEnd+'T00:00:00');
+      var workingDays=0,presentInRange=0;
+      while(cursor<=endD){
+        var iso=cursor.toLocaleDateString('en-CA');
+        var wd=dNames[cursor.getDay()];
+        if(offDays.indexOf(wd)===-1){
+          workingDays++;
+          if(presentDates[iso])presentInRange++;
+        }
+        cursor.setDate(cursor.getDate()+1);
+      }
+      leavesCount=Math.max(0,workingDays-presentInRange);
+    }
+
     if(sumDiv)sumDiv.innerHTML=
       '<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1d4ed8;">'+totalDays+'</div><div style="font-size:11px;color:#64748b;">Days Present</div></div>'
-      +'<div style="background:#f0fdf4;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#065f46;">'+fmtH(totalWorkMins)+'</div><div style="font-size:11px;color:#64748b;">Total Work</div></div>'
+      +(leavesCount!=null?'<div style="background:#fdf2f8;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#be185d;">'+leavesCount+'</div><div style="font-size:11px;color:#64748b;">Leaves</div></div>':'')
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#065f46;">'+fmtH(totalWorkMins)+'</div><div style="font-size:11px;color:#64748b;">Actual Work Total</div></div>'
       +'<div style="background:#fff8e1;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#92400e;">'+fmtH(totalOTMins)+'</div><div style="font-size:11px;color:#64748b;">Overtime</div></div>'
+      +'<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1d4ed8;">'+fmtH(totalOfficeMins)+'</div><div style="font-size:11px;color:#64748b;">Office Hours Total</div></div>'
+      +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+fmtH(totalShortfallMins)+'</div><div style="font-size:11px;color:#64748b;">Late/Early Total</div></div>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#059669;">'+fmtH(totalAdjustMins)+'</div><div style="font-size:11px;color:#64748b;">Adjust Hours Total</div></div>'
       +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>';
     // Table
-    if(!logs.length){wrap.innerHTML='<div class="alert alert-info">No records found</div>';return;}
+    if(!logs.length&&!rosterRows.length){wrap.innerHTML='<div class="alert alert-info">No records found</div>';return;}
     var isAdmin=currentUser.role==='admin'||window._isCspMgr;
     var isEmp=!isAdmin&&currentUser.role==='engineer';
+    var displayRows=logs.concat(rosterRows);
     var html='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1000px;">'
       +'<thead><tr style="background:var(--bg);"><th style="padding:8px;text-align:left;">Employee</th><th style="padding:8px;">Date</th>'
       +'<th style="padding:8px;">Punch In</th><th style="padding:8px;">In Selfie</th><th style="padding:8px;">In Location</th>'
@@ -21540,8 +21597,21 @@ async function loadAttendanceReport(){
       +'<th style="padding:8px;">Actual Work (incl. OT)</th><th style="padding:8px;">Overtime</th>'
       +'<th style="padding:8px;">Office Hours</th><th style="padding:8px;">Late/Early Punch</th><th style="padding:8px;">Adjust Hours</th>'
       +'<th style="padding:8px;">Status</th><th style="padding:8px;">Action</th></tr></thead><tbody>';
-    logs.forEach(function(l){
+    displayRows.forEach(function(l){
       function fmtM(m){if(!m)return'-';return Math.floor(m/60)+'h '+(m%60)+'m';}
+      if(l._notPunched){
+        html+='<tr style="border-bottom:1px solid var(--border);opacity:0.55;">'
+          +'<td style="padding:8px;font-weight:600;">'+l.eng_name+'</td>'
+          +'<td style="padding:8px;white-space:nowrap;">'+l.punch_in_date+'</td>'
+          +'<td style="padding:8px;">-</td><td style="padding:8px;text-align:center;">-</td><td style="padding:8px;text-align:center;">-</td>'
+          +'<td style="padding:8px;">-</td><td style="padding:8px;text-align:center;">-</td><td style="padding:8px;text-align:center;">-</td>'
+          +'<td style="padding:8px;text-align:center;">-</td><td style="padding:8px;text-align:center;">-</td>'
+          +'<td style="padding:8px;text-align:center;">-</td><td style="padding:8px;text-align:center;">-</td><td style="padding:8px;text-align:center;">-</td>'
+          +'<td style="padding:8px;"><span class="badge badge-open" style="background:#f1f5f9;color:#64748b;">Not Punched In</span></td>'
+          +'<td style="padding:8px;"></td>'
+          +'</tr>';
+        return;
+      }
       var photoIn=l.punch_in_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_in_photo)+'\')" style="padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var photoOut=l.punch_out_photo?'<button onclick="showPhotoFull(\''+encodeURIComponent(l.punch_out_photo)+'\')" style="padding:4px 10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">👁️ View</button>':'-';
       var locIn=(l.punch_in_lat&&l.punch_in_lng)?'<a href="https://maps.google.com/?q='+l.punch_in_lat+','+l.punch_in_lng+'" target="_blank" style="color:#1d4ed8;font-size:11px;">📍 Map</a>'+(l.punch_in_accuracy?' <span style="font-size:10px;color:'+(l.punch_in_accuracy<=200?'#065f46':'#dc2626')+';">±'+l.punch_in_accuracy+'m</span>':''):'-';
