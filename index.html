@@ -5545,6 +5545,7 @@ async function viewTicket(id,autoPrint=false){
       <div><h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">CALL INFO</h3>
         <div style="font-size:13px;line-height:1.9;">Model: <b>${t.model}</b><br>Serial: <b>${t.serial}</b><br>
         Type: ${t.call_type} | ${t.service_type}<br>
+        ${t.se_call_id?'SE Call ID: <b>'+t.se_call_id+'</b><br>':''}
         Engineer: <b>${t.assigned_name||'<span style="color:var(--danger);">Unassigned</span>'}</b><br>
         Status: ${statusBadge(t.status)}</div>
       </div>
@@ -11371,6 +11372,7 @@ async function openReportEditModal(ticketId){
   setVal('call-desc',t.description||'');
   setVal('call-condition',t.condition||'');
   setVal('call-accessories',t.accessories||'');
+  setVal('call-phys-js',t.phys_js||'');
   // Address: split back if combined
   const addr=(t.address||'').split(', ');
   setVal('call-address',addr[0]||'');
@@ -11386,11 +11388,16 @@ async function openReportEditModal(ticketId){
   // Pin
   const pinEl=document.getElementById('call-pin');
   if(pinEl){pinEl.value=t.pin||'';pinEl.dataset.pin=t.pin||'';}
-  // Brand — find matching option
+  // Brand — find matching option. selectBrandFromDrop() always clears the Model
+  // field as a side effect (correct for the New Call flow, where changing brand
+  // should reset an incompatible model) — so restore Model afterward, same
+  // pattern used elsewhere when calling it programmatically.
   const brandEl=document.getElementById('call-brand-input');
   if(brandEl&&t.brand_name){
-    Array.from(brandEl.options).forEach(o=>{if(o.text===t.brand_name)o.selected=true;});
-    selectBrandFromDrop(brandEl.value,t.brand_name);
+    const wanted=t.brand_name.trim().toLowerCase();
+    Array.from(brandEl.options).forEach(o=>{if(o.text.trim().toLowerCase()===wanted)o.selected=true;});
+    selectBrandFromDrop(brandEl.value,brandEl.options[brandEl.selectedIndex]?.text||t.brand_name);
+    setTimeout(()=>{setVal('call-model',t.model||'');},60);
   }
   // Service charges
   setVal('call-service-charges',t.labor||0);
