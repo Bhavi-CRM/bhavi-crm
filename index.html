@@ -3904,8 +3904,18 @@ function showKpiDetail(title,tickets){
   document.body.appendChild(ov);
 }
 
+// Office/reception logins — not real people, no attendance/punch tracking needed.
+var ATT_EXCLUDED_IDS=['WC001','WC002','ENG008'];
+// Office logins that don't need continuous live GPS tracking. ACCT001 (the
+// accountant) still punches in/out with mandatory selfie+GPS like everyone
+// else - this only stops the ongoing tracking interval from starting after,
+// so she never appears on the Live Map. WC001/WC002 never punch in at all
+// (see ATT_EXCLUDED_IDS), so this only meaningfully applies to ACCT001.
+var LIVE_TRACKING_EXCLUDED_IDS=['WC001','WC002','ACCT001'];
+
 // PUNCH IN/OUT - Point 4
 async function doPunchIn(){
+  if(ATT_EXCLUDED_IDS.includes(currentUser.eng_id||currentUser.user_id)){alert('This account does not require Punch In.');return;}
   const key='punch_'+currentUser.user_id;
   const today=new Date().toLocaleDateString('en-CA');
   try{
@@ -3920,8 +3930,10 @@ async function doPunchIn(){
     }
   }catch(e){console.log('Punch check error:',e);}
 
-  // Admin only — simple punch in without camera/selfie/meter (WC now uses camera+GPS like engineers)
-  const _isSimpleIn=currentUser&&(currentUser.role==='admin');
+  // True admin only — simple punch in without camera/selfie/meter. ACCT001 has
+  // role='admin' too (for other permissions) but is a real staff member who
+  // must punch in with selfie+GPS like everyone else, so is excluded here.
+  const _isSimpleIn=currentUser&&currentUser.role==='admin'&&!window._isAcct;
   if(_isSimpleIn){
     var pinTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!confirm('Punch In?\nTime: '+pinTime))return;
@@ -4188,6 +4200,7 @@ async function doSavePunchIn(loc){
   navigate(currentUser&&currentUser.role==='engineer'?'my-calls':'dashboard');
 }
 function doPunchOut(){
+  if(ATT_EXCLUDED_IDS.includes(currentUser.eng_id||currentUser.user_id)){alert('This account does not require Punch Out.');return;}
   const key=`punch_${currentUser.user_id}`;
   const ps=JSON.parse(localStorage.getItem(key)||'null');
   if(!ps||!ps.punched_in){alert('Please Punch In first');return;}
@@ -4199,10 +4212,10 @@ async function showPunchOutModal(ps,key){
   var ex=document.getElementById('punch-out-modal');
   if(ex)ex.remove();
   
-  // Admin only — simple punch out without meter/selfie/GPS. Everyone else (including
-  // carry-in engineers and WC) must go through the mandatory selfie+GPS flow below,
-  // same policy as Punch In. Admin doesn't punch in/out for attendance/tracking purposes.
-  const _isSimplePunch=currentUser&&currentUser.role==='admin';
+  // True admin only — simple punch out without meter/selfie/GPS. Everyone else
+  // (including carry-in engineers, WC, and ACCT001) must go through the
+  // mandatory selfie+GPS flow below, same policy as Punch In.
+  const _isSimplePunch=currentUser&&currentUser.role==='admin'&&!window._isAcct;
   if(_isSimplePunch){
     var poutTime=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!confirm('Punch Out?\nTime: '+poutTime))return;
@@ -8168,6 +8181,29 @@ async function runFilteredReport(){
     if(service) q+=`&service_type=eq.${encodeURIComponent(service)}`;
     
     let tickets=await sbAll('tickets',q);
+
+    // "Closed Date" filtering used updated_at directly, which bumps on ANY edit
+    // (e.g. WC adding an invoice number weeks after the real close) - that
+    // doesn't mean the ticket's status actually changed within this date range.
+    // Verify against the ticket's own timeline: find the most recent entry
+    // whose action mentions the ticket's current status (covers every status
+    // label variant used across the app - "Updated — Closed", "Force Status →
+    // Closed", "Call Cancelled by Engineer", "Closed (Back-Date)", etc., since
+    // they all embed the status name) and only keep it if THAT date falls in
+    // the selected range.
+    if(dateType==='closed'){
+      tickets=tickets.filter(function(t){
+        var keyword=t.status;
+        if(!keyword)return false;
+        var tl=t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+        if(!Array.isArray(tl))return false;
+        var lastMatch=null;
+        tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf(keyword)!==-1&&entry.at)lastMatch=entry;});
+        if(!lastMatch)return false;
+        var d=new Date(lastMatch.at).toLocaleDateString('en-CA');
+        return (!from||d>=from)&&(!to||d<=to);
+      });
+    }
 
     // Client-side filter for customer and city
     if(customer) tickets=tickets.filter(t=>(t.cname||'').toLowerCase().includes(customer.toLowerCase())||(t.mobile||'').includes(customer));
@@ -12579,6 +12615,7 @@ var _gpsWatchdog=null;
 
 function startLocationTracking(){
   if(_watchId)return;
+  if(currentUser&&LIVE_TRACKING_EXCLUDED_IDS.includes(currentUser.eng_id||currentUser.user_id))return;
 
   // watchPosition: OS-level GPS, fires on every position change (works better in background than polling)
   if(navigator.geolocation){
@@ -12841,9 +12878,10 @@ async function renderLiveMap(){
   // sync button state
   (function(){var b1=document.getElementById('lm-btn-street'),b2=document.getElementById('lm-btn-satellite');if(!b1||!b2)return;if(_curLayer==='satellite'){b2.style.background='#1d4ed8';b2.style.color='#fff';b1.style.background='#f8fafc';b1.style.color='#374151';}else{b1.style.background='#1d4ed8';b1.style.color='#fff';b2.style.background='#f8fafc';b2.style.color='#374151';}})();
 
-  // Group by engineer
+  // Group by engineer (skip office logins that don't need live tracking)
   var engMap={};
   locs.forEach(function(l){
+    if(LIVE_TRACKING_EXCLUDED_IDS.includes(l.eng_id))return;
     if(!engMap[l.eng_id])engMap[l.eng_id]={name:l.eng_name,points:[],latest:null};
     engMap[l.eng_id].points.push([l.lat,l.lng,l.event_type,l.recorded_at,l.ticket_id]);
     engMap[l.eng_id].latest=l;
@@ -21480,7 +21518,7 @@ async function renderAttendanceReport(){
   try{
     var emps=await sb('users','GET',null,'?order=name');
     var sel=document.getElementById('att-emp');
-    if(sel)emps.forEach(function(e){var o=document.createElement('option');o.value=e.user_id;o.textContent=e.name+(e.role==='engineer'?' (Eng)':' (WC)');sel.appendChild(o);});
+    if(sel)emps.filter(function(e){return!ATT_EXCLUDED_IDS.includes(e.eng_id||e.user_id);}).forEach(function(e){var o=document.createElement('option');o.value=e.user_id;o.textContent=e.name+(e.role==='engineer'?' (Eng)':' (WC)');sel.appendChild(o);});
   }catch(e){}
   loadAttendanceReport();
 }
@@ -21513,6 +21551,9 @@ async function loadAttendanceReport(){
   else{q+='&eng_id=eq.'+encodeURIComponent(myId);}
   try{
     var logs=await sb('punch_logs','GET',null,q);
+    // Office/reception logins (ATT_EXCLUDED_IDS) don't punch in/out and never
+    // belong in the Attendance Report — filter out any historical rows too.
+    logs=(logs||[]).filter(function(l){return!ATT_EXCLUDED_IDS.includes(l.eng_id);});
     window._attLogs=logs;
     // Shift settings per employee — needed for Office Hours / Late-Early / Adjust Hours columns
     var allShifts=await sb('shift_settings','GET',null,'').catch(function(){return[];});
@@ -21532,6 +21573,7 @@ async function loadAttendanceReport(){
         (allUsers||[]).filter(function(u){return!(u.role==='admin'&&u.role_type!=='work_controller');})
           .forEach(function(u){
             var uid=u.eng_id||u.user_id;
+            if(ATT_EXCLUDED_IDS.includes(uid))return;
             if(!punchedIds[uid])rosterRows.push({_notPunched:true,eng_id:uid,eng_name:u.name,punch_in_date:from});
           });
       }catch(e){}
@@ -21708,7 +21750,7 @@ async function openAttAddModal(){
     var allUsers=await sb('users','GET',null,'?order=name');
     // Exclude true admins only — WC accounts can be stored as role='admin' with
     // role_type='work_controller', and those must still appear here.
-    var emps=(allUsers||[]).filter(function(e){return !(e.role==='admin'&&e.role_type!=='work_controller');});
+    var emps=(allUsers||[]).filter(function(e){return !(e.role==='admin'&&e.role_type!=='work_controller')&&!ATT_EXCLUDED_IDS.includes(e.eng_id||e.user_id);});
     var sel=document.getElementById('att-add-emp');
     if(sel){
       sel.innerHTML='<option value="">Select employee...</option>';
