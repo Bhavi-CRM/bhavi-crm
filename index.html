@@ -16090,8 +16090,14 @@ function addCourierEditProd(container,data,isOut){
   var savedAcc=data&&data.accessories;
   if(typeof savedAcc==='string'){try{savedAcc=JSON.parse(savedAcc);}catch(e){savedAcc=[];}}
   if(!Array.isArray(savedAcc))savedAcc=[];
+  // Match case/whitespace-insensitively — an older entry saved with a
+  // slightly different casing (e.g. from before the accessory label list was
+  // tidied up) would otherwise silently fail the exact-string check below and
+  // still show as unchecked even though the value round-trips correctly.
+  var normAcc=function(s){return String(s||'').trim().toLowerCase();};
+  var savedAccNorm=savedAcc.map(normAcc);
   var accOpts=(window.ACCESSORIES_LIST||[]).map(function(a){
-    var chk=savedAcc.indexOf(a)>=0?' checked':'';
+    var chk=savedAccNorm.indexOf(normAcc(a))>=0?' checked':'';
     return'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0;">'
       +'<input type="checkbox" class="ced-acc" value="'+a+'"'+chk+' style="cursor:pointer;"> '+a+'</label>';
   }).join('');
