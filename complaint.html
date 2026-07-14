@@ -2281,6 +2281,15 @@ var CHAT_DATA={
       sent:'🎉 Inquiry નોંધાઈ ગઈ! ટૂંક સમયમાં call / WhatsApp આવશે.',
       backBtn:'← પ્રશ્ન પર પાછા જાઓ'
     },
+    track:{
+      prompt:'📱 તમારો Mobile Number આપો, અમે તમારી complaint ની live status બતાવીશું.',
+      mobilePh:'Mobile Number (10 digits)',
+      searchBtn:'🔍 Status જુઓ',
+      searching:'શોધી રહ્યા છીએ...',
+      noResult:'આ mobile number સાથે કોઈ complaint મળી નહીં.',
+      invalidMobile:'કૃપા કરી સાચો 10-digit mobile number આપો.',
+      backBtn:'← પ્રશ્ન પર પાછા જાઓ'
+    },
     qa:[
       {q:'🛍️ Product ખરીદવી / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Product / Model શોધો',a:'__MODEL_SEARCH__'},
@@ -2288,8 +2297,7 @@ var CHAT_DATA={
        a:'સામાન્ય રીતે <b>3–5 working days</b>માં repair થાય. Complex problems માટે વધુ સમય લાગી શકે. Ticket no. થી track કરી શકો.'},
       {q:'💰 Service charge કેટલો છે?',
        a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate પ્રમાણે અલગ.'},
-      {q:'📦 મારી complaint track કેવી રીતે કરું?',
-       a:'Home screen પર <b>"Track My Order"</b> option છે. ત્યાં ticket number enter કરો — live status મળશે.'},
+      {q:'📦 મારી complaint track કેવી રીતે કરું?',a:'__TRACK_COMPLAINT__'},
       {q:'🛡️ Repair પર warranty મળે છે?',
        a:'હા! Repaired parts પર <b>90 days ની warranty</b> આપવામાં આવે છે.'},
       {q:'📷 કયા products service થાય?',
@@ -2322,6 +2330,15 @@ var CHAT_DATA={
       sent:'🎉 Inquiry मिल गई! जल्द call / WhatsApp आएगा।',
       backBtn:'← प्रश्न पर वापस जाएं'
     },
+    track:{
+      prompt:'📱 अपना Mobile Number दें, हम आपकी complaint की live status दिखाएंगे।',
+      mobilePh:'Mobile Number (10 digits)',
+      searchBtn:'🔍 Status देखें',
+      searching:'खोज रहे हैं...',
+      noResult:'इस mobile number से कोई complaint नहीं मिली।',
+      invalidMobile:'कृपया सही 10-अंकों का mobile number डालें।',
+      backBtn:'← प्रश्न पर वापस जाएं'
+    },
     qa:[
       {q:'🛍️ Product खरीदनी है / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Product / Model खोजें',a:'__MODEL_SEARCH__'},
@@ -2329,8 +2346,7 @@ var CHAT_DATA={
        a:'आमतौर पर <b>3–5 working days</b> में repair होती है. जटिल समस्याओं में अधिक समय लग सकता है. Ticket no. से track करें.'},
       {q:'💰 Service charge कितना है?',
        a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate के अनुसार अलग.'},
-      {q:'📦 मेरी complaint track कैसे करूँ?',
-       a:'Home screen पर <b>"Track My Order"</b> option है. वहाँ ticket number enter करें — live status मिलेगा.'},
+      {q:'📦 मेरी complaint track कैसे करूँ?',a:'__TRACK_COMPLAINT__'},
       {q:'🛡️ Repair पर warranty मिलती है?',
        a:'हाँ! Repaired parts पर <b>90 days की warranty</b> दी जाती है.'},
       {q:'📷 कौन से products service होते हैं?',
@@ -2363,6 +2379,15 @@ var CHAT_DATA={
       sent:'🎉 Inquiry received! We will call / WhatsApp you shortly.',
       backBtn:'← Back to questions'
     },
+    track:{
+      prompt:'📱 Enter your Mobile Number and we\'ll show your complaint status live.',
+      mobilePh:'Mobile Number (10 digits)',
+      searchBtn:'🔍 Check Status',
+      searching:'Searching...',
+      noResult:'No complaints found for this mobile number.',
+      invalidMobile:'Please enter a valid 10-digit mobile number.',
+      backBtn:'← Back to questions'
+    },
     qa:[
       {q:'🛍️ Buy a Product / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
       {q:'🔍 Search Product / Model',a:'__MODEL_SEARCH__'},
@@ -2370,8 +2395,7 @@ var CHAT_DATA={
        a:'Usually <b>3–5 working days</b>. Complex problems may take longer. You can track status using your ticket number.'},
       {q:'💰 What is the service charge?',
        a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges extra as per estimate.'},
-      {q:'📦 How do I track my complaint?',
-       a:'Use <b>"Track My Order"</b> on the home screen. Enter your ticket number to see live status.'},
+      {q:'📦 How do I track my complaint?',a:'__TRACK_COMPLAINT__'},
       {q:'🛡️ Is there warranty on repairs?',
        a:'Yes! A <b>90-day warranty</b> is provided on all repaired parts.'},
       {q:'📷 Which products do you service?',
@@ -2463,6 +2487,21 @@ function chatAns(i){
       +'<div id="chat-model-results" style="max-height:200px;overflow-y:auto;"></div>'
       +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+d.backBtn+'</button>';
     setTimeout(function(){var el=document.getElementById('chat-model-inp');if(el)el.focus();},100);
+    return;
+  }
+  if(qa.a==='__TRACK_COMPLAINT__'){
+    var tk=d.track;
+    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.7;">'+tk.prompt+'</div>';
+    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
+    msgs.scrollTop=msgs.scrollHeight;
+    document.getElementById('chat-q-area').innerHTML=
+      '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+      +'<input id="chat-track-mob" type="tel" maxlength="10" inputmode="numeric" placeholder="'+escHtml(tk.mobilePh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" onkeydown="if(event.key===\'Enter\')chatTrackSearch()">'
+      +'<button onclick="chatTrackSearch()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">'+tk.searchBtn+'</button>'
+      +'</div>'
+      +'<div id="chat-track-results" style="max-height:280px;overflow-y:auto;"></div>'
+      +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+tk.backBtn+'</button>';
+    setTimeout(function(){var el=document.getElementById('chat-track-mob');if(el)el.focus();},100);
     return;
   }
   var ans;
@@ -2650,6 +2689,45 @@ function chatModelSelect(brand,modelNo,modelName,brochureUrl){
   msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
   msgs.scrollTop=msgs.scrollHeight;
   _renderChatQ();
+}
+
+// ── Track My Complaint (real live lookup by mobile, in-chat) ──────
+// The old FAQ answer pointed customers to "Track My Order" on the home
+// screen, but that page queries sales_orders (purchases), not the tickets
+// table used for repair complaints — customers looking up a repair got
+// nothing there. This looks up the real tickets table directly, inline.
+var TRACK_STATUS_COLORS={
+  'Pending Customer Arrival':'#f59e0b','Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6',
+  'Pending Parts':'#d97706','Pending Customer Approval':'#8b5cf6','Customer Approved':'#6366f1',
+  'Pending Repair Carry In':'#3b82f6','Pending Repair On Site':'#3b82f6','Repaired':'#059669','Sent to MSC':'#7c3aed',
+  'Pending for Delivery':'#059669','Closed':'#059669','Delivered':'#059669','Call Cancel':'#94a3b8','Customer Reject':'#dc2626'
+};
+async function chatTrackSearch(){
+  var d=CHAT_DATA[_chatLang];if(!d)return;var tk=d.track;
+  var inp=document.getElementById('chat-track-mob');
+  var res=document.getElementById('chat-track-results');
+  if(!inp||!res)return;
+  var mob=inp.value.trim();
+  if(!/^\d{10}$/.test(mob)){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:8px;">'+tk.invalidMobile+'</div>';return;}
+  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">'+tk.searching+'</div>';
+  try{
+    var tickets=await sbGet('tickets','?mobile=eq.'+mob+'&order=created_at.desc&limit=20');
+    if(!tickets||!tickets.length){res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+tk.noResult+'</div>';return;}
+    res.innerHTML=tickets.map(function(t){
+      var clr=TRACK_STATUS_COLORS[t.status]||'#64748b';
+      var dateStr=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;">'
+        +'<div style="font-size:12.5px;font-weight:800;color:#1e293b;">'+escHtml(t.id)+'</div>'
+        +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:2px 9px;font-size:10.5px;font-weight:700;white-space:nowrap;">'+escHtml(t.status||'')+'</span>'
+        +'</div>'
+        +(dateStr?'<div style="font-size:10.5px;color:#94a3b8;margin-bottom:3px;">📅 '+dateStr+'</div>':'')
+        +(t.model?'<div style="font-size:11.5px;color:#64748b;">🖨️ '+escHtml(t.model)+(t.serial?' · '+escHtml(t.serial):'')+'</div>':'')
+        +(t.problem?'<div style="font-size:11.5px;color:#1e293b;margin-top:2px;">⚠️ '+escHtml(t.problem)+'</div>':'')
+        +(t.assigned_name?'<div style="font-size:11.5px;color:#2563eb;font-weight:600;margin-top:2px;">👷 Engineer: '+escHtml(t.assigned_name)+'</div>':'')
+        +'</div>';
+    }).join('');
+  }catch(e){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+escHtml(e.message)+'</div>';}
 }
 </script>
 
