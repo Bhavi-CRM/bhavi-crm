@@ -3011,13 +3011,11 @@ const TICKET_CANCELLED_STATUSES=['Call Cancel','Customer Reject'];
 function isTicketClosed(t){return TICKET_DONE_STATUSES.includes(t.status);}
 function isTicketCancelled(t){return TICKET_CANCELLED_STATUSES.includes(t.status);}
 function isTicketActive(t){return !isTicketClosed(t)&&!isTicketCancelled(t);}
-// Only these model types get repaired onsite (engineer visits) — everything
-// else (camera, other, etc.) is Carry-In only, per business policy.
-const MODEL_ONSITE_ELIGIBLE_TYPES=['laser','inkjet','photo','scanner'];
-// Legacy model records were never classified with a Type — treat "unset" as
-// eligible (don't hide Onsite for models we simply haven't classified yet).
-// Only an explicit non-eligible type (camera, other) turns Onsite off.
-function isModelOnsiteEligible(printerType){return !printerType||MODEL_ONSITE_ELIGIBLE_TYPES.includes(printerType);}
+// Onsite eligibility is an explicit per-model flag (models.onsite_applicable),
+// set via the ✏️ Edit Model checkbox — not inferred from Type. Unset/true =
+// applicable (so legacy models default to available); only an explicit
+// false (admin unchecked the box) turns Onsite off for that model.
+function isModelOnsiteEligible(model){return !model||model.onsite_applicable!==false;}
 function statusBadge(s){
   const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
@@ -5103,7 +5101,7 @@ function applyModelServiceFields(){
 
   // Restrict Service Type options based on the model's category
   var onsiteOpt=Array.from(svcTypeEl.options).find(function(o){return o.value==='On Site';});
-  var eligible=!m||isModelOnsiteEligible(m.printer_type);
+  var eligible=isModelOnsiteEligible(m);
   if(onsiteOpt)onsiteOpt.disabled=!eligible;
   if(!eligible&&svcTypeEl.value==='On Site')svcTypeEl.value='Carry In';
 
@@ -9834,12 +9832,13 @@ async function switchMasterTab(tab,el){
   }else if(tab==='models'){
     var brands,models;
     try{
-      [brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price,carry_in_charge,onsite_charge&limit=300')]);
+      [brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price,carry_in_charge,onsite_charge,onsite_applicable&limit=300')]);
     }catch(e){
-      // carry_in_charge/onsite_charge columns not added to the DB yet — fall back
-      // so the tab still loads; charges just show blank until the migration runs.
+      // carry_in_charge/onsite_charge/onsite_applicable columns not added to the
+      // DB yet — fall back so the tab still loads; charges just show blank
+      // until the migration runs.
       [brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price&limit=300')]);
-      models.forEach(function(m){m.carry_in_charge=null;m.onsite_charge=null;});
+      models.forEach(function(m){m.carry_in_charge=null;m.onsite_charge=null;m.onsite_applicable=true;});
     }
     c.innerHTML=`<div class="card" style="margin-bottom:12px;"><h3 style="font-weight:700;margin-bottom:10px;font-size:14px;">Add Model</h3>
       <div class="master-add-row">
@@ -9851,12 +9850,12 @@ async function switchMasterTab(tab,el){
         <button class="btn btn-primary btn-sm" onclick="addModel()">+ Add</button>
       </div>
       <div class="master-add-row"><input type="file" id="model-file" accept=".xlsx,.xls,.csv" style="flex:1;"><button class="btn btn-outline btn-sm" onclick="importModels()">📥 Import</button><button class="btn btn-outline btn-sm" onclick="downloadTemplate('models')">📄 Template</button></div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💰 Service charges (Carry-In / Onsite) are set per-model via the ✏️ Edit button below — Onsite is only available for Laser/Inkjet/Photo/Scanner types.</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💰 Service charges (Carry-In / Onsite) are set per-model via the ✏️ Edit button below — tick "Onsite Service Applicable" there to enable Onsite for that model.</div>
     </div>
     <div class="card">
       <div class="filter-bar" style="margin-bottom:10px;"><input type="text" id="model-search" placeholder="Search..." oninput="filterModels()" style="flex:1;"></div>
       <div class="table-wrap"><table><thead><tr><th>Model No</th><th>Name</th><th>Brand</th><th>Type</th><th>Price</th><th>Carry-In ₹</th><th>Onsite ₹</th><th>Action</th></tr></thead>
-      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';var ci=m.carry_in_charge!=null?'₹'+Number(m.carry_in_charge).toLocaleString('en-IN'):'-';var os=isModelOnsiteEligible(m.printer_type)?(m.onsite_charge!=null?'₹'+Number(m.onsite_charge).toLocaleString('en-IN'):'-'):'—';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td>'+ci+'</td><td>'+os+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
+      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';var ci=m.carry_in_charge!=null?'₹'+Number(m.carry_in_charge).toLocaleString('en-IN'):'-';var os=isModelOnsiteEligible(m)?(m.onsite_charge!=null?'₹'+Number(m.onsite_charge).toLocaleString('en-IN'):'-'):'N/A';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td>'+ci+'</td><td>'+os+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
     </div>`;
     window._mModels=models;window._mBrands=brands;
   }else if(tab==='problems'){
@@ -10000,12 +9999,13 @@ async function deleteSubcat(id){if(!confirm('Delete?'))return;await sb('subcateg
 async function addModel(){const bid=document.getElementById('new-model-brand')?.value;const no=document.getElementById('new-model-no')?.value.trim();const nm=document.getElementById('new-model-name')?.value.trim();const tp=document.getElementById('new-model-type')?.value||null;const pr=document.getElementById('new-model-price')?.value;if(!no){alert('Enter model no');return;}await sb('models','POST',{brand_id:bid||null,model_no:no,model_name:nm||null,printer_type:tp||null,sale_price:pr?Number(pr):null});await loadMasterData();switchMasterTab('models',null);}
 // Edit Model - assign/change brand and name
 let _editModelId=null;
-function editModel(id, modelNo, modelName, brandId, subcatId, printerType, salePrice, carryInCharge, onsiteCharge){
+function editModel(id, modelNo, modelName, brandId, subcatId, printerType, salePrice, carryInCharge, onsiteCharge, onsiteApplicable){
   _editModelId=id;
   const brandOpts=allBrands.map(b=>'<option value="'+b.id+'"'+(b.id===brandId?' selected':'')+'>'+b.name+'</option>').join('');
   const brandSubcats=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
   const subcatOpts=brandSubcats.map(s=>'<option value="'+s.id+'"'+(s.id===subcatId?' selected':'')+'>'+s.name+'</option>').join('');
   const typeOpts=[['','Type'],['laser','🖨️ Laser'],['inkjet','💧 Inkjet'],['photo','📸 Photo'],['scanner','🖷 Scanner'],['camera','📷 Camera'],['other','Other']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===printerType?' selected':'')+'>'+o[1]+'</option>';}).join('');
+  const onsiteOn=onsiteApplicable!==false;
   const existing=document.getElementById('edit-model-modal');
   if(existing)existing.remove();
   const div=document.createElement('div');
@@ -10024,16 +10024,18 @@ function editModel(id, modelNo, modelName, brandId, subcatId, printerType, saleP
     +'<select id="em-subcat" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
     +'<option value="">-- All / General --</option>'+subcatOpts+'</select></div>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Printer / Product Type</label>'
-    +'<select id="em-type" onchange="toggleEditModelOnsiteCharge(this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+typeOpts+'</select></div>'
+    +'<select id="em-type" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+typeOpts+'</select></div>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sale Price (₹)</label>'
     +'<input type="number" id="em-price" value="'+(salePrice||'')+'" min="0" placeholder="e.g. 12500" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
     +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:20px;">'
     +'<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;">💰 Service Charges</div>'
-    +'<div style="margin-bottom:'+(isModelOnsiteEligible(printerType)?'10px':'0')+';"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Carry-In Charge (₹)</label>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Carry-In Charge (₹)</label>'
     +'<input type="number" id="em-carryin-charge" value="'+(carryInCharge||'')+'" min="0" placeholder="e.g. 413" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
-    +'<div id="em-onsite-charge-wrap" style="display:'+(isModelOnsiteEligible(printerType)?'block':'none')+';"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Onsite Charge (₹)</label>'
-    +'<input type="number" id="em-onsite-charge" value="'+(onsiteCharge||'')+'" min="0" placeholder="e.g. 649" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;">'
-    +'<div style="font-size:10px;color:#166534;margin-top:3px;">Only Laser/Inkjet/Photo/Scanner types get Onsite service.</div></div>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;cursor:pointer;">'
+    +'<input type="checkbox" id="em-onsite-applicable" '+(onsiteOn?'checked':'')+' onchange="toggleEditModelOnsiteCharge(this.checked)"> Onsite Service Applicable for this Model</label>'
+    +'<div id="em-onsite-charge-wrap" style="display:'+(onsiteOn?'block':'none')+';"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Onsite Charge (₹)</label>'
+    +'<input type="number" id="em-onsite-charge" value="'+(onsiteCharge||'')+'" min="0" placeholder="e.g. 649" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
+    +'<div id="em-onsite-na-note" style="display:'+(onsiteOn?'none':'block')+';font-size:10px;color:#64748b;">Onsite not applicable — this model will show as Carry-In only, everywhere (call form + chatbot).</div>'
     +'</div>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
     +'<button onclick="closeEditModelModal()" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Cancel</button>'
@@ -10041,12 +10043,13 @@ function editModel(id, modelNo, modelName, brandId, subcatId, printerType, saleP
     +'</div></div>';
   document.body.appendChild(div);
 }
-function toggleEditModelOnsiteCharge(printerType){
+function toggleEditModelOnsiteCharge(applicable){
   var wrap=document.getElementById('em-onsite-charge-wrap');
+  var note=document.getElementById('em-onsite-na-note');
   if(!wrap)return;
-  var eligible=isModelOnsiteEligible(printerType);
-  wrap.style.display=eligible?'block':'none';
-  if(!eligible){var inp=document.getElementById('em-onsite-charge');if(inp)inp.value='';}
+  wrap.style.display=applicable?'block':'none';
+  if(note)note.style.display=applicable?'none':'block';
+  if(!applicable){var inp=document.getElementById('em-onsite-charge');if(inp)inp.value='';}
 }
 function updateEditModelSubcats(brandId){
   const sc=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
@@ -10061,11 +10064,11 @@ async function saveEditModel(){
   const type=document.getElementById('em-type')?.value||null;
   const price=document.getElementById('em-price')?.value;
   const carryInCharge=document.getElementById('em-carryin-charge')?.value;
-  const onsiteEligible=isModelOnsiteEligible(type);
-  const onsiteCharge=onsiteEligible?document.getElementById('em-onsite-charge')?.value:'';
+  const onsiteApplicable=document.getElementById('em-onsite-applicable')?.checked===true;
+  const onsiteCharge=onsiteApplicable?document.getElementById('em-onsite-charge')?.value:'';
   if(!no){alert('Enter model no');return;}
   try{
-    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null,printer_type:type||null,sale_price:price?Number(price):null,carry_in_charge:carryInCharge?Number(carryInCharge):null,onsite_charge:onsiteCharge?Number(onsiteCharge):null},`?id=eq.${_editModelId}`);
+    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null,printer_type:type||null,sale_price:price?Number(price):null,carry_in_charge:carryInCharge?Number(carryInCharge):null,onsite_applicable:onsiteApplicable,onsite_charge:onsiteCharge?Number(onsiteCharge):null},`?id=eq.${_editModelId}`);
     document.getElementById('edit-model-modal')?.remove();
     await loadMasterData();switchMasterTab('models',null);
   }catch(e){alert('Error: '+e.message);}
@@ -10117,7 +10120,7 @@ async function editModelById(btn){
     var res=await sb('models','GET',null,'?id=eq.'+id);
     if(!res.length)return;
     var m=res[0];
-    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'',m.printer_type||'',m.sale_price||'',m.carry_in_charge||'',m.onsite_charge||'');
+    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'',m.printer_type||'',m.sale_price||'',m.carry_in_charge||'',m.onsite_charge||'',m.onsite_applicable);
   }catch(e){alert('Error: '+e.message);}
 }
 async function deleteModel(id){if(!confirm('Delete?'))return;await sb('models','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('models',null);}

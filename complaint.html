@@ -2328,6 +2328,7 @@ const LANG = {
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"અમારી team આપને confirm કરશે",
     confirmChargeIntro:"📋 Booking confirm કરતા પહેલા, નીચેની service details ચકાસો:",
+    msg_onsiteNotAvailable:"ℹ️ માફ કરશો, આ model માટે Onsite service available નથી — Carry-In service ના rates બતાવ્યા છે.",
     chip_approveBook:"✅ Approve & Book કરો",
     chip_cancelBooking:"❌ Cancel કરો",
     p_warrantyStatus:"Product Warranty માં છે કે Non-Warranty માં? (આ પસંદ કરવું ફરજિયાત છે)",
@@ -2427,6 +2428,7 @@ const LANG = {
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"Hamari team aapko confirm karegi",
     confirmChargeIntro:"📋 Booking confirm karne se pehle, neeche di gayi service details check karein:",
+    msg_onsiteNotAvailable:"ℹ️ Maaf kijiye, is model ke liye Onsite service available nahi hai — Carry-In service ke rates dikhaye hain.",
     chip_approveBook:"✅ Approve & Book Karein",
     chip_cancelBooking:"❌ Cancel Karein",
     p_warrantyStatus:"Product Warranty mein hai ya Non-Warranty mein? (Ye select karna zaroori hai)",
@@ -2526,6 +2528,7 @@ const LANG = {
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"Our team will confirm this with you",
     confirmChargeIntro:"📋 Before we confirm your booking, please review the service details below:",
+    msg_onsiteNotAvailable:"ℹ️ Sorry, Onsite service is not available for this model — showing Carry-In service rates instead.",
     chip_approveBook:"✅ Approve & Book",
     chip_cancelBooking:"❌ Cancel",
     p_warrantyStatus:"Is the product under Warranty or Non-Warranty? (This selection is mandatory)",
@@ -2845,6 +2848,20 @@ async function bhaiCreateTicket(a, ctx, chargeAmount){
   await sbPostMin('tickets', tData);
   return ticketId;
 }
+// If the customer picked Onsite but this specific model has Onsite service
+// disabled (models.onsite_applicable = false, set via the admin Edit Model
+// checkbox), silently downgrade to Carry-In and tell them why. Mutates a.serviceMode.
+async function bhaiCheckOnsiteAvailability(a, ctx){
+  if(a.serviceMode!=='Onsite'||!a.model) return false;
+  try{
+    var rows = await sbGet('models', '?model_no=ilike.*'+encodeURIComponent(a.model.trim())+'*&select=onsite_applicable&limit=1');
+    if(rows && rows.length && rows[0].onsite_applicable===false){
+      a.serviceMode='CarryIn';
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
 async function bhaiResolveCharge(a, ctx){
   if(a.model){
     try{
@@ -2857,7 +2874,7 @@ async function bhaiResolveCharge(a, ctx){
   }
   return {amount:null, text: resolveChargeText(a, ctx)};
 }
-async function bhaiBookServiceTicket(a, ctx){
+async function bhaiBookServiceTicket(a, ctx, onsiteSwapped){
   var isFreeWarranty = a.warrantyStatus==='Warranty' && a.invoiceAvailable==='Yes';
   var chargeAmount = 0;
   if(!isFreeWarranty){
@@ -2865,7 +2882,7 @@ async function bhaiBookServiceTicket(a, ctx){
     chargeAmount = resolved.amount!=null ? resolved.amount : 0;
   }
   var ticketId = await bhaiCreateTicket(a, ctx, chargeAmount);
-  var msg = fmt(bhaiT('msg_ticketCreated'), {ticketId:ticketId, device:ctx.device||'', issue:ctx.issue||''});
+  var msg = (onsiteSwapped ? bhaiT('msg_onsiteNotAvailable')+'\n\n' : '') + fmt(bhaiT('msg_ticketCreated'), {ticketId:ticketId, device:ctx.device||'', issue:ctx.issue||''});
   return {message:msg, chips:[
     {label:bhaiT('chip_trackRepair'), action:{type:'flow', id:'trackRepair'}},
   ]};
@@ -3044,9 +3061,13 @@ const FLOWS = {
       return s;
     },
     complete:async (a,ctx)=>{
+      // Model-level Onsite eligibility applies regardless of warranty status —
+      // silently downgrade to Carry-In and flag it if this model doesn't support Onsite.
+      var onsiteSwapped = await bhaiCheckOnsiteAvailability(a, ctx);
+
       // Warranty + invoice available is free — no charge to approve, book straight away.
       var isFreeWarranty = a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'Yes';
-      if(isFreeWarranty) return await bhaiBookServiceTicket(a, ctx);
+      if(isFreeWarranty) return await bhaiBookServiceTicket(a, ctx, onsiteSwapped);
 
       // Every chargeable case (Non-Warranty, or Warranty without invoice) shows
       // the real charge and waits for explicit customer approval before the
@@ -3058,6 +3079,7 @@ const FLOWS = {
         : `${bhaiT('lbl_warranty')}: ${bhaiT('opt_nonWarranty')}`;
       var msg = `${bhaiT('confirmChargeIntro')}\n\n`
         + `📱 ${ctx.device||''} — ${ctx.issue||''}\n`
+        + (onsiteSwapped ? `${bhaiT('msg_onsiteNotAvailable')}\n` : '')
         + (modeLabel?`${bhaiT('lbl_serviceMode')}: ${modeLabel}\n`:'')
         + `${warrantyLine}\n`
         + `${bhaiT('lbl_serviceCharge')}: *${resolved.text}*`;
