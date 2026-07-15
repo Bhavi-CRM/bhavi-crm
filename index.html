@@ -411,7 +411,7 @@ tr:hover td{background:#f8fafc;}
           <input type="hidden" id="call-subcat-id">
         </div>
         <div class="form-group"><label>Model No <span class="req">*</span></label>
-          <div class="autocomplete-wrap"><input type="text" id="call-model" placeholder="Type model..." oninput="filterModelAC(this.value)" autocomplete="off" onkeydown="acKeydown(event,'model-ac')">
+          <div class="autocomplete-wrap"><input type="text" id="call-model" placeholder="Type model..." oninput="filterModelAC(this.value)" onblur="applyModelServiceFields()" autocomplete="off" onkeydown="acKeydown(event,'model-ac')">
           <div class="ac-list" id="model-ac"></div></div>
         </div>
         <div class="form-group">
@@ -434,14 +434,14 @@ tr:hover td{background:#f8fafc;}
           </select>
         </div>
         <div class="form-group"><label>Service Type <span class="req">*</span></label>
-          <select id="call-service-type"><option value="On Site">On Site</option><option value="Carry In">Carry In</option></select>
+          <select id="call-service-type" onchange="applyModelServiceFields()"><option value="On Site">On Site</option><option value="Carry In">Carry In</option></select>
         </div>
         <div class="form-group"><label>SE Call ID</label><input type="text" id="call-se-id"></div>
         <div class="form-group"><label>Priority</label><select id="call-priority"><option value="Normal">Normal</option><option value="High">High 🟡</option><option value="Urgent">Urgent 🔴</option></select></div>
         <div class="form-group" id="call-service-charges-row" style="display:none;">
           <label>💰 Service / Labour Charges (₹) <span class="req">*</span></label>
           <input type="number" id="call-service-charges" min="0" step="50" value="" placeholder="Required — enter amount">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts will appear here once added above</div>
+          <div id="call-service-charges-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Parts will appear here once added above</div>
         </div>
       </div>
       <hr class="divider">
@@ -981,9 +981,28 @@ tr:hover td{background:#f8fafc;}
           <span style="font-size:13px;font-weight:700;color:#fff;">Total Closed Calls Today</span>
           <span id="dr-all-total" style="font-size:20px;font-weight:800;color:#fff;">0</span>
         </div>
-        <div id="dr-pending-bar" style="display:none;margin-top:8px;background:#fef3c7;border-radius:8px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:12px;font-weight:600;color:#92400e;">⏳ Pending Calls (Hold/Approval/Parts)</span>
-          <input id="dr-pending-count" type="number" min="0" value="0" style="width:60px;border:1px solid #f59e0b;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:800;color:#92400e;text-align:center;outline:none;background:#fff;">
+        <div id="dr-pending-bar" style="display:none;margin-top:8px;">
+          <div style="background:#fef3c7;border-radius:8px;padding:10px 14px;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;">⏳ Pending Calls (Current Backlog)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div style="text-align:center;">
+                <div style="font-size:11px;color:#92400e;margin-bottom:3px;">Parts</div>
+                <input id="dr-pending-parts" type="number" min="0" value="0" style="width:100%;border:1px solid #f59e0b;border-radius:6px;padding:4px;font-size:14px;font-weight:800;color:#92400e;text-align:center;outline:none;background:#fff;">
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:11px;color:#92400e;margin-bottom:3px;">Approval</div>
+                <input id="dr-pending-approval" type="number" min="0" value="0" style="width:100%;border:1px solid #f59e0b;border-radius:6px;padding:4px;font-size:14px;font-weight:800;color:#92400e;text-align:center;outline:none;background:#fff;">
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:11px;color:#92400e;margin-bottom:3px;">Other</div>
+                <input id="dr-pending-other" type="number" min="0" value="0" style="width:100%;border:1px solid #f59e0b;border-radius:6px;padding:4px;font-size:14px;font-weight:800;color:#92400e;text-align:center;outline:none;background:#fff;">
+              </div>
+            </div>
+          </div>
+          <div style="background:#fef2f2;border-radius:8px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:600;color:#991b1b;">❌ Customer Reject (Today)</span>
+            <input id="dr-cust-reject" type="number" min="0" value="0" style="width:60px;border:1px solid #fca5a5;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:800;color:#991b1b;text-align:center;outline:none;background:#fff;">
+          </div>
         </div>
       </div>
 
@@ -1944,8 +1963,8 @@ function openModal_report_init(){
 
 function previewReportCount(){
   const filtered=applyReportFilters(allTickets);
-  const closed=filtered.filter(t=>t.status==='Closed').length;
-  const active=filtered.filter(t=>!['Closed','Call Cancel','Customer Reject'].includes(t.status)).length;
+  const closed=filtered.filter(isTicketClosed).length;
+  const active=filtered.filter(isTicketActive).length;
   const ci=filtered.filter(t=>t.service_type==='Carry In').length;
   const os=filtered.filter(t=>t.service_type==='On Site').length;
   document.getElementById('rpt-preview').innerHTML=
@@ -2047,7 +2066,7 @@ function downloadReport(type){
     const totalParts=filtered.reduce((a,t)=>a+getTicketFinancials(t).partsTotal,0);
     const totalSvc=filtered.reduce((a,t)=>a+getTicketFinancials(t).svc,0);
     const totalGrand=filtered.reduce((a,t)=>a+getTicketFinancials(t).grand,0);
-    const totalClosed=filtered.filter(t=>t.status==='Closed').length;
+    const totalClosed=filtered.filter(isTicketClosed).length;
 
     const rows=filtered.map((t,i)=>{
       const {partsTotal,partsNames,svc,other,grand}=getTicketFinancials(t);
@@ -2275,7 +2294,7 @@ function filterModelAC(q){
   if(subcatId) filtered=filtered.filter(m=>m.subcategory_id===subcatId||!m.subcategory_id);
   filtered=filtered.slice(0,20);
   if(!filtered.length){list.classList.remove('open');return;}
-  list.innerHTML=filtered.map(m=>`<div class="ac-item" onclick="document.getElementById('call-model').value='${m.model_no}';closeAllAC();">${m.model_no}${m.model_name?' — '+m.model_name:''}</div>`).join('');
+  list.innerHTML=filtered.map(m=>`<div class="ac-item" onclick="document.getElementById('call-model').value='${m.model_no}';closeAllAC();applyModelServiceFields();">${m.model_no}${m.model_name?' — '+m.model_name:''}</div>`).join('');
   list.classList.add('open');
   acData['model-ac']={filtered:filtered.map(m=>m.model_no),highlighted:-1};
 }
@@ -2982,6 +3001,19 @@ async function navigate(page){
 
 // STATUS SYSTEM
 const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery'];
+// Canonical Active/Closed/Cancelled buckets — matches Dashboard's own numbers
+// (confirmed correct). Several pages each had their own slightly different
+// "closed status" list, so the same ticket could show as Closed on one page
+// and Active on another. Use these everywhere a KPI count needs to agree
+// with Dashboard rather than inlining a fresh status array.
+const TICKET_DONE_STATUSES=['Closed','Delivered','Repaired','Pending for Delivery'];
+const TICKET_CANCELLED_STATUSES=['Call Cancel','Customer Reject'];
+function isTicketClosed(t){return TICKET_DONE_STATUSES.includes(t.status);}
+function isTicketCancelled(t){return TICKET_CANCELLED_STATUSES.includes(t.status);}
+function isTicketActive(t){return !isTicketClosed(t)&&!isTicketCancelled(t);}
+// Only these model types get repaired onsite (engineer visits) — everything
+// else (camera, other, etc.) is Carry-In only, per business policy.
+const MODEL_ONSITE_ELIGIBLE_TYPES=['laser','inkjet','photo','scanner'];
 function statusBadge(s){
   const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
@@ -4737,7 +4769,7 @@ async function renderMyCalls(){
       sb('tasks','GET',null,`?assigned_to=eq.${engId}&status=neq.Closed&order=created_at.desc`)
     ]);
     const todayStr=new Date().toLocaleDateString('en-CA');
-    const todayRoute=tickets.filter(t=>t.planned_date===todayStr&&!['Closed','Call Cancel','Customer Reject'].includes(t.status)).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
+    const todayRoute=tickets.filter(t=>t.planned_date===todayStr&&isTicketActive(t)).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
     // Punch bar
     const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
     // Check 10PM auto punch out
@@ -4798,8 +4830,8 @@ async function renderMyCalls(){
       ${rtoHtml}
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Total</div><div class="kpi-value">${tickets.length}</div></div>
-        <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${tickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length}</div></div>
-        <div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Closed</div><div class="kpi-value">${tickets.filter(t=>t.status==='Closed').length}</div></div>
+        <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${tickets.filter(isTicketActive).length}</div></div>
+        <div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Closed</div><div class="kpi-value">${tickets.filter(isTicketClosed).length}</div></div>
         <div class="kpi-card" style="border-color:#7c3aed"><div class="kpi-label">Tasks</div><div class="kpi-value">${tasks.length}</div></div>
       </div>
       ${todayRoute.length?`<div class="card" style="margin-bottom:14px;border-left:4px solid #1d4ed8;">
@@ -4866,16 +4898,15 @@ async function renderMyCalls(){
           </select>
         </div>
         <div id="my-calls-tbody">${(()=>{
-            const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
             const sorted=[...tickets].sort((a,b)=>{
-              const aOpen=!closedStatuses.includes(a.status);
-              const bOpen=!closedStatuses.includes(b.status);
+              const aOpen=isTicketActive(a);
+              const bOpen=isTicketActive(b);
               if(aOpen!==bOpen) return aOpen?-1:1;
               return (b.id||'').localeCompare(a.id||'');
             });
             if(!sorted.length) return '<div style="text-align:center;padding:30px;color:var(--text-muted);">No calls</div>';
             return sorted.map(t=>{
-              const isClosed=closedStatuses.includes(t.status);
+              const isClosed=!isTicketActive(t);
               return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${isClosed?'var(--border)':'#bfdbfe'};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                   <div>
@@ -5034,7 +5065,10 @@ function selectCustomerForCall(serial,cname,mobile,address,model,alt,pin,city,ar
           var sEl=document.getElementById('call-subcat-input');
           if(sEl){var sOpt=Array.from(sEl.options).find(function(o){return o.value===mObj.subcategory_id;});if(sOpt){sEl.value=sOpt.value;document.getElementById('call-subcat-id').value=sOpt.value;}}
         }
+        applyModelServiceFields();
       },50);
+    } else {
+      applyModelServiceFields();
     }
   }
   document.getElementById('customer-search-results').innerHTML=`<div style="color:var(--success);font-size:13px;margin-top:6px;">✅ Selected: <b>${cname}</b> | ${mobile}</div>`;
@@ -5047,6 +5081,43 @@ function handleCallTypeChange(){
   const isNW=ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other';
   const row=document.getElementById('call-service-charges-row');
   if(row)row.style.display=isNW?'':'none';
+  applyModelServiceFields();
+}
+
+// Looks up the currently-typed/selected Model No in allModels and:
+// 1) restricts Service Type to Carry In only when the model isn't
+//    Laser/Inkjet/Photo/Scanner (Onsite doesn't apply to those categories).
+// 2) auto-fills the Service Charge from the model's per-mode rate when the
+//    call is Non-Warranty family — never overwrites a charge the FOC
+//    re-repair flow has locked (setReRepairCharges disables the input).
+function applyModelServiceFields(){
+  var modelEl=document.getElementById('call-model');
+  var svcTypeEl=document.getElementById('call-service-type');
+  if(!modelEl||!svcTypeEl)return;
+  var modelNo=(modelEl.value||'').trim().toLowerCase();
+  var m=modelNo?(allModels||[]).find(function(x){return(x.model_no||'').trim().toLowerCase()===modelNo;}):null;
+
+  // Restrict Service Type options based on the model's category
+  var onsiteOpt=Array.from(svcTypeEl.options).find(function(o){return o.value==='On Site';});
+  var eligible=!m||MODEL_ONSITE_ELIGIBLE_TYPES.includes(m.printer_type);
+  if(onsiteOpt)onsiteOpt.disabled=!eligible;
+  if(!eligible&&svcTypeEl.value==='On Site')svcTypeEl.value='Carry In';
+
+  // Auto-fill service charge for Non-Warranty family calls
+  var ct=document.getElementById('call-type')?.value;
+  var isNW=ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other';
+  var scInput=document.getElementById('call-service-charges');
+  var hint=document.getElementById('call-service-charges-hint');
+  if(!isNW||!scInput||scInput.disabled)return; // FOC re-repair already locked this field
+  if(m){
+    var charge=svcTypeEl.value==='On Site'?m.onsite_charge:m.carry_in_charge;
+    if(charge!=null){
+      scInput.value=charge;
+      if(hint)hint.textContent='Auto-filled from '+m.model_no+' ('+svcTypeEl.value+') — adjust if needed.';
+      return;
+    }
+  }
+  if(hint)hint.textContent='Parts will appear here once added above';
 }
 
 async function checkReRepair(serial){
@@ -7848,8 +7919,8 @@ async function switchReportTab(tab, el){
 async function renderReportOverview(c){
   try{
     const tickets=await sbAll('tickets','?order=created_at.desc');
-    const total=tickets.length,closed=tickets.filter(t=>t.status==='Closed').length;
-    const active=tickets.filter(t=>!['Closed','Customer Reject','Call Cancel'].includes(t.status)).length;
+    const total=tickets.length,closed=tickets.filter(isTicketClosed).length;
+    const active=tickets.filter(isTicketActive).length;
     const warranty=tickets.filter(t=>t.call_type&&t.call_type.includes('Warranty')).length;
     const nw=tickets.filter(t=>t.call_type&&(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')).length;
     const amc=tickets.filter(t=>t.call_type==='AMC').length;
@@ -8050,8 +8121,7 @@ async function renderReportOverview(c){
             const topEngEntry=Object.entries(byEng).filter(([n])=>n!=='Unassigned').sort((a,b)=>(b[1].total||b[1])-(a[1].total||a[1]))[0];
             const topEngName=topEngEntry?topEngEntry[0].split(' ')[0]:'—';
             const topEngCount=topEngEntry?(topEngEntry[1].total||topEngEntry[1]):0;
-            // Fix: Active = not closed/cancelled
-            const activeCount=allTickets.filter(t=>!['Closed','Call Cancel','Customer Reject'].includes(t.status)).length;
+            const activeCount=allTickets.filter(isTicketActive).length;
             return '<div style="display:flex;flex-direction:column;gap:8px;">'
               +'<div style="text-align:center;padding:8px;background:var(--bg-secondary);border-radius:8px;">'
               +'<div style="font-size:14px;font-weight:700;color:#1d4ed8;">'+bestMonth3[0]+'</div>'
@@ -8258,7 +8328,7 @@ async function runFilteredReport(){
     document.getElementById('filter-results').innerHTML=`
       <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
         <div class="kpi-card" style="flex:1;min-width:120px;padding:12px;"><div class="kpi-label">Results</div><div class="kpi-value" style="font-size:22px;">${tickets.length}</div></div>
-        <div class="kpi-card" style="flex:1;min-width:120px;padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Closed</div><div class="kpi-value" style="font-size:22px;color:#0e9f6e;">${tickets.filter(t=>t.status==='Closed').length}</div></div>
+        <div class="kpi-card" style="flex:1;min-width:120px;padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Closed</div><div class="kpi-value" style="font-size:22px;color:#0e9f6e;">${tickets.filter(isTicketClosed).length}</div></div>
         <div class="kpi-card" style="flex:1;min-width:120px;padding:12px;border-color:#7c3aed;"><div class="kpi-label">Revenue</div><div class="kpi-value" style="font-size:18px;">₹${totalRev.toFixed(0)}</div></div>
       </div>
       <div class="card">
@@ -9758,7 +9828,7 @@ async function switchMasterTab(tab,el){
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Brand</th><th>Sub-Category</th><th>Action</th></tr></thead>
     <tbody>${sc.map(s=>`<tr><td>${brands.find(b=>b.id===s.brand_id)?.name||'-'}</td><td>${s.name}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="editSubcat('${s.id}','${s.name}','${s.brand_id||''}')">✏️</button><button class="btn-icon" onclick="deleteSubcat('${s.id}')" style="color:var(--danger);">🗑️</button></td></tr>`).join('')}</tbody></table></div></div>`;
   }else if(tab==='models'){
-    const[brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price&limit=300')]);
+    const[brands,models]=await Promise.all([sb('brands','GET',null,'?order=name'),sb('models','GET',null,'?order=model_no&select=id,model_no,model_name,brand_id,printer_type,sale_price,carry_in_charge,onsite_charge&limit=300')]);
     c.innerHTML=`<div class="card" style="margin-bottom:12px;"><h3 style="font-weight:700;margin-bottom:10px;font-size:14px;">Add Model</h3>
       <div class="master-add-row">
         <select id="new-model-brand" style="max-width:130px;"><option value="">Brand</option>${brands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select>
@@ -9769,11 +9839,12 @@ async function switchMasterTab(tab,el){
         <button class="btn btn-primary btn-sm" onclick="addModel()">+ Add</button>
       </div>
       <div class="master-add-row"><input type="file" id="model-file" accept=".xlsx,.xls,.csv" style="flex:1;"><button class="btn btn-outline btn-sm" onclick="importModels()">📥 Import</button><button class="btn btn-outline btn-sm" onclick="downloadTemplate('models')">📄 Template</button></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💰 Service charges (Carry-In / Onsite) are set per-model via the ✏️ Edit button below — Onsite is only available for Laser/Inkjet/Photo/Scanner types.</div>
     </div>
     <div class="card">
       <div class="filter-bar" style="margin-bottom:10px;"><input type="text" id="model-search" placeholder="Search..." oninput="filterModels()" style="flex:1;"></div>
-      <div class="table-wrap"><table><thead><tr><th>Model No</th><th>Name</th><th>Brand</th><th>Type</th><th>Price</th><th>Action</th></tr></thead>
-      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Model No</th><th>Name</th><th>Brand</th><th>Type</th><th>Price</th><th>Carry-In ₹</th><th>Onsite ₹</th><th>Action</th></tr></thead>
+      <tbody id="model-tbody">${(function(){var html='';models.forEach(function(m){var bn=brands.find(function(b){return b.id===m.brand_id;})?brands.find(function(b){return b.id===m.brand_id;}).name:'-';var tp=m.printer_type||'-';var pr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):'-';var ci=m.carry_in_charge!=null?'₹'+Number(m.carry_in_charge).toLocaleString('en-IN'):'-';var os=MODEL_ONSITE_ELIGIBLE_TYPES.includes(m.printer_type)?(m.onsite_charge!=null?'₹'+Number(m.onsite_charge).toLocaleString('en-IN'):'-'):'—';html+='<tr><td><b>'+m.model_no+'</b></td><td>'+(m.model_name||'-')+'</td><td>'+bn+'</td><td>'+tp+'</td><td>'+pr+'</td><td>'+ci+'</td><td>'+os+'</td><td><button class="btn-icon" onclick="editModelById(this)" data-id="'+m.id+'">✏️</button><button class="btn-icon" onclick="deleteModelById(this)" data-id="'+m.id+'" style="color:var(--danger)">🗑️</button></td></tr>';});return html;})()}</tbody></table></div>
     </div>`;
     window._mModels=models;window._mBrands=brands;
   }else if(tab==='problems'){
@@ -9917,7 +9988,7 @@ async function deleteSubcat(id){if(!confirm('Delete?'))return;await sb('subcateg
 async function addModel(){const bid=document.getElementById('new-model-brand')?.value;const no=document.getElementById('new-model-no')?.value.trim();const nm=document.getElementById('new-model-name')?.value.trim();const tp=document.getElementById('new-model-type')?.value||null;const pr=document.getElementById('new-model-price')?.value;if(!no){alert('Enter model no');return;}await sb('models','POST',{brand_id:bid||null,model_no:no,model_name:nm||null,printer_type:tp||null,sale_price:pr?Number(pr):null});await loadMasterData();switchMasterTab('models',null);}
 // Edit Model - assign/change brand and name
 let _editModelId=null;
-function editModel(id, modelNo, modelName, brandId, subcatId, printerType, salePrice){
+function editModel(id, modelNo, modelName, brandId, subcatId, printerType, salePrice, carryInCharge, onsiteCharge){
   _editModelId=id;
   const brandOpts=allBrands.map(b=>'<option value="'+b.id+'"'+(b.id===brandId?' selected':'')+'>'+b.name+'</option>').join('');
   const brandSubcats=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
@@ -9941,14 +10012,29 @@ function editModel(id, modelNo, modelName, brandId, subcatId, printerType, saleP
     +'<select id="em-subcat" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'
     +'<option value="">-- All / General --</option>'+subcatOpts+'</select></div>'
     +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Printer / Product Type</label>'
-    +'<select id="em-type" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+typeOpts+'</select></div>'
-    +'<div style="margin-bottom:20px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sale Price (₹)</label>'
+    +'<select id="em-type" onchange="toggleEditModelOnsiteCharge(this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+typeOpts+'</select></div>'
+    +'<div style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Sale Price (₹)</label>'
     +'<input type="number" id="em-price" value="'+(salePrice||'')+'" min="0" placeholder="e.g. 12500" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
+    +'<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-bottom:20px;">'
+    +'<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;">💰 Service Charges</div>'
+    +'<div style="margin-bottom:'+(MODEL_ONSITE_ELIGIBLE_TYPES.includes(printerType)?'10px':'0')+';"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Carry-In Charge (₹)</label>'
+    +'<input type="number" id="em-carryin-charge" value="'+(carryInCharge||'')+'" min="0" placeholder="e.g. 413" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
+    +'<div id="em-onsite-charge-wrap" style="display:'+(MODEL_ONSITE_ELIGIBLE_TYPES.includes(printerType)?'block':'none')+';"><label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Onsite Charge (₹)</label>'
+    +'<input type="number" id="em-onsite-charge" value="'+(onsiteCharge||'')+'" min="0" placeholder="e.g. 649" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;">'
+    +'<div style="font-size:10px;color:#166534;margin-top:3px;">Only Laser/Inkjet/Photo/Scanner types get Onsite service.</div></div>'
+    +'</div>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;">'
     +'<button onclick="closeEditModelModal()" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Cancel</button>'
     +'<button onclick="saveEditModel()" style="padding:8px 16px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(div);
+}
+function toggleEditModelOnsiteCharge(printerType){
+  var wrap=document.getElementById('em-onsite-charge-wrap');
+  if(!wrap)return;
+  var eligible=MODEL_ONSITE_ELIGIBLE_TYPES.includes(printerType);
+  wrap.style.display=eligible?'block':'none';
+  if(!eligible){var inp=document.getElementById('em-onsite-charge');if(inp)inp.value='';}
 }
 function updateEditModelSubcats(brandId){
   const sc=allSubcats.filter(s=>!brandId||s.brand_id===brandId);
@@ -9962,9 +10048,12 @@ async function saveEditModel(){
   const subcat=document.getElementById('em-subcat')?.value;
   const type=document.getElementById('em-type')?.value||null;
   const price=document.getElementById('em-price')?.value;
+  const carryInCharge=document.getElementById('em-carryin-charge')?.value;
+  const onsiteEligible=MODEL_ONSITE_ELIGIBLE_TYPES.includes(type);
+  const onsiteCharge=onsiteEligible?document.getElementById('em-onsite-charge')?.value:'';
   if(!no){alert('Enter model no');return;}
   try{
-    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null,printer_type:type||null,sale_price:price?Number(price):null},`?id=eq.${_editModelId}`);
+    await sb('models','PATCH',{model_no:no,model_name:name||null,brand_id:brand||null,subcategory_id:subcat||null,printer_type:type||null,sale_price:price?Number(price):null,carry_in_charge:carryInCharge?Number(carryInCharge):null,onsite_charge:onsiteCharge?Number(onsiteCharge):null},`?id=eq.${_editModelId}`);
     document.getElementById('edit-model-modal')?.remove();
     await loadMasterData();switchMasterTab('models',null);
   }catch(e){alert('Error: '+e.message);}
@@ -10016,7 +10105,7 @@ async function editModelById(btn){
     var res=await sb('models','GET',null,'?id=eq.'+id);
     if(!res.length)return;
     var m=res[0];
-    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'',m.printer_type||'',m.sale_price||'');
+    editModel(m.id,m.model_no,m.model_name||'',m.brand_id||'',m.subcategory_id||'',m.printer_type||'',m.sale_price||'',m.carry_in_charge||'',m.onsite_charge||'');
   }catch(e){alert('Error: '+e.message);}
 }
 async function deleteModel(id){if(!confirm('Delete?'))return;await sb('models','DELETE',null,`?id=eq.${id}`);await loadMasterData();switchMasterTab('models',null);}
@@ -12076,7 +12165,7 @@ function openDailyReport(){
   var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
   // Reset call summary fields
-  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
+  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery','dr-pending-parts','dr-pending-approval','dr-pending-other','dr-cust-reject'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
   updateCallTotals();
   // Auto-fill call counts from CRM
   drAutoFillCalls();
@@ -12348,9 +12437,33 @@ async function drAutoFillCalls(){
       if(!lastMatch)return false;
       return new Date(lastMatch.at).toLocaleDateString('en-CA')===date;
     }
-    // Pending calls: engineer visited today (visit_date=today) but still pending
-    var pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&visit_date=eq.'+date+'&select=status').catch(()=>[]);
-    var pendingCount=(pendingTickets||[]).filter(function(t){var s=(t.status||'').toLowerCase();return!s.includes('close')&&!s.includes('cancel');}).length;
+    // Same "actual event date, not just touched today" check, reused for
+    // Customer Reject — a rejected estimate is a discrete event on a specific
+    // day, same as a Closed/Repaired call, so it gets counted the same way
+    // (not lumped into the open Pending backlog below).
+    function customerRejectedToday(t){
+      if(t.status!=='Customer Reject')return false;
+      var tl=t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+      if(!Array.isArray(tl))return false;
+      var lastMatch=null;
+      tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf('Reject')!==-1&&entry.at)lastMatch=entry;});
+      if(!lastMatch)return false;
+      return new Date(lastMatch.at).toLocaleDateString('en-CA')===date;
+    }
+    // Pending calls: current open backlog for this engineer (not date-scoped —
+    // this is "what's still waiting", as of today's report), broken down by
+    // category instead of one aggregate number.
+    var PENDING_PARTS_STATUSES=['Pending Parts','Pending Engineer Stock','Pending Spare'];
+    var PENDING_APPROVAL_STATUSES=['Pending Customer Approval'];
+    var PENDING_OTHER_STATUSES=['Pending Repair Carry In','Pending Repair On Site','Pending Allocation','Pending Customer Arrival','Hold'];
+    var pendingTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=in.('+PENDING_PARTS_STATUSES.concat(PENDING_APPROVAL_STATUSES,PENDING_OTHER_STATUSES).join(',')+')&select=status').catch(()=>[]);
+    var pendingParts=(pendingTickets||[]).filter(function(t){return PENDING_PARTS_STATUSES.includes(t.status);}).length;
+    var pendingApproval=(pendingTickets||[]).filter(function(t){return PENDING_APPROVAL_STATUSES.includes(t.status);}).length;
+    var pendingOther=(pendingTickets||[]).filter(function(t){return PENDING_OTHER_STATUSES.includes(t.status);}).length;
+    // Customer Reject today: needs its own fetch since it may not be in the
+    // `tickets` set above if it wasn't touched today via updated_at/created_at.
+    var rejectTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=eq.Customer Reject&select=status,timeline').catch(()=>[]);
+    var custRejectCount=(rejectTickets||[]).filter(customerRejectedToday).length;
     var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0;
     (tickets||[]).forEach(function(t){
       var ct=t.call_type||'';
@@ -12376,12 +12489,13 @@ async function drAutoFillCalls(){
     });
     // Show pending bar
     var pb=document.getElementById('dr-pending-bar');
-    var pc2=document.getElementById('dr-pending-count');
-    if(pb&&pc2){pb.style.display='flex';pc2.value=pendingCount;}
+    if(pb)pb.style.display='block';
     var setVal=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
     setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);
     setVal('dr-nw-breakdown',nwBreakdown);setVal('dr-nw-repeat',nwRepeat);
     setVal('dr-nw-other',nwOther);setVal('dr-nw-delivery',nwDelivery);
+    setVal('dr-pending-parts',pendingParts);setVal('dr-pending-approval',pendingApproval);setVal('dr-pending-other',pendingOther);
+    setVal('dr-cust-reject',custRejectCount);
     updateCallTotals();
   }catch(e){console.log('drAutoFillCalls error:',e);}
 }
@@ -12406,7 +12520,11 @@ async function saveDailyReport(){
   callSummary.warranty_total=callSummary.w_install+callSummary.w_breakdown+callSummary.w_repeat;
   callSummary.nonwarranty_total=callSummary.nw_breakdown+callSummary.nw_repeat+callSummary.nw_other+callSummary.nw_delivery;
   callSummary.grand_total=callSummary.warranty_total+callSummary.nonwarranty_total;
-  callSummary.pending_calls=parseInt(document.getElementById('dr-pending-count')?.value)||0;
+  callSummary.pending_parts=parseInt(document.getElementById('dr-pending-parts')?.value)||0;
+  callSummary.pending_approval=parseInt(document.getElementById('dr-pending-approval')?.value)||0;
+  callSummary.pending_other=parseInt(document.getElementById('dr-pending-other')?.value)||0;
+  callSummary.pending_calls=callSummary.pending_parts+callSummary.pending_approval+callSummary.pending_other;
+  callSummary.customer_reject=parseInt(document.getElementById('dr-cust-reject')?.value)||0;
   var siteVisits=[]; // kept for backward compat
 
   // Collect office work
@@ -12511,6 +12629,24 @@ function formatDailyReportWA(d){
     lines.push('');
     lines.push('  ─────────────────────');
     lines.push('  🔵 Warranty: *'+wTotal+'*   🔴 Non-W: *'+nwTotal+'*   📊 Total: *'+grandTotal+'*');
+    lines.push('');
+  }
+
+  // Pending backlog
+  var pendingTotal=(cs.pending_parts||0)+(cs.pending_approval||0)+(cs.pending_other||0)||(cs.pending_calls||0);
+  if(pendingTotal>0){
+    lines.push('⏳ *PENDING CALLS*  (Total: '+pendingTotal+')');
+    lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
+    if(cs.pending_parts>0)lines.push('     • Parts: '+cs.pending_parts);
+    if(cs.pending_approval>0)lines.push('     • Approval: '+cs.pending_approval);
+    if(cs.pending_other>0)lines.push('     • Other: '+cs.pending_other);
+    if(!cs.pending_parts&&!cs.pending_approval&&!cs.pending_other&&cs.pending_calls)lines.push('     • '+cs.pending_calls);
+    lines.push('');
+  }
+
+  // Customer Reject
+  if(cs.customer_reject>0){
+    lines.push('❌ *CUSTOMER REJECT (Today):* '+cs.customer_reject);
     lines.push('');
   }
 
