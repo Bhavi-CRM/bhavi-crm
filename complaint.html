@@ -2327,6 +2327,9 @@ const LANG = {
     lbl_serviceMode:"Service Mode",
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"અમારી team આપને confirm કરશે",
+    confirmChargeIntro:"📋 Booking confirm કરતા પહેલા, નીચેની service details ચકાસો:",
+    chip_approveBook:"✅ Approve & Book કરો",
+    chip_cancelBooking:"❌ Cancel કરો",
     p_warrantyStatus:"Product Warranty માં છે કે Non-Warranty માં? (આ પસંદ કરવું ફરજિયાત છે)",
     opt_warranty:"🛡 Under Warranty",
     opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
@@ -2423,6 +2426,9 @@ const LANG = {
     lbl_serviceMode:"Service Mode",
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"Hamari team aapko confirm karegi",
+    confirmChargeIntro:"📋 Booking confirm karne se pehle, neeche di gayi service details check karein:",
+    chip_approveBook:"✅ Approve & Book Karein",
+    chip_cancelBooking:"❌ Cancel Karein",
     p_warrantyStatus:"Product Warranty mein hai ya Non-Warranty mein? (Ye select karna zaroori hai)",
     opt_warranty:"🛡 Under Warranty",
     opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
@@ -2519,6 +2525,9 @@ const LANG = {
     lbl_serviceMode:"Service Mode",
     lbl_serviceCharge:"Service Charge",
     chargeTBD:"Our team will confirm this with you",
+    confirmChargeIntro:"📋 Before we confirm your booking, please review the service details below:",
+    chip_approveBook:"✅ Approve & Book",
+    chip_cancelBooking:"❌ Cancel",
     p_warrantyStatus:"Is the product under Warranty or Non-Warranty? (This selection is mandatory)",
     opt_warranty:"🛡 Under Warranty",
     opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
@@ -2797,7 +2806,7 @@ function bhaiDeviceBrand(deviceLabel){
   if(d.indexOf('canon')>=0||d.indexOf('scanner')>=0)return'Canon';
   return'';
 }
-async function bhaiCreateTicket(a, ctx){
+async function bhaiCreateTicket(a, ctx, chargeAmount){
   var now=new Date();
   var year=now.getFullYear();
   var existing=await sbGet('tickets','?id=like.BEA-'+year+'*&order=id.desc&limit=1');
@@ -2808,9 +2817,7 @@ async function bhaiCreateTicket(a, ctx){
   var isCarryIn = a.serviceMode ? a.serviceMode==='CarryIn' : true;
   var serviceType = isCarryIn ? 'Carry In' : 'On Site';
   var callType = a.warrantyStatus==='Warranty' ? 'Warranty' : 'Non-Warranty';
-  var charges = 0;
-  var rates = SERVICE_CHARGES[ctx.device];
-  if(rates){ var amt = rates[isCarryIn?'CarryIn':'Onsite']; if(amt!=null) charges=amt; }
+  var charges = chargeAmount!=null ? chargeAmount : 0;
   var problemText = (ctx.issue||'') + (a.problem ? ' — '+a.problem : '');
   var descLines=['Booked via Bhavi AI Assistant (Customer Portal)','Device: '+(ctx.device||''),'Issue: '+(ctx.issue||'')];
   if(a.model) descLines.push('Model: '+a.model);
@@ -2837,6 +2844,31 @@ async function bhaiCreateTicket(a, ctx){
   };
   await sbPostMin('tickets', tData);
   return ticketId;
+}
+async function bhaiResolveCharge(a, ctx){
+  if(a.model){
+    try{
+      var rows = await sbGet('models', '?model_no=ilike.*'+encodeURIComponent(a.model.trim())+'*&select=model_no,carry_in_charge,onsite_charge&limit=1');
+      if(rows && rows.length){
+        var amount = a.serviceMode==='Onsite' ? rows[0].onsite_charge : rows[0].carry_in_charge;
+        if(amount!=null) return {amount:Number(amount), text:'₹'+amount};
+      }
+    }catch(e){}
+  }
+  return {amount:null, text: resolveChargeText(a, ctx)};
+}
+async function bhaiBookServiceTicket(a, ctx){
+  var isFreeWarranty = a.warrantyStatus==='Warranty' && a.invoiceAvailable==='Yes';
+  var chargeAmount = 0;
+  if(!isFreeWarranty){
+    var resolved = await bhaiResolveCharge(a, ctx);
+    chargeAmount = resolved.amount!=null ? resolved.amount : 0;
+  }
+  var ticketId = await bhaiCreateTicket(a, ctx, chargeAmount);
+  var msg = fmt(bhaiT('msg_ticketCreated'), {ticketId:ticketId, device:ctx.device||'', issue:ctx.issue||''});
+  return {message:msg, chips:[
+    {label:bhaiT('chip_trackRepair'), action:{type:'flow', id:'trackRepair'}},
+  ]};
 }
 async function bhaiSubmitInquiry(inquiryType, name, mobile, city, description){
   await sbPostMin('auto_inquiries',{
@@ -3012,29 +3044,27 @@ const FLOWS = {
       return s;
     },
     complete:async (a,ctx)=>{
-      try{
-        const ticketId = await bhaiCreateTicket(a, ctx);
-        let msg = fmt(bhaiT('msg_ticketCreated'), {ticketId, device:ctx.device, issue:ctx.issue});
+      // Warranty + invoice available is free — no charge to approve, book straight away.
+      var isFreeWarranty = a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'Yes';
+      if(isFreeWarranty) return await bhaiBookServiceTicket(a, ctx);
 
-        if(a.serviceMode){
-          const modeLabel = a.serviceMode === 'Onsite' ? bhaiT('opt_onsite') : bhaiT('opt_carryIn');
-          msg += `\n${bhaiT('lbl_serviceMode')}: ${modeLabel}`;
-        }
-
-        if(a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'Yes'){
-          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_warranty')} ✅\n${bhaiT('lbl_invoiceDate')}: ${a.invoiceDate || bhaiT('notProvided')}\n\n${bhaiT('msg_warrantyCheck')}`;
-        } else if(a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'No'){
-          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_warranty')} — ${bhaiT('msg_noInvoiceNote')}\n${bhaiT('lbl_serviceCharge')}: ${resolveChargeText(a, ctx)}`;
-        } else {
-          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_nonWarranty')}\n${bhaiT('lbl_serviceCharge')}: ${resolveChargeText(a, ctx)}`;
-        }
-
-        return {message:msg, chips:[
-          {label:bhaiT('chip_trackRepair'), action:{type:'flow', id:'trackRepair'}},
-        ]};
-      }catch(e){
-        return {message: bhaiT('errorFallback')+'\n\n(Error: '+e.message+')', chips:[]};
-      }
+      // Every chargeable case (Non-Warranty, or Warranty without invoice) shows
+      // the real charge and waits for explicit customer approval before the
+      // ticket is actually created — nothing gets booked silently.
+      var resolved = await bhaiResolveCharge(a, ctx);
+      var modeLabel = a.serviceMode ? (a.serviceMode === 'Onsite' ? bhaiT('opt_onsite') : bhaiT('opt_carryIn')) : '';
+      var warrantyLine = a.warrantyStatus === 'Warranty'
+        ? `${bhaiT('lbl_warranty')}: ${bhaiT('opt_warranty')} — ${bhaiT('msg_noInvoiceNote')}`
+        : `${bhaiT('lbl_warranty')}: ${bhaiT('opt_nonWarranty')}`;
+      var msg = `${bhaiT('confirmChargeIntro')}\n\n`
+        + `📱 ${ctx.device||''} — ${ctx.issue||''}\n`
+        + (modeLabel?`${bhaiT('lbl_serviceMode')}: ${modeLabel}\n`:'')
+        + `${warrantyLine}\n`
+        + `${bhaiT('lbl_serviceCharge')}: *${resolved.text}*`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_approveBook'), action:{type:'confirmServiceTicket', a:a, ctx:ctx}},
+        {label:bhaiT('chip_cancelBooking'), action:{type:'menu', id:'main'}},
+      ]};
     }
   },
   leadCapture:{
@@ -3242,6 +3272,10 @@ function bhaiHandleAction(action, parentCtx){
       {label:'AMC', onSelect:()=>bhaiStartFlow('automationQualify', {atype:`CCTV AMC — ${property}`})},
     ]);
   }
+  else if(action.type === 'confirmServiceTicket'){
+    bhaiState.mode = 'flow';
+    bhaiRenderResult(bhaiBookServiceTicket(action.a, action.ctx));
+  }
 }
 
 /* ---------- Flow engine ---------- */
@@ -3321,10 +3355,13 @@ function bhaiRecordAnswer(key, value){
 }
 async function bhaiFinishFlow(){
   const f = bhaiState.flow;
+  await bhaiRenderResult(Promise.resolve(f.def.complete(f.answers, f.ctx)));
+}
+async function bhaiRenderResult(resultPromise){
   bhaiShowTyping();
   let result;
   try{
-    result = await Promise.resolve(f.def.complete(f.answers, f.ctx));
+    result = await resultPromise;
   }catch(e){
     result = {message: bhaiT('errorFallback')+'\n\n(Error: '+e.message+')', chips:[]};
   }
