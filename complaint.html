@@ -2251,484 +2251,1209 @@ function printLabel(){
 }
 
 // ============================================================
-// CUSTOMER CHAT WIDGET
+// BHAVI AI ASSISTANT — full conversational chatbot, wired to the
+// real CRM (Supabase tickets / auto_inquiries tables) so complaint
+// booking creates a real ticket + job sheet, track-repair does a
+// real live lookup, and every inquiry lands in the CRM's Inquiry
+// list with the same email/Telegram notification other inquiries
+// already get (server-side trigger on auto_inquiries insert — no
+// extra client call needed, same as the existing booking wizard).
+// `state`/`t()` are renamed bhaiState/bhaiT to avoid colliding with
+// this page's own booking-wizard `state`/`t()`.
 // ============================================================
-// CUSTOMER CHAT WIDGET — Multilingual (gu / hi / en)
-// ============================================================
-var _chatLang='';
-
-var CHAT_DATA={
+const LANG = {
   gu:{
-    welcome:'👋 <b>સ્વાગત છે!</b> હું Bhavi Assistant છું.<br>કૃપા કરી આપનો પ્રશ્ન પસંદ કરો.',
-    pick:'પ્રશ્ન પસંદ કરો',
-    more:'બીજો પ્રશ્ન પૂછો',
-    searchPh:'Model no. અથવા Product name type કરો...',
-    searchBtn:'🔍 શોધો',
-    searching:'શોધી રહ્યા છીએ...',
-    noResult:'કોઈ model મળ્યું નહીં. બીજો શબ્દ try કરો.',
-    backBtn:'← પ્રશ્ન પર પાછા જાઓ',
-    purch:{
-      typePick:'📦 કઈ category ની printer / product જોઈએ?',
-      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'🖷 Scanner',v:'scanner'},{l:'📋 બધા Models',v:'all'}],
-      searchPh:'Model no. type કરો... (e.g. G3010)',
-      noResult:'Model મળ્યું નહીં. બીજો keyword try કરો.',
-      noPrice:'ભાવ inquiry ઉપર',
-      brochureBtn:'📄 Brochure',
-      buyBtn:'🛒 ખરીદવા માંગો?',
-      namePh:'Full Name',
-      mobilePh:'Mobile Number (10 digits)',
-      submitBtn:'✅ Inquiry મોકલો',
-      sent:'🎉 Inquiry નોંધાઈ ગઈ! ટૂંક સમયમાં call / WhatsApp આવશે.',
-      backBtn:'← પ્રશ્ન પર પાછા જાઓ'
-    },
-    track:{
-      prompt:'📱 તમારો Mobile Number આપો, અમે તમારી complaint ની live status બતાવીશું.',
-      mobilePh:'Mobile Number (10 digits)',
-      searchBtn:'🔍 Status જુઓ',
-      searching:'શોધી રહ્યા છીએ...',
-      noResult:'આ mobile number સાથે કોઈ complaint મળી નહીં.',
-      invalidMobile:'કૃપા કરી સાચો 10-digit mobile number આપો.',
-      backBtn:'← પ્રશ્ન પર પાછા જાઓ'
-    },
-    qa:[
-      {q:'🛍️ Product ખરીદવી / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
-      {q:'🔍 Product / Model શોધો',a:'__MODEL_SEARCH__'},
-      {q:'🕐 Repair કેટલા સમયમાં થાય?',
-       a:'સામાન્ય રીતે <b>3–5 working days</b>માં repair થાય. Complex problems માટે વધુ સમય લાગી શકે. Ticket no. થી track કરી શકો.'},
-      {q:'💰 Service charge કેટલો છે?',
-       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate પ્રમાણે અલગ.'},
-      {q:'📦 મારી complaint track કેવી રીતે કરું?',a:'__TRACK_COMPLAINT__'},
-      {q:'🛡️ Repair પર warranty મળે છે?',
-       a:'હા! Repaired parts પર <b>90 days ની warranty</b> આપવામાં આવે છે.'},
-      {q:'📷 કયા products service થાય?',
-       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
-      {q:'💳 Payment કેવી રીતે થાય?',
-       a:'Cash અને UPI બંને accept થાય.<br><b>Carry-in:</b> Office પર payment.<br><b>Onsite:</b> Engineer ને ઘરે payment.'},
-      {q:'📞 Contact / વધુ માહિતી',a:'__CONTACT__'},
-    ]
+    greeting:"નમસ્તે! 👋 Bhavi Electronics & Automation માં તમારું સ્વાગત છે.\n\nહું Bhavi AI Assistant છું — sales, service અને automation ને લગતી કોઈ પણ જરૂરિયાત માટે હું હાજર છું.\n\n✨ Where Customer Delight is First",
+    askLanguage:"શરૂઆત કરવા માટે, કૃપા કરી તમારી પસંદગીની ભાષા પસંદ કરો:",
+    langConfirmed:"બરાબર, હવેથી આપણે ગુજરાતીમાં વાત કરીશું ✅",
+    mainMenuTitle:"📋 મુખ્ય મેનુ — શું કામ કરવું છે?",
+    backMain:"🏠 મુખ્ય મેનુ",
+    restart:"⟳ ફરી શરૂ કરો",
+    placeholder:"તમારો જવાબ ટાઈપ કરો...",
+    chooseOption:"નીચેથી એક વિકલ્પ પસંદ કરો:",
+    errorFallback:"માફ કરજો, આ request હું process કરી ના શક્યો 🙏 ચાલો આપણે Main Menu પરથી પાછા શરૂ કરીએ, જેથી હું સાચી રીતે તમારી મદદ કરી શકું.",
+    skip:"છોડો / નથી",
+    notProvided:"—",
+    p_name:"તમારું નામ શું છે?",
+    p_mobile:"તમારો મોબાઈલ નંબર આપો:",
+    p_city:"તમે કયા શહેર/વિસ્તારમાં છો?",
+    p_budget:"તમારું અંદાજિત બજેટ શું છે? (છોડી પણ શકો છો)",
+    p_date:"તમારી પસંદગીની તારીખ/સમય જણાવો:",
+    p_model:"Product/Model નંબર ખબર હોય તો આપો (વૈકલ્પિક):",
+    p_serial:"Serial નંબર ખબર હોય તો આપો (વૈકલ્પિક):",
+    p_problem:"Problem વિશે થોડું વધારે વિગતવાર જણાવો:",
+    p_photo:"Problem નો photo store visit વખતે બતાવશો કે અત્યારે share કરશો?",
+    p_invoice:"Purchase invoice/bill તમારી પાસે છે?",
+    p_location:"Site/property નું location (વિસ્તાર/શહેર):",
+    p_requirement:"તમારી જરૂરિયાત ટૂંકમાં જણાવો:",
+    p_propertyType:"Property type પસંદ કરો:",
+    p_roomSize:"Room ની અંદાજિત size (sq.ft અથવા feet માં):",
+    p_technology:"Automation કઈ technology થી જોઈએ છે?",
+    p_monthlyPrint:"મહિનામાં આશરે કેટલા prints થાય છે?",
+    p_needType:"તમારે શું જોઈએ છે?",
+    p_connectivity:"Connectivity કઈ જોઈએ છે?",
+    p_scannerType:"કયા type નું scanner જોઈએ છે?",
+    p_dailyScan:"રોજના આશરે કેટલા scan થાય છે?",
+    p_duplex:"Duplex (બંને બાજુ) scanning જોઈએ છે?",
+    p_photoUsage:"Photo printer કયા માટે જોઈએ છે?",
+    p_paperSize:"કયું paper size જોઈએ છે?",
+    p_instaxOccasion:"કયા occasion માટે જોઈએ છે? (gift, party, travel, વગેરે)",
+    p_projectorNeeds:"Projector સાથે બીજું શું જોઈએ છે?",
+    p_roomType:"Living room કે dedicated theatre room?",
+    p_displayType:"TV જોઈએ કે Projector?",
+    p_priority:"સૌથી વધારે શું use થશે?",
+    p_acoustic:"Acoustic treatment (sound-proofing/design) જોઈએ છે?",
+    p_automationIntegration:"Home automation સાથે integrate કરવું છે?",
+    p_jobOrMobile:"Job Sheet Number અથવા Mobile Number ટાઈપ કરો:",
+    msg_ticketCreated:"✅ તમારું Service Ticket બની ગયું છે!\n\nTicket ID: {ticketId}\nDevice: {device}\nIssue: {issue}\n\nઅમારો engineer તરત જ assign થશે અને તમને call/WhatsApp પર update મળશે.",
+    msg_leadCreated:"✅ આભાર {name}! તમારી details save થઈ ગઈ છે. અમારી team {mobile} પર તરત contact કરશે.",
+    msg_expertConnect:"✅ આભાર {name}! {expert} તમને {mobile} પર તરત contact કરશે.",
+    msg_siteVisitAssigned:"✅ આભાર! તમારી site visit request નોંધાઈ ગઈ છે. Consultant {date} ના રોજ contact કરશે.",
+    msg_companyInfo:"🏠 Bhavi Electronics & Automation\n\n✅ Authorized Service Centre (All Gujarat): Canon Camera, Panasonic Camera, Fujifilm Camera, Godox, Casio Keyboard\n✅ Sales & Service (Ahmedabad & Nearby): Canon Printer, Scanner, Photo Printer, Projectors\n✅ Fujifilm Instax: All Gujarat\n✅ Automation: Home, Office, Security, Entertainment & Business Solutions",
+    chip_getQuotation:"📄 Quotation મેળવો",
+    chip_talkToSales:"☎ Sales સાથે વાત કરો",
+    chip_trackRepair:"📦 Repair Track કરો",
+    chip_bookSiteVisit:"📅 Site Visit Book કરો",
+    chip_contactExpert:"☎ Expert નો Contact કરો",
+    recommendIntro:"🤖 તમારી જરૂરિયાત ના આધારે, અમારી professional ભલામણ:",
+    lbl_city:"શહેર",
+    profileFound:"👤 તમે અમારી સાથે પહેલેથી registered છો:\n\nનામ: {name}\nMobile: {mobile}{cityLine}\n\nશું હું આ details use કરું, કે નવી details લઉં?",
+    useSaved:"✅ હા, આ Details Use Karo",
+    enterNew:"✏️ ના, નવી Details આપવી છે",
+    kbFollowup:"વધુ કોઈ પ્રશ્ન હોય તો પૂછો, અથવા નીચેથી આગળ વધો:",
+    p_serviceMode:"તમે Service કઈ રીતે કરાવવા માંગો છો? (આ પસંદ કરવું ફરજિયાત છે)",
+    opt_onsite:"🏠 Onsite Service (Engineer તમારા સ્થળે આવશે)",
+    opt_carryIn:"🏬 Carry-In Service (તમે product store પર લાવશો)",
+    lbl_serviceMode:"Service Mode",
+    lbl_serviceCharge:"Service Charge",
+    chargeTBD:"અમારી team આપને confirm કરશે",
+    p_warrantyStatus:"Product Warranty માં છે કે Non-Warranty માં? (આ પસંદ કરવું ફરજિયાત છે)",
+    opt_warranty:"🛡 Under Warranty",
+    opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
+    p_invoiceAvailable:"Purchase invoice/bill તમારી પાસે છે?",
+    p_invoiceDate:"Purchase invoice/bill ની તારીખ જણાવો:",
+    lbl_warranty:"Warranty Status",
+    lbl_invoiceDate:"Invoice Date",
+    msg_warrantyCheck:"🔍 અમારો engineer product અને invoice check કરશે અને warranty eligibility confirm કરશે — જો warranty valid હોય તો કોઈ charge લાગશે નહીં.",
+    msg_noInvoiceNote:"invoice ના હોવાથી warranty verify કરી શકાય નહીં, એટલે standard service charge લાગુ થશે.",
+    opt_photoLater:"🏬 Store Visit વખતે બતાવીશ",
+    opt_photoNow:"📸 અત્યારે Share કરીશ",
+    menuTitle_buy:"🛒 Buy Products — કયું product જોઈએ છે?",
+    menuTitle_printerType:"🖨 Canon Printer — કયા use માટે જોઈએ છે?",
+    menuTitle_instax:"📸 Fujifilm Instax — શું જોઈએ છે?",
+    menuTitle_buyProjector:"📽 Projector કયા માટે જોઈએ છે?",
+    menuTitle_projectorsTop:"📽 Projectors — શું જોઈએ છે?",
+    menuTitle_serviceDevice:"🛠 Book Service — કયા device માટે?",
+    menuTitle_automation:"🏡 Automation Solutions — કયો type જોઈએ છે?",
+    menuTitle_vdp:"📹 Video Door Phone — property type?",
+    menuTitle_panel:"🖥 Interactive Panels — ક્યાં માટે જોઈએ છે?",
+    menuTitle_cctv:"📹 CCTV & Security — property type?",
+    menuTitle_hometheatre:"🎬 Home Theatre & Custom AV — શું જોઈએ છે?",
+    menuTitle_contactExpert:"☎ Contact Expert — કયા expert સાથે વાત કરવી છે?",
+    dynTitle_deviceIssue:"🛠 {device} — problem પસંદ કરો:",
+    dynTitle_cctvOptions:"📹 CCTV ({property}) — શું જોઈએ છે?",
+    dynTitle_cctvIssue:"🛠 CCTV ({property}) — issue પસંદ કરો:",
+    invalidMobile:"કૃપા કરી સાચો 10-અંકનો Mobile Number આપો.",
+    trackNotFound:"આ Mobile Number / Job Sheet Number સાથે કોઈ complaint મળી નહીં.",
+    trackFoundIntro:"તમારી Complaint(s) ની Live Status:",
+    lbl_engineer:"Engineer",
   },
   hi:{
-    welcome:'👋 <b>आपका स्वागत है!</b> मैं Bhavi Assistant हूँ.<br>कृपया अपना प्रश्न चुनें।',
-    pick:'प्रश्न चुनें',
-    more:'दूसरा प्रश्न पूछें',
-    searchPh:'Model no. या Product name type करें...',
-    searchBtn:'🔍 खोजें',
-    searching:'खोज रहे हैं...',
-    noResult:'कोई model नहीं मिला. दूसरा शब्द try करें.',
-    backBtn:'← प्रश्न पर वापस जाएं',
-    purch:{
-      typePick:'📦 किस category का printer / product चाहिए?',
-      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'🖷 Scanner',v:'scanner'},{l:'📋 सभी Models',v:'all'}],
-      searchPh:'Model no. type करें... (e.g. G3010)',
-      noResult:'Model नहीं मिला. दूसरा keyword try करें.',
-      noPrice:'Price on inquiry',
-      brochureBtn:'📄 Brochure',
-      buyBtn:'🛒 खरीदना चाहते हैं?',
-      namePh:'Full Name',
-      mobilePh:'Mobile Number (10 digits)',
-      submitBtn:'✅ Inquiry भेजें',
-      sent:'🎉 Inquiry मिल गई! जल्द call / WhatsApp आएगा।',
-      backBtn:'← प्रश्न पर वापस जाएं'
-    },
-    track:{
-      prompt:'📱 अपना Mobile Number दें, हम आपकी complaint की live status दिखाएंगे।',
-      mobilePh:'Mobile Number (10 digits)',
-      searchBtn:'🔍 Status देखें',
-      searching:'खोज रहे हैं...',
-      noResult:'इस mobile number से कोई complaint नहीं मिली।',
-      invalidMobile:'कृपया सही 10-अंकों का mobile number डालें।',
-      backBtn:'← प्रश्न पर वापस जाएं'
-    },
-    qa:[
-      {q:'🛍️ Product खरीदनी है / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
-      {q:'🔍 Product / Model खोजें',a:'__MODEL_SEARCH__'},
-      {q:'🕐 Repair में कितना समय लगेगा?',
-       a:'आमतौर पर <b>3–5 working days</b> में repair होती है. जटिल समस्याओं में अधिक समय लग सकता है. Ticket no. से track करें.'},
-      {q:'💰 Service charge कितना है?',
-       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges estimate के अनुसार अलग.'},
-      {q:'📦 मेरी complaint track कैसे करूँ?',a:'__TRACK_COMPLAINT__'},
-      {q:'🛡️ Repair पर warranty मिलती है?',
-       a:'हाँ! Repaired parts पर <b>90 days की warranty</b> दी जाती है.'},
-      {q:'📷 कौन से products service होते हैं?',
-       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
-      {q:'💳 Payment कैसे होती है?',
-       a:'Cash और UPI दोनों accept होते हैं.<br><b>Carry-in:</b> Office पर payment.<br><b>Onsite:</b> Engineer को घर पर payment.'},
-      {q:'📞 Contact / अधिक जानकारी',a:'__CONTACT__'},
-    ]
+    greeting:"Namaste! 👋 Bhavi Electronics & Automation mein aapka swagat hai.\n\nMain Bhavi AI Assistant hoon — sales, service aur automation se judi kisi bhi zaroorat ke liye yahan hoon.\n\n✨ Where Customer Delight is First",
+    askLanguage:"Shuru karne ke liye, apni preferred bhasha select karein:",
+    langConfirmed:"Theek hai, ab hum Hindi mein baat karenge ✅",
+    mainMenuTitle:"📋 Main Menu — kya karna hai?",
+    backMain:"🏠 Main Menu",
+    restart:"⟳ Restart",
+    placeholder:"Apna jawab type karein...",
+    chooseOption:"Neeche se ek option select karein:",
+    errorFallback:"Maaf kijiye, main is request ko process nahi kar paaya 🙏 Chaliye Main Menu se dobara shuru karte hain, taaki main sahi tarah madad kar sakoon.",
+    skip:"Skip / Nahi",
+    notProvided:"—",
+    p_name:"Aapka naam kya hai?",
+    p_mobile:"Apna mobile number dein:",
+    p_city:"Aap kis city/area mein hain?",
+    p_budget:"Aapka approx budget kya hai? (Skip bhi kar sakte hain)",
+    p_date:"Preferred date/time jaisa aap chahein:",
+    p_model:"Product/Model number pata ho to dein (optional):",
+    p_serial:"Serial number pata ho to dein (optional):",
+    p_problem:"Problem ke baare mein thoda aur detail mein bataayein:",
+    p_photo:"Problem ka photo store visit ke time dikhayenge ya abhi share karenge?",
+    p_invoice:"Purchase invoice/bill aapke paas hai?",
+    p_location:"Site/property ka location (area/city):",
+    p_requirement:"Apni requirement short mein batayein:",
+    p_propertyType:"Property type select karein:",
+    p_roomSize:"Room ka approx size (sq.ft ya feet mein):",
+    p_technology:"Automation kis technology se chahiye?",
+    p_monthlyPrint:"Monthly kitne prints hote hain?",
+    p_needType:"Aapko kya chahiye?",
+    p_connectivity:"Connectivity kaunsi chahiye?",
+    p_scannerType:"Kaunsa scanner type chahiye?",
+    p_dailyScan:"Daily kitne scan hote hain? (approx)",
+    p_duplex:"Duplex (both-side) scanning chahiye?",
+    p_photoUsage:"Photo printer kis liye chahiye?",
+    p_paperSize:"Kaunsa paper size chahiye?",
+    p_instaxOccasion:"Kis occasion ke liye chahiye? (gift, party, travel, etc.)",
+    p_projectorNeeds:"Projector ke saath aur kya chahiye?",
+    p_roomType:"Living room ya dedicated theatre room?",
+    p_displayType:"TV chahiye ya Projector?",
+    p_priority:"Sabse zyada kya use hoga?",
+    p_acoustic:"Acoustic treatment (sound-proofing/design) chahiye?",
+    p_automationIntegration:"Home automation ke saath integrate karna hai?",
+    p_jobOrMobile:"Job Sheet Number ya Mobile Number type karein:",
+    msg_ticketCreated:"✅ Aapka Service Ticket ban gaya hai!\n\nTicket ID: {ticketId}\nDevice: {device}\nIssue: {issue}\n\nHamara engineer turant assign hoga aur aapko call/WhatsApp par update milega.",
+    msg_leadCreated:"✅ Dhanyavaad {name}! Aapki details save ho gayi hain. Hamari team {mobile} par turant contact karegi.",
+    msg_expertConnect:"✅ Dhanyavaad {name}! {expert} aapko {mobile} par turant contact karenge.",
+    msg_siteVisitAssigned:"✅ Dhanyavaad! Aapka site visit request note ho gaya hai. Consultant {date} ko contact karega.",
+    msg_companyInfo:"🏠 Bhavi Electronics & Automation\n\n✅ Authorized Service Centre (All Gujarat): Canon Camera, Panasonic Camera, Fujifilm Camera, Godox, Casio Keyboard\n✅ Sales & Service (Ahmedabad & Nearby): Canon Printer, Scanner, Photo Printer, Projectors\n✅ Fujifilm Instax: All Gujarat\n✅ Automation: Home, Office, Security, Entertainment & Business Solutions",
+    chip_getQuotation:"📄 Quotation Lein",
+    chip_talkToSales:"☎ Talk to Sales",
+    chip_trackRepair:"📦 Track Repair",
+    chip_bookSiteVisit:"📅 Book Site Visit",
+    chip_contactExpert:"☎ Contact Expert",
+    recommendIntro:"🤖 Aapki zaroorat ke aadhar par, hamari professional recommendation:",
+    lbl_city:"City",
+    profileFound:"👤 Aap hamare saath pehle se registered hain:\n\nNaam: {name}\nMobile: {mobile}{cityLine}\n\nKya main yehi details use karoon, ya naye details lein?",
+    useSaved:"✅ Haan, Yehi Details Use Karo",
+    enterNew:"✏️ Nahi, Naye Details Denge",
+    kbFollowup:"Aur koi sawaal ho to poochein, ya neeche se aage badhein:",
+    p_serviceMode:"Aap Service kaise karwana chahte hain? (Ye select karna zaroori hai)",
+    opt_onsite:"🏠 Onsite Service (Engineer aapke sthaan par aayega)",
+    opt_carryIn:"🏬 Carry-In Service (Aap product store le aayenge)",
+    lbl_serviceMode:"Service Mode",
+    lbl_serviceCharge:"Service Charge",
+    chargeTBD:"Hamari team aapko confirm karegi",
+    p_warrantyStatus:"Product Warranty mein hai ya Non-Warranty mein? (Ye select karna zaroori hai)",
+    opt_warranty:"🛡 Under Warranty",
+    opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
+    p_invoiceAvailable:"Purchase invoice/bill aapke paas hai?",
+    p_invoiceDate:"Purchase invoice/bill ki date bataayein:",
+    lbl_warranty:"Warranty Status",
+    lbl_invoiceDate:"Invoice Date",
+    msg_warrantyCheck:"🔍 Hamara engineer product aur invoice check karega aur warranty eligibility confirm karega — agar warranty valid hai to koi charge nahi lagega.",
+    msg_noInvoiceNote:"invoice na hone se warranty verify nahi ho sakti, isliye standard service charge lagu hoga.",
+    opt_photoLater:"🏬 Store Visit ke waqt dikhaunga",
+    opt_photoNow:"📸 Abhi Share Karunga",
+    menuTitle_buy:"🛒 Buy Products — कौनसा product चाहिए?",
+    menuTitle_printerType:"🖨 Canon Printer — किस use ke liye chahiye?",
+    menuTitle_instax:"📸 Fujifilm Instax — क्या चाहिए?",
+    menuTitle_buyProjector:"📽 Projector kis liye chahiye?",
+    menuTitle_projectorsTop:"📽 Projectors — क्या चाहिए?",
+    menuTitle_serviceDevice:"🛠 Book Service — किस device ke liye?",
+    menuTitle_automation:"🏡 Automation Solutions — कौनसा type chahiye?",
+    menuTitle_vdp:"📹 Video Door Phone — property type?",
+    menuTitle_panel:"🖥 Interactive Panels — kahaan ke liye chahiye?",
+    menuTitle_cctv:"📹 CCTV & Security — property type?",
+    menuTitle_hometheatre:"🎬 Home Theatre & Custom AV — क्या चाहिए?",
+    menuTitle_contactExpert:"☎ Contact Expert — kis expert se baat karni hai?",
+    dynTitle_deviceIssue:"🛠 {device} — problem चुनें:",
+    dynTitle_cctvOptions:"📹 CCTV ({property}) — क्या चाहिए?",
+    dynTitle_cctvIssue:"🛠 CCTV ({property}) — issue चुनें:",
+    invalidMobile:"Kripya sahi 10-ank ka Mobile Number dein.",
+    trackNotFound:"Is Mobile Number / Job Sheet Number se koi complaint nahi mili.",
+    trackFoundIntro:"Aapki Complaint(s) ki Live Status:",
+    lbl_engineer:"Engineer",
   },
   en:{
-    welcome:'👋 <b>Welcome!</b> I am Bhavi Assistant.<br>Please select your question below.',
-    pick:'Select a question',
-    more:'Ask another question',
-    searchPh:'Type model no. or product name...',
-    searchBtn:'🔍 Search',
-    searching:'Searching...',
-    noResult:'No model found. Try a different keyword.',
-    backBtn:'← Back to questions',
-    purch:{
-      typePick:'📦 Which category of printer / product do you need?',
-      typeOpts:[{l:'🖨️ Laser Printer',v:'laser'},{l:'💧 Inkjet Printer',v:'inkjet'},{l:'📸 Photo Printer',v:'photo'},{l:'🖷 Scanner',v:'scanner'},{l:'📋 All Models',v:'all'}],
-      searchPh:'Type model no... (e.g. G3010)',
-      noResult:'No model found. Try a different keyword.',
-      noPrice:'Price on request',
-      brochureBtn:'📄 Brochure',
-      buyBtn:'🛒 Want to Buy?',
-      namePh:'Full Name',
-      mobilePh:'Mobile Number (10 digits)',
-      submitBtn:'✅ Send Inquiry',
-      sent:'🎉 Inquiry received! We will call / WhatsApp you shortly.',
-      backBtn:'← Back to questions'
-    },
-    track:{
-      prompt:'📱 Enter your Mobile Number and we\'ll show your complaint status live.',
-      mobilePh:'Mobile Number (10 digits)',
-      searchBtn:'🔍 Check Status',
-      searching:'Searching...',
-      noResult:'No complaints found for this mobile number.',
-      invalidMobile:'Please enter a valid 10-digit mobile number.',
-      backBtn:'← Back to questions'
-    },
-    qa:[
-      {q:'🛍️ Buy a Product / Purchase Inquiry',a:'__PURCHASE_INQUIRY__'},
-      {q:'🔍 Search Product / Model',a:'__MODEL_SEARCH__'},
-      {q:'🕐 How long does repair take?',
-       a:'Usually <b>3–5 working days</b>. Complex problems may take longer. You can track status using your ticket number.'},
-      {q:'💰 What is the service charge?',
-       a:'<b>Carry-in Service:</b> Rs. 413/- (non-refundable)<br><b>Onsite Visit:</b> Rs. 649/- (non-refundable)<br>Parts / spare charges extra as per estimate.'},
-      {q:'📦 How do I track my complaint?',a:'__TRACK_COMPLAINT__'},
-      {q:'🛡️ Is there warranty on repairs?',
-       a:'Yes! A <b>90-day warranty</b> is provided on all repaired parts.'},
-      {q:'📷 Which products do you service?',
-       a:'📷 Cameras (Canon, Panasonic, Fujifilm, Instax)<br>🖨️ Printers &amp; Scanners (Canon)<br>📽️ Projectors (Casio)<br>⚡ Flash/Lights (Canon, Godox)<br>🎵 Musical Instruments'},
-      {q:'💳 How do I pay?',
-       a:'Cash and UPI both accepted.<br><b>Carry-in:</b> Pay at office.<br><b>Onsite:</b> Pay engineer at your door.'},
-      {q:'📞 Contact / More Info',a:'__CONTACT__'},
-    ]
+    greeting:"Hello! 👋 Welcome to Bhavi Electronics & Automation.\n\nI'm your Bhavi AI Assistant — here to help with sales, service, and automation needs.\n\n✨ Where Customer Delight is First",
+    askLanguage:"To get started, please select your preferred language:",
+    langConfirmed:"Great, we'll continue in English ✅",
+    mainMenuTitle:"📋 Main Menu — how can I help?",
+    backMain:"🏠 Main Menu",
+    restart:"⟳ Restart",
+    placeholder:"Type your reply...",
+    chooseOption:"Please select an option below:",
+    errorFallback:"I'm sorry, I wasn't able to process that request 🙏 Let's return to the Main Menu so I can assist you properly.",
+    skip:"Skip",
+    notProvided:"—",
+    p_name:"What's your name?",
+    p_mobile:"Please share your mobile number:",
+    p_city:"Which city/area are you in?",
+    p_budget:"What's your approximate budget? (you can skip)",
+    p_date:"Preferred date/time:",
+    p_model:"Product/model number if known (optional):",
+    p_serial:"Serial number if known (optional):",
+    p_problem:"Please describe the problem in a bit more detail:",
+    p_photo:"Will you share a photo now, or show it at store visit?",
+    p_invoice:"Do you have the purchase invoice/bill?",
+    p_location:"Site/property location (area/city):",
+    p_requirement:"Briefly describe your requirement:",
+    p_propertyType:"Select property type:",
+    p_roomSize:"Approx room size (sq.ft or feet):",
+    p_technology:"Which automation technology do you prefer?",
+    p_monthlyPrint:"How many prints per month approx?",
+    p_needType:"What do you need?",
+    p_connectivity:"Which connectivity do you need?",
+    p_scannerType:"Which scanner type do you need?",
+    p_dailyScan:"How many scans per day approx?",
+    p_duplex:"Do you need duplex (both-side) scanning?",
+    p_photoUsage:"What's the photo printer for?",
+    p_paperSize:"Which paper size do you need?",
+    p_instaxOccasion:"What's the occasion? (gift, party, travel, etc.)",
+    p_projectorNeeds:"What else do you need with the projector?",
+    p_roomType:"Living room or a dedicated theatre room?",
+    p_displayType:"TV or Projector?",
+    p_priority:"What will it mostly be used for?",
+    p_acoustic:"Do you need acoustic treatment (sound-proofing/design)?",
+    p_automationIntegration:"Do you want it integrated with home automation?",
+    p_jobOrMobile:"Type your Job Sheet Number or Mobile Number:",
+    msg_ticketCreated:"✅ Your Service Ticket has been created!\n\nTicket ID: {ticketId}\nDevice: {device}\nIssue: {issue}\n\nAn engineer will be assigned shortly and you'll get updates via call/WhatsApp.",
+    msg_leadCreated:"✅ Thank you {name}! Your details are saved. Our team will contact you shortly on {mobile}.",
+    msg_expertConnect:"✅ Thank you {name}! {expert} will contact you shortly on {mobile}.",
+    msg_siteVisitAssigned:"✅ Thank you! Your site visit request is noted. Our consultant will contact you on {date}.",
+    msg_companyInfo:"🏠 Bhavi Electronics & Automation\n\n✅ Authorized Service Centre (All Gujarat): Canon Camera, Panasonic Camera, Fujifilm Camera, Godox, Casio Keyboard\n✅ Sales & Service (Ahmedabad & Nearby): Canon Printer, Scanner, Photo Printer, Projectors\n✅ Fujifilm Instax: All Gujarat\n✅ Automation: Home, Office, Security, Entertainment & Business Solutions",
+    chip_getQuotation:"📄 Get Quotation",
+    chip_talkToSales:"☎ Talk to Sales",
+    chip_trackRepair:"📦 Track Repair",
+    chip_bookSiteVisit:"📅 Book Site Visit",
+    chip_contactExpert:"☎ Contact Expert",
+    recommendIntro:"🤖 Based on your requirements, here is our professional recommendation:",
+    lbl_city:"City",
+    profileFound:"👤 Welcome back — we already have your details on file:\n\nName: {name}\nMobile: {mobile}{cityLine}\n\nShould I use these saved details, or would you like to provide new ones?",
+    useSaved:"✅ Yes, Use These Details",
+    enterNew:"✏️ No, Enter New Details",
+    kbFollowup:"Happy to help with anything else — feel free to ask, or continue below:",
+    p_serviceMode:"How would you like the service done? (This selection is mandatory)",
+    opt_onsite:"🏠 Onsite Service (engineer visits you)",
+    opt_carryIn:"🏬 Carry-In Service (you bring it to our store)",
+    lbl_serviceMode:"Service Mode",
+    lbl_serviceCharge:"Service Charge",
+    chargeTBD:"Our team will confirm this with you",
+    p_warrantyStatus:"Is the product under Warranty or Non-Warranty? (This selection is mandatory)",
+    opt_warranty:"🛡 Under Warranty",
+    opt_nonWarranty:"💳 Non-Warranty (Chargeable)",
+    p_invoiceAvailable:"Do you have the purchase invoice/bill?",
+    p_invoiceDate:"Please provide the purchase invoice/bill date:",
+    lbl_warranty:"Warranty Status",
+    lbl_invoiceDate:"Invoice Date",
+    msg_warrantyCheck:"🔍 Our engineer will inspect the product and invoice to confirm warranty eligibility — if the warranty is valid, no charge will apply.",
+    msg_noInvoiceNote:"without an invoice, warranty cannot be verified, so the standard service charge will apply.",
+    opt_photoLater:"🏬 I'll show it at store visit",
+    opt_photoNow:"📸 I'll share it now",
+    menuTitle_buy:"🛒 Buy Products — which product do you need?",
+    menuTitle_printerType:"🖨 Canon Printer — what will you use it for?",
+    menuTitle_instax:"📸 Fujifilm Instax — what do you need?",
+    menuTitle_buyProjector:"📽 What's the projector for?",
+    menuTitle_projectorsTop:"📽 Projectors — what do you need?",
+    menuTitle_serviceDevice:"🛠 Book Service — which device?",
+    menuTitle_automation:"🏡 Automation Solutions — which type do you need?",
+    menuTitle_vdp:"📹 Video Door Phone — property type?",
+    menuTitle_panel:"🖥 Interactive Panels — where do you need it?",
+    menuTitle_cctv:"📹 CCTV & Security — property type?",
+    menuTitle_hometheatre:"🎬 Home Theatre & Custom AV — what do you need?",
+    menuTitle_contactExpert:"☎ Contact Expert — which expert would you like to talk to?",
+    dynTitle_deviceIssue:"🛠 {device} — select the issue:",
+    dynTitle_cctvOptions:"📹 CCTV ({property}) — what do you need?",
+    dynTitle_cctvIssue:"🛠 CCTV ({property}) — select the issue:",
+    invalidMobile:"Please enter a valid 10-digit Mobile Number.",
+    trackNotFound:"No complaints found for this Mobile Number / Job Sheet Number.",
+    trackFoundIntro:"Live status for your complaint(s):",
+    lbl_engineer:"Engineer",
   }
 };
+function bhaiT(key){ return (LANG[bhaiState.lang] && LANG[bhaiState.lang][key]) || LANG.en[key] || key; }
+function fmt(str, vars){ return str.replace(/\{(\w+)\}/g, (m,k)=> (vars[k]!==undefined? vars[k] : m)); }
+function YN(){ return bhaiState.lang==='gu' ? ['હા','ના'] : bhaiState.lang==='hi' ? ['हाँ','नहीं'] : ['Yes','No']; }
 
-function openChat(){
-  _chatLang='';
-  document.getElementById('chat-modal').style.display='';
-  document.getElementById('chat-msgs').innerHTML='';
-  // Step 1: Language selection
-  document.getElementById('chat-q-area').innerHTML=
-    '<div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:10px;text-align:center;">🌐 ભાષા / भाषा / Language</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
-    +_langBtn('gu','🇮🇳','ગુજરાતી')
-    +_langBtn('hi','🇮🇳','हिंदी')
-    +_langBtn('en','🇬🇧','English')
-    +'</div>';
-}
+/* ============================================================
+   STATIC DATA: DEVICES for Service Tickets
+   ============================================================ */
+const DEVICES = [
+  {id:'canonCamera', label:'Canon Camera', issues:['Camera Not ON','Lens Error','Focus Issue','Sensor Cleaning','Firmware Update','Repair Estimate','Courier Service']},
+  {id:'panasonicCamera', label:'Panasonic Camera', issues:['Camera Not ON','Lens Issue','Focus Issue','General Service','Repair Estimate','Courier Service']},
+  {id:'fujifilmCamera', label:'Fujifilm Camera', issues:['Camera Error','Lens Issue','Sensor Cleaning','Repair Estimate','Courier Service']},
+  {id:'canonPrinterSvc', label:'Canon Printer', issues:['Not Printing','Paper Jam','Offline','Ink Error','Wi-Fi Issue','Installation','Driver','Book Engineer'], serviceModeApplicable:true},
+  {id:'scannerSvc', label:'Canon Scanner', issues:['Not Scanning','Driver','Paper Jam','ADF Issue','Book Engineer'], serviceModeApplicable:true},
+  {id:'projectorSvc', label:'Projector', issues:['Lamp Issue','Image Problem','HDMI Issue','Installation','AMC','Engineer Visit']},
+  {id:'godox', label:'Godox', issues:['Flash Not ON','Trigger Issue','LED Issue','Estimate','Courier']},
+  {id:'casio', label:'Casio Keyboard', issues:['No Power','Key Problem','No Sound','Display Error','Estimate']},
+  {id:'instaxSvc', label:'Fujifilm Instax', issues:['Camera Repair','Film Issue','Warranty','Book Service']},
+];
+const CCTV_REPAIR_ISSUES = ['Camera Not Working','DVR/NVR Issue','Cable Issue','Night Vision Issue','Installation','AMC'];
 
-function _langBtn(code,flag,label){
-  return '<button onclick="selectChatLang(\''+code+'\')" style="background:#f1f5f9;border:2px solid #e2e8f0;border-radius:12px;padding:14px 8px;font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;text-align:center;transition:all .15s;" onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#93c5fd\'" onmouseout="this.style.background=\'#f1f5f9\';this.style.borderColor=\'#e2e8f0\'">'
-    +'<div style="font-size:22px;margin-bottom:4px;">'+flag+'</div>'
-    +label+'</button>';
-}
-
-function selectChatLang(lang){
-  _chatLang=lang;
-  var d=CHAT_DATA[lang];
-  var msgs=document.getElementById('chat-msgs');
-  // User "selected language" bubble
-  var lLabels={gu:'ગુજરાતી',hi:'हिंदी',en:'English'};
-  msgs.innerHTML='<div style="text-align:right;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 14px;font-size:13px;font-weight:600;">🌐 '+lLabels[lang]+'</span></div>';
-  // Bot welcome message
-  msgs.innerHTML+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px 14px 14px 4px;padding:12px 14px;font-size:13px;color:#1e40af;line-height:1.65;max-width:90%;margin-top:4px;">'+d.welcome+'</div>';
-  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;padding-left:2px;">Bhavi Assistant • just now</div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  _renderChatQ();
-}
-
-function _renderChatQ(){
-  var d=CHAT_DATA[_chatLang];
-  document.getElementById('chat-q-area').innerHTML=
-    '<div style="font-size:10px;color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">'+d.pick+'</div>'
-    +d.qa.map(function(qa,i){
-      return '<button onclick="chatAns('+i+')" style="display:block;width:100%;text-align:left;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:600;color:#1e293b;margin-bottom:6px;cursor:pointer;transition:background .15s;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'">'
-        +qa.q+'</button>';
-    }).join('');
-}
-
-function closeChat(){document.getElementById('chat-modal').style.display='none';}
-
-function chatAns(i){
-  var d=CHAT_DATA[_chatLang];if(!d)return;
-  var qa=d.qa[i];
-  var msgs=document.getElementById('chat-msgs');
-  // User question bubble
-  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(qa.q)+'</span></div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  if(qa.a==='__PURCHASE_INQUIRY__'){
-    var p=d.purch;
-    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;">'+p.typePick+'</div>';
-    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-    msgs.scrollTop=msgs.scrollHeight;
-    document.getElementById('chat-q-area').innerHTML=
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
-      +p.typeOpts.map(function(opt){
-        return '<button onclick="selectPurchaseType(\''+opt.v+'\',\''+escHtml(opt.l)+'\')" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px 6px;font-size:11.5px;font-weight:700;color:#1e293b;cursor:pointer;transition:all .15s;text-align:center;" onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#93c5fd\'" onmouseout="this.style.background=\'#f8fafc\';this.style.borderColor=\'#e2e8f0\'">'+opt.l+'</button>';
-      }).join('')
-      +'</div>'
-      +'<button onclick="_renderChatQ()" style="background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
-    return;
+/* Onsite / Carry-In service charges (₹). Add more devices here as pricing is confirmed. */
+const SERVICE_CHARGES = {
+  'Canon Printer': { Onsite:649, CarryIn:413 },
+  'Canon Scanner': { Onsite:null, CarryIn:null }, // exact Scanner charges not yet confirmed — shows "will be confirmed by our team" until filled in
+};
+function resolveChargeText(a, ctx){
+  const rates = SERVICE_CHARGES[ctx.device];
+  let amount = null;
+  if(rates){
+    if(a.serviceMode && rates[a.serviceMode] !== undefined){ amount = rates[a.serviceMode]; }
+    else if(rates.flat !== undefined){ amount = rates.flat; }
   }
-  if(qa.a==='__MODEL_SEARCH__'){
-    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.7;">🔍 '+(d.searchPh)+'<br><span style="font-size:11px;color:#64748b;">Type karo ne Search dabao.</span></div>';
-    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-    msgs.scrollTop=msgs.scrollHeight;
-    // Show search input in q-area
-    document.getElementById('chat-q-area').innerHTML=
-      '<div style="display:flex;gap:8px;margin-bottom:10px;">'
-      +'<input id="chat-model-inp" type="text" placeholder="'+escHtml(d.searchPh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" oninput="chatModelDebounce()" onkeydown="if(event.key===\'Enter\')chatModelSearch()">'
-      +'<button onclick="chatModelSearch()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">'+d.searchBtn+'</button>'
-      +'</div>'
-      +'<div id="chat-model-results" style="max-height:200px;overflow-y:auto;"></div>'
-      +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+d.backBtn+'</button>';
-    setTimeout(function(){var el=document.getElementById('chat-model-inp');if(el)el.focus();},100);
-    return;
-  }
-  if(qa.a==='__TRACK_COMPLAINT__'){
-    var tk=d.track;
-    msgs.innerHTML+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.7;">'+tk.prompt+'</div>';
-    msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-    msgs.scrollTop=msgs.scrollHeight;
-    document.getElementById('chat-q-area').innerHTML=
-      '<div style="display:flex;gap:8px;margin-bottom:10px;">'
-      +'<input id="chat-track-mob" type="tel" maxlength="10" inputmode="numeric" placeholder="'+escHtml(tk.mobilePh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" onkeydown="if(event.key===\'Enter\')chatTrackSearch()">'
-      +'<button onclick="chatTrackSearch()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">'+tk.searchBtn+'</button>'
-      +'</div>'
-      +'<div id="chat-track-results" style="max-height:280px;overflow-y:auto;"></div>'
-      +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+tk.backBtn+'</button>';
-    setTimeout(function(){var el=document.getElementById('chat-track-mob');if(el)el.focus();},100);
-    return;
-  }
-  var ans;
-  if(qa.a==='__CONTACT__'){
-    ans='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.9;">'
-      +'<b>📞 Bhavi Electronics &amp; Automation</b><br>'
-      +'📱 Call: <a href="tel:+919574004969" style="color:#059669;font-weight:700;">+91 95740 04969</a><br>'
-      +'💬 WhatsApp: <a href="https://wa.me/919574004969?text=Hello%20Bhavi%20Electronics%2C%20I%20need%20help" target="_blank" style="color:#059669;font-weight:700;">Chat on WhatsApp →</a><br>'
-      +'🕐 Mon–Sat: 10 AM – 7 PM<br>'
-      +'📍 Ahmedabad, Gujarat</div>';
+  return (amount !== null && amount !== undefined) ? `₹${amount}` : bhaiT('chargeTBD');
+}
+
+/* ============================================================
+   KNOWLEDGE BASE — deeper, professional answers for
+   open-ended questions the menu tree doesn't directly cover.
+   ============================================================ */
+const KB = [
+  {kw:['authorized','genuine','original','dealer','official','authentic'],
+    a:{gu:"Ha, ame Canon, Panasonic, Fujifilm, Godox ane Casio na officially Authorized Service Centre chhiye All Gujarat mate. Etle spare parts genuine hoy chhe ane manufacturer warranty valid rahe chhe.",
+       hi:"Ji haan, hum Canon, Panasonic, Fujifilm, Godox aur Casio ke officially Authorized Service Centre hain, poore Gujarat ke liye. Isliye spare parts genuine hote hain aur manufacturer warranty valid rehti hai.",
+       en:"Yes, we are the officially Authorized Service Centre for Canon, Panasonic, Fujifilm, Godox, and Casio across all of Gujarat. This means all spare parts used are genuine and your manufacturer warranty remains valid."}},
+  {kw:['warranty','guarantee'],
+    a:{gu:"Brand-authorized products par manufacturer warranty malshe, ane amara automation/installation kaam par ame separate service warranty aapiye chhiye. Exact duration product ane service type par depend kare chhe — quotation vakhte clearly jaNaavishu.",
+       hi:"Brand-authorized products par manufacturer warranty milegi, aur hamare automation/installation kaam par hum alag se service warranty dete hain. Exact duration product aur service type par depend karti hai — quotation ke samay clearly bataayenge.",
+       en:"Brand-authorized products carry the manufacturer's warranty, and our automation/installation work comes with a separate service warranty. Exact duration depends on the product and service type — we'll clarify this in your quotation."}},
+  {kw:['area','coverage','location','kya area','gujarat mate','service kya'],
+    a:{gu:"Camera, lighting ane keyboard service — All Gujarat ma available chhe. Printer, scanner, photo printer ane projector ni sales/service — Ahmedabad & Nearby area ma. CCTV/Automation/Home Theatre — site visit thi confirm thay chhe.",
+       hi:"Camera, lighting aur keyboard service — poore Gujarat mein available hai. Printer, scanner, photo printer aur projector ki sales/service — Ahmedabad & Nearby area mein. CCTV/Automation/Home Theatre — site visit se confirm hoti hai.",
+       en:"Camera, lighting, and keyboard service is available across all of Gujarat. Printer, scanner, photo printer, and projector sales/service cover Ahmedabad & Nearby areas. CCTV/Automation/Home Theatre coverage is confirmed via site visit."}},
+  {kw:['price','pricing','cost','rate','kharch','quotation kevi','kitna'],
+    a:{gu:"Pricing product/service ane requirement mujab vary thay chhe, etle ame fix rate quote nathi karta baar exact quotation vagar. Tame jo product/service ma interested chho tenu naam jaNaavo, hu tarat quotation process shaRu karu.",
+       hi:"Pricing product/service aur requirement ke hisaab se vary karti hai, isliye hum bina exact quotation ke fix rate quote nahi karte. Aap jis product/service mein interested hain uska naam batayein, main turant quotation process shuru karta hoon.",
+       en:"Pricing varies by product, service, and specific requirement, so we don't quote a fixed rate without a proper assessment. Let me know which product or service you're interested in, and I'll start the quotation process right away."}},
+  {kw:['wireless','hybrid','fully wired','difference','technology automation'],
+    a:{gu:"Automation ma trane options male chhe:\n\n🔹 Wireless — koi wiring todva vagar existing ghar ma easily install thay, thodu costlier per-device hoy chhe.\n🔹 Fully Wired — new construction mate best, sauthi reliable ane long-term, pan wiring jaruri chhe.\n🔹 Hybrid — banne no mix, jya wiring possible hoy tya wired ane baki wireless.\n\nAmaro consultant tamari property joi ne best option suggest karshe.",
+       hi:"Automation mein teen options milte hain:\n\n🔹 Wireless — bina wiring todhe existing ghar mein aasani se install hoti hai, per-device thodi costlier hoti hai.\n🔹 Fully Wired — new construction ke liye best, sabse reliable aur long-term, lekin wiring zaroori hai.\n🔹 Hybrid — dono ka mix, jahan wiring possible ho wahan wired aur baaki wireless.\n\nHamara consultant aapki property dekh kar best option suggest karega.",
+       en:"There are three automation technology options:\n\n🔹 Wireless — installs easily in existing homes with no wiring disruption, slightly higher cost per device.\n🔹 Fully Wired — ideal for new construction, most reliable long-term, but requires wiring.\n🔹 Hybrid — a mix of both, wired where feasible and wireless elsewhere.\n\nOur consultant will assess your property and recommend the best fit."}},
+  {kw:['amc','annual maintenance','maintenance contract'],
+    a:{gu:"AMC (Annual Maintenance Contract) etle ek yearly plan jema regular servicing, priority support ane certain repairs cover thay chhe — jethi tamaru equipment (CCTV, Projector, etc.) lambo samay sudhi smoothly chale ane unexpected repair cost ochho aave.",
+       hi:"AMC (Annual Maintenance Contract) ek yearly plan hai jisme regular servicing, priority support aur kuch repairs cover hote hain — taaki aapka equipment (CCTV, Projector, etc.) lambe samay tak smoothly chale aur unexpected repair cost kam aaye.",
+       en:"An AMC (Annual Maintenance Contract) is a yearly plan that covers regular servicing, priority support, and certain repairs — helping your equipment (CCTV, Projector, etc.) run smoothly long-term while reducing unexpected repair costs."}},
+  {kw:['dolby atmos','surround sound','speaker layout'],
+    a:{gu:"Dolby Atmos ek advanced surround sound technology chhe je overhead (ceiling) speakers thi 3D, immersive audio experience aape chhe — movies ane gaming banne mate perfect. Amara Home Theatre team room size mujab ideal speaker layout design kare chhe.",
+       hi:"Dolby Atmos ek advanced surround sound technology hai jo overhead (ceiling) speakers se 3D, immersive audio experience deti hai — movies aur gaming dono ke liye perfect. Hamari Home Theatre team room size ke hisaab se ideal speaker layout design karti hai.",
+       en:"Dolby Atmos is an advanced surround sound technology that uses overhead (ceiling) speakers to deliver a 3D, immersive audio experience — ideal for both movies and gaming. Our Home Theatre team designs the ideal speaker layout based on your room size."}},
+  {kw:['lumens','brightness','projector kai lai'],
+    a:{gu:"Projector select karta vakhte 'lumens' (brightness) ane 'resolution' agatya na chhe. Dark room mate 2000-3000 lumens paNa chalse, pan vadhare light hoy tya (jem ke office/hall) 3500+ lumens joiye. Amara team site visit karine exact recommend karshe.",
+       hi:"Projector select karte waqt 'lumens' (brightness) aur 'resolution' zaroori hain. Dark room ke liye 2000-3000 lumens bhi chal jaate hain, lekin zyada light wale area (jaise office/hall) mein 3500+ lumens chahiye. Hamari team site visit karke exact recommend karegi.",
+       en:"When choosing a projector, 'lumens' (brightness) and resolution matter most. A dark room works fine with 2000–3000 lumens, but brighter spaces (like offices/halls) need 3500+ lumens. Our team will do a site visit and recommend the exact model."}},
+  {kw:['sensor cleaning','kevi vaar','how often','cleaning frequency'],
+    a:{gu:"Camera sensor cleaning normally 6 mahina thi 1 varsh ma ek vaar karavvi joiye — vadhare use (especially lens change vaarNvaar karta hoy) to vahelu karavvu saru. Dust spots photos ma dekhay to tarat service karavo.",
+       hi:"Camera sensor cleaning normally 6 mahine se 1 saal mein ek baar karani chahiye — zyada use (khaaskar baar-baar lens change karte hain to) jaldi karana behtar hai. Dust spots photos mein dikhein to turant service karayein.",
+       en:"Camera sensor cleaning is typically recommended every 6 months to 1 year — more frequently if you change lenses often. If you notice dust spots in your photos, get it serviced right away."}},
+  {kw:['cctv footage','data privacy','recording storage','how long footage'],
+    a:{gu:"CCTV footage storage duration DVR/NVR na storage capacity par depend kare chhe — normally 15-30 days sudhi footage save rahe chhe. Tame requirement mujab bigger storage/cloud backup paN add karavi shako chho.",
+       hi:"CCTV footage storage duration DVR/NVR ki storage capacity par depend karta hai — normally 15-30 din tak footage save rehti hai. Aap requirement ke hisaab se bigger storage/cloud backup bhi add kara sakte hain.",
+       en:"CCTV footage retention depends on your DVR/NVR's storage capacity — typically 15–30 days. You can opt for larger storage or cloud backup based on your requirement."}},
+  {kw:['track repair kevi rite','job sheet number','how to track'],
+    a:{gu:"Repair status track karva mate 'Track Repair' option use karo ane tamaru Job Sheet Number athva Mobile Number aapo — hu tamne live status batavish.",
+       hi:"Repair status track karne ke liye 'Track Repair' option use karein aur apna Job Sheet Number ya Mobile Number dein — main aapko live status dikhaunga.",
+       en:"To track your repair status, use the 'Track Repair' option and provide your Job Sheet Number or Mobile Number — I'll show you the live status."}},
+  {kw:['payment','emi','installment'],
+    a:{gu:"Payment options product ane order value mujab vary thay chhe — tamari sales executive quotation vakhte badha available options (cash, card, UPI, EMI jya applicable hoy) jaNaavshe.",
+       hi:"Payment options product aur order value ke hisaab se vary karte hain — hamara sales executive quotation ke samay sabhi available options (cash, card, UPI, EMI jahan applicable ho) bataayega.",
+       en:"Payment options vary by product and order value — our sales executive will share all available options (cash, card, UPI, EMI where applicable) at the time of quotation."}},
+  {kw:['demo','free demo','trial'],
+    a:{gu:"Ha, Home Theatre, Automation ane CCTV jeva solutions mate demo/site visit available chhe — jethi tame kharidva pehla actual setup experience kari shako. 'Book Site Visit' option thi schedule kari shako chho.",
+       hi:"Ji haan, Home Theatre, Automation aur CCTV jaise solutions ke liye demo/site visit available hai — taaki aap kharidne se pehle actual setup experience kar sakein. 'Book Site Visit' option se schedule kar sakte hain.",
+       en:"Yes, demos/site visits are available for Home Theatre, Automation, and CCTV solutions — so you can experience the actual setup before purchasing. You can schedule one via the 'Book Site Visit' option."}},
+];
+function searchKB(text){
+  const norm = text.trim().toLowerCase();
+  if(norm.length < 3) return null;
+  let best=null, bestScore=0;
+  KB.forEach(entry=>{
+    let score=0;
+    entry.kw.forEach(k=>{ if(norm.includes(k.toLowerCase())) score += k.split(' ').length; });
+    if(score>bestScore){ bestScore=score; best=entry; }
+  });
+  return bestScore>0 ? best : null;
+}
+
+/* ============================================================
+   MENUS
+   ============================================================ */
+const MENUS = {
+  main:{
+    title:()=>bhaiT('mainMenuTitle'),
+    options:[
+      {label:'🏠 Home / Company Info', action:{type:'info', key:'msg_companyInfo'}},
+      {label:'🛒 Buy Products', action:{type:'menu', id:'buy'}},
+      {label:'🛠 Book Service', action:{type:'menu', id:'serviceDevice'}},
+      {label:'🏡 Automation Solutions', action:{type:'menu', id:'automation'}},
+      {label:'🎬 Home Theatre & AV', action:{type:'menu', id:'hometheatre'}},
+      {label:'📽 Projectors', action:{type:'menu', id:'projectorsTop'}},
+      {label:'📹 CCTV & Security', action:{type:'menu', id:'cctvProperty'}},
+      {label:'📦 Track Repair', action:{type:'flow', id:'trackRepair'}},
+      {label:'📅 Book Site Visit', action:{type:'flow', id:'siteVisit'}},
+      {label:'☎ Contact Expert', action:{type:'menu', id:'contactExpert'}},
+    ]
+  },
+  buy:{
+    title:()=>bhaiT('menuTitle_buy'),
+    options:[
+      {label:'Canon Printers', action:{type:'menu', id:'printerType'}},
+      {label:'Canon Scanners', action:{type:'flow', id:'scannerQualify'}},
+      {label:'Canon Photo Printers', action:{type:'flow', id:'photoPrinterQualify'}},
+      {label:'Fujifilm Instax', action:{type:'menu', id:'instaxMenu'}},
+      {label:'Projectors', action:{type:'menu', id:'buyProjectorCategory'}},
+      {label:'Talk to Sales', action:{type:'flow', id:'leadCapture', ctx:{source:'Buy Products'}}},
+    ]
+  },
+  printerType:{
+    title:()=>bhaiT('menuTitle_printerType'),
+    options:[
+      {label:'Home Use', action:{type:'flow', id:'printerQualify', ctx:{usage:'Home Use'}}},
+      {label:'Office Use', action:{type:'flow', id:'printerQualify', ctx:{usage:'Office Use'}}},
+      {label:'School / College', action:{type:'flow', id:'printerQualify', ctx:{usage:'School / College'}}},
+      {label:'Shop', action:{type:'flow', id:'printerQualify', ctx:{usage:'Shop'}}},
+      {label:'Photo Printing', action:{type:'flow', id:'photoPrinterQualify'}},
+      {label:'Heavy Printing', action:{type:'flow', id:'printerQualify', ctx:{usage:'Heavy Printing'}}},
+      {label:'Suggest Me', action:{type:'flow', id:'printerQualify', ctx:{usage:'Suggest Me'}}},
+    ]
+  },
+  instaxMenu:{
+    title:()=>bhaiT('menuTitle_instax'),
+    options:[
+      {label:'Camera', action:{type:'flow', id:'instaxQualify', ctx:{itemType:'Camera'}}},
+      {label:'Film', action:{type:'flow', id:'instaxQualify', ctx:{itemType:'Film'}}},
+      {label:'Accessories', action:{type:'flow', id:'instaxQualify', ctx:{itemType:'Accessories'}}},
+      {label:'Gift Pack', action:{type:'flow', id:'instaxQualify', ctx:{itemType:'Gift Pack'}}},
+    ]
+  },
+  buyProjectorCategory:{
+    title:()=>bhaiT('menuTitle_buyProjector'),
+    options:[
+      {label:'Office', action:{type:'flow', id:'projectorQualify', ctx:{use:'Office'}}},
+      {label:'School', action:{type:'flow', id:'projectorQualify', ctx:{use:'School'}}},
+      {label:'Conference Room', action:{type:'flow', id:'projectorQualify', ctx:{use:'Conference Room'}}},
+      {label:'Home Theatre', action:{type:'flow', id:'projectorQualify', ctx:{use:'Home Theatre'}}},
+      {label:'Temple', action:{type:'flow', id:'projectorQualify', ctx:{use:'Temple'}}},
+      {label:'Event', action:{type:'flow', id:'projectorQualify', ctx:{use:'Event'}}},
+    ]
+  },
+  projectorsTop:{
+    title:()=>bhaiT('menuTitle_projectorsTop'),
+    options:[
+      {label:'Business', action:{type:'flow', id:'projectorQualify', ctx:{use:'Business'}}},
+      {label:'Education', action:{type:'flow', id:'projectorQualify', ctx:{use:'Education'}}},
+      {label:'Home Theatre', action:{type:'flow', id:'projectorQualify', ctx:{use:'Home Theatre'}}},
+      {label:'Installation', action:{type:'flow', id:'serviceTicket', ctx:{device:'Projector', issue:'Installation'}}},
+      {label:'Repair', action:{type:'flow', id:'serviceTicket', ctx:{device:'Projector', issue:'Repair'}}},
+      {label:'AMC', action:{type:'flow', id:'serviceTicket', ctx:{device:'Projector', issue:'AMC'}}},
+      {label:'Lamp Replacement', action:{type:'flow', id:'serviceTicket', ctx:{device:'Projector', issue:'Lamp Replacement'}}},
+    ]
+  },
+  serviceDevice:{
+    title:()=>bhaiT('menuTitle_serviceDevice'),
+    options: DEVICES.map(d=>({label:d.label, action:{type:'dynIssueMenu', deviceId:d.id}}))
+  },
+  automation:{
+    title:()=>bhaiT('menuTitle_automation'),
+    options:[
+      {label:'Home Automation', action:{type:'flow', id:'automationQualify', ctx:{atype:'Home Automation'}}},
+      {label:'Office Automation', action:{type:'flow', id:'automationQualify', ctx:{atype:'Office Automation'}}},
+      {label:'Lighting Automation', action:{type:'flow', id:'automationQualify', ctx:{atype:'Lighting Automation'}}},
+      {label:'Climate Control', action:{type:'flow', id:'automationQualify', ctx:{atype:'Climate Control'}}},
+      {label:'Curtain Automation', action:{type:'flow', id:'automationQualify', ctx:{atype:'Curtain Automation'}}},
+      {label:'Video Door Phone', action:{type:'menu', id:'vdpMenu'}},
+      {label:'Interactive Panels', action:{type:'menu', id:'panelMenu'}},
+    ]
+  },
+  vdpMenu:{
+    title:()=>bhaiT('menuTitle_vdp'),
+    options:['Apartment','Villa','Office','Society'].map(p=>(
+      {label:p, action:{type:'flow', id:'automationQualify', ctx:{atype:'Video Door Phone — '+p}}}
+    ))
+  },
+  panelMenu:{
+    title:()=>bhaiT('menuTitle_panel'),
+    options:['School','College','Office','Conference Room'].map(p=>(
+      {label:p, action:{type:'flow', id:'automationQualify', ctx:{atype:'Interactive Panel — '+p}}}
+    ))
+  },
+  cctvProperty:{
+    title:()=>bhaiT('menuTitle_cctv'),
+    options:['Home','Office','Factory','School','Hospital','Warehouse'].map(p=>(
+      {label:p, action:{type:'dynCctvServiceMenu', property:p}}
+    ))
+  },
+  hometheatre:{
+    title:()=>bhaiT('menuTitle_hometheatre'),
+    options:['Movies','Music','Gaming','Dolby Atmos','Stereo Hi-Fi','Projector Theatre','Customized Audio & Video','Acoustic Design','AV Consultation','Demo','Site Visit'].map(p=>(
+      {label:p, action:{type:'flow', id:'hometheatreQualify', ctx:{focus:p}}}
+    ))
+  },
+  contactExpert:{
+    title:()=>bhaiT('menuTitle_contactExpert'),
+    options:['Sales Expert','Service Expert','Automation Consultant','Home Theatre Consultant','Accounts'].map(p=>(
+      {label:p, action:{type:'flow', id:'contactCapture', ctx:{expert:p}}}
+    ))
+  },
+};
+
+/* ============================================================
+   FLOWS
+   ============================================================ */
+function opts(arr){ return arr.map(v=>({label:v, value:v})); }
+
+/* ── Real backend integration ─────────────────────────────────
+   Reuses this page's own SB_URL/SB_KEY/sbGet/sbPostMin (already
+   defined above for the booking wizard / My Orders / My Account).
+   ─────────────────────────────────────────────────────────── */
+function bhaiDeviceBrand(deviceLabel){
+  var d=(deviceLabel||'').toLowerCase();
+  if(d.indexOf('panasonic')>=0)return'Panasonic';
+  if(d.indexOf('fujifilm')>=0||d.indexOf('instax')>=0)return'Fujifilm';
+  if(d.indexOf('godox')>=0)return'Godox';
+  if(d.indexOf('projector')>=0)return'Casio';
+  if(d.indexOf('casio')>=0)return'Casio';
+  if(d.indexOf('canon')>=0||d.indexOf('scanner')>=0)return'Canon';
+  return'';
+}
+async function bhaiCreateTicket(a, ctx){
+  var now=new Date();
+  var year=now.getFullYear();
+  var existing=await sbGet('tickets','?id=like.BEA-'+year+'*&order=id.desc&limit=1');
+  var num=1; if(existing&&existing.length) num=parseInt(existing[0].id.split('-').pop())+1;
+  var ticketId='BEA-'+year+'-'+String(num).padStart(3,'0');
+  // Devices without a serviceMode step (cameras, projector, godox, casio, instax) are
+  // drop-off items by default — Carry In is the safe default; admin/WC can correct it.
+  var isCarryIn = a.serviceMode ? a.serviceMode==='CarryIn' : true;
+  var serviceType = isCarryIn ? 'Carry In' : 'On Site';
+  var callType = a.warrantyStatus==='Warranty' ? 'Warranty' : 'Non-Warranty';
+  var charges = 0;
+  var rates = SERVICE_CHARGES[ctx.device];
+  if(rates){ var amt = rates[isCarryIn?'CarryIn':'Onsite']; if(amt!=null) charges=amt; }
+  var problemText = (ctx.issue||'') + (a.problem ? ' — '+a.problem : '');
+  var descLines=['Booked via Bhavi AI Assistant (Customer Portal)','Device: '+(ctx.device||''),'Issue: '+(ctx.issue||'')];
+  if(a.model) descLines.push('Model: '+a.model);
+  if(a.serial) descLines.push('Serial: '+a.serial);
+  if(a.problem) descLines.push('Details: '+a.problem);
+  descLines.push('Photo: '+(a.photo==='Share Now'?'Customer will share now':'Will show at store visit'));
+  if(a.warrantyStatus==='Warranty'){
+    descLines.push('Warranty: Claimed'+(a.invoiceAvailable==='Yes'?' (invoice available, date: '+(a.invoiceDate||'-')+')':' (no invoice)'));
   } else {
-    ans='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12.5px;color:#1e293b;max-width:90%;margin-top:6px;line-height:1.75;box-shadow:0 1px 4px rgba(0,0,0,.05);">'+qa.a+'</div>';
+    descLines.push('Warranty: Non-Warranty / Chargeable');
   }
-  msgs.innerHTML+=ans;
-  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  // Re-show main question list so user can ask another question
-  setTimeout(function(){ _renderChatQ(); }, 300);
+  if(a.date) descLines.push('Preferred date/time: '+a.date);
+  var initStatus = isCarryIn ? 'Pending Customer Arrival' : 'Pending Allocation';
+  var tData={
+    id:ticketId, job_sheet:ticketId, call_type:callType, service_type:serviceType, status:initStatus,
+    brand_name:bhaiDeviceBrand(ctx.device), model:a.model||'', serial:a.serial||'',
+    cname:a.name, mobile:a.mobile, alt_mobile:'', address:'', city:a.city||'', pin:'', state:'', area:'',
+    problem:problemText, description:descLines.join('\n'), action:'',
+    assigned_to:null, assigned_name:null,
+    warranty_coverage: a.warrantyStatus==='Warranty' ? null : 'NA',
+    wc_type:'CSP', service_charges:charges, rerepair:'No', rerepair_foc:false, spares:[],
+    timeline:[{action:'Complaint Registered', by:'Customer (AI Assistant)', at:now.toISOString(), note:'Via Bhavi AI Assistant — '+(ctx.device||'')+' / '+(ctx.issue||'')}],
+    created_at:now.toISOString(), updated_at:now.toISOString()
+  };
+  await sbPostMin('tickets', tData);
+  return ticketId;
+}
+async function bhaiSubmitInquiry(inquiryType, name, mobile, city, description){
+  await sbPostMin('auto_inquiries',{
+    customer_name:name||'', mobile:mobile||'', address:city||'',
+    inquiry_type:inquiryType, description:description,
+    status:'Open', created_by:'Bhavi AI Assistant', updated_at:new Date().toISOString()
+  });
+}
+async function bhaiTrackLookup(ref){
+  var clean=(ref||'').trim();
+  var isMobile=/^\d{10}$/.test(clean.replace(/\D/g,'')) && clean.replace(/\D/g,'').length===10;
+  if(isMobile){
+    return await sbGet('tickets','?mobile=eq.'+clean.replace(/\D/g,'')+'&order=created_at.desc&limit=10');
+  }
+  return await sbGet('tickets','?id=eq.'+encodeURIComponent(clean.toUpperCase())+'&limit=1');
 }
 
-// ── Brochure URL auto-detect (jpg OR pdf) ─────────────────────
-async function _findBrochure(modelNo, dbUrl){
-  if(dbUrl) return dbUrl;
-  var base=SB_URL+'/storage/v1/object/public/brochures/'+encodeURIComponent(modelNo);
-  var results=await Promise.all([
-    fetch(base+'.jpg',{method:'HEAD'}).then(function(r){return r.ok?base+'.jpg':null;}).catch(function(){return null;}),
-    fetch(base+'.pdf',{method:'HEAD'}).then(function(r){return r.ok?base+'.pdf':null;}).catch(function(){return null;})
-  ]);
-  return results[0]||results[1]||null;
-}
-
-// ── Purchase Inquiry Flow ─────────────────────────────────────
-var _purchaseType='';
-var _purchModDebTimer=null;
-
-function selectPurchaseType(type,typeLabel){
-  _purchaseType=type;
-  var d=CHAT_DATA[_chatLang];var p=d.purch;
-  var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(typeLabel)+'</span></div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  document.getElementById('chat-q-area').innerHTML=
-    '<div style="display:flex;gap:8px;margin-bottom:10px;">'
-    +'<input id="purch-model-inp" type="text" placeholder="'+escHtml(p.searchPh)+'" style="flex:1;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;" oninput="purchModelDebounce()" onkeydown="if(event.key===\'Enter\')purchModelSearch()">'
-    +'<button onclick="purchModelSearch()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;">🔍</button>'
-    +'</div>'
-    +'<div id="purch-model-results" style="max-height:230px;overflow-y:auto;"></div>'
-    +'<button onclick="_renderChatQ()" style="margin-top:6px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
-  setTimeout(function(){var el=document.getElementById('purch-model-inp');if(el)el.focus();},100);
-}
-
-function purchModelDebounce(){
-  clearTimeout(_purchModDebTimer);
-  _purchModDebTimer=setTimeout(purchModelSearch,500);
-}
-
-async function purchModelSearch(){
-  var d=CHAT_DATA[_chatLang];var p=d.purch;
-  var inp=document.getElementById('purch-model-inp');
-  var res=document.getElementById('purch-model-results');
-  if(!inp||!res)return;
-  var q=inp.value.trim();if(!q){res.innerHTML='';return;}
-  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">⏳ Searching...</div>';
-  try{
-    if(!_chatBrands){_chatBrands=await sbGet('brands','?select=id,name&order=name');}
-    var brandMap={};(_chatBrands||[]).forEach(function(b){brandMap[b.id]=b.name;});
-    var enc=encodeURIComponent(q);
-    var qs='?or=(model_no.ilike.*'+enc+'*,model_name.ilike.*'+enc+'*)&select=id,model_no,model_name,brand_id,sale_price,brochure_url,printer_type&order=model_no&limit=20';
-    if(_purchaseType&&_purchaseType!=='all'){qs+='&printer_type=eq.'+_purchaseType;}
-    var models=await sbGet('models',qs);
-    if(!models||!models.length){res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+p.noResult+'</div>';return;}
-    var brochures=await Promise.all(models.map(function(m){return _findBrochure(m.model_no,m.brochure_url);}));
-    res.innerHTML=models.map(function(m,i){
-      var brand=brandMap[m.brand_id]||'';
-      var brochure=brochures[i];
-      var priceStr=m.sale_price?'₹'+Number(m.sale_price).toLocaleString('en-IN'):p.noPrice;
-      return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
-        +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11px;">'+escHtml(m.model_name)+'</span>':'')+'</div>'
-        +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:1px;">📷 '+escHtml(brand)+'</div>':'')
-        +'<div style="display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap;">'
-        +'<span style="font-size:14px;font-weight:900;color:#059669;">'+escHtml(priceStr)+'</span>'
-        +(brochure?'<a href="'+escHtml(brochure)+'" target="_blank" style="font-size:11px;background:#fefce8;color:#854d0e;border:1px solid #fcd34d;border-radius:6px;padding:3px 8px;font-weight:700;text-decoration:none;white-space:nowrap;">'+p.brochureBtn+'</a>':'')
-        +'<button onclick="showBuyForm(\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(brand)+'\',\''+escHtml(priceStr)+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:7px;padding:4px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">'+p.buyBtn+'</button>'
-        +'</div></div>';
-    }).join('');
-  }catch(e){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+e.message+'</div>';}
-}
-
-function showBuyForm(modelNo,modelName,brand,priceStr){
-  var d=CHAT_DATA[_chatLang];var p=d.purch;
-  var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+p.buyBtn+' — '+escHtml(modelNo)+'</span></div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  document.getElementById('chat-q-area').innerHTML=
-    '<div style="background:#fff;border:2px solid #1d4ed8;border-radius:12px;padding:14px;">'
-    +'<div style="font-size:12.5px;font-weight:700;color:#1d4ed8;margin-bottom:10px;">🛒 '+escHtml(modelNo)+' <span style="color:#059669;font-size:13px;">'+escHtml(priceStr)+'</span></div>'
-    +'<input id="purch-name" type="text" placeholder="'+escHtml(p.namePh)+'" style="display:block;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;">'
-    +'<input id="purch-mobile" type="tel" placeholder="'+escHtml(p.mobilePh)+'" maxlength="10" style="display:block;width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box;">'
-    +'<button onclick="submitPurchaseInquiry(\''+escHtml(modelNo)+'\',\''+escHtml(modelName)+'\',\''+escHtml(brand)+'\',\''+escHtml(priceStr)+'\')" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:11px;width:100%;font-size:13px;font-weight:700;cursor:pointer;">'+p.submitBtn+'</button>'
-    +'</div>'
-    +'<button onclick="_renderChatQ()" style="margin-top:8px;background:none;border:none;color:#64748b;font-size:12px;cursor:pointer;text-decoration:underline;">'+p.backBtn+'</button>';
-  setTimeout(function(){var el=document.getElementById('purch-name');if(el)el.focus();},100);
-}
-
-async function submitPurchaseInquiry(modelNo,modelName,brand,priceStr){
-  var d=CHAT_DATA[_chatLang];var p=d.purch;
-  var name=((document.getElementById('purch-name')||{}).value||'').trim();
-  var mobile=((document.getElementById('purch-mobile')||{}).value||'').trim();
-  if(!name){var ne=document.getElementById('purch-name');if(ne)ne.style.borderColor='#dc2626';return;}
-  if(!mobile){var me=document.getElementById('purch-mobile');if(me)me.style.borderColor='#dc2626';return;}
-  var desc='Purchase Inquiry: '+modelNo+(modelName?' ('+modelName+')':'')+(brand?' | Brand: '+brand:'')+(priceStr?' | Price: '+priceStr:'')+' | Via Portal Chat';
-  try{
-    await sbPostMin('auto_inquiries',{customer_name:name,mobile:mobile,address:'',inquiry_type:'Purchase Inquiry',description:desc,status:'Open',created_by:'Customer Portal Chat',updated_at:new Date().toISOString()});
-  }catch(e){}
-  var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(name)+' | '+escHtml(mobile)+'</span></div>';
-  msgs.innerHTML+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:13px 14px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.9;">'+p.sent+'</div>';
-  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  _renderChatQ();
-}
-
-// ── Model Search ──────────────────────────────────────────────
-var _modelDebTimer=null;
-var _chatBrands=null;
-
-function chatModelDebounce(){
-  clearTimeout(_modelDebTimer);
-  _modelDebTimer=setTimeout(chatModelSearch,500);
-}
-
-async function chatModelSearch(){
-  var d=CHAT_DATA[_chatLang]||CHAT_DATA.en;
-  var inp=document.getElementById('chat-model-inp');
-  var res=document.getElementById('chat-model-results');
-  if(!inp||!res)return;
-  var q=inp.value.trim();
-  if(!q){res.innerHTML='';return;}
-  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">'+d.searching+'</div>';
-  try{
-    // Load brands once
-    if(!_chatBrands){
-      _chatBrands=await sbGet('brands','?select=id,name&order=name');
+const FLOWS = {
+  printerQualify:{
+    steps:[
+      {key:'monthlyPrint', type:'choice', prompt:'p_monthlyPrint', options:opts(['< 100','100–300','300–500','500+'])},
+      {key:'needType', type:'choice', prompt:'p_needType', options:opts(['Print Only','Print + Scan + Copy'])},
+      {key:'connectivity', type:'choice', prompt:'p_connectivity', options:opts(['USB','Wi-Fi'])},
+      {key:'budget', type:'text', prompt:'p_budget', optional:true},
+    ],
+    complete:(a,ctx)=>{
+      const usage = ctx.usage || 'General';
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Use: ${usage}\n📌 Monthly Prints: ${a.monthlyPrint}\n📌 Need: ${a.needType}\n📌 Connectivity: ${a.connectivity}\n\n👉 ${a.needType.includes('Scan') ? 'Canon PIXMA / MAXIFY All-in-One' : 'Canon PIXMA Single Function'} series tamara mate best rahese (${a.connectivity} sathe).`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_getQuotation'), action:{type:'flow', id:'leadCapture', ctx:{source:'Canon Printer — '+usage}}},
+        {label:bhaiT('chip_talkToSales'), action:{type:'flow', id:'leadCapture', ctx:{source:'Canon Printer — Talk to Sales'}}},
+      ]};
     }
-    var brandMap={};
-    (_chatBrands||[]).forEach(function(b){brandMap[b.id]=b.name;});
+  },
+  photoPrinterQualify:{
+    steps:[
+      {key:'usage', type:'choice', prompt:'p_photoUsage', options:opts(['Studio','Event','Passport Photo','Personal Use'])},
+      {key:'paperSize', type:'choice', prompt:'p_paperSize', options:opts(['4x6','A4','Both'])},
+      {key:'budget', type:'text', prompt:'p_budget', optional:true},
+    ],
+    complete:(a)=>{
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Usage: ${a.usage}\n📌 Paper Size: ${a.paperSize}\n\n👉 Canon SELPHY (compact photo) ya Canon PIXMA Photo series suggest kariye chhiye — ink & paper cost-per-print details quotation ma malshe.`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_getQuotation'), action:{type:'flow', id:'leadCapture', ctx:{source:'Canon Photo Printer'}}},
+      ]};
+    }
+  },
+  scannerQualify:{
+    steps:[
+      {key:'stype', type:'choice', prompt:'p_scannerType', options:opts(['Flatbed','Document','High Speed','Office','Photo'])},
+      {key:'dailyVolume', type:'text', prompt:'p_dailyScan', optional:true},
+      {key:'duplex', type:'choice', prompt:'p_duplex', dynamicOptions:'YN'},
+    ],
+    complete:(a)=>{
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Type: ${a.stype}\n📌 Duplex: ${a.duplex}\n\n👉 Canon imageFORMULA series (${a.stype}) tamara volume mate suggest kariye chhiye.`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_getQuotation'), action:{type:'flow', id:'leadCapture', ctx:{source:'Canon Scanner'}}},
+        {label:'🎥 Demo Book Karo', action:{type:'flow', id:'leadCapture', ctx:{source:'Canon Scanner Demo'}}},
+      ]};
+    }
+  },
+  instaxQualify:{
+    steps:[
+      {key:'occasion', type:'text', prompt:'p_instaxOccasion', optional:true},
+    ],
+    complete:(a,ctx)=>{
+      const item = ctx.itemType || 'Instax';
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Item: ${item}\n📌 Occasion: ${a.occasion || bhaiT('notProvided')}\n\n👉 Fujifilm Instax Mini / Wide series + bundle offer (film + case) tamara mate suggest kariye chhiye.`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_getQuotation'), action:{type:'flow', id:'leadCapture', ctx:{source:'Fujifilm Instax — '+item}}},
+      ]};
+    }
+  },
+  projectorQualify:{
+    steps:[
+      {key:'roomSize', type:'text', prompt:'p_roomSize', optional:true},
+      {key:'needs', type:'choice', prompt:'p_projectorNeeds', options:opts(['Screen + Mount + Installation','Only Projector'])},
+    ],
+    complete:(a,ctx)=>{
+      const use = ctx.use || 'General';
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Use: ${use}\n📌 Room Size: ${a.roomSize || bhaiT('notProvided')}\n📌 Needs: ${a.needs}\n\n👉 Brightness & resolution mujab suitable projector model suggest karishu — site visit thi exact recommendation aapishu.`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_getQuotation'), action:{type:'flow', id:'leadCapture', ctx:{source:'Projector — '+use}}},
+        {label:bhaiT('chip_bookSiteVisit'), action:{type:'flow', id:'siteVisit', ctx:{source:'Projector — '+use}}},
+      ]};
+    }
+  },
+  automationQualify:{
+    steps:[
+      {key:'technology', type:'choice', prompt:'p_technology', options:opts(['Wireless','Hybrid','Fully Wired'])},
+      {key:'budget', type:'text', prompt:'p_budget', optional:true},
+      {key:'date', type:'text', prompt:'p_date', optional:true},
+      {key:'name', type:'text', prompt:'p_name'},
+      {key:'mobile', type:'text', prompt:'p_mobile'},
+      {key:'city', type:'text', prompt:'p_city'},
+    ],
+    complete:async (a,ctx)=>{
+      const atype = ctx.atype || 'Automation';
+      try{
+        const desc='Automation inquiry via Bhavi AI Assistant\nType: '+atype+'\nTechnology: '+a.technology+(a.budget?('\nBudget: '+a.budget):'')+(a.date?('\nPreferred Date: '+a.date):'');
+        await bhaiSubmitInquiry(atype, a.name, a.mobile, a.city, desc);
+      }catch(e){}
+      const msg = fmt(bhaiT('msg_leadCreated'), {name:a.name, mobile:a.mobile}) + `\n\n📌 Type: ${atype}\n📌 Technology: ${a.technology}`;
+      return {message:msg, chips:[
+        {label:bhaiT('chip_bookSiteVisit'), action:{type:'flow', id:'siteVisit', ctx:{source:atype}}},
+      ]};
+    }
+  },
+  hometheatreQualify:{
+    steps:[
+      {key:'roomSize', type:'text', prompt:'p_roomSize', optional:true},
+      {key:'roomType', type:'choice', prompt:'p_roomType', options:opts(['Living Room','Dedicated Theatre'])},
+      {key:'displayType', type:'choice', prompt:'p_displayType', options:opts(['TV','Projector'])},
+      {key:'budget', type:'text', prompt:'p_budget', optional:true},
+      {key:'priority', type:'choice', prompt:'p_priority', options:opts(['Movies','Music','Gaming'])},
+      {key:'acoustic', type:'choice', prompt:'p_acoustic', dynamicOptions:'YN'},
+      {key:'automationIntegration', type:'choice', prompt:'p_automationIntegration', dynamicOptions:'YN'},
+      {key:'name', type:'text', prompt:'p_name'},
+      {key:'mobile', type:'text', prompt:'p_mobile'},
+    ],
+    complete:async (a,ctx)=>{
+      const suggested = (a.priority==='Movies'?'5.1 Dolby Atmos Speaker Layout + AV Receiver':'Stereo Hi-Fi Setup')+' + '+a.displayType+' + Subwoofer';
+      try{
+        const desc='Home Theatre inquiry via Bhavi AI Assistant\nRoom: '+a.roomType+' ('+(a.roomSize||'-')+')\nDisplay: '+a.displayType+'\nPriority: '+a.priority+'\nAcoustic Treatment: '+a.acoustic+'\nAutomation Integration: '+a.automationIntegration+(a.budget?('\nBudget: '+a.budget):'')+'\nSuggested Setup: '+suggested;
+        await bhaiSubmitInquiry('Home Theatre', a.name, a.mobile, '', desc);
+      }catch(e){}
+      const msg = bhaiT('recommendIntro') + `\n\n📌 Room: ${a.roomType} (${a.roomSize || bhaiT('notProvided')})\n📌 Display: ${a.displayType}\n📌 Priority: ${a.priority}\n📌 Acoustic Treatment: ${a.acoustic}\n\n👉 Suggested Setup: ${suggested}\n\n` + fmt(bhaiT('msg_leadCreated'), {name:a.name, mobile:a.mobile});
+      return {message:msg, chips:[
+        {label:bhaiT('chip_bookSiteVisit'), action:{type:'flow', id:'siteVisit', ctx:{source:'Home Theatre'}}},
+      ]};
+    }
+  },
+  serviceTicket:{
+    steps:(ctx)=>{
+      const s = [
+        {key:'name', type:'text', prompt:'p_name'},
+        {key:'mobile', type:'text', prompt:'p_mobile'},
+        {key:'city', type:'text', prompt:'p_city'},
+      ];
+      if(ctx && ctx.serviceModeApplicable){
+        s.push({key:'serviceMode', type:'choice', prompt:'p_serviceMode', options:[
+          {label:bhaiT('opt_onsite'), value:'Onsite'},
+          {label:bhaiT('opt_carryIn'), value:'CarryIn'},
+        ]});
+      }
+      s.push(
+        {key:'model', type:'text', prompt:'p_model', optional:true},
+        {key:'serial', type:'text', prompt:'p_serial', optional:true},
+        {key:'problem', type:'text', prompt:'p_problem', optional:true},
+        {key:'photo', type:'choice', prompt:'p_photo', options:[
+          {label:bhaiT('opt_photoLater'), value:'Store Visit'},
+          {label:bhaiT('opt_photoNow'), value:'Share Now'},
+        ]},
+        {
+          key:'warrantyStatus', type:'choice', prompt:'p_warrantyStatus',
+          options:[
+            {label:bhaiT('opt_warranty'), value:'Warranty'},
+            {label:bhaiT('opt_nonWarranty'), value:'NonWarranty'},
+          ],
+          branch:(value)=>{
+            if(value === 'Warranty'){
+              return [{
+                key:'invoiceAvailable', type:'choice', prompt:'p_invoiceAvailable',
+                options:[ {label:YN()[0], value:'Yes'}, {label:YN()[1], value:'No'} ],
+                branch:(v)=> v === 'Yes' ? [{key:'invoiceDate', type:'text', prompt:'p_invoiceDate'}] : []
+              }];
+            }
+            return [];
+          }
+        },
+        {key:'date', type:'text', prompt:'p_date', optional:true}
+      );
+      return s;
+    },
+    complete:async (a,ctx)=>{
+      try{
+        const ticketId = await bhaiCreateTicket(a, ctx);
+        let msg = fmt(bhaiT('msg_ticketCreated'), {ticketId, device:ctx.device, issue:ctx.issue});
 
-    var enc=encodeURIComponent(q);
-    var models=await sbGet('models',
-      '?or=(model_no.ilike.*'+enc+'*,model_name.ilike.*'+enc+'*)&select=id,model_no,model_name,brand_id,brochure_url&order=model_no&limit=15');
+        if(a.serviceMode){
+          const modeLabel = a.serviceMode === 'Onsite' ? bhaiT('opt_onsite') : bhaiT('opt_carryIn');
+          msg += `\n${bhaiT('lbl_serviceMode')}: ${modeLabel}`;
+        }
 
-    if(!models||!models.length){
-      res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+d.noResult+'</div>';
+        if(a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'Yes'){
+          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_warranty')} ✅\n${bhaiT('lbl_invoiceDate')}: ${a.invoiceDate || bhaiT('notProvided')}\n\n${bhaiT('msg_warrantyCheck')}`;
+        } else if(a.warrantyStatus === 'Warranty' && a.invoiceAvailable === 'No'){
+          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_warranty')} — ${bhaiT('msg_noInvoiceNote')}\n${bhaiT('lbl_serviceCharge')}: ${resolveChargeText(a, ctx)}`;
+        } else {
+          msg += `\n${bhaiT('lbl_warranty')}: ${bhaiT('opt_nonWarranty')}\n${bhaiT('lbl_serviceCharge')}: ${resolveChargeText(a, ctx)}`;
+        }
+
+        return {message:msg, chips:[
+          {label:bhaiT('chip_trackRepair'), action:{type:'flow', id:'trackRepair'}},
+        ]};
+      }catch(e){
+        return {message: bhaiT('errorFallback')+'\n\n(Error: '+e.message+')', chips:[]};
+      }
+    }
+  },
+  leadCapture:{
+    steps:[
+      {key:'name', type:'text', prompt:'p_name'},
+      {key:'mobile', type:'text', prompt:'p_mobile'},
+      {key:'city', type:'text', prompt:'p_city', optional:true},
+    ],
+    complete:async (a,ctx)=>{
+      try{
+        await bhaiSubmitInquiry(ctx.source||'General Inquiry', a.name, a.mobile, a.city, 'Lead via Bhavi AI Assistant — Interested In: '+(ctx.source||'General'));
+      }catch(e){}
+      const msg = fmt(bhaiT('msg_leadCreated'), {name:a.name, mobile:a.mobile}) + (ctx.source? `\n\n📌 Interested In: ${ctx.source}` : '');
+      return {message:msg, chips:[]};
+    }
+  },
+  contactCapture:{
+    steps:[
+      {key:'name', type:'text', prompt:'p_name'},
+      {key:'mobile', type:'text', prompt:'p_mobile'},
+    ],
+    complete:async (a,ctx)=>{
+      try{
+        await bhaiSubmitInquiry('Contact Expert — '+ctx.expert, a.name, a.mobile, '', 'Contact request via Bhavi AI Assistant — wants to speak with: '+ctx.expert);
+      }catch(e){}
+      const msg = fmt(bhaiT('msg_expertConnect'), {name:a.name, expert:ctx.expert, mobile:a.mobile});
+      return {message:msg, chips:[]};
+    }
+  },
+  trackRepair:{
+    steps:[
+      {key:'ref', type:'text', prompt:'p_jobOrMobile'},
+    ],
+    complete:async (a)=>{
+      try{
+        const tickets = await bhaiTrackLookup(a.ref);
+        if(!tickets || !tickets.length){
+          return {message: bhaiT('trackNotFound'), chips:[
+            {label:bhaiT('chip_contactExpert'), action:{type:'menu', id:'contactExpert'}},
+          ]};
+        }
+        const lines = tickets.slice(0,5).map(function(tk){
+          let l = '🧾 '+tk.id+' — '+(tk.status||'');
+          if(tk.model) l += '\n   🖨️ '+tk.model+(tk.serial?' · '+tk.serial:'');
+          if(tk.problem) l += '\n   ⚠️ '+tk.problem;
+          if(tk.assigned_name) l += '\n   👷 '+bhaiT('lbl_engineer')+': '+tk.assigned_name;
+          return l;
+        });
+        const msg = '📦 '+bhaiT('trackFoundIntro')+'\n\n'+lines.join('\n\n');
+        return {message:msg, chips:[
+          {label:bhaiT('chip_contactExpert'), action:{type:'menu', id:'contactExpert'}},
+        ]};
+      }catch(e){
+        return {message: bhaiT('errorFallback')+'\n\n(Error: '+e.message+')', chips:[]};
+      }
+    }
+  },
+  siteVisit:{
+    steps:[
+      {key:'location', type:'text', prompt:'p_location'},
+      {key:'propertyType', type:'choice', prompt:'p_propertyType', options:opts(['Home','Office','Other'])},
+      {key:'requirement', type:'text', prompt:'p_requirement', optional:true},
+      {key:'budget', type:'text', prompt:'p_budget', optional:true},
+      {key:'date', type:'text', prompt:'p_date'},
+      {key:'name', type:'text', prompt:'p_name'},
+      {key:'mobile', type:'text', prompt:'p_mobile'},
+    ],
+    complete:async (a,ctx)=>{
+      try{
+        const src = ctx&&ctx.source ? (' — '+ctx.source) : '';
+        const desc='Site Visit request via Bhavi AI Assistant'+src+'\nLocation: '+a.location+'\nProperty Type: '+a.propertyType+(a.requirement?('\nRequirement: '+a.requirement):'')+(a.budget?('\nBudget: '+a.budget):'')+'\nPreferred Date: '+a.date;
+        await bhaiSubmitInquiry('Site Visit'+src, a.name, a.mobile, a.location, desc);
+      }catch(e){}
+      const msg = fmt(bhaiT('msg_siteVisitAssigned'), {date:a.date});
+      return {message:msg, chips:[]};
+    }
+  },
+};
+
+/* ============================================================
+   STATE MACHINE ENGINE
+   ============================================================ */
+const bhaiState = { lang:null, mode:'awaiting_lang', currentMenuId:null, currentMenuCtx:{}, flow:null, profile:{name:null, mobile:null, city:null} };
+
+function bhaiScrollBottom(){ var el=document.getElementById('chat'); if(el) el.scrollTop = el.scrollHeight; }
+
+function bhaiBotIcon(){
+  return `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="#3FCBB0"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="#E8A33D"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="#E8A33D"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="#3FCBB0"/></svg>`;
+}
+function bhaiAddBotBubble(text){
+  const chatEl = document.getElementById('chat');
+  const row = document.createElement('div');
+  row.className = 'row bot';
+  row.innerHTML = `<div class="avatar">${bhaiBotIcon()}</div><div class="bubble"></div>`;
+  row.querySelector('.bubble').textContent = text;
+  chatEl.appendChild(row); bhaiScrollBottom();
+  return row;
+}
+function bhaiAddUserBubble(text){
+  const chatEl = document.getElementById('chat');
+  const row = document.createElement('div');
+  row.className = 'row user';
+  row.innerHTML = `<div class="bubble"></div>`;
+  row.querySelector('.bubble').textContent = text;
+  chatEl.appendChild(row); bhaiScrollBottom();
+}
+function bhaiAddChips(items){
+  const chatEl = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'chip-wrap';
+  items.forEach(it=>{
+    const b = document.createElement('button');
+    b.className = 'chip' + (it.cls? ' '+it.cls : '');
+    b.textContent = it.label;
+    b.onclick = ()=>{ wrap.querySelectorAll('button').forEach(x=>x.disabled=true); wrap.style.opacity='0.55'; it.onClick(); };
+    wrap.appendChild(b);
+  });
+  chatEl.appendChild(wrap); bhaiScrollBottom();
+  return wrap;
+}
+function bhaiShowTyping(){
+  const chatEl = document.getElementById('chat');
+  const row = document.createElement('div');
+  row.className = 'row bot'; row.id = 'bhaiTypingRow';
+  row.innerHTML = `<div class="avatar">${bhaiBotIcon()}</div><div class="typing"><span></span><span></span><span></span></div>`;
+  chatEl.appendChild(row); bhaiScrollBottom();
+}
+function bhaiHideTyping(){ const el = document.getElementById('bhaiTypingRow'); if(el) el.remove(); }
+
+function botSay(text, then){
+  bhaiShowTyping();
+  setTimeout(()=>{ bhaiHideTyping(); bhaiAddBotBubble(text); if(then) then(); }, 380 + Math.random()*280);
+}
+
+/* ---------- Language stage ---------- */
+function bhaiStartApp(){
+  bhaiState.mode = 'awaiting_lang';
+  botSay("નમસ્તે! 👋 Bhavi Electronics & Automation માં તમારું સ્વાગત છે.\nनमस्ते! आपका स्वागत है!\nWelcome!\n\n✨ Where Customer Delight is First", ()=>{
+    botSay("કૃપા કરી તમારી ભાષા પસંદ કરો\nकृपया अपनी भाषा चुनें\nPlease select your language:", ()=>{
+      bhaiAddChips([
+        {label:'ગુજરાતી', onClick:()=>bhaiSelectLanguage('gu')},
+        {label:'हिंदी', onClick:()=>bhaiSelectLanguage('hi')},
+        {label:'English', onClick:()=>bhaiSelectLanguage('en')},
+      ]);
+    });
+  });
+}
+function bhaiSelectLanguage(lang){
+  bhaiState.lang = lang;
+  bhaiAddUserBubble(lang==='gu'?'ગુજરાતી':lang==='hi'?'हिंदी':'English');
+  var inputEl = document.getElementById('userInput');
+  if(inputEl) inputEl.placeholder = bhaiT('placeholder');
+  botSay(bhaiT('greeting'), ()=>{ bhaiGoMainMenu(); });
+}
+
+/* ---------- Menu rendering ---------- */
+function bhaiGoMainMenu(){
+  if(!bhaiState.lang){ bhaiStartApp(); return; }
+  bhaiState.mode = 'menu'; bhaiState.flow = null; bhaiState.currentMenuId = 'main'; bhaiState.currentMenuCtx = {};
+  bhaiRenderMenu('main', {});
+}
+function bhaiOpenMenu(menuId, ctx){
+  bhaiState.mode = 'menu'; bhaiState.flow = null; bhaiState.currentMenuId = menuId; bhaiState.currentMenuCtx = ctx||{};
+  bhaiRenderMenu(menuId, ctx||{});
+}
+function bhaiRenderMenu(menuId, ctx){
+  const menu = MENUS[menuId];
+  const title = typeof menu.title === 'function' ? menu.title() : menu.title;
+  botSay(title, ()=>{
+    const chips = menu.options.map(o=>({
+      label:o.label,
+      onClick:()=>{ bhaiAddUserBubble(o.label); bhaiHandleAction(o.action, ctx); }
+    }));
+    if(menuId !== 'main'){ chips.push({label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }}); }
+    bhaiAddChips(chips);
+  });
+}
+function bhaiRenderDynamicMenu(title, options){
+  bhaiState.mode = 'menu'; bhaiState.currentDynamic = {title, options};
+  botSay(title, ()=>{
+    const chips = options.map(o=>({ label:o.label, onClick:()=>{ bhaiAddUserBubble(o.label); o.onSelect(); } }));
+    chips.push({label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }});
+    bhaiAddChips(chips);
+  });
+}
+
+function bhaiHandleAction(action, parentCtx){
+  parentCtx = parentCtx || {};
+  if(action.type === 'menu'){ bhaiOpenMenu(action.id, {...parentCtx, ...(action.ctx||{})}); }
+  else if(action.type === 'flow'){ bhaiStartFlow(action.id, {...parentCtx, ...(action.ctx||{})}); }
+  else if(action.type === 'info'){ botSay(bhaiT(action.key), ()=>{ bhaiAddChips([{label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }}]); }); bhaiState.mode='menu'; bhaiState.currentMenuId='main'; }
+  else if(action.type === 'dynIssueMenu'){
+    const device = DEVICES.find(d=>d.id===action.deviceId);
+    bhaiRenderDynamicMenu(fmt(bhaiT('dynTitle_deviceIssue'), {device:device.label}), device.issues.map(iss=>({
+      label:iss, onSelect:()=>bhaiStartFlow('serviceTicket', {device:device.label, issue:iss, serviceModeApplicable: !!device.serviceModeApplicable})
+    })));
+  }
+  else if(action.type === 'dynCctvServiceMenu'){
+    const property = action.property;
+    bhaiRenderDynamicMenu(fmt(bhaiT('dynTitle_cctvOptions'), {property}), [
+      {label:'Need Site Survey', onSelect:()=>bhaiStartFlow('automationQualify', {atype:`CCTV Site Survey — ${property}`})},
+      {label:'Repair', onSelect:()=>bhaiRenderDynamicMenu(fmt(bhaiT('dynTitle_cctvIssue'), {property}), CCTV_REPAIR_ISSUES.map(iss=>({
+          label:iss, onSelect:()=>bhaiStartFlow('serviceTicket', {device:`CCTV (${property})`, issue:iss})
+        })))},
+      {label:'AMC', onSelect:()=>bhaiStartFlow('automationQualify', {atype:`CCTV AMC — ${property}`})},
+    ]);
+  }
+}
+
+/* ---------- Flow engine ---------- */
+function bhaiStartFlow(flowId, ctx){
+  const def = FLOWS[flowId];
+  const flowCtx = ctx||{};
+  bhaiState.mode = 'flow';
+  const steps = (typeof def.steps === 'function') ? def.steps(flowCtx) : def.steps.slice();
+  bhaiState.flow = { id:flowId, def, steps, idx:0, answers:{}, ctx: flowCtx };
+
+  const contactKeys = steps.filter(s=>['name','mobile','city'].includes(s.key)).map(s=>s.key);
+  const hasSavedProfile = bhaiState.profile.name && bhaiState.profile.mobile;
+
+  if(contactKeys.length && hasSavedProfile){
+    bhaiOfferSavedProfile(contactKeys);
+  } else {
+    bhaiAskCurrentStep();
+  }
+}
+
+function bhaiOfferSavedProfile(contactKeys){
+  const p = bhaiState.profile;
+  const cityLine = p.city ? `\n${bhaiT('lbl_city')}: ${p.city}` : '';
+  const msg = fmt(bhaiT('profileFound'), {name:p.name, mobile:p.mobile, cityLine});
+  botSay(msg, ()=>{
+    bhaiAddChips([
+      {label:bhaiT('useSaved'), onClick:()=>{ bhaiAddUserBubble(bhaiT('useSaved')); bhaiApplySavedProfile(contactKeys); }},
+      {label:bhaiT('enterNew'), onClick:()=>{ bhaiAddUserBubble(bhaiT('enterNew')); bhaiAskCurrentStep(); }},
+    ]);
+  });
+}
+
+function bhaiApplySavedProfile(contactKeys){
+  const f = bhaiState.flow;
+  const p = bhaiState.profile;
+  contactKeys.forEach(k=>{
+    if(p[k]){ f.answers[k] = p[k]; }
+  });
+  f.steps = f.steps.filter(s => !(contactKeys.includes(s.key) && p[s.key]));
+  f.idx = 0;
+  if(f.steps.length === 0){ bhaiFinishFlow(); }
+  else { bhaiAskCurrentStep(); }
+}
+function bhaiResolveStepOptions(step){
+  if(step.dynamicOptions === 'YN') return opts(YN());
+  return step.options;
+}
+function bhaiAskCurrentStep(){
+  const f = bhaiState.flow;
+  const step = f.steps[f.idx];
+  const promptText = bhaiT(step.prompt) + (step.optional ? '  ('+bhaiT('skip')+' OK)' : '');
+  botSay(promptText, ()=>{
+    if(step.type === 'choice'){
+      const stepOptions = bhaiResolveStepOptions(step);
+      const chips = stepOptions.map(o=>({ label:o.label, onClick:()=>{ bhaiAddUserBubble(o.label); bhaiRecordAnswer(step.key, o.value); } }));
+      if(step.optional) chips.push({label:bhaiT('skip'), cls:'alt', onClick:()=>{ bhaiAddUserBubble(bhaiT('skip')); bhaiRecordAnswer(step.key, ''); }});
+      bhaiAddChips(chips);
+    } else {
+      if(step.optional){
+        bhaiAddChips([{label:bhaiT('skip'), cls:'alt', onClick:()=>{ bhaiAddUserBubble(bhaiT('skip')); bhaiRecordAnswer(step.key, ''); }}]);
+      }
+    }
+  });
+}
+function bhaiRecordAnswer(key, value){
+  const f = bhaiState.flow;
+  const currentStep = f.steps[f.idx];
+  f.answers[key] = value;
+  if(['name','mobile','city'].includes(key) && value){ bhaiState.profile[key] = value; }
+  f.idx++;
+  if(currentStep && typeof currentStep.branch === 'function'){
+    const extraSteps = currentStep.branch(value, f.answers) || [];
+    if(extraSteps.length){ f.steps.splice(f.idx, 0, ...extraSteps); }
+  }
+  if(f.idx >= f.steps.length){ bhaiFinishFlow(); }
+  else { bhaiAskCurrentStep(); }
+}
+async function bhaiFinishFlow(){
+  const f = bhaiState.flow;
+  bhaiShowTyping();
+  let result;
+  try{
+    result = await Promise.resolve(f.def.complete(f.answers, f.ctx));
+  }catch(e){
+    result = {message: bhaiT('errorFallback')+'\n\n(Error: '+e.message+')', chips:[]};
+  }
+  bhaiHideTyping();
+  bhaiAddBotBubble(result.message);
+  const chips = (result.chips||[]).map(c=>({
+    label:c.label,
+    onClick:()=>{ bhaiAddUserBubble(c.label); bhaiHandleAction(c.action, {}); }
+  }));
+  chips.push({label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }});
+  bhaiAddChips(chips);
+  bhaiScrollBottom();
+  bhaiState.mode = 'menu'; bhaiState.flow = null; bhaiState.currentMenuId = 'main';
+}
+
+/* ---------- Fuzzy match helpers for free-text input ---------- */
+function bhaiFuzzyMatchOption(text, labels){
+  const norm = text.trim().toLowerCase();
+  if(!norm) return -1;
+  let idx = labels.findIndex(l => l.toLowerCase() === norm);
+  if(idx >= 0) return idx;
+  idx = labels.findIndex(l => l.toLowerCase().includes(norm) || norm.includes(l.toLowerCase()));
+  if(idx >= 0) return idx;
+  const num = parseInt(norm, 10);
+  if(!isNaN(num) && num >= 1 && num <= labels.length) return num - 1;
+  return -1;
+}
+
+/* ---------- Global text input handling ---------- */
+function bhaiHandleSend(){
+  const inputEl = document.getElementById('userInput');
+  if(!inputEl) return;
+  const val = inputEl.value.trim();
+  if(!val) return;
+  inputEl.value = '';
+
+  if(bhaiState.mode === 'awaiting_lang'){
+    bhaiAddUserBubble(val);
+    botSay("કૃપા કરી નીચેના બટનથી ભાષા પસંદ કરો 🙏\nकृपया नीचे दिए बटन से भाषा चुनें\nPlease select a language using the buttons below");
+    return;
+  }
+
+  if(bhaiState.mode === 'flow'){
+    const f = bhaiState.flow;
+    const step = f.steps[f.idx];
+    bhaiAddUserBubble(val);
+    if(step.type === 'text'){
+      // Mobile numbers feed real ticket/inquiry creation - validate before accepting.
+      if(step.key === 'mobile'){
+        const digits = val.replace(/\D/g,'');
+        if(digits.length !== 10){ botSay(bhaiT('invalidMobile')); return; }
+        bhaiRecordAnswer(step.key, digits);
+        return;
+      }
+      bhaiRecordAnswer(step.key, val);
+    } else {
+      const stepOptions = bhaiResolveStepOptions(step);
+      const labels = stepOptions.map(o=>o.label);
+      const idx = bhaiFuzzyMatchOption(val, labels);
+      if(idx >= 0){ bhaiRecordAnswer(step.key, stepOptions[idx].value); return; }
+      const kbHit = searchKB(val);
+      if(kbHit){
+        botSay(kbHit.a[bhaiState.lang] || kbHit.a.en, ()=>{ bhaiAskCurrentStep(); });
+      } else {
+        bhaiTriggerError();
+      }
+    }
+    return;
+  }
+
+  if(bhaiState.mode === 'menu'){
+    bhaiAddUserBubble(val);
+    let labels, execute;
+    if(bhaiState.currentDynamic){
+      labels = bhaiState.currentDynamic.options.map(o=>o.label);
+      execute = (idx)=> bhaiState.currentDynamic.options[idx].onSelect();
+    } else {
+      const menu = MENUS[bhaiState.currentMenuId];
+      labels = menu.options.map(o=>o.label);
+      execute = (idx)=> bhaiHandleAction(menu.options[idx].action, bhaiState.currentMenuCtx);
+    }
+    const idx = bhaiFuzzyMatchOption(val, labels);
+    if(idx >= 0){ execute(idx); return; }
+
+    const kbHit = searchKB(val);
+    if(kbHit){
+      botSay(kbHit.a[bhaiState.lang] || kbHit.a.en, ()=>{
+        botSay(bhaiT('kbFollowup'), ()=>{
+          if(bhaiState.currentDynamic){
+            const chips = bhaiState.currentDynamic.options.map(o=>({ label:o.label, onClick:()=>{ bhaiAddUserBubble(o.label); o.onSelect(); } }));
+            chips.push({label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }});
+            bhaiAddChips(chips);
+          } else {
+            const menu = MENUS[bhaiState.currentMenuId];
+            const chips = menu.options.map(o=>({ label:o.label, onClick:()=>{ bhaiAddUserBubble(o.label); bhaiHandleAction(o.action, bhaiState.currentMenuCtx); } }));
+            if(bhaiState.currentMenuId !== 'main'){ chips.push({label:bhaiT('backMain'), cls:'main', onClick:()=>{ bhaiAddUserBubble(bhaiT('backMain')); bhaiGoMainMenu(); }}); }
+            bhaiAddChips(chips);
+          }
+        });
+      });
       return;
     }
-
-    var brochures=await Promise.all(models.map(function(m){return _findBrochure(m.model_no,m.brochure_url);}));
-    res.innerHTML=models.map(function(m,i){
-      var brand=brandMap[m.brand_id]||'';
-      var brochure=brochures[i];
-      return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;transition:background .15s;" '
-        +'onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#f8fafc\'" '
-        +'onclick="chatModelSelect(\''+escHtml(brand)+'\',\''+escHtml(m.model_no)+'\',\''+escHtml(m.model_name||'')+'\',\''+escHtml(brochure||'')+'\')">'
-        +'<div style="font-size:12.5px;font-weight:700;color:#1e293b;">'+escHtml(m.model_no)+(m.model_name?' <span style="font-weight:400;color:#64748b;font-size:11.5px;">— '+escHtml(m.model_name)+'</span>':'')+'</div>'
-        +(brand?'<div style="font-size:11px;color:#1d4ed8;margin-top:2px;">📷 '+escHtml(brand)+'</div>':'')
-        +(brochure?'<div style="margin-top:5px;"><a href="'+escHtml(brochure)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;background:#f0fdf4;color:#059669;border:1px solid #86efac;border-radius:6px;padding:3px 9px;font-weight:700;text-decoration:none;">📄 Brochure →</a></div>':'')
-        +'</div>';
-    }).join('');
-  }catch(e){
-    res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+e.message+'</div>';
+    bhaiTriggerError();
+    return;
   }
 }
-
-function chatModelSelect(brand,modelNo,modelName,brochureUrl){
-  var msgs=document.getElementById('chat-msgs');
-  msgs.innerHTML+='<div style="text-align:right;margin-top:8px;"><span style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:14px 14px 4px 14px;padding:8px 13px;font-size:12px;font-weight:600;max-width:85%;">'+escHtml(modelNo)+'</span></div>';
-  msgs.innerHTML+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px 14px 14px 4px;padding:12px 14px;font-size:12.5px;color:#166534;max-width:90%;margin-top:6px;line-height:1.8;">'
-    +'<b>✅ '+escHtml(modelNo)+'</b>'+(modelName?' — '+escHtml(modelName):'')+'<br>'
-    +(brand?'📷 <b>Brand:</b> '+escHtml(brand)+'<br>':'')
-    +(brochureUrl?'📄 <a href="'+escHtml(brochureUrl)+'" target="_blank" style="color:#059669;font-weight:700;">View Brochure →</a><br>':'')
-    +'<br>🛠️ Aa model ni service Bhavi Electronics ma thay chhe.<br>'
-    +'📞 Book karva: <a href="tel:+919574004969" style="color:#059669;font-weight:700;">+91 95740 04969</a>'
-    +' &nbsp;|&nbsp; <a href="https://wa.me/919574004969?text=Service+booking+for+'+encodeURIComponent(modelNo)+'" target="_blank" style="color:#059669;font-weight:700;">WhatsApp →</a>'
-    +'</div>';
-  msgs.innerHTML+='<div style="font-size:10px;color:#94a3b8;margin-top:3px;padding-left:2px;">Bhavi Assistant • just now</div>';
-  msgs.scrollTop=msgs.scrollHeight;
-  _renderChatQ();
+function bhaiTriggerError(){
+  botSay(bhaiT('errorFallback'), ()=>{ bhaiGoMainMenu(); });
 }
 
-// ── Track My Complaint (real live lookup by mobile, in-chat) ──────
-// The old FAQ answer pointed customers to "Track My Order" on the home
-// screen, but that page queries sales_orders (purchases), not the tickets
-// table used for repair complaints — customers looking up a repair got
-// nothing there. This looks up the real tickets table directly, inline.
-var TRACK_STATUS_COLORS={
-  'Pending Customer Arrival':'#f59e0b','Pending Allocation':'#ef4444','Assigned':'#f59e0b','In Progress':'#3b82f6',
-  'Pending Parts':'#d97706','Pending Customer Approval':'#8b5cf6','Customer Approved':'#6366f1',
-  'Pending Repair Carry In':'#3b82f6','Pending Repair On Site':'#3b82f6','Repaired':'#059669','Sent to MSC':'#7c3aed',
-  'Pending for Delivery':'#059669','Closed':'#059669','Delivered':'#059669','Call Cancel':'#94a3b8','Customer Reject':'#dc2626'
-};
-async function chatTrackSearch(){
-  var d=CHAT_DATA[_chatLang];if(!d)return;var tk=d.track;
-  var inp=document.getElementById('chat-track-mob');
-  var res=document.getElementById('chat-track-results');
-  if(!inp||!res)return;
-  var mob=inp.value.trim();
-  if(!/^\d{10}$/.test(mob)){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:8px;">'+tk.invalidMobile+'</div>';return;}
-  res.innerHTML='<div style="font-size:12px;color:#64748b;padding:6px;">'+tk.searching+'</div>';
-  try{
-    var tickets=await sbGet('tickets','?mobile=eq.'+mob+'&order=created_at.desc&limit=20');
-    if(!tickets||!tickets.length){res.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center;">'+tk.noResult+'</div>';return;}
-    res.innerHTML=tickets.map(function(t){
-      var clr=TRACK_STATUS_COLORS[t.status]||'#64748b';
-      var dateStr=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
-      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;">'
-        +'<div style="font-size:12.5px;font-weight:800;color:#1e293b;">'+escHtml(t.id)+'</div>'
-        +'<span style="background:'+clr+'22;color:'+clr+';border-radius:99px;padding:2px 9px;font-size:10.5px;font-weight:700;white-space:nowrap;">'+escHtml(t.status||'')+'</span>'
-        +'</div>'
-        +(dateStr?'<div style="font-size:10.5px;color:#94a3b8;margin-bottom:3px;">📅 '+dateStr+'</div>':'')
-        +(t.model?'<div style="font-size:11.5px;color:#64748b;">🖨️ '+escHtml(t.model)+(t.serial?' · '+escHtml(t.serial):'')+'</div>':'')
-        +(t.problem?'<div style="font-size:11.5px;color:#1e293b;margin-top:2px;">⚠️ '+escHtml(t.problem)+'</div>':'')
-        +(t.assigned_name?'<div style="font-size:11.5px;color:#2563eb;font-weight:600;margin-top:2px;">👷 Engineer: '+escHtml(t.assigned_name)+'</div>':'')
-        +'</div>';
-    }).join('');
-  }catch(e){res.innerHTML='<div style="font-size:12px;color:#dc2626;padding:6px;">Error: '+escHtml(e.message)+'</div>';}
+function bhaiGoMainMenuFromHeader(){ if(bhaiState.lang) bhaiGoMainMenu(); else bhaiStartApp(); }
+function fullRestart(){
+  const chatEl = document.getElementById('chat');
+  if(chatEl) chatEl.innerHTML = '';
+  bhaiState.lang = null; bhaiState.mode='awaiting_lang'; bhaiState.flow=null; bhaiState.currentMenuId=null; bhaiState.currentDynamic=null;
+  bhaiState.profile = {name:null, mobile:null, city:null};
+  const inputEl = document.getElementById('userInput');
+  if(inputEl) inputEl.placeholder = 'Type message...';
+  bhaiStartApp();
 }
+function goMainMenu(){ bhaiGoMainMenuFromHeader(); }
+
+/* ---------- Open/close (wired to the existing floating Help/Chat button) ---------- */
+function openChat(){
+  document.getElementById('chat-modal').style.display='';
+  fullRestart();
+}
+function closeChat(){document.getElementById('chat-modal').style.display='none';}
+
 </script>
 
 <!-- ====== FLOATING CHAT BUTTON ====== -->
@@ -2736,28 +3461,91 @@ async function chatTrackSearch(){
   <span style="font-size:18px;">💬</span> Help / Chat
 </button>
 
-<!-- ====== CHAT MODAL ====== -->
+<style>
+:root{
+  --ink:#161A20; --panel:#1D222B; --panel-2:#242A34; --line:rgba(232,228,219,0.10);
+  --paper:#F3EFE6; --paper-dim:#B9B4A8; --amber:#E8A33D; --teal:#3FCBB0; --teal-dim:#2A8E7A;
+  --font-body-ai:'Inter','Segoe UI',system-ui,sans-serif;
+}
+#chat-modal, #chat-modal *{ text-transform:none; box-sizing:border-box; }
+#chat-modal .bhai-card{
+  width:100%; max-width:520px; margin:0 auto; height:88vh; max-height:88vh;
+  background:var(--panel); border-radius:22px 22px 0 0; border:1px solid var(--line); border-bottom:none;
+  display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -8px 40px rgba(0,0,0,.35);
+  font-family:var(--font-body-ai); color:var(--paper);
+}
+#chat-modal .head{ padding:16px 16px 14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, var(--panel-2), var(--panel)); flex-shrink:0; }
+#chat-modal .aperture{ width:36px;height:36px;flex-shrink:0; border-radius:9px; background:#F3EFE6; padding:4px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.25); }
+#chat-modal .aperture img{ width:100%; height:100%; object-fit:contain; display:block; }
+#chat-modal .head-text{flex:1;min-width:0;}
+#chat-modal .head-title{ font-size:15.5px; font-weight:600; display:flex; align-items:center; gap:7px; color:var(--paper); }
+#chat-modal .dot-live{ width:6px;height:6px;border-radius:50%;background:var(--teal); box-shadow:0 0 0 3px rgba(63,203,176,0.18); flex-shrink:0; }
+#chat-modal .head-sub{ font-size:11px; color:var(--paper-dim); margin-top:2px; }
+#chat-modal .head-btns{ display:flex; gap:6px; flex-shrink:0; }
+#chat-modal .icon-btn{
+  background:transparent; border:1px solid var(--line); color:var(--paper-dim);
+  font-size:14px; width:30px;height:30px; border-radius:9px; cursor:pointer;
+  display:flex;align-items:center;justify-content:center; transition:all .15s ease;
+}
+#chat-modal .icon-btn:hover{ color:var(--paper); border-color:rgba(232,228,219,0.28); }
+#chat-modal .chat{ flex:1; overflow-y:auto; padding:16px 14px; display:flex; flex-direction:column; gap:10px; }
+#chat-modal .chat::-webkit-scrollbar{width:6px;}
+#chat-modal .chat::-webkit-scrollbar-thumb{background:rgba(232,228,219,0.15); border-radius:10px;}
+#chat-modal .row{ display:flex; gap:8px; max-width:100%; animation:bhaiRise .25s ease; }
+@keyframes bhaiRise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+#chat-modal .row.user{ justify-content:flex-end; }
+#chat-modal .avatar{ width:24px;height:24px;border-radius:7px;flex-shrink:0; background:var(--panel-2);
+  border:1px solid var(--line); display:flex;align-items:center;justify-content:center; margin-top:2px; }
+#chat-modal .avatar svg{width:13px;height:13px;}
+#chat-modal .bubble{ padding:10px 12px; border-radius:13px; font-size:13.3px; line-height:1.55; max-width:82%; white-space:pre-wrap; }
+#chat-modal .row.bot .bubble{ background:var(--panel-2); border:1px solid var(--line); border-top-left-radius:4px; color:var(--paper); }
+#chat-modal .row.user .bubble{ background:var(--amber); color:#241705; border-top-right-radius:4px; font-weight:500; }
+#chat-modal .chip-wrap{ display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; padding-left:32px; }
+#chat-modal .chip{ padding:7px 12px; border-radius:10px; background:transparent; border:1px solid var(--teal-dim);
+  color:var(--teal); font-size:12px; cursor:pointer; font-family:inherit; transition:all .15s ease; text-align:left; }
+#chat-modal .chip:hover{ background:rgba(63,203,176,0.12); }
+#chat-modal .chip.alt{ border-color:rgba(232,163,61,0.55); color:var(--amber); }
+#chat-modal .chip.alt:hover{ background:rgba(232,163,61,0.10); }
+#chat-modal .chip.main{ border-color:rgba(232,228,219,0.30); color:var(--paper); font-weight:600; }
+#chat-modal .typing{ display:flex; gap:4px; align-items:center; padding:11px 12px; background:var(--panel-2);
+  border:1px solid var(--line); border-radius:13px; border-top-left-radius:4px; width:fit-content; }
+#chat-modal .typing span{ width:5px;height:5px;border-radius:50%;background:var(--paper-dim); animation:bhaiBlink 1.2s infinite ease-in-out; }
+#chat-modal .typing span:nth-child(2){animation-delay:.2s;} #chat-modal .typing span:nth-child(3){animation-delay:.4s;}
+@keyframes bhaiBlink{ 0%,80%,100%{opacity:.25;} 40%{opacity:1;} }
+#chat-modal .inputbar{ display:flex; gap:8px; padding:12px 14px 14px; border-top:1px solid var(--line); background:var(--panel); flex-shrink:0; }
+#chat-modal .inputbar input{ flex:1; background:var(--panel-2); border:1px solid var(--line); color:var(--paper);
+  padding:11px 14px; border-radius:12px; font-size:13.3px; font-family:inherit; outline:none; }
+#chat-modal .inputbar input:focus{ border-color:var(--teal-dim); }
+#chat-modal .inputbar input::placeholder{ color:var(--paper-dim); }
+#chat-modal .send-btn{ width:42px;height:42px;flex-shrink:0; border-radius:12px; border:none; background:var(--teal);
+  color:#0E1712; cursor:pointer; display:flex;align-items:center;justify-content:center; transition:transform .12s ease, background .15s ease; }
+#chat-modal .send-btn:hover{ background:#54DABF; } #chat-modal .send-btn:active{ transform:scale(0.92); }
+#chat-modal .send-btn svg{width:18px;height:18px;}
+@media (max-width:480px){ #chat-modal .bhai-card{ max-width:100%; height:100vh; max-height:100vh; border-radius:0; border:none; } }
+</style>
+<!-- ====== CHAT MODAL — Bhavi AI Assistant ====== -->
 <div id="chat-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);" onclick="if(event.target===this)closeChat()">
-  <div style="position:absolute;bottom:0;left:0;right:0;max-height:88vh;background:#fff;border-radius:22px 22px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.18);">
-
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#1d4ed8,#1a3fa8);color:#fff;padding:16px 20px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;">🤖</div>
-        <div>
-          <div style="font-size:15px;font-weight:800;letter-spacing:.1px;">Bhavi Assistant</div>
-          <div style="font-size:11px;opacity:.8;margin-top:1px;">● Online — Instant Replies</div>
-        </div>
+  <div class="bhai-card" style="position:absolute;bottom:0;left:0;right:0;">
+    <div class="head">
+      <div class="aperture" style="background:linear-gradient(135deg,#3FCBB0,#2A8E7A);display:flex;align-items:center;justify-content:center;font-size:18px;">🤖</div>
+      <div class="head-text">
+        <div class="head-title">Bhavi AI Assistant <span class="dot-live"></span></div>
+        <div class="head-sub">Sales · Service · Automation</div>
       </div>
-      <button onclick="closeChat()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+      <div class="head-btns">
+        <button class="icon-btn" onclick="goMainMenu()" title="Main Menu">🏠</button>
+        <button class="icon-btn" onclick="fullRestart()" title="Restart">⟳</button>
+        <button class="icon-btn" onclick="closeChat()" title="Close">✕</button>
+      </div>
     </div>
-
-    <!-- Messages -->
-    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:#f8fafc;"></div>
-
-    <!-- Quick Questions -->
-    <div id="chat-q-area" style="padding:12px 14px 16px;background:#fff;border-top:1px solid #e2e8f0;flex-shrink:0;max-height:52vh;overflow-y:auto;"></div>
-
+    <div class="chat" id="chat"></div>
+    <div class="inputbar">
+      <input id="userInput" class="no-caps" type="text" placeholder="Type message..." autocomplete="off" onkeydown="if(event.key==='Enter')bhaiHandleSend()">
+      <button class="send-btn" onclick="bhaiHandleSend()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 12L20 4L14 20L11 13L4 12Z" fill="#0E1712"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 <script>
