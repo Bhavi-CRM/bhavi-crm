@@ -311,6 +311,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('my-report')" id="nav-my-report"><span class="icon">📊</span><span>My Report</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
+    <div class="nav-item hidden" onclick="navigate('eng-daily-report')" id="nav-eng-daily-report"><span class="icon">📅</span><span>Engineer Daily Report</span></div>
     <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
     <div class="nav-item hidden" onclick="navigate('walk-in')" id="nav-walk-in"><span class="icon">🚶</span><span>Walk-in</span></div>
     <div class="nav-item hidden" onclick="navigate('courier')" id="nav-courier"><span class="icon">📦</span><span>Courier</span></div>
@@ -2858,7 +2859,7 @@ function setupNav(){
 
     if(isPeon){
       // Peon sees only their own task dashboard — hide everything else
-      ['nav-tickets','nav-my-calls','nav-my-report','nav-work-log','nav-walk-in','nav-courier','btn-new-call',
+      ['nav-tickets','nav-my-calls','nav-my-report','nav-eng-daily-report','nav-work-log','nav-walk-in','nav-courier','btn-new-call',
        'nav-inventory','nav-customers','nav-reports','nav-work-log-report','nav-walk-in-report',
        'nav-courier-report','nav-master','nav-settings','nav-tasks','nav-sales','nav-route-planning',
        'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report','nav-inquiries',
@@ -2872,7 +2873,7 @@ function setupNav(){
       if(autoSec2)autoSec2.style.display='none';
       if(aiSec2)aiSec2.style.display='none';
     }else if(isEng){
-      sv('nav-tickets',false);sv('nav-my-calls',true);sv('nav-my-report',true);sv('nav-work-log',true);sv('nav-walk-in',false);sv('nav-courier',false);
+      sv('nav-tickets',false);sv('nav-my-calls',true);sv('nav-my-report',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
@@ -2892,10 +2893,10 @@ function setupNav(){
       var _up=window._navPerms&&window._navPerms.users&&window._navPerms.users[_uid]||null;
       if(_up&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_up[item.id]===true)sv(item.id,true);else if(_up[item.id]===false)sv(item.id,false);});}
     }else if(isWC){
-      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
+      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
-      sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
+      sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
@@ -2908,7 +2909,7 @@ function setupNav(){
       var _wcUp=window._navPerms&&window._navPerms.users&&window._navPerms.users[_wcUid]||null;
       if(_wcUp&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_wcUp[item.id]===true)sv(item.id,true);else if(_wcUp[item.id]===false)sv(item.id,false);});}
     }else{
-      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
+      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-eng-daily-report',true);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
@@ -2993,9 +2994,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -12153,6 +12154,118 @@ async function loadMyReport(){
       +'<th style="padding:8px;">Total Closed</th><th style="padding:8px;">Pending</th><th style="padding:8px;">Payment/Invoice Done</th>'
       +'</tr></thead><tbody>'+(rowsHtml||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>')+'</tbody></table></div>';
   }catch(e){if(wrap)wrap.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
+}
+
+// ===== ENGINEER DAILY REPORT (admin, all-engineers summary) =====
+// Same counting policy as My Report (MYRPT_DONE_STATUSES/MYRPT_PENDING_STATUSES,
+// timeline-event-date matching) so numbers here always agree with each
+// engineer's own My Report and the Daily Report they submit — one engineer's
+// total should never be different on two different admin pages.
+async function renderEngDailyReport(){
+  var pc=document.getElementById('page-content');
+  var today=new Date();
+  var monthStart=today.toLocaleDateString('en-CA').substring(0,8)+'01';
+  var todayStr=today.toLocaleDateString('en-CA');
+  if(!allEngineers||!allEngineers.length){try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}}
+  var engOpts='<option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+e.name+'</option>';}).join('');
+  pc.innerHTML='<div class="card">'
+    +'<div class="section-header"><h2>📅 Engineer Daily Report</h2></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
+    +'<div class="form-group" style="margin-bottom:0;"><label>Engineer</label><select id="edr-eng" onchange="loadEngDailyReport()" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;min-width:170px;">'+engOpts+'</select></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="edr-from" value="'+monthStart+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="edr-to" value="'+todayStr+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="loadEngDailyReport()" style="margin-bottom:0;height:36px;">🔍 Search</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="edrQuick(\'today\')" style="margin-bottom:0;height:36px;">Today</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="edrQuick(\'week\')" style="margin-bottom:0;height:36px;">This Week</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="edrQuick(\'month\')" style="margin-bottom:0;height:36px;">This Month</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="edrQuick(\'year\')" style="margin-bottom:0;height:36px;">This Year</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadEngDailyReport()" style="margin-bottom:0;height:36px;">⬇️ Download Excel</button>'
+    +'</div>'
+    +'<div id="edr-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>'
+    +'<div id="edr-table-wrap" style="overflow-x:auto;"></div>'
+    +'</div>';
+  loadEngDailyReport();
+}
+
+function edrQuick(type){
+  var today=new Date();
+  var from,to=today.toLocaleDateString('en-CA');
+  if(type==='today'){from=to;}
+  else if(type==='week'){var d=new Date(today);d.setDate(today.getDate()-today.getDay()+1);from=d.toLocaleDateString('en-CA');}
+  else if(type==='year'){from=today.getFullYear()+'-01-01';}
+  else{from=today.toLocaleDateString('en-CA').substring(0,8)+'01';}
+  var fi=document.getElementById('edr-from');var ti=document.getElementById('edr-to');
+  if(fi)fi.value=from;if(ti)ti.value=to;
+  loadEngDailyReport();
+}
+
+window._edrRows=[];window._edrRange={};
+
+async function loadEngDailyReport(){
+  var wrap=document.getElementById('edr-table-wrap');
+  var summaryEl=document.getElementById('edr-summary');
+  var from=document.getElementById('edr-from')?.value||'';
+  var to=document.getElementById('edr-to')?.value||'';
+  var engFilter=document.getElementById('edr-eng')?.value||'';
+  if(!from||!to){if(wrap)wrap.innerHTML='';return;}
+  if(wrap)wrap.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var q='?select=id,status,call_type,timeline,assigned_to,assigned_name';
+    q+=engFilter?('&assigned_to=eq.'+encodeURIComponent(engFilter)):'&assigned_to=not.is.null';
+    var tickets=await sbAll('tickets',q);
+    var byEng={};
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0};return byEng[id];}
+    (tickets||[]).forEach(function(t){
+      if(!t.assigned_to)return;
+      var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+      if(MYRPT_DONE_STATUSES.indexOf(t.status)!==-1){
+        var d=myRptStatusEventDate(t);
+        if(d&&d>=from&&d<=to){var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;}
+      }else if(MYRPT_PENDING_STATUSES.indexOf(t.status)!==-1){
+        var d2=myRptStatusEventDate(t);
+        if(d2&&d2>=from&&d2<=to)ensure(t.assigned_to,t.assigned_name).pending++;
+      }
+      myRptInvoiceDates(t).forEach(function(d3){if(d3>=from&&d3<=to)ensure(t.assigned_to,t.assigned_name).invoice++;});
+    });
+    // Ensure every matching engineer shows even with zero activity in range.
+    (allEngineers||[]).forEach(function(e){
+      if(engFilter&&e.eng_id!==engFilter)return;
+      ensure(e.eng_id,e.name);
+    });
+    var rows=Object.keys(byEng).map(function(id){var r=byEng[id];r.id=id;r.total=r.w+r.ow;return r;});
+    rows.sort(function(a,b){return b.total-a.total;});
+    window._edrRows=rows;window._edrRange={from:from,to:to};
+    var totW=0,totOW=0,totPending=0,totInvoice=0;
+    rows.forEach(function(r){totW+=r.w;totOW+=r.ow;totPending+=r.pending;totInvoice+=r.invoice;});
+    if(summaryEl)summaryEl.innerHTML=
+      '<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">🛡️ Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+totW+'</div></div>'
+      +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">💳 Non-Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+totOW+'</div></div>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Total Closed</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+(totW+totOW)+'</div></div>'
+      +'<div style="background:#fefce8;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#a16207;font-weight:700;">⏳ Total Pending</div><div style="font-size:20px;font-weight:800;color:#a16207;">'+totPending+'</div></div>'
+      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">🧾 Payment/Invoice Done</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+totInvoice+'</div></div>';
+    var rowsHtml=rows.map(function(r){
+      return '<tr><td style="font-weight:600;">'+r.name+'</td><td style="text-align:center;">'+r.w+'</td><td style="text-align:center;">'+r.ow+'</td>'
+        +'<td style="text-align:center;font-weight:700;color:#15803d;">'+r.total+'</td>'
+        +'<td style="text-align:center;">'+r.pending+'</td>'
+        +'<td style="text-align:center;">'+r.invoice+'</td></tr>';
+    }).join('');
+    if(wrap)wrap.innerHTML='<div class="table-wrap"><table><thead><tr>'
+      +'<th style="text-align:left;padding:8px;">Engineer</th><th style="padding:8px;">Warranty Closed</th><th style="padding:8px;">Non-Warranty Closed</th>'
+      +'<th style="padding:8px;">Total Closed</th><th style="padding:8px;">Pending</th><th style="padding:8px;">Payment/Invoice Done</th>'
+      +'</tr></thead><tbody>'+(rowsHtml||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>')+'</tbody></table></div>';
+  }catch(e){if(wrap)wrap.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
+}
+
+function downloadEngDailyReport(){
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
+  var rows=window._edrRows||[];
+  if(!rows.length){alert('No data to download — run Search first.');return;}
+  var data=rows.map(function(r){return {'Engineer':r.name,'Warranty Closed':r.w,'Non-Warranty Closed':r.ow,'Total Closed':r.total,'Pending':r.pending,'Payment/Invoice Done':r.invoice};});
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Engineer Report');
+  var range=window._edrRange||{};
+  XLSX.writeFile(wb,'Engineer_Daily_Report_'+(range.from||'')+'_to_'+(range.to||'')+'.xlsx');
 }
 
 // ===== DAILY REPORT =====
