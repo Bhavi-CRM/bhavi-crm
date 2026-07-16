@@ -17050,17 +17050,17 @@ async function renderWorkLog(){
   const wdays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const d=new Date();
   const dateStr=dd+suffix+' '+months[d.getMonth()]+' '+d.getFullYear()+', '+wdays[d.getDay()];
-  const slots=[];
-  for(var h=7;h<=21;h++){['00','15','30','45'].forEach(function(m){slots.push((h<10?'0':'')+h+':'+m);});}
   const now=new Date();
-  const hh=now.getHours();const rawMin=now.getMinutes();const mm2=rawMin<15?'00':rawMin<30?'15':rawMin<45?'30':'45';
-  const curr=(hh<10?'0':'')+hh+':'+mm2;
-  const sidx=slots.indexOf(curr);
-  const fromDef=sidx>=0?curr:slots[0];
-  const toDef=sidx>=0?slots[Math.min(sidx+2,slots.length-1)]:slots[2];
+  const currExact=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var logs=[];
   try{logs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&log_date=eq.'+today+'&order=from_time');}catch(e){}
   window._todayWorkLogs=logs;window._todayWorkDate=today;
+  // From Time defaults to the END of the last log entry (auto or manual) so a
+  // fresh entry chains on exactly — no forced 15-min grid causing gaps/overlap
+  // against auto entries (Visit Start/Work Start) that log at their real time.
+  const lastLog=logs.length?logs[logs.length-1]:null;
+  const fromDef=(lastLog&&lastLog.to_time&&lastLog.to_time!=='OPEN')?lastLog.to_time:currExact;
+  const toDef=currExact;
   function logsHtml(items){
     if(!items.length)return'<div style="text-align:center;padding:28px;color:var(--text-muted);font-size:13px;">📭 No log entries found</div>';
     return items.map(function(l){
@@ -17087,8 +17087,8 @@ async function renderWorkLog(){
     +'<div class="card" style="margin-bottom:14px;">'
     +'<div class="section-header"><h2>➕ Add Entry</h2></div>'
     +'<div class="form-grid" style="margin-bottom:10px;">'
-    +'<div class="form-group"><label>From Time</label><select id="wl-from" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===fromDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
-    +'<div class="form-group"><label>To Time</label><select id="wl-to" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">'+slots.map(function(s){return'<option value="'+s+'"'+(s===toDef?' selected':'')+'>'+s+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>From Time</label><input type="time" id="wl-from" value="'+fromDef+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>To Time</label><input type="time" id="wl-to" value="'+toDef+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
     +'</div>'
     +'<div class="form-group" style="margin-bottom:12px;"><label>What work was done? <span class="req">*</span></label>'
     +'<textarea id="wl-task" rows="3" placeholder="e.g. Client call — proposal discuss, Site visit, Bug fix..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;resize:none;font-family:inherit;"></textarea>'
