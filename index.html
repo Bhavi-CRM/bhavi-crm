@@ -2868,10 +2868,14 @@ async function tryAutoLogin(){
     resetExpiredSeqs();
     if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
   }catch(renderErr){
-    // The session itself was confirmed valid — a rendering hiccup here
-    // shouldn't force a fresh login. Just reload; localStorage is untouched.
-    console.log('tryAutoLogin render error, reloading:',renderErr);
-    location.reload();
+    // The session itself was confirmed valid — do NOT reload here. If this
+    // render step fails for a deterministic reason (not a fluke), reloading
+    // just re-triggers the same failure every time, which looks like an
+    // infinite login/logout flicker loop to the user. Fall back to the
+    // login form instead — a single manual login, not a loop — and leave
+    // localStorage untouched since the session itself was never the problem.
+    console.log('tryAutoLogin render error:',renderErr);
+    restoreLoginFormHTML();
   }
 }
 function setupNav(){
