@@ -4579,6 +4579,17 @@ async function renderTickets(){
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 const TERMINAL_TICKET_STATUSES=['Closed','Customer Reject','Call Cancel','Delivered'];
+// Problem filter suggestions: union of the master Problem Types list AND every
+// distinct value actually typed into tickets' problem field. The New Call
+// form's problem input is free-text with autocomplete (not a locked dropdown),
+// so plenty of real values (e.g. "Installation") were never added to Master
+// Data — a master-data-only list would silently exclude them from filtering.
+function ticketProblemFilterOptions(){
+  var set=new Set();
+  (allProblems||[]).forEach(function(p){if(p.problem)set.add(p.problem.trim());});
+  (allTickets||[]).forEach(function(t){if(t.problem)set.add(t.problem.trim());});
+  return Array.from(set).filter(Boolean).sort(function(a,b){return a.localeCompare(b);});
+}
 function renderTicketTable(filtered){
   const tickets=filtered||allTickets.filter(t=>!TERMINAL_TICKET_STATUSES.includes(t.status));
   document.getElementById('page-content').innerHTML=`
@@ -4612,9 +4623,8 @@ function renderTicketTable(filtered){
         <select id="ticket-eng-filter" onchange="filterTickets()">
           <option value="">All Engineers</option>${allEngineers.map(e=>`<option value="${e.eng_id}">${e.name}</option>`).join('')}
         </select>
-        <select id="ticket-problem-filter" onchange="filterTickets()" style="min-width:150px;">
-          <option value="">All Problems</option>${(allProblems||[]).map(p=>`<option value="${p.problem}">${p.problem}</option>`).join('')}
-        </select>
+        <input type="text" id="ticket-problem-filter" list="ticket-problem-list" placeholder="All Problems" oninput="filterTickets()" style="min-width:160px;">
+        <datalist id="ticket-problem-list">${ticketProblemFilterOptions().map(p=>`<option value="${p}">`).join('')}</datalist>
         <select id="ticket-invoice-filter" onchange="filterTickets()">
           <option value="">All Invoice</option><option value="pending">🧾 Invoice Pending</option><option value="done">✅ Invoice Done</option>
         </select>
