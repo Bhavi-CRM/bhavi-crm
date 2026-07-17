@@ -2967,18 +2967,27 @@ function setupNav(){
 
 // MASTER DATA
 async function loadMasterData(){
-  try{
-    var results=await Promise.all([
-      sb('brands','GET',null,'?order=name'),sb('subcategories','GET',null,'?order=name'),
-      sb('models','GET',null,'?order=model_no'),sb('problem_types','GET',null,'?is_active=eq.true&order=problem'),
-      sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
-      sb('users','GET',null,'?select=user_id,name&order=name')
-    ]);
-    [allBrands,allSubcats,allModels,allProblems,allEngineers]=results;
-    var allU=results[5]||[];
+  // Each dataset is fetched independently (not Promise.all) so one failing
+  // request can't silently blank out all five — a single bad table load used
+  // to leave every dropdown fed by this function empty for the rest of the
+  // session (e.g. Engineer/Problem filters on All Tickets).
+  var results=await Promise.allSettled([
+    sb('brands','GET',null,'?order=name'),sb('subcategories','GET',null,'?order=name'),
+    sb('models','GET',null,'?order=model_no'),sb('problem_types','GET',null,'?is_active=eq.true&order=problem'),
+    sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name'),
+    sb('users','GET',null,'?select=user_id,name&order=name')
+  ]);
+  results.forEach(function(r,i){if(r.status==='rejected')console.error('Master data load failed for query',i,':',r.reason);});
+  if(results[0].status==='fulfilled')allBrands=results[0].value;
+  if(results[1].status==='fulfilled')allSubcats=results[1].value;
+  if(results[2].status==='fulfilled')allModels=results[2].value;
+  if(results[3].status==='fulfilled')allProblems=results[3].value;
+  if(results[4].status==='fulfilled')allEngineers=results[4].value;
+  if(results[5].status==='fulfilled'){
+    var allU=results[5].value||[];
     window._userNameMap={};
     allU.forEach(function(u){if(u.user_id&&u.name)window._userNameMap[u.user_id]=u.name;});
-  }catch(e){console.error('Master:',e);}
+  }
 }
 
 // NAVIGATE
@@ -4542,6 +4551,12 @@ async function savePunchOut(key){
 async function renderTickets(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
+    // Self-heal: the Engineer/Problem filter dropdowns read allEngineers/allProblems,
+    // which are normally populated once at login — but if that initial load ever
+    // failed silently (one bad request fails the whole Promise.all in
+    // loadMasterData), those filters would stay empty for the rest of the
+    // session. Retry here so opening All Tickets always has data for them.
+    if(!allEngineers?.length||!allProblems?.length) await loadMasterData();
     const engId=currentUser.eng_id||currentUser.user_id;
     let q='?order=created_at.desc';
     if(currentUser.role==='engineer'&&window._isCspMgr){
