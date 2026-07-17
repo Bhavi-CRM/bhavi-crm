@@ -4597,13 +4597,16 @@ function renderTicketTable(filtered){
         <select id="ticket-eng-filter" onchange="filterTickets()">
           <option value="">All Engineers</option>${allEngineers.map(e=>`<option value="${e.eng_id}">${e.name}</option>`).join('')}
         </select>
+        <select id="ticket-problem-filter" onchange="filterTickets()" style="min-width:150px;">
+          <option value="">All Problems</option>${(allProblems||[]).map(p=>`<option value="${p.problem}">${p.problem}</option>`).join('')}
+        </select>
         <select id="ticket-invoice-filter" onchange="filterTickets()">
           <option value="">All Invoice</option><option value="pending">🧾 Invoice Pending</option><option value="done">✅ Invoice Done</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="exportFilteredTickets()">📥 Excel Export</button>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>City</th><th>Model</th><th>Type</th><th>Engineer</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>City</th><th>Model</th><th>Problem</th><th>Type</th><th>Engineer</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="ticket-tbody">${tickets.map(t=>ticketRow(t)).join('')}</tbody>
       </table></div>
     </div>`;
@@ -4612,6 +4615,7 @@ function ticketRow(t){
   return `<tr><td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
     <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
     <td>${t.city||'-'}</td><td>${t.model||'-'}</td>
+    <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
     <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
@@ -4630,17 +4634,19 @@ function filterTickets(){
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
+  const problem=document.getElementById('ticket-problem-filter')?.value||'';
   const inv=document.getElementById('ticket-invoice-filter')?.value||'';
-  const showAll=!!(q||s||inv);
+  const showAll=!!(q||s||inv||problem);
   const f=allTickets.filter(t=>{
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
     const mOpen=showAll||!TERMINAL_TICKET_STATUSES.includes(t.status);
     const isNW=t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat';
     const mInv=!inv||(inv==='pending'&&isNW&&t.status==='Closed'&&!t.invoice_done)||(inv==='done'&&isNW&&t.status==='Closed'&&t.invoice_done);
-    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv;
+    const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
+    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
   });
-  document.getElementById('ticket-tbody').innerHTML=f.map(t=>ticketRow(t)).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  document.getElementById('ticket-tbody').innerHTML=f.map(t=>ticketRow(t)).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
 }
 async function exportFilteredTickets(){
   const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
@@ -4649,10 +4655,12 @@ async function exportFilteredTickets(){
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
+  const problem=document.getElementById('ticket-problem-filter')?.value||'';
   const filtered=allTickets.filter(t=>{
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
-    return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng);
+    const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
+    return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mProblem;
   });
   if(!filtered.length){alert('No records to export.');return;}
 
@@ -4915,6 +4923,7 @@ async function renderMyCalls(){
                   <div>
                     <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
+                    ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
                   </div>
                   <div style="flex-shrink:0;">${statusBadge(t.status)}</div>
                 </div>
@@ -4924,7 +4933,6 @@ async function renderMyCalls(){
                   <div>📞 <a href="tel:${t.mobile}" style="color:#1d4ed8;font-weight:600;">${t.mobile||'-'}</a>${t.mobile?` <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a>`:''}</div>
                   <div>⏱ TAT: ${mcTatHtml(t)}</div>
                   ${t.alt_mobile?`<div style="grid-column:1/-1;">📞 Alt: <a href="tel:${t.alt_mobile}" style="color:#1d4ed8;font-weight:600;">${t.alt_mobile}</a> <a href="https://wa.me/91${(t.alt_mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a></div>`:''}
-                  ${t.problem?`<div style="grid-column:1/-1;color:var(--text-muted);">🔧 ${t.problem}</div>`:''}
                 </div>
                 ${(t.address||t.area||t.city)?`<div onclick="var el=document.getElementById('addr-${t.id}');if(el)el.style.display=el.style.display==='none'?'block':'none';" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#166534;margin-bottom:8px;">📍 Address <span style="font-size:9px;">▼</span></div>
                 <div id="addr-${t.id}" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:#166534;">
