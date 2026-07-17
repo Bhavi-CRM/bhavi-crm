@@ -2755,34 +2755,99 @@ function doLogout(){
 }
 
 // Auto-login from saved session on page load
+// Shows the normal login form — used both on first load and as the fallback
+// when auto-login genuinely can't restore a session (not on a plain network
+// hiccup, which retries instead — see tryAutoLogin below).
+function restoreLoginFormHTML(){
+  const ls=document.getElementById('login-screen');
+  if(ls){
+    ls.innerHTML=`<div class="login-card">
+      <div class="login-logo">
+        <div id="login-logo-img" style="height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">🔧</div>
+        <div class="company">BHAVI ELECTRONICS</div>
+        <div class="tagline">& Automation — Service CRM</div>
+      </div>
+      <div class="login-tabs">
+        <div class="login-tab active" onclick="setLoginRole('admin')">Admin / WC</div>
+        <div class="login-tab" onclick="setLoginRole('engineer')">Engineer</div>
+      </div>
+      <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ENG001, ADMIN001" onkeydown="if(event.key==='Enter')doLogin()" oninput="_loginIdLookup(this.value)" autocomplete="off" style="text-transform:uppercase;"><div id="login-id-hint" style="min-height:18px;margin-top:4px;font-size:12px;font-weight:600;padding-left:2px;"></div></div>
+      <div class="login-field"><label>Password</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="login-btn" onclick="doLogin()">Sign In →</button>
+      <div class="login-error" id="login-error"></div>
+    </div>`;
+    applyLogo();
+  }
+}
+// Auto-login retries a transient network failure instead of logging the user
+// out — mobile browsers commonly reload a backgrounded tab when the phone is
+// unlocked, and the network is often still reconnecting (WiFi/mobile data)
+// at that exact moment. A saved session must only be cleared when the SERVER
+// actually confirms it's invalid (user not found/inactive, or a genuine
+// session-token mismatch from logging in elsewhere) — never on a fetch that
+// simply failed to reach Supabase.
+window._autoLoginRetries=0;
 async function tryAutoLogin(){
+  const saved=localStorage.getItem('bhavi_session');
+  if(!saved)return;
+  const loginScreen=document.getElementById('login-screen');
+  if(loginScreen){
+    loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
+  }
+  let session;
+  try{session=JSON.parse(saved);}catch(e){localStorage.removeItem('bhavi_session');restoreLoginFormHTML();return;}
+  if(Date.now()-session.savedAt > 30*24*60*60*1000){
+    localStorage.removeItem('bhavi_session');
+    location.reload();
+    return;
+  }
+
+  let res;
   try{
-    const saved=localStorage.getItem('bhavi_session');
-    if(!saved)return;
-    // Hide login, show loading while checking session
-    const loginScreen=document.getElementById('login-screen');
-    if(loginScreen){
-      loginScreen.innerHTML='<div style="text-align:center;color:#fff;"><div style="font-size:48px;margin-bottom:16px;">⟳</div><div style="font-size:18px;font-weight:600;">Loading...</div><div style="font-size:13px;opacity:0.7;margin-top:8px;">Restoring your session</div></div>';
+    res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
+  }catch(networkErr){
+    // fetch() itself threw — offline / DNS not ready / connection reset.
+    // Retry a few times with a short delay instead of destroying the session.
+    window._autoLoginRetries++;
+    if(window._autoLoginRetries<=5){
+      setTimeout(tryAutoLogin,2000);
+    }else{
+      window._autoLoginRetries=0;
+      restoreLoginFormHTML(); // session stays in localStorage — next app open retries fresh
     }
-    const session=JSON.parse(saved);
-    if(Date.now()-session.savedAt > 30*24*60*60*1000){
-      localStorage.removeItem('bhavi_session');
-      // Restore login form (it was replaced with spinner above)
-      if(loginScreen){loginScreen.style.display='flex';loginScreen.innerHTML=document.getElementById('login-screen')?loginScreen.innerHTML:'';}
-      location.reload();
-      return;
+    return;
+  }
+  if(!res.ok){
+    // Server reachable but returned an error unrelated to "user not found"
+    // (5xx, rate limit, etc.) — treat the same as a network hiccup: retry.
+    window._autoLoginRetries++;
+    if(window._autoLoginRetries<=5){
+      setTimeout(tryAutoLogin,2000);
+    }else{
+      window._autoLoginRetries=0;
+      restoreLoginFormHTML();
     }
-    const res=await fetch(`${SB_URL}/rest/v1/users?user_id=eq.${encodeURIComponent(session.user_id)}&is_active=eq.true`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
-    if(!res.ok){localStorage.removeItem('bhavi_session');throw new Error('Session fetch failed');}
-    const users=await res.json();
-    if(!Array.isArray(users)||!users.length){localStorage.removeItem('bhavi_session');throw new Error('User not found');}
-    currentUser=null;
-    currentUser=normalizeWCUser(users[0]);
-    if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
-      localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
-      alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
-      throw new Error('Session expired');
-    }
+    return;
+  }
+  window._autoLoginRetries=0;
+
+  let users;
+  try{users=await res.json();}catch(e){restoreLoginFormHTML();return;}
+  if(!Array.isArray(users)||!users.length){
+    // Server explicitly confirmed there's no such active user — genuinely invalid.
+    localStorage.removeItem('bhavi_session');
+    restoreLoginFormHTML();
+    return;
+  }
+  currentUser=null;
+  currentUser=normalizeWCUser(users[0]);
+  if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
+    localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
+    alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
+    restoreLoginFormHTML();
+    return;
+  }
+  try{
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='peon'?'Office Boy':currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
@@ -2802,28 +2867,11 @@ async function tryAutoLogin(){
     scheduleMidnightSeqReset();
     resetExpiredSeqs();
     if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
-  }catch(e){
-    localStorage.removeItem('bhavi_session');
-    // Restore login screen
-    const ls=document.getElementById('login-screen');
-    if(ls){
-      ls.innerHTML=`<div class="login-card">
-        <div class="login-logo">
-          <div id="login-logo-img" style="height:50px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;">🔧</div>
-          <div class="company">BHAVI ELECTRONICS</div>
-          <div class="tagline">& Automation — Service CRM</div>
-        </div>
-        <div class="login-tabs">
-          <div class="login-tab active" onclick="setLoginRole('admin')">Admin / WC</div>
-          <div class="login-tab" onclick="setLoginRole('engineer')">Engineer</div>
-        </div>
-        <div class="login-field"><label>User ID</label><input type="text" id="login-id" placeholder="e.g. ENG001, ADMIN001" onkeydown="if(event.key==='Enter')doLogin()" oninput="_loginIdLookup(this.value)" autocomplete="off" style="text-transform:uppercase;"><div id="login-id-hint" style="min-height:18px;margin-top:4px;font-size:12px;font-weight:600;padding-left:2px;"></div></div>
-        <div class="login-field"><label>Password</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')doLogin()"></div>
-        <button class="login-btn" onclick="doLogin()">Sign In →</button>
-        <div class="login-error" id="login-error"></div>
-      </div>`;
-      applyLogo();
-    }
+  }catch(renderErr){
+    // The session itself was confirmed valid — a rendering hiccup here
+    // shouldn't force a fresh login. Just reload; localStorage is untouched.
+    console.log('tryAutoLogin render error, reloading:',renderErr);
+    location.reload();
   }
 }
 function setupNav(){
