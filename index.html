@@ -1005,6 +1005,11 @@ tr:hover td{background:#f8fafc;}
             <input id="dr-cust-reject" type="number" min="0" value="0" style="width:60px;border:1px solid #fca5a5;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:800;color:#991b1b;text-align:center;outline:none;background:#fff;">
           </div>
         </div>
+        <!-- Site Visits — ENG002 only (Automation) -->
+        <div id="dr-sitevisit-section" style="display:none;background:#fff7ed;border-radius:8px;padding:8px 14px;margin-top:8px;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:600;color:#9a3412;">🏗️ Site Visits (Today, Auto)</span>
+            <input id="dr-site-visits" type="number" min="0" value="0" readonly style="width:60px;border:1px solid #fdba74;border-radius:6px;padding:4px 8px;font-size:15px;font-weight:800;color:#9a3412;text-align:center;outline:none;background:#fff;">
+        </div>
       </div>
 
       <!-- Section 2: Office / Remote Work -->
@@ -12452,10 +12457,15 @@ function openDailyReport(){
   var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
   // Reset call summary fields
-  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery','dr-pending-parts','dr-pending-approval','dr-pending-other','dr-cust-reject'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
+  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery','dr-pending-parts','dr-pending-approval','dr-pending-other','dr-cust-reject','dr-site-visits'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
   updateCallTotals();
   // Auto-fill call counts from CRM
   drAutoFillCalls();
+  // Site Visits section — ENG002 only (Automation)
+  var svSection=document.getElementById('dr-sitevisit-section');
+  var isSiteVisitEng=currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002';
+  if(svSection){svSection.style.display=isSiteVisitEng?'flex':'none';}
+  if(isSiteVisitEng)drAutoFillSiteVisits();
   // Init office work rows
   var or2=document.getElementById('dr-office-rows');
   if(or2)or2.innerHTML='';
@@ -12787,6 +12797,19 @@ async function drAutoFillCalls(){
   }catch(e){console.log('drAutoFillCalls error:',e);}
 }
 
+// Site Visits count — ENG002 only (Automation). Only counts visits that were
+// actually FINISHED that day (visit_status='completed'), same "don't count
+// unfinished work" policy used for calls elsewhere in this report.
+async function drAutoFillSiteVisits(){
+  try{
+    var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
+    var engId=currentUser.eng_id||currentUser.user_id;
+    var visits=await sb('auto_site_visits','GET',null,'?created_by=eq.'+encodeURIComponent(engId)+'&visit_date=eq.'+date+'&visit_status=eq.completed&select=id').catch(function(){return[];});
+    var el=document.getElementById('dr-site-visits');
+    if(el)el.value=(visits||[]).length;
+  }catch(e){console.log('drAutoFillSiteVisits error:',e);}
+}
+
 async function saveDailyReport(){
   var date=document.getElementById('dr-date').value;
   var petrolKm=parseFloat(document.getElementById('dr-petrol-km').value)||0;
@@ -12812,6 +12835,10 @@ async function saveDailyReport(){
   callSummary.pending_other=parseInt(document.getElementById('dr-pending-other')?.value)||0;
   callSummary.pending_calls=callSummary.pending_parts+callSummary.pending_approval+callSummary.pending_other;
   callSummary.customer_reject=parseInt(document.getElementById('dr-cust-reject')?.value)||0;
+  // Automation site visits (ENG002 only) — nested under call_summary, deliberately
+  // NOT named site_visits/total_site_visits, since those are pre-existing
+  // top-level report fields used for something else (kept for backward compat).
+  callSummary.auto_site_visits=parseInt(document.getElementById('dr-site-visits')?.value)||0;
   var siteVisits=[]; // kept for backward compat
 
   // Collect office work
@@ -12934,6 +12961,12 @@ function formatDailyReportWA(d){
   // Customer Reject
   if(cs.customer_reject>0){
     lines.push('❌ *CUSTOMER REJECT (Today):* '+cs.customer_reject);
+    lines.push('');
+  }
+
+  // Automation Site Visits (ENG002 only — 0/absent for everyone else)
+  if(cs.auto_site_visits>0){
+    lines.push('🏗️ *SITE VISITS (Today):* '+cs.auto_site_visits);
     lines.push('');
   }
 
@@ -18691,34 +18724,242 @@ async function viewSiteVisits(siteId,siteName){
 }
 
 // ── ADD VISIT MODAL (topbar button) ──
+// ════════════════════════════════════════════════════════════
+// SITE VISIT LIVE TRACKER — Visit Start / Work Start / Hold / Finish,
+// mirroring the ticket engineer-update panel's fully-resumable cycle, but
+// completely self-contained on auto_site_visits (own timeline + visit_status
+// columns) — no shared state with tickets or work_logs, so it can never
+// interfere with the call-tracking flow.
+// ════════════════════════════════════════════════════════════
+function svRemoveModal(){var m=document.getElementById('modal-site-visit-quick');if(m)m.remove();}
+function svParseTL(v){var tl=v&&v.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}return Array.isArray(tl)?tl:[];}
+// Same "most recent event across all event types wins" approach used for
+// ticket On-Site calls — makes the cycle fully repeatable (multiple visits/day).
+function svDeriveState(v){
+  var tl=svParseTL(v);
+  var evAll=[];
+  tl.forEach(function(e){
+    if(!e||!e.at)return;
+    var kind=e.action==='Visit Start'?'visitstart':e.action==='Visit Stop'?'visitstop':(e.action&&e.action.indexOf('Work Start')!==-1)?'workstart':e.action==='Work on Hold'?'hold':null;
+    if(kind)evAll.push({t:new Date(e.at).getTime(),kind:kind,at:e.at});
+  });
+  evAll.sort(function(a,b){return a.t-b.t;});
+  var last=evAll.length?evAll[evAll.length-1]:null;
+  var wsCount=tl.filter(function(e){return e.action&&e.action.indexOf('Work Start')!==-1;}).length;
+  return {tl:tl,lastKind:last?last.kind:null,lastAt:last?last.at:null,wsCount:wsCount};
+}
+async function svLabel(v){
+  if(v.site_id){
+    try{var s=await sb('auto_sites','GET',null,'?id=eq.'+v.site_id+'&select=site_name,client_name');if(s&&s[0])return s[0].site_name+' — '+s[0].client_name;}catch(e){}
+    return 'Site #'+v.site_id;
+  }
+  return '🔧 '+(v.adhoc_label||'One-off Visit');
+}
+function svFmtTime(iso){return iso?new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):'';}
+
 async function openSiteVisitModal(){
   try{
+    var memberId=currentUser.eng_id||currentUser.user_id;
+    var openVisits=await sb('auto_site_visits','GET',null,'?created_by=eq.'+encodeURIComponent(memberId)+'&visit_status=eq.active&order=created_at.desc&limit=1').catch(function(){return[];});
+    if(openVisits&&openVisits.length){openSiteVisitTracker(openVisits[0].id);return;}
+
     var sites=await sb('auto_sites','GET',null,'?order=site_name');
-    if(!sites.length){alert('Please create a site first!');navigate('auto-sites');return;}
     var modal=document.createElement('div');
     modal.id='modal-site-visit-quick';
     modal.className='modal-overlay';
     modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
-      +'<div class="modal-header"><h2>🏗️ Add Site Visit</h2><button class="close-btn" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">✕</button></div>'
+      +'<div class="modal-header"><h2>🏗️ New Site Visit</h2><button class="close-btn" onclick="svRemoveModal()">✕</button></div>'
       +'<div class="modal-body">'
-      +'<div class="form-group" style="margin-bottom:12px;"><label>Select Site <span class="req">*</span></label>'
+      +'<div class="form-group" style="margin-bottom:12px;"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;">'
+      +'<input type="checkbox" id="qv-adhoc" onchange="toggleQuickVisitAdhoc(this.checked)"> One-off visit — chhutu/nanu kaam, koi ongoing site sathe nathi</label></div>'
+      +'<div class="form-group" id="qv-site-wrap" style="margin-bottom:12px;"><label>Select Site <span class="req">*</span></label>'
       +'<select id="qv-site" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Select Site --</option>'
       +sites.map(function(s){return'<option value="'+s.id+'">'+s.site_name+' — '+s.client_name+'</option>';}).join('')
       +'</select></div>'
-      +'<div class="form-grid">'
+      +'<div class="form-group" id="qv-adhoc-wrap" style="margin-bottom:12px;display:none;"><label>Work / Location <span class="req">*</span></label>'
+      +'<input type="text" id="qv-adhoc-label" placeholder="e.g. Ramesh Society — camera fault check" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
       +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="qv-date" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
-      +'<div class="form-group"><label>Time</label><input type="time" id="qv-time"></div>'
-      +'</div>'
-      +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done..."></textarea>'
-      +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'qv-work\')">✨ AI Remark</button></div>'
-      +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable..."></textarea></div>'
-+'<div class="form-group" style="margin-top:10px;"><label>📷 Photos <small style="color:var(--text-muted);">(optional)</small></label><input type="file" id="qv-photos" accept="image/*" multiple style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;" onchange="previewVisitPhotos(this,\'qv-photo-preview\')"><div id="qv-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div></div>'
       +'</div>'
       +'<div class="modal-footer">'
-      +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-site-visit-quick\').remove()">Cancel</button>'
-      +'<button class="btn btn-primary" onclick="saveQuickVisit()">💾 Save Visit</button>'
+      +'<button class="btn btn-outline" onclick="svRemoveModal()">Cancel</button>'
+      +'<button onclick="svStartNew(\'visit\')" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🚗 Visit Start</button>'
+      +'<button onclick="svStartNew(\'work\')" style="flex:1;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🔧 Work Start</button>'
       +'</div></div>';
     document.body.appendChild(modal);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function toggleQuickVisitAdhoc(checked){
+  var siteWrap=document.getElementById('qv-site-wrap');
+  var adhocWrap=document.getElementById('qv-adhoc-wrap');
+  if(siteWrap)siteWrap.style.display=checked?'none':'';
+  if(adhocWrap)adhocWrap.style.display=checked?'':'none';
+}
+
+// Create a brand-new visit record, starting either the travel or work clock.
+async function svStartNew(kind){
+  var isAdhoc=document.getElementById('qv-adhoc')?.checked;
+  var siteId=document.getElementById('qv-site')?.value;
+  var adhocLabel=document.getElementById('qv-adhoc-label')?.value.trim();
+  var date=document.getElementById('qv-date')?.value;
+  if(isAdhoc){if(!adhocLabel){alert('Please enter work/location description!');return;}}
+  else{if(!siteId){alert('Please select a site!');return;}}
+  if(!date){alert('Date required!');return;}
+  try{
+    var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var action=kind==='visit'?'Visit Start':'Work Started';
+    var note=kind==='visit'?'Travel started: '+timeNow:'Session 1: Time In: '+timeNow;
+    var vData={
+      site_id:isAdhoc?null:parseInt(siteId),adhoc_label:isAdhoc?adhocLabel:null,
+      visit_date:date,visit_status:'active',
+      timeline:[{action:action,by:currentUser.name,at:now.toISOString(),note:note}],
+      created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||''
+    };
+    var r=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(vData)});
+    if(!r.ok)throw new Error(await r.text());
+    var created=(await r.json())[0];
+    svRemoveModal();
+    openSiteVisitTracker(created.id);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// Live tracker panel — re-rendered after every action, exactly like the
+// ticket On-Site engineer-update panel.
+async function openSiteVisitTracker(visitId){
+  try{
+    var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+    if(!v)return;
+    var label=await svLabel(v);
+    var st=svDeriveState(v);
+    var panelHtml='';
+    if(st.lastKind==='workstart'){
+      panelHtml='<div style="background:#059669;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+        +'<div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:8px;">🔧 Work Started — '+svFmtTime(st.lastAt)+(st.wsCount>1?' (Session '+st.wsCount+')':'')+'</div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button onclick="svShowHoldModal(\''+visitId+'\')" style="flex:1;background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.6);color:#fff;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">⏸️ Work on Hold</button>'
+        +'<button onclick="svOpenFinishForm(\''+visitId+'\')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:800;cursor:pointer;">✅ Finish Visit</button>'
+        +'</div></div>';
+    }else if(st.lastKind==='visitstart'){
+      panelHtml='<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+        +'<div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:8px;">🚗 Visiting — '+svFmtTime(st.lastAt)+'</div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button onclick="svAction(\''+visitId+'\',\'stop\')" style="flex:1;background:#fff;color:#b45309;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">🛑 Stop</button>'
+        +'<button onclick="svAction(\''+visitId+'\',\'work\')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>'
+        +'</div></div>';
+    }else{ // visitstop or hold — paused, ready to resume
+      var label2=st.lastKind==='hold'?'⏸️ Work on Hold — Ready to resume':'🛑 Travel Stopped — Ready to restart';
+      panelHtml='<div style="background:#fef9c3;border:1.5px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:12px;">'
+        +'<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">'+label2+'</div>'
+        +(st.wsCount?'<div style="font-size:12px;color:#92400e;margin-bottom:8px;">📋 '+st.wsCount+' session(s) done</div>':'')
+        +'<div style="display:flex;gap:8px;">'
+        +'<button onclick="svAction(\''+visitId+'\',\'visit\')" style="flex:1;background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🚗 Visit Start</button>'
+        +'<button onclick="svAction(\''+visitId+'\',\'work\')" style="flex:1;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">🔧 Work Start</button>'
+        +'</div>'
+        +'<button onclick="svOpenFinishForm(\''+visitId+'\')" style="width:100%;margin-top:8px;background:#fff;border:1.5px solid #fbbf24;color:#92400e;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">✅ Finish Visit</button>'
+        +'</div>';
+    }
+    var existing=document.getElementById('modal-site-visit-quick');if(existing)existing.remove();
+    var modal=document.createElement('div');
+    modal.id='modal-site-visit-quick';
+    modal.className='modal-overlay';
+    modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
+      +'<div class="modal-header"><h2>🏗️ '+label+'</h2><button class="close-btn" onclick="svRemoveModal()">✕</button></div>'
+      +'<div class="modal-body">'+panelHtml+'</div>'
+      +'<div class="modal-footer"><button class="btn btn-outline" onclick="svRemoveModal()">Close (Resume Later)</button></div>'
+      +'</div>';
+    document.body.appendChild(modal);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// visit/work/stop actions all just append a timeline event and re-render.
+async function svAction(visitId,kind){
+  try{
+    var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+    if(!v)return;
+    var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var st=svDeriveState(v);
+    var action=kind==='visit'?'Visit Start':kind==='work'?'Work Started':'Visit Stop';
+    var note=kind==='visit'?'Travel started: '+timeNow:kind==='work'?('Session '+(st.wsCount+1)+': Time In: '+timeNow):'Travel stopped: '+timeNow;
+    var tl=svParseTL(v).concat([{action:action,by:currentUser.name,at:now.toISOString(),note:note}]);
+    await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+    openSiteVisitTracker(visitId);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function svShowHoldModal(visitId){
+  var ex=document.getElementById('sv-hold-modal');if(ex)ex.remove();
+  var overlay=document.createElement('div');
+  overlay.id='sv-hold-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+    +'<div style="font-size:16px;font-weight:800;color:#92400e;margin-bottom:6px;">⏸️ Work on Hold</div>'
+    +'<div style="font-size:13px;color:#6b7280;margin-bottom:16px;">Visit will be paused. You can attend something else and come back to resume.</div>'
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Reason for hold <span style="color:#dc2626;">*</span></label>'
+    +'<textarea id="sv-hold-remark" rows="3" placeholder="e.g. Going to another urgent job..." style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px;font-size:13px;resize:none;outline:none;box-sizing:border-box;"></textarea>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<button onclick="document.getElementById(\'sv-hold-modal\').remove()" style="flex:1;padding:10px;background:#f1f5f9;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Cancel</button>'
+    +'<button onclick="svConfirmHold(\''+visitId+'\')" style="flex:1;padding:10px;background:#f59e0b;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">⏸️ Put on Hold</button>'
+    +'</div></div>';
+  document.body.appendChild(overlay);
+}
+async function svConfirmHold(visitId){
+  var remark=document.getElementById('sv-hold-remark')?.value?.trim();
+  if(!remark){alert('Reason is mandatory!');return;}
+  var overlay=document.getElementById('sv-hold-modal');if(overlay)overlay.remove();
+  try{
+    var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+    if(!v)return;
+    var now=new Date();
+    var tl=svParseTL(v).concat([{action:'Work on Hold',by:currentUser.name,at:now.toISOString(),note:remark}]);
+    await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+    alert('Visit paused ✅\nCome back and tap Visit Start / Work Start to resume.');
+    svRemoveModal();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// Finish — capture Work Done / Material / Photos, mark completed.
+async function svOpenFinishForm(visitId){
+  var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+  if(!v)return;
+  var label=await svLabel(v);
+  var existing=document.getElementById('modal-site-visit-quick');if(existing)existing.remove();
+  var modal=document.createElement('div');
+  modal.id='modal-site-visit-quick';
+  modal.className='modal-overlay';
+  modal.innerHTML='<div class="modal" style="max-width:500px;" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>✅ Finish — '+label+'</h2><button class="close-btn" onclick="svRemoveModal()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group"><label>Work Done 🔧</label><textarea id="qv-work" rows="3" placeholder="Describe the work done...">'+(v.work_done||'')+'</textarea>'
+    +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'qv-work\')">✨ AI Remark</button></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>Material Delivered 📦</label><textarea id="qv-material" rows="2" placeholder="e.g. 2x Camera, 10m Cable...">'+(v.material_delivered||'')+'</textarea></div>'
+    +'<div class="form-group" style="margin-top:10px;"><label>📷 Photos <small style="color:var(--text-muted);">(optional)</small></label><input type="file" id="qv-photos" accept="image/*" multiple style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;" onchange="previewVisitPhotos(this,\'qv-photo-preview\')"><div id="qv-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="openSiteVisitTracker(\''+visitId+'\')">Back</button>'
+    +'<button class="btn btn-primary" onclick="svFinishVisit(\''+visitId+'\')">💾 Complete Visit</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+}
+async function svFinishVisit(visitId){
+  var work=document.getElementById('qv-work')?.value.trim()||null;
+  var material=document.getElementById('qv-material')?.value.trim()||null;
+  try{
+    var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+    if(!v)return;
+    var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var photos=await _readPhotosBase64('qv-photos');
+    var tl=svParseTL(v).concat([{action:'Visit Finished',by:currentUser.name,at:now.toISOString(),note:'Completed: '+timeNow}]);
+    var patch={timeline:tl,visit_status:'completed',work_done:work,material_delivered:material};
+    if(photos.length)patch.photos=photos;
+    await sb('auto_site_visits','PATCH',patch,'?id=eq.'+visitId);
+    svRemoveModal();
+    alert('✅ Visit completed!');
+    if(currentPage==='auto-sites')renderAutoSites();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -18942,23 +19183,6 @@ async function saveVisitWithMaterial(siteId,btn){
   }catch(e){alert('Error: '+e.message);}
 }
 
-async function saveQuickVisit(){
-  var siteId=document.getElementById('qv-site')?.value;
-  var date=document.getElementById('qv-date')?.value;
-  var time=document.getElementById('qv-time')?.value||null;
-  var work=document.getElementById('qv-work')?.value.trim()||null;
-  var material=document.getElementById('qv-material')?.value.trim()||null;
-  if(!siteId){alert('Please select a site!');return;}
-  if(!date){alert('Date required!');return;}
-  try{
-    var photos=await _readPhotosBase64('qv-photos');
-    var vData={site_id:parseInt(siteId),visit_date:date,visit_time:time,work_done:work,material_delivered:material,photos:photos.length?photos:null,created_by:currentUser?.user_id||'ENG002',created_by_name:currentUser?.name||currentUser?.user_id||''};
-    await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(vData)});
-    document.getElementById('modal-site-visit-quick').remove();
-    alert('✅ Visit saved!');
-  }catch(e){alert('Error: '+e.message);}
-}
-
 // ── VISIT REPORT (ADMIN + ENG) ──
 async function renderAutoVisitsReport(){
   var pc=document.getElementById('page-content');
@@ -18998,21 +19222,29 @@ async function loadAutoVisitReport(){
     var visits=await sb('auto_site_visits','GET',null,q);
     var sites=window._avrSites||[];
     var siteMap={};sites.forEach(function(s){siteMap[s.id]=s;});
-    window._avrVisits=visits.map(function(v){var s=siteMap[v.site_id]||{};return Object.assign({},v,{site_name:s.site_name||'-',client_name:s.client_name||'-'});});
+    window._avrVisits=visits.map(function(v){
+      var s=siteMap[v.site_id]||{};
+      var isAdhoc=!v.site_id;
+      return Object.assign({},v,{
+        site_name:isAdhoc?('🔧 '+(v.adhoc_label||'One-off Visit')):(s.site_name||'-'),
+        client_name:isAdhoc?'—':(s.client_name||'-')
+      });
+    });
     if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">No visits found for the selected filter.</div>';return;}
     // KPI
     var totalVisits=window._avrVisits.length;
-    var sitesVisited=new Set(window._avrVisits.map(function(v){return v.site_id;})).size;
+    var sitesVisited=new Set(window._avrVisits.map(function(v){return v.site_id||('adhoc_'+v.id);})).size;
     var withMaterial=window._avrVisits.filter(function(v){return v.material_delivered;}).length;
     var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">'
       +'<div class="kpi-card" style="padding:12px;"><div class="kpi-label">Total Visits</div><div class="kpi-value">'+totalVisits+'</div></div>'
       +'<div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Sites Visited</div><div class="kpi-value" style="color:#7c3aed;">'+sitesVisited+'</div></div>'
       +'<div class="kpi-card" style="padding:12px;border-color:#0e9f6e;"><div class="kpi-label">Material Delivered</div><div class="kpi-value" style="color:#0e9f6e;">'+withMaterial+'</div></div>'
       +'</div>';
-    // Group by site
+    // Group by site — each one-off/ad-hoc visit gets its own card (they're
+    // unrelated jobs, not part of the same ongoing site)
     var bySite={};
     window._avrVisits.forEach(function(v){
-      var k=v.site_id;
+      var k=v.site_id||('adhoc_'+v.id);
       if(!bySite[k])bySite[k]={site_name:v.site_name,client_name:v.client_name,visits:[]};
       bySite[k].visits.push(v);
     });
