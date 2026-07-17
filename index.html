@@ -947,6 +947,10 @@ tr:hover td{background:#f8fafc;}
               <label style="font-size:12px;color:#374151;">Repeat</label>
               <input id="dr-w-repeat" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
             </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">📞 Resolved By Phone</label>
+              <input id="dr-w-resolved-phone" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
             <div style="border-top:1px solid #bfdbfe;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:12px;font-weight:700;color:#1d4ed8;">Warranty Total</span>
               <span id="dr-w-total" style="font-size:15px;font-weight:800;color:#1d4ed8;">0</span>
@@ -970,6 +974,10 @@ tr:hover td{background:#f8fafc;}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <label style="font-size:12px;color:#374151;">Cart/Ink Delivery</label>
               <input id="dr-nw-delivery" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="font-size:12px;color:#374151;">📞 Resolved By Phone</label>
+              <input id="dr-nw-resolved-phone" type="number" min="0" value="0" oninput="updateCallTotals()" style="width:60px;border:1px solid #fecaca;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;outline:none;">
             </div>
             <div style="border-top:1px solid #fecaca;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:12px;font-weight:700;color:#dc2626;">Non-W Total</span>
@@ -3067,13 +3075,13 @@ async function navigate(page){
 }
 
 // STATUS SYSTEM
-const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery'];
+const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery','Resolved By Phone'];
 // Canonical Active/Closed/Cancelled buckets — matches Dashboard's own numbers
 // (confirmed correct). Several pages each had their own slightly different
 // "closed status" list, so the same ticket could show as Closed on one page
 // and Active on another. Use these everywhere a KPI count needs to agree
 // with Dashboard rather than inlining a fresh status array.
-const TICKET_DONE_STATUSES=['Closed','Delivered','Repaired','Pending for Delivery'];
+const TICKET_DONE_STATUSES=['Closed','Delivered','Repaired','Pending for Delivery','Resolved By Phone'];
 const TICKET_CANCELLED_STATUSES=['Call Cancel','Customer Reject'];
 function isTicketClosed(t){return TICKET_DONE_STATUSES.includes(t.status);}
 function isTicketCancelled(t){return TICKET_CANCELLED_STATUSES.includes(t.status);}
@@ -3084,7 +3092,7 @@ function isTicketActive(t){return !isTicketClosed(t)&&!isTicketCancelled(t);}
 // false (admin unchecked the box) turns Onsite off for that model.
 function isModelOnsiteEligible(model){return !model||model.onsite_applicable!==false;}
 function statusBadge(s){
-  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery'};
+  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery','Resolved By Phone':'badge-closed'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
 function priorityBadge(p){
@@ -3131,14 +3139,16 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // Call Cancel is always available to the engineer directly — e.g. customer not
         // available at site, or charges not approved — no admin approval needed, just a
         // mandatory reason (enforced via the required Action Taken field).
-        return isCarryIn?['In Progress','Repaired','Sent to MSC','Call Cancel']:['In Progress','Closed','Call Cancel'];
+        // Resolved By Phone: On-Site only — the visit turned out unnecessary because the
+        // fix was talked through on a phone call, so it closes without ever going out.
+        return isCarryIn?['In Progress','Repaired','Sent to MSC','Call Cancel']:['In Progress','Closed','Resolved By Phone','Call Cancel'];
       }
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
-        if(isRepeat) return['Closed','Call Cancel'];
+        if(isRepeat) return isCarryIn?['Closed','Call Cancel']:['Closed','Resolved By Phone','Call Cancel'];
         // Carry In: Repaired + Sent to MSC. On-Site: only Closed (engineer repairs on location).
-        return isCarryIn?['Repaired','Sent to MSC','Call Cancel']:['Closed','Call Cancel'];
+        return isCarryIn?['Repaired','Sent to MSC','Call Cancel']:['Closed','Resolved By Phone','Call Cancel'];
       }
 
       case 'Pending Parts':
@@ -6823,7 +6833,8 @@ async function saveEngUpdate(){
   }
   
   // AUTO-CALCULATE charges when closing Non-Warranty or Out-of-Coverage call (no popup)
-  if(status==='Closed'){
+  // — also applies to Resolved By Phone, which is still a genuine chargeable close.
+  if(status==='Closed'||status==='Resolved By Phone'){
     const isNonWarranty=t.call_type&&(t.call_type.includes('Non-Warranty'));
     const isRepeatFOC=t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'));
     const isOutCoverage=t.warranty_coverage==='Out of Coverage'||t.out_of_coverage===true;
@@ -6845,7 +6856,8 @@ async function saveEngUpdate(){
   try{
     await sb('tickets','PATCH',data,`?id=eq.${id}`);
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
-    if(status==='Closed'){
+    // (Resolved By Phone included: harmless no-op if no spares were added, since there was no visit.)
+    if(status==='Closed'||status==='Resolved By Phone'){
       const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
       const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
       const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
@@ -6995,10 +7007,10 @@ async function saveEngUpdate(){
         }).catch(()=>{});
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
-    if(status==='Closed'){
+    if(status==='Closed'||status==='Resolved By Phone'){
       saveLocationEvent('ticket_close',id);
     }
-    if(status==='Closed'||origStatus==='Repaired'){
+    if(status==='Closed'||status==='Resolved By Phone'||origStatus==='Repaired'){
       _tgNotifyClose(id,t,data,origStatus,currentSpares);
     }
     // Auto-close open work log when call goes to a paused/pending status
@@ -12509,7 +12521,7 @@ function openDailyReport(){
   var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
   // Reset call summary fields
-  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery','dr-pending-parts','dr-pending-approval','dr-pending-other','dr-cust-reject','dr-site-visits'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
+  ['dr-w-install','dr-w-breakdown','dr-w-repeat','dr-w-resolved-phone','dr-nw-breakdown','dr-nw-repeat','dr-nw-other','dr-nw-delivery','dr-nw-resolved-phone','dr-pending-parts','dr-pending-approval','dr-pending-other','dr-cust-reject','dr-site-visits'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='0';});
   updateCallTotals();
   // Auto-fill call counts from CRM
   drAutoFillCalls();
@@ -12747,12 +12759,14 @@ function updateCallTotals(){
   var wI=parseInt(document.getElementById('dr-w-install')?.value)||0;
   var wB=parseInt(document.getElementById('dr-w-breakdown')?.value)||0;
   var wR=parseInt(document.getElementById('dr-w-repeat')?.value)||0;
+  var wRP=parseInt(document.getElementById('dr-w-resolved-phone')?.value)||0;
   var nwB=parseInt(document.getElementById('dr-nw-breakdown')?.value)||0;
   var nwR=parseInt(document.getElementById('dr-nw-repeat')?.value)||0;
   var nwO=parseInt(document.getElementById('dr-nw-other')?.value)||0;
   var nwD=parseInt(document.getElementById('dr-nw-delivery')?.value)||0;
-  var wTotal=wI+wB+wR;
-  var nwTotal=nwB+nwR+nwO+nwD;
+  var nwRP=parseInt(document.getElementById('dr-nw-resolved-phone')?.value)||0;
+  var wTotal=wI+wB+wR+wRP;
+  var nwTotal=nwB+nwR+nwO+nwD+nwRP;
   var allTotal=wTotal+nwTotal;
   var wt=document.getElementById('dr-w-total');if(wt)wt.textContent=wTotal;
   var nwt=document.getElementById('dr-nw-total');if(nwt)nwt.textContent=nwTotal;
@@ -12777,7 +12791,7 @@ async function drAutoFillCalls(){
     // creates a fresh timeline entry with today's date, so that correctly
     // still counts.
     function closedRepairedToday(t){
-      var keyword=t.status==='Closed'?'Closed':(t.status==='Pending for Delivery'?'Repaired':null);
+      var keyword=t.status==='Closed'?'Closed':(t.status==='Pending for Delivery'?'Repaired':(t.status==='Resolved By Phone'?'Resolved By Phone':null));
       if(!keyword)return false;
       var tl=t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
       if(!Array.isArray(tl))return false;
@@ -12813,14 +12827,21 @@ async function drAutoFillCalls(){
     // `tickets` set above if it wasn't touched today via updated_at/created_at.
     var rejectTickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&status=eq.Customer Reject&select=status,timeline').catch(()=>[]);
     var custRejectCount=(rejectTickets||[]).filter(customerRejectedToday).length;
-    var wInstall=0,wBreakdown=0,wRepeat=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0;
+    var wInstall=0,wBreakdown=0,wRepeat=0,wResolvedPhone=0,nwBreakdown=0,nwRepeat=0,nwOther=0,nwDelivery=0,nwResolvedPhone=0;
     (tickets||[]).forEach(function(t){
       var ct=t.call_type||'';
       var prob=(t.problem||'').toLowerCase();
       var status=(t.status||'').toLowerCase();
       if(status.includes('cancel'))return; // skip cancelled
-      if(!status.includes('close')&&!status.includes('pending for delivery')&&!status.includes('repaired'))return; // only completed calls
+      if(!status.includes('close')&&!status.includes('pending for delivery')&&!status.includes('repaired')&&!status.includes('resolved by phone'))return; // only completed calls
       if(!closedRepairedToday(t))return; // only count if actually closed/repaired today, not just edited today
+      // Resolved By Phone — closed without a visit, tracked separately from
+      // the usual Install/Breakdown/Repeat buckets but still a real Warranty/
+      // Non-Warranty closed call (feeds into the same section totals & grand total).
+      if(t.status==='Resolved By Phone'){
+        if(ct==='Warranty'||ct==='Warranty Repeat')wResolvedPhone++;else nwResolvedPhone++;
+        return;
+      }
       if(ct==='Warranty'){
         if(prob.includes('install')||prob.includes('new set'))wInstall++;
         else wBreakdown++;
@@ -12840,9 +12861,9 @@ async function drAutoFillCalls(){
     var pb=document.getElementById('dr-pending-bar');
     if(pb)pb.style.display='block';
     var setVal=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
-    setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);
+    setVal('dr-w-install',wInstall);setVal('dr-w-breakdown',wBreakdown);setVal('dr-w-repeat',wRepeat);setVal('dr-w-resolved-phone',wResolvedPhone);
     setVal('dr-nw-breakdown',nwBreakdown);setVal('dr-nw-repeat',nwRepeat);
-    setVal('dr-nw-other',nwOther);setVal('dr-nw-delivery',nwDelivery);
+    setVal('dr-nw-other',nwOther);setVal('dr-nw-delivery',nwDelivery);setVal('dr-nw-resolved-phone',nwResolvedPhone);
     setVal('dr-pending-parts',pendingParts);setVal('dr-pending-approval',pendingApproval);setVal('dr-pending-other',pendingOther);
     setVal('dr-cust-reject',custRejectCount);
     updateCallTotals();
@@ -12874,13 +12895,15 @@ async function saveDailyReport(){
     w_install:parseInt(document.getElementById('dr-w-install')?.value)||0,
     w_breakdown:parseInt(document.getElementById('dr-w-breakdown')?.value)||0,
     w_repeat:parseInt(document.getElementById('dr-w-repeat')?.value)||0,
+    w_resolved_phone:parseInt(document.getElementById('dr-w-resolved-phone')?.value)||0,
     nw_breakdown:parseInt(document.getElementById('dr-nw-breakdown')?.value)||0,
     nw_repeat:parseInt(document.getElementById('dr-nw-repeat')?.value)||0,
     nw_other:parseInt(document.getElementById('dr-nw-other')?.value)||0,
-    nw_delivery:parseInt(document.getElementById('dr-nw-delivery')?.value)||0
+    nw_delivery:parseInt(document.getElementById('dr-nw-delivery')?.value)||0,
+    nw_resolved_phone:parseInt(document.getElementById('dr-nw-resolved-phone')?.value)||0
   };
-  callSummary.warranty_total=callSummary.w_install+callSummary.w_breakdown+callSummary.w_repeat;
-  callSummary.nonwarranty_total=callSummary.nw_breakdown+callSummary.nw_repeat+callSummary.nw_other+callSummary.nw_delivery;
+  callSummary.warranty_total=callSummary.w_install+callSummary.w_breakdown+callSummary.w_repeat+callSummary.w_resolved_phone;
+  callSummary.nonwarranty_total=callSummary.nw_breakdown+callSummary.nw_repeat+callSummary.nw_other+callSummary.nw_delivery+callSummary.nw_resolved_phone;
   callSummary.grand_total=callSummary.warranty_total+callSummary.nonwarranty_total;
   callSummary.pending_parts=parseInt(document.getElementById('dr-pending-parts')?.value)||0;
   callSummary.pending_approval=parseInt(document.getElementById('dr-pending-approval')?.value)||0;
@@ -12980,18 +13003,20 @@ function formatDailyReportWA(d){
   if(grandTotal>0){
     lines.push('📊 *CALL SUMMARY*  (Total: '+grandTotal+')');
     lines.push('▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔');
-    var wTotal=cs.warranty_total||((cs.w_install||0)+(cs.w_breakdown||0)+(cs.w_repeat||0));
-    var nwTotal=cs.nonwarranty_total||((cs.nw_breakdown||0)+(cs.nw_repeat||0)+(cs.nw_other||0)+(cs.nw_delivery||0));
+    var wTotal=cs.warranty_total||((cs.w_install||0)+(cs.w_breakdown||0)+(cs.w_repeat||0)+(cs.w_resolved_phone||0));
+    var nwTotal=cs.nonwarranty_total||((cs.nw_breakdown||0)+(cs.nw_repeat||0)+(cs.nw_other||0)+(cs.nw_delivery||0)+(cs.nw_resolved_phone||0));
     lines.push('  🔵 *WARRANTY*  ('+wTotal+')');
     if(cs.w_install>0)lines.push('     • Installation: '+cs.w_install);
     if(cs.w_breakdown>0)lines.push('     • Breakdown: '+cs.w_breakdown);
     if(cs.w_repeat>0)lines.push('     • Repeat: '+cs.w_repeat);
+    if(cs.w_resolved_phone>0)lines.push('     • 📞 Resolved By Phone: '+cs.w_resolved_phone);
     lines.push('');
     lines.push('  🔴 *NON-WARRANTY*  ('+nwTotal+')');
     if(cs.nw_breakdown>0)lines.push('     • Breakdown: '+cs.nw_breakdown);
     if(cs.nw_repeat>0)lines.push('     • Repeat: '+cs.nw_repeat);
     if(cs.nw_other>0)lines.push('     • Other / AMC: '+cs.nw_other);
     if(cs.nw_delivery>0)lines.push('     • Cart/Ink Delivery: '+cs.nw_delivery);
+    if(cs.nw_resolved_phone>0)lines.push('     • 📞 Resolved By Phone: '+cs.nw_resolved_phone);
     lines.push('');
     lines.push('  ─────────────────────');
     lines.push('  🔵 Warranty: *'+wTotal+'*   🔴 Non-W: *'+nwTotal+'*   📊 Total: *'+grandTotal+'*');
@@ -18858,6 +18883,46 @@ function toggleQuickVisitAdhoc(checked){
 }
 
 // Create a brand-new visit record, starting either the travel or work clock.
+// ── WORK LOG integration — same auto travel/work log entries the ticket
+// On-Site call flow creates, but linked via site_visit_id instead of
+// ticket_id, so these rows are entirely separate from any ticket's logs.
+async function svCloseOpenWorkLog(visitId,timeNow){
+  try{
+    var openLogs=await sb('work_logs','GET',null,'?site_visit_id=eq.'+visitId+'&to_time=eq.OPEN');
+    for(var i=0;i<(openLogs||[]).length;i++){
+      await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+openLogs[i].id).catch(function(){});
+    }
+  }catch(e){}
+}
+async function svOpenWorkLog(visitId,label,kind,timeNow,dateNow){
+  var memberId=currentUser.eng_id||currentUser.user_id;
+  var memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+  var desc=kind==='visit'?('🚗 Traveling — '+label):('🔧 Work Start — '+label);
+  try{
+    await sb('work_logs','POST',{
+      eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
+      log_date:dateNow,from_time:timeNow,to_time:'OPEN',
+      task_description:desc,site_visit_id:visitId,
+      log_type:kind==='visit'?'travel':'work',created_at:new Date().toISOString()
+    });
+  }catch(e){}
+}
+// Same "something's already open" guard the ticket flow uses (checks ANY
+// open log for the engineer today, not scoped by source) — so a site visit
+// can't start while a ticket call's log is open, and vice versa, for free.
+async function svCheckOpenLogBlock(){
+  var memberId=currentUser.eng_id||currentUser.user_id;
+  var dateNow=new Date().toLocaleDateString('en-CA');
+  try{
+    var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(memberId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN');
+    if(openLogs&&openLogs.length){
+      alert('⚠️ A Work/Traveling log is already OPEN!\n\n"'+openLogs[0].task_description+'"\n\nPlease close that first before starting a new Visit.');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 async function svStartNew(kind){
   var isAdhoc=document.getElementById('qv-adhoc')?.checked;
   var siteId=document.getElementById('qv-site')?.value;
@@ -18871,6 +18936,7 @@ async function svStartNew(kind){
     if(!adhocLabel){alert('Please enter the work to be done!');return;}
   }else{if(!siteId){alert('Please select a site!');return;}}
   if(!date){alert('Date required!');return;}
+  if(await svCheckOpenLogBlock())return;
   try{
     var now=new Date();
     var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
@@ -18889,6 +18955,8 @@ async function svStartNew(kind){
     var r=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(vData)});
     if(!r.ok)throw new Error(await r.text());
     var created=(await r.json())[0];
+    var label=await svLabel(vData);
+    await svOpenWorkLog(created.id,label,kind,timeNow,date);
     svRemoveModal();
     openSiteVisitTracker(created.id);
   }catch(e){alert('Error: '+e.message);}
@@ -18949,11 +19017,18 @@ async function svAction(visitId,kind){
     if(!v)return;
     var now=new Date();
     var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var dateNow=now.toLocaleDateString('en-CA');
     var st=svDeriveState(v);
     var action=kind==='visit'?'Visit Start':kind==='work'?'Work Started':'Visit Stop';
     var note=kind==='visit'?'Travel started: '+timeNow:kind==='work'?('Session '+(st.wsCount+1)+': Time In: '+timeNow):'Travel stopped: '+timeNow;
     var tl=svParseTL(v).concat([{action:action,by:currentUser.name,at:now.toISOString(),note:note}]);
     await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+    // Work Log: close whatever leg was open, then open the new one (skip on 'stop')
+    await svCloseOpenWorkLog(visitId,timeNow);
+    if(kind==='visit'||kind==='work'){
+      var label=await svLabel(v);
+      await svOpenWorkLog(visitId,label,kind,timeNow,dateNow);
+    }
     openSiteVisitTracker(visitId);
   }catch(e){alert('Error: '+e.message);}
 }
@@ -18984,8 +19059,20 @@ async function svConfirmHold(visitId){
     var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
     if(!v)return;
     var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var dateNow=now.toLocaleDateString('en-CA');
     var tl=svParseTL(v).concat([{action:'Work on Hold',by:currentUser.name,at:now.toISOString(),note:remark}]);
     await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+    await svCloseOpenWorkLog(visitId,timeNow);
+    var label=await svLabel(v);
+    var memberId=currentUser.eng_id||currentUser.user_id;
+    var memberRole=currentUser.role_type==='work_controller'?'WC':'Engineer';
+    await sb('work_logs','POST',{
+      eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
+      log_date:dateNow,from_time:timeNow,to_time:timeNow,
+      task_description:'⏸️ Work on Hold — '+label+' ('+remark+')',
+      site_visit_id:visitId,log_type:'work',created_at:now.toISOString()
+    }).catch(function(){});
     alert('Visit paused ✅\nCome back and tap Visit Start / Work Start to resume.');
     svRemoveModal();
   }catch(e){alert('Error: '+e.message);}
@@ -19027,6 +19114,7 @@ async function svFinishVisit(visitId){
     var patch={timeline:tl,visit_status:'completed',work_done:work,material_delivered:material};
     if(photos.length)patch.photos=photos;
     await sb('auto_site_visits','PATCH',patch,'?id=eq.'+visitId);
+    await svCloseOpenWorkLog(visitId,timeNow);
     svRemoveModal();
     alert('✅ Visit completed!');
     if(currentPage==='auto-sites')renderAutoSites();
