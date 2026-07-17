@@ -18805,7 +18805,8 @@ async function svLabel(v){
     try{var s=await sb('auto_sites','GET',null,'?id=eq.'+v.site_id+'&select=site_name,client_name');if(s&&s[0])return s[0].site_name+' — '+s[0].client_name;}catch(e){}
     return 'Site #'+v.site_id;
   }
-  return '🔧 '+(v.adhoc_label||'One-off Visit');
+  var who=v.adhoc_client_name?(v.adhoc_client_name+(v.adhoc_area?' — '+v.adhoc_area:'')):(v.adhoc_label||'One-off Visit');
+  return '🔧 '+who;
 }
 function svFmtTime(iso){return iso?new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):'';}
 
@@ -18828,8 +18829,16 @@ async function openSiteVisitModal(){
       +'<select id="qv-site" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"><option value="">-- Select Site --</option>'
       +sites.map(function(s){return'<option value="'+s.id+'">'+s.site_name+' — '+s.client_name+'</option>';}).join('')
       +'</select></div>'
-      +'<div class="form-group" id="qv-adhoc-wrap" style="margin-bottom:12px;display:none;"><label>Work / Location <span class="req">*</span></label>'
-      +'<input type="text" id="qv-adhoc-label" placeholder="e.g. Ramesh Society — camera fault check" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div id="qv-adhoc-wrap" style="display:none;">'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Client Name <span class="req">*</span></label>'
+      +'<input type="text" id="qv-adhoc-client" placeholder="e.g. Ramesh Bhai" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Address</label>'
+      +'<input type="text" id="qv-adhoc-address" placeholder="House/Society, Street..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Area</label>'
+      +'<input type="text" id="qv-adhoc-area" placeholder="e.g. Bodakdev" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'<div class="form-group" style="margin-bottom:12px;"><label>Work <span class="req">*</span></label>'
+      +'<input type="text" id="qv-adhoc-label" placeholder="e.g. Camera fault check" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;"></div>'
+      +'</div>'
       +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="qv-date" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
       +'</div>'
       +'<div class="modal-footer">'
@@ -18852,10 +18861,15 @@ function toggleQuickVisitAdhoc(checked){
 async function svStartNew(kind){
   var isAdhoc=document.getElementById('qv-adhoc')?.checked;
   var siteId=document.getElementById('qv-site')?.value;
+  var adhocClient=document.getElementById('qv-adhoc-client')?.value.trim();
+  var adhocAddress=document.getElementById('qv-adhoc-address')?.value.trim();
+  var adhocArea=document.getElementById('qv-adhoc-area')?.value.trim();
   var adhocLabel=document.getElementById('qv-adhoc-label')?.value.trim();
   var date=document.getElementById('qv-date')?.value;
-  if(isAdhoc){if(!adhocLabel){alert('Please enter work/location description!');return;}}
-  else{if(!siteId){alert('Please select a site!');return;}}
+  if(isAdhoc){
+    if(!adhocClient){alert('Please enter client name!');return;}
+    if(!adhocLabel){alert('Please enter the work to be done!');return;}
+  }else{if(!siteId){alert('Please select a site!');return;}}
   if(!date){alert('Date required!');return;}
   try{
     var now=new Date();
@@ -18863,7 +18877,11 @@ async function svStartNew(kind){
     var action=kind==='visit'?'Visit Start':'Work Started';
     var note=kind==='visit'?'Travel started: '+timeNow:'Session 1: Time In: '+timeNow;
     var vData={
-      site_id:isAdhoc?null:parseInt(siteId),adhoc_label:isAdhoc?adhocLabel:null,
+      site_id:isAdhoc?null:parseInt(siteId),
+      adhoc_label:isAdhoc?adhocLabel:null,
+      adhoc_client_name:isAdhoc?adhocClient:null,
+      adhoc_address:isAdhoc?(adhocAddress||null):null,
+      adhoc_area:isAdhoc?(adhocArea||null):null,
       visit_date:date,visit_status:'active',
       timeline:[{action:action,by:currentUser.name,at:now.toISOString(),note:note}],
       created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||''
@@ -19278,8 +19296,8 @@ async function loadAutoVisitReport(){
       var s=siteMap[v.site_id]||{};
       var isAdhoc=!v.site_id;
       return Object.assign({},v,{
-        site_name:isAdhoc?('🔧 '+(v.adhoc_label||'One-off Visit')):(s.site_name||'-'),
-        client_name:isAdhoc?'—':(s.client_name||'-')
+        site_name:isAdhoc?('🔧 '+(v.adhoc_label||'One-off Visit')+(v.adhoc_address||v.adhoc_area?' — '+[v.adhoc_address,v.adhoc_area].filter(Boolean).join(', '):'')):(s.site_name||'-'),
+        client_name:isAdhoc?(v.adhoc_client_name||'—'):(s.client_name||'-')
       });
     });
     if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">No visits found for the selected filter.</div>';return;}
