@@ -5449,22 +5449,30 @@ async function saveCall(){
       // "last ticket id" and generate a duplicate id, causing a 409 conflict on
       // insert (id is the primary key). If that happens, regenerate a fresh id
       // and try again instead of failing the whole save.
-      let id;
-      for(let attempt=0;attempt<5;attempt++){
+      const MAX_ATTEMPTS=9;
+      let id,lastErr;
+      for(let attempt=0;attempt<MAX_ATTEMPTS;attempt++){
         id=await generateTicketNo();
+        // Last-resort fallback: if we've already collided several times (heavy
+        // concurrent traffic), append a short random suffix so this id is
+        // essentially guaranteed unique instead of retrying forever.
+        if(attempt>=5)id=id+'-'+Math.random().toString(36).slice(2,5).toUpperCase();
         data.id=id;data.job_sheet=id;
         try{
           await sb('tickets','POST',data);
+          lastErr=null;
           break; // success
         }catch(insEx){
+          lastErr=insEx;
           const isDup=/duplicate key|23505/i.test(insEx.message||'');
-          if(isDup&&attempt<4){
-            await new Promise(r=>setTimeout(r,150+Math.random()*250)); // small random backoff
-            continue; // regenerate id and retry
+          if(isDup&&attempt<MAX_ATTEMPTS-1){
+            await new Promise(r=>setTimeout(r,150+Math.random()*350)); // random backoff
+            continue; // regenerate id (or add suffix) and retry
           }
           throw insEx; // not a duplicate-id issue, or out of retries — bubble up
         }
       }
+      if(lastErr)throw lastErr;
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
       tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
@@ -5485,8 +5493,18 @@ async function saveCall(){
 }
 async function generateTicketNo(){
   const year=new Date().getFullYear();
-  const tickets=await sb('tickets','GET',null,`?id=like.BEA-${year}*&order=id.desc&limit=1`);
-  let num=1;if(tickets.length)num=parseInt(tickets[0].id.split('-').pop())+1;
+  // IMPORTANT: id is a TEXT column, so `order=id.desc&limit=1` sorts
+  // alphabetically, not numerically. That breaks once the ticket count
+  // crosses a digit-count boundary (e.g. "BEA-2026-999" sorts AFTER
+  // "BEA-2026-1000" alphabetically, since '9' > '1'), which made the
+  // generator loop forever trying to reuse the same id once past 999.
+  // Fix: fetch all of this year's ids and compute the max number in JS.
+  const rows=await sbAll('tickets',`?id=like.BEA-${year}*&select=id`,1000);
+  let num=1;
+  for(const r of rows){
+    const n=parseInt((r.id||'').split('-').pop(),10);
+    if(!isNaN(n)&&n+1>num)num=n+1;
+  }
   return `BEA-${year}-${String(num).padStart(3,'0')}`;
 }
 
