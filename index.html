@@ -5445,8 +5445,18 @@ async function saveCall(){
       // Point 13: Edit only allows remark — no customer/product change
       await sb('tickets','PATCH',{remarks:data.remarks,updated_at:data.updated_at},`?id=eq.${editingCallId}`);
     }else{
-      const id=await generateTicketNo();data.id=id;data.job_sheet=id;
-      await sb('tickets','POST',data);
+      let id, saved=false, attempts=0;
+      while(!saved && attempts<5){
+        id=await generateTicketNo();
+        data.id=id;data.job_sheet=id;
+        try{
+          await sb('tickets','POST',data);
+          saved=true;
+        }catch(insertErr){
+          attempts++;
+          if(attempts>=5) throw insertErr;
+        }
+      }
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
       tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
