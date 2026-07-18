@@ -2699,6 +2699,14 @@ function _loginIdLookup(val){
   },400);
 }
 function setLoginRole(r){loginRole=r;document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active',(r==='admin'&&i===0)||(r==='engineer'&&i===1)));}
+function ensureFreshRenderAfterLogin(){
+  try{
+    if(!sessionStorage.getItem('bhavi_post_login_reloaded')){
+      sessionStorage.setItem('bhavi_post_login_reloaded','1');
+      location.reload();
+    }
+  }catch(e){}
+}
 async function doLogin(){
   const uid=document.getElementById('login-id').value.trim();
   const pass=document.getElementById('login-pass').value;
@@ -2720,7 +2728,7 @@ async function doLogin(){
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='peon'?'Office Boy':currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
-    document.getElementById('topbar-user').textContent=currentUser.name;
+    var _tbu=document.getElementById('topbar-user');if(_tbu)_tbu.textContent=currentUser.name;
     setupNav();
     currentPage='';
     allTickets=[];
@@ -2737,6 +2745,7 @@ async function doLogin(){
     scheduleMidnightSeqReset();
     resetExpiredSeqs();
     if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
+    ensureFreshRenderAfterLogin();
   }catch(e){showLoginError('Error: '+e.message);}
 }
 function showLoginError(msg){const el=document.getElementById('login-error');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',3000);}
@@ -2860,7 +2869,7 @@ async function tryAutoLogin(){
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='peon'?'Office Boy':currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
-    document.getElementById('topbar-user').textContent=currentUser.name;
+    var _tbu=document.getElementById('topbar-user');if(_tbu)_tbu.textContent=currentUser.name;
     setupNav();
     currentPage='';
     allTickets=[];
@@ -2875,6 +2884,7 @@ async function tryAutoLogin(){
     scheduleMidnightSeqReset();
     resetExpiredSeqs();
     if(currentUser.role==='engineer'){setTimeout(function(){if(currentPage!=='my-calls')navigate('my-calls');},300);}
+    ensureFreshRenderAfterLogin();
   }catch(renderErr){
     // The session itself was confirmed valid — do NOT reload here. If this
     // render step fails for a deterministic reason (not a fluke), reloading
@@ -5435,8 +5445,26 @@ async function saveCall(){
       // Point 13: Edit only allows remark — no customer/product change
       await sb('tickets','PATCH',{remarks:data.remarks,updated_at:data.updated_at},`?id=eq.${editingCallId}`);
     }else{
-      const id=await generateTicketNo();data.id=id;data.job_sheet=id;
-      await sb('tickets','POST',data);
+      // Retry loop: two users saving at the same instant can both read the same
+      // "last ticket id" and generate a duplicate id, causing a 409 conflict on
+      // insert (id is the primary key). If that happens, regenerate a fresh id
+      // and try again instead of failing the whole save.
+      let id;
+      for(let attempt=0;attempt<5;attempt++){
+        id=await generateTicketNo();
+        data.id=id;data.job_sheet=id;
+        try{
+          await sb('tickets','POST',data);
+          break; // success
+        }catch(insEx){
+          const isDup=/duplicate key|23505/i.test(insEx.message||'');
+          if(isDup&&attempt<4){
+            await new Promise(r=>setTimeout(r,150+Math.random()*250)); // small random backoff
+            continue; // regenerate id and retry
+          }
+          throw insEx; // not a duplicate-id issue, or out of retries — bubble up
+        }
+      }
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
       tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
