@@ -5460,13 +5460,16 @@ async function saveCall(){
   }
 }
 async function generateTicketNo(){
-  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-0451). Series runs across months and resets only on year change.
+  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-1028). Series runs across months and resets only on year change.
+  // Numeric max over all of this year's tickets (old BEA-YYYY-N and new BEA-YYYYMM-N both counted),
+  // because string sort misorders unpadded legacy numbers (e.g. "999" above "1027").
   const now=new Date();
   const year=now.getFullYear();
   const ym=year+String(now.getMonth()+1).padStart(2,'0');
-  const tickets=await sb('tickets','GET',null,`?id=like.BEA-${year}*&order=id.desc&limit=1`);
-  let num=1;if(tickets.length)num=parseInt(tickets[0].id.split('-').pop())+1;
-  return `BEA-${ym}-${String(num).padStart(4,'0')}`;
+  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&limit=5000`);
+  let max=0;
+  for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(n>max)max=n;}
+  return `BEA-${ym}-${String(max+1).padStart(4,'0')}`;
 }
 
 // Point 13: Admin edit — only remark
@@ -6856,7 +6859,9 @@ async function saveEngUpdate(){
       if(isRepeatFOC){
         data.charges_note='Re-Repair FOC | Parts: ₹'+partsCost.toFixed(0)+' | Total: ₹'+finalCharges.toFixed(0);
       }
-      data.timeline=[...(t.timeline||[]),{action:'Charges Set'+(isRepeatFOC?' (Re-Repair FOC)':''),by:currentUser.name,at:new Date().toISOString(),note:data.charges_note}];
+      // Append to tl (not t.timeline) so the 'Updated — Closed' / 'Updated — Resolved By Phone'
+      // entry survives — daily reports count closed calls from that entry.
+      data.timeline=[...tl,{action:'Charges Set'+(isRepeatFOC?' (Re-Repair FOC)':''),by:currentUser.name,at:new Date().toISOString(),note:data.charges_note}];
     }
   }
 
@@ -12297,6 +12302,12 @@ function myRptStatusEventDate(t){
   if(!Array.isArray(tl))return null;
   var lastMatch=null;
   tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf(keyword)!==-1&&entry.at)lastMatch=entry;});
+  // Legacy Non-Warranty closes: the old charges code overwrote the
+  // 'Updated — Closed' entry, leaving only 'Charges Set' (written at the
+  // moment of close), so use that as the close-date for those tickets.
+  if(!lastMatch&&(keyword==='Closed'||keyword==='Resolved By Phone')){
+    tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf('Charges Set')!==-1&&entry.at)lastMatch=entry;});
+  }
   if(!lastMatch)return null;
   return new Date(lastMatch.at).toLocaleDateString('en-CA');
 }
@@ -12305,7 +12316,7 @@ function myRptInvoiceDates(t){
   if(!Array.isArray(tl))return[];
   return tl.filter(function(e){return e&&e.action==='Invoice Done'&&e.at;}).map(function(e){return new Date(e.at).toLocaleDateString('en-CA');});
 }
-var MYRPT_DONE_STATUSES=['Closed','Delivered','Pending for Delivery','Repaired'];
+var MYRPT_DONE_STATUSES=['Closed','Delivered','Pending for Delivery','Repaired','Resolved By Phone'];
 var MYRPT_PENDING_STATUSES=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold','Pending Repair Carry In','Pending Repair On Site','Pending Allocation','Pending Customer Arrival'];
 
 async function renderMyReport(){
@@ -12804,6 +12815,11 @@ async function drAutoFillCalls(){
       if(!Array.isArray(tl))return false;
       var lastMatch=null;
       tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf(keyword)!==-1&&entry.at)lastMatch=entry;});
+      // Legacy Non-Warranty closes: old charges code dropped the
+      // 'Updated — Closed' entry; 'Charges Set' was written at close time.
+      if(!lastMatch&&(keyword==='Closed'||keyword==='Resolved By Phone')){
+        tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf('Charges Set')!==-1&&entry.at)lastMatch=entry;});
+      }
       if(!lastMatch)return false;
       return new Date(lastMatch.at).toLocaleDateString('en-CA')===date;
     }
