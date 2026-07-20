@@ -2991,6 +2991,20 @@ function setupNav(){
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
     }
+    // Position KM Tracking + Payment QR per role:
+    // Admin → below Engineer Daily Report (Dashboard, All Tickets, Eng Daily Report first)
+    // WC → below Courier | Engineer → below My Report (original spot)
+    var _kmNav=document.getElementById('nav-km-report');
+    var _pqNav=document.getElementById('nav-payment-qr');
+    if(_kmNav&&_pqNav){
+      var _navAnchor=isAdmin?document.getElementById('nav-eng-daily-report')
+        :(isWC?document.getElementById('nav-courier')
+        :document.getElementById('nav-my-report'));
+      if(_navAnchor&&_navAnchor.parentNode){
+        _navAnchor.parentNode.insertBefore(_kmNav,_navAnchor.nextSibling);
+        _kmNav.parentNode.insertBefore(_pqNav,_kmNav.nextSibling);
+      }
+    }
     // AI Agent nav: show for admin and special engineers
     if(isEng){
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);
@@ -22867,7 +22881,8 @@ async function startKmCamera(){
 }
 function closeKmCapture(){stopKmCamera();var m=document.getElementById('modal-km-capture');if(m)m.remove();}
 function openKmCapture(opts){
-  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;
+  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmOcrValue=null;
+  loadTesseractLib().catch(function(){}); // warm up OCR lib while engineer frames the shot
   var titles={opening:'🏢 Opening KM — Day Start',arrival:'📍 Arrival KM — Reached Customer',closing:'🏁 Closing KM — Day End'};
   var title=titles[opts.type]||'Odometer KM';
   var sub=opts.type==='arrival'&&opts.ticketId?('Call: '+opts.ticketId):'';
@@ -22880,7 +22895,11 @@ function openKmCapture(opts){
     +'<div class="modal-body" style="padding:14px 18px;">'
     +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:10px;">📸 Odometer (meter) photo is <b>mandatory</b>. Live camera only — gallery not allowed. Time & GPS are saved automatically and cannot be edited.</div>'
     +'<div id="km-cam-status" style="font-size:12px;margin-bottom:6px;"></div>'
-    +'<video id="km-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover;"></video>'
+    +'<div style="position:relative;">'
+    +'<video id="km-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover;display:block;"></video>'
+    +'<div id="km-guide-box" style="position:absolute;left:15%;right:15%;top:35%;bottom:35%;border:2.5px dashed #fbbf24;border-radius:8px;pointer-events:none;"></div>'
+    +'<div id="km-guide-text" style="position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 3px #000;pointer-events:none;">Meter na numbers ne pila box ma rakho</div>'
+    +'</div>'
     +'<div id="km-photo-preview" style="display:none;"></div>'
     +'<div style="display:flex;gap:8px;margin:10px 0;">'
     +'<button id="km-capture-btn" class="btn btn-primary" style="flex:1;" onclick="captureKmPhoto()">📸 Capture Odometer</button>'
@@ -22889,6 +22908,7 @@ function openKmCapture(opts){
     +'<div class="form-group" style="margin-bottom:10px;">'
     +'<label style="font-weight:700;">Odometer Reading (KM) <span class="req">*</span></label>'
     +'<input type="number" id="km-reading" inputmode="numeric" placeholder="e.g. 25132" style="font-size:16px;font-weight:700;letter-spacing:1px;">'
+    +'<div id="km-ocr-status" style="font-size:12px;margin-top:4px;"></div>'
     +'</div>'
     +'<div style="font-size:12px;color:#64748b;margin-bottom:10px;">📍 GPS: <span id="km-gps-status">Getting location...</span> &nbsp;|&nbsp; 🕐 <span id="km-time-now"></span></div>'
     +'<button id="km-save-btn" class="btn btn-success" style="width:100%;" onclick="saveKmEntry()">💾 Save KM Entry</button>'
@@ -22918,19 +22938,112 @@ function captureKmPhoto(){
   canvas.getContext('2d').drawImage(vid,0,0,w,h);
   _kmPhotoData=canvas.toDataURL('image/jpeg',0.72);
   vid.style.display='none';
+  var gb=document.getElementById('km-guide-box');if(gb)gb.style.display='none';
+  var gt=document.getElementById('km-guide-text');if(gt)gt.style.display='none';
   var prev=document.getElementById('km-photo-preview');
   if(prev){prev.style.display='';prev.innerHTML='<img src="'+_kmPhotoData+'" style="width:100%;border-radius:10px;">';}
   var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='none';
   var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='';
   stopKmCamera();
+  runKmOcr(canvas); // auto-read the meter digits → pre-fills the reading field
 }
 function retakeKmPhoto(){
-  _kmPhotoData=null;
+  _kmPhotoData=null;_kmOcrValue=null;
   var vid=document.getElementById('km-video');if(vid)vid.style.display='';
+  var gb=document.getElementById('km-guide-box');if(gb)gb.style.display='';
+  var gt=document.getElementById('km-guide-text');if(gt)gt.style.display='';
   var prev=document.getElementById('km-photo-preview');if(prev){prev.style.display='none';prev.innerHTML='';}
   var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='';
   var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='none';
+  var os=document.getElementById('km-ocr-status');if(os)os.innerHTML='';
+  var inp=document.getElementById('km-reading');if(inp)inp.value='';
   startKmCamera();
+}
+
+// ── ODOMETER OCR (auto-read meter digits from the photo) ──
+// Tesseract.js is lazy-loaded from CDN only when a KM photo is captured.
+// The OCR value pre-fills the reading box; the engineer just confirms, or
+// corrects it if the auto-read is wrong (raw OCR + correction both saved).
+var _kmOcrValue=null,_kmOcrLibPromise=null,_kmOcrWorker=null;
+function loadTesseractLib(){
+  if(window.Tesseract)return Promise.resolve();
+  if(_kmOcrLibPromise)return _kmOcrLibPromise;
+  _kmOcrLibPromise=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    s.onload=function(){resolve();};
+    s.onerror=function(){_kmOcrLibPromise=null;reject(new Error('OCR library load failed'));};
+    document.head.appendChild(s);
+    setTimeout(function(){if(!window.Tesseract){_kmOcrLibPromise=null;reject(new Error('OCR library load timeout'));}},20000);
+  });
+  return _kmOcrLibPromise;
+}
+async function getKmOcrWorker(){
+  if(_kmOcrWorker)return _kmOcrWorker;
+  await loadTesseractLib();
+  var w=await Tesseract.createWorker('eng');
+  await w.setParameters({tessedit_char_whitelist:'0123456789'});
+  _kmOcrWorker=w;
+  return w;
+}
+// Crop the guide-box region (center 70% x 30%) + upscale + grayscale/contrast —
+// big accuracy boost for odometer digits vs feeding the whole photo.
+function kmOcrPrepCanvas(srcCanvas){
+  var sx=Math.round(srcCanvas.width*0.15),sw=Math.round(srcCanvas.width*0.70);
+  var sy=Math.round(srcCanvas.height*0.35),sh=Math.round(srcCanvas.height*0.30);
+  var scale=2;
+  var c=document.createElement('canvas');c.width=sw*scale;c.height=sh*scale;
+  var ctx=c.getContext('2d');
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(srcCanvas,sx,sy,sw,sh,0,0,c.width,c.height);
+  var img=ctx.getImageData(0,0,c.width,c.height);
+  var d=img.data,min=255,max=0;
+  for(var i=0;i<d.length;i+=4){
+    var g=Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
+    d[i]=d[i+1]=d[i+2]=g;
+    if(g<min)min=g;if(g>max)max=g;
+  }
+  var range=Math.max(1,max-min);
+  for(var j=0;j<d.length;j+=4){
+    var v=Math.round((d[j]-min)*255/range);
+    d[j]=d[j+1]=d[j+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return c;
+}
+function pickKmCandidate(text,prevMax){
+  var runs=(String(text||'').match(/\d{3,7}/g)||[]);
+  if(!runs.length)return null;
+  var nums=runs.map(Number);
+  // Prefer a number that continues today's series (>= last reading, within ~2000 km)
+  if(prevMax!==null&&prevMax!==undefined){
+    var ok=nums.filter(function(n){return n>=prevMax&&n<=prevMax+2000;});
+    if(ok.length)return Math.min.apply(null,ok);
+  }
+  // Otherwise the longest digit run (odometers are the longest number in frame)
+  runs.sort(function(a,b){return b.length-a.length;});
+  return Number(runs[0]);
+}
+async function runKmOcr(srcCanvas){
+  var st=document.getElementById('km-ocr-status');
+  _kmOcrValue=null;
+  if(st)st.innerHTML='<span style="color:#1d4ed8;font-weight:700;">🤖 Reading meter from photo...</span>';
+  try{
+    var worker=await getKmOcrWorker();
+    var prep=kmOcrPrepCanvas(srcCanvas);
+    var res=await worker.recognize(prep);
+    var val=pickKmCandidate(res&&res.data&&res.data.text,_kmPrevMax);
+    if(val===null){
+      if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read fail — reading jate lakhi do.</span>';
+      return;
+    }
+    _kmOcrValue=val;
+    var inp=document.getElementById('km-reading');
+    if(inp&&!inp.value)inp.value=val;
+    if(st)st.innerHTML='<span style="color:#15803d;font-weight:700;">🤖 Auto reading: '+val+'</span> <span style="color:#64748b;">— check karo, khotu hoy to sudhari lo</span>';
+  }catch(e){
+    if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read not available — reading jate lakhi do.</span>';
+  }
 }
 async function saveKmEntry(){
   if(!_kmPhotoData){alert('📸 Odometer photo is required! Please capture the photo first.');return;}
@@ -22950,6 +23063,8 @@ async function saveKmEntry(){
     entry_type:_kmCapOpts.type,
     ticket_id:_kmCapOpts.ticketId||null,
     odometer_km:kmVal,photo_url:photoUrl,
+    ocr_km:_kmOcrValue,
+    corrected_by:(_kmOcrValue!==null&&kmVal!==_kmOcrValue)?currentUser.name:null,
     lat:_kmLoc?_kmLoc.lat:null,lng:_kmLoc?_kmLoc.lng:null,gps_accuracy:_kmLoc?_kmLoc.accuracy:null,
     captured_at:now.toISOString(),created_at:now.toISOString()
   };
