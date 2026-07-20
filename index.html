@@ -5460,10 +5460,13 @@ async function saveCall(){
   }
 }
 async function generateTicketNo(){
-  const year=new Date().getFullYear();
+  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-0451). Series runs across months and resets only on year change.
+  const now=new Date();
+  const year=now.getFullYear();
+  const ym=year+String(now.getMonth()+1).padStart(2,'0');
   const tickets=await sb('tickets','GET',null,`?id=like.BEA-${year}*&order=id.desc&limit=1`);
   let num=1;if(tickets.length)num=parseInt(tickets[0].id.split('-').pop())+1;
-  return `BEA-${year}-${String(num).padStart(3,'0')}`;
+  return `BEA-${ym}-${String(num).padStart(4,'0')}`;
 }
 
 // Point 13: Admin edit — only remark
