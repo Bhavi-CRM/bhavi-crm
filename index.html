@@ -309,6 +309,8 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-section-title">Main</div>
     <div class="nav-item hidden" onclick="navigate('my-calls')" id="nav-my-calls"><span class="icon">📞</span><span>My Calls</span></div>
     <div class="nav-item hidden" onclick="navigate('my-report')" id="nav-my-report"><span class="icon">📊</span><span>My Report</span></div>
+    <div class="nav-item hidden" onclick="navigate('km-report')" id="nav-km-report"><span class="icon">🛣️</span><span>KM Tracking</span></div>
+    <div class="nav-item hidden" onclick="showPaymentQR()" id="nav-payment-qr"><span class="icon">💳</span><span>Payment QR</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('eng-daily-report')" id="nav-eng-daily-report"><span class="icon">📅</span><span>Engineer Daily Report</span></div>
@@ -519,6 +521,7 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-header">
       <div><h2 id="modal-ticket-title">Ticket</h2><div id="modal-ticket-sub" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div></div>
       <div style="display:flex;gap:6px;">
+        <button class="btn btn-outline btn-sm" onclick="viewCallPhotos(viewingTicketId)" style="border-color:#0d9488;color:#0d9488;">📷 Photos</button>
         <button class="btn btn-outline btn-sm" onclick="printJobSheet()">🖨️ Print</button>
         <button class="btn btn-outline btn-sm" onclick="printLabel()" style="border-color:#7c3aed;color:#7c3aed;">🏷️ Label</button>
         <button class="close-btn" onclick="closeModal('modal-ticket')">✕</button>
@@ -2934,7 +2937,7 @@ function setupNav(){
        'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report','nav-inquiries',
        'nav-live-map','nav-ai-agent','nav-ai-analysis','nav-attendance','nav-targets','nav-amc',
        'nav-feedback','nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
-       'btn-daily-report','btn-weekly-report','nav-eng-parts'
+       'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr'
       ].forEach(function(id){sv(id,false);});
       if(as)as.style.display='none';
       var autoSec2=document.getElementById('nav-automation-section');
@@ -2942,7 +2945,7 @@ function setupNav(){
       if(autoSec2)autoSec2.style.display='none';
       if(aiSec2)aiSec2.style.display='none';
     }else if(isEng){
-      sv('nav-tickets',false);sv('nav-my-calls',true);sv('nav-my-report',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',false);sv('nav-courier',false);
+      sv('nav-tickets',false);sv('nav-my-calls',true);sv('nav-my-report',true);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',false);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);sv('nav-tasks',true);
@@ -2962,7 +2965,7 @@ function setupNav(){
       var _up=window._navPerms&&window._navPerms.users&&window._navPerms.users[_uid]||null;
       if(_up&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_up[item.id]===true)sv(item.id,true);else if(_up[item.id]===false)sv(item.id,false);});}
     }else if(isWC){
-      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
+      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
@@ -2978,7 +2981,7 @@ function setupNav(){
       var _wcUp=window._navPerms&&window._navPerms.users&&window._navPerms.users[_wcUid]||null;
       if(_wcUp&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_wcUp[item.id]===true)sv(item.id,true);else if(_wcUp[item.id]===false)sv(item.id,false);});}
     }else{
-      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-eng-daily-report',true);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
+      sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',true);sv('nav-work-log',false);sv('nav-walk-in',false);sv('nav-courier',false);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
@@ -3072,9 +3075,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -4320,6 +4323,16 @@ function doPunchOut(){
   const key=`punch_${currentUser.user_id}`;
   const ps=JSON.parse(localStorage.getItem(key)||'null');
   if(!ps||!ps.punched_in){alert('Please Punch In first');return;}
+  // KM TRACKING — engineer returning home directly: capture Closing KM before punch out
+  // (skipped automatically if Reached Office already captured it, or no travel happened today)
+  if(currentUser.role==='engineer'){
+    kmTodayLogs().then(function(logs){
+      var needClosing=logs&&logs.some(function(l){return l.entry_type==='opening';})&&!logs.some(function(l){return l.entry_type==='closing';});
+      if(needClosing){openKmCapture({type:'closing',ticketId:null,onDone:function(){showPunchOutModal(ps,key);}});}
+      else showPunchOutModal(ps,key);
+    }).catch(function(){showPunchOutModal(ps,key);});
+    return;
+  }
   // Show punch out modal
   showPunchOutModal(ps,key);
 }
@@ -4718,6 +4731,7 @@ function ticketRow(t){
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
+      <button class="btn-icon" title="KM & Job Sheet Photos" onclick="viewCallPhotos('${t.id}')">📷</button>
       ${!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn-icon" onclick="openAdminEdit('${t.id}')">✏️</button>`:''}
       <button class="btn-icon" title="Print Job Sheet" onclick="viewingTicketId='${t.id}';printJobSheet()">🖨️</button>
     </td></tr>`;
@@ -6407,11 +6421,15 @@ async function openEngUpdate(id){
           <button onclick="showWorkHoldModal('${t.id}')" style="width:100%;background:rgba(255,255,255,0.2);border:1.5px solid rgba(255,255,255,0.6);color:#fff;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">⏸️ Work on Hold</button>
         </div>`;
       } else if(lastKind==='visitstart'){
-        return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:14px;font-weight:700;">🚗 Visiting — ${vsTime}</span>
-          <div style="display:flex;gap:6px;">
+        const reachedToday=tl.some(e=>e&&e.action==='Reached Location'&&e.at&&new Date(e.at).toLocaleDateString('en-CA')===new Date().toLocaleDateString('en-CA'));
+        return `<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span style="font-size:14px;font-weight:700;">🚗 Visiting — ${vsTime}</span>
             <button onclick="doVisitStop('${t.id}')" style="background:#fff;color:#b45309;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;">🛑 Stop</button>
-            <button onclick="doWorkStart('${t.id}')" style="background:#fff;color:#059669;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="doReachedLocation('${t.id}')" style="flex:1;background:${reachedToday?'rgba(255,255,255,0.25)':'#fff'};color:${reachedToday?'#fff':'#0d9488'};border:${reachedToday?'1.5px solid rgba(255,255,255,0.6)':'none'};border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">${reachedToday?'✅ Reached':'📍 Reached Location'}</button>
+            <button onclick="doWorkStart('${t.id}')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>
           </div>
         </div>`;
       } else {
@@ -6501,7 +6519,14 @@ async function openEngUpdate(id){
       <div class="form-group"><label>Other ₹</label><input type="number" id="upd-other" value="${t.other_charge||0}" oninput="refreshEstimateTotal()"></div>
     </div>`:`<input type="hidden" id="upd-labor" value="0"><input type="hidden" id="upd-other" value="0"><div class="alert alert-info">Warranty — no charges</div>`}
     <div id="estimate-total-bar" style="display:none;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
+    <hr class="divider">
+    <div class="form-group" style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:12px;margin-bottom:10px;">
+      <label style="font-weight:700;color:#0369a1;font-size:13px;">📄 Job Sheet Photo <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:#64748b;">(required to Close the call — camera or gallery)</span></label>
+      <div id="js-photo-preview" style="margin:8px 0;">${t.jobsheet_photo?`<img src="${t.jobsheet_photo}" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull('${encodeURIComponent(t.jobsheet_photo)}')"> <span style="color:#15803d;font-size:12px;font-weight:700;">✅ Attached</span>`:`<span style="color:#b45309;font-size:12px;">No job sheet photo attached yet</span>`}</div>
+      <input type="file" id="js-photo-input" accept="image/*" onchange="onJsPhotoPick(this)" style="font-size:12px;">
+    </div>
     <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
+  window._jsPhotoData=null;
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -6865,8 +6890,30 @@ async function saveEngUpdate(){
     }
   }
 
+  // JOB SHEET PHOTO — mandatory to Close a call (camera or gallery both allowed).
+  // Resolved By Phone is exempt: no visit happened, so there is no job sheet.
+  if(status==='Closed'&&!t.jobsheet_photo&&!window._jsPhotoData){
+    alert('📄 Job Sheet Photo is required to close this call!\n\nPlease attach the job sheet photo (camera or gallery) in the "Job Sheet Photo" section, then save again.');
+    return;
+  }
+  if(window._jsPhotoData){
+    try{data.jobsheet_photo=await uploadCrmPhoto(window._jsPhotoData,'jobsheet_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'_'+Date.now()+'.jpg');}
+    catch(_je){data.jobsheet_photo=window._jsPhotoData;}
+    window._jsPhotoData=null;
+  }
+
   try{
-    await sb('tickets','PATCH',data,`?id=eq.${id}`);
+    try{
+      await sb('tickets','PATCH',data,`?id=eq.${id}`);
+    }catch(pe){
+      // tickets.jobsheet_photo column not added yet (setup SQL not run) —
+      // don't brick call closing: retry without the photo field.
+      if(data.jobsheet_photo&&String(pe&&pe.message).indexOf('jobsheet_photo')!==-1){
+        delete data.jobsheet_photo;
+        await sb('tickets','PATCH',data,`?id=eq.${id}`);
+        console.log('jobsheet_photo column missing — run KM_SETUP_SQL in Supabase');
+      }else throw pe;
+    }
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
     // (Resolved By Phone included: harmless no-op if no spares were added, since there was no visit.)
     if(status==='Closed'||status==='Resolved By Phone'){
@@ -12083,6 +12130,17 @@ async function doVisitStart(ticketId){
     }
   }catch(ex){}
 
+  // KM TRACKING — first travel of the day requires Opening KM odometer photo (office/home)
+  if(currentUser.role==='engineer'){
+    try{
+      var _kmL=await kmTodayLogs();
+      if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='opening';})){
+        openKmCapture({type:'opening',ticketId:null,onDone:function(){doVisitStart(ticketId);}});
+        return;
+      }
+    }catch(_ke){}
+  }
+
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
     const ticketLabel=(t?.ticket_no||ticketId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');
@@ -12202,6 +12260,37 @@ function onManualTimeInput(){
 }
 
 // Work Start - auto sets Time In + auto work log
+// Reached Location — engineer taps this at the customer's location (parking/gate),
+// BEFORE going inside: captures the Arrival KM odometer photo, closes the open
+// traveling log (accurate travel time) and stamps the ticket timeline. Work Start
+// is then tapped separately when actual work begins inside.
+async function doReachedLocation(ticketId){
+  var _kmL=await kmTodayLogs();
+  if(_kmL&&_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
+    alert('✅ Arrival KM is already recorded for this call today.');
+    return;
+  }
+  openKmCapture({type:'arrival',ticketId:ticketId,onDone:async function(){
+    var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var dateNow=now.toLocaleDateString('en-CA');
+    var engId=currentUser.eng_id||currentUser.user_id;
+    // Close the open traveling log — travel ends at arrival, not at Work Start
+    try{
+      var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN&log_type=eq.travel');
+      for(var i=0;i<(openLogs||[]).length;i++){await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+openLogs[i].id).catch(function(){});}
+    }catch(e){}
+    // Timeline entry so the modal shows ✅ Reached and reports can use arrival time
+    try{
+      var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
+      var tl=[...(t?.timeline||[]),{action:'Reached Location',by:currentUser.name,at:now.toISOString(),note:'Arrival KM recorded at '+timeNow}];
+      await sb('tickets','PATCH',{timeline:tl,updated_at:now.toISOString()},'?id=eq.'+ticketId);
+    }catch(e){}
+    alert('📍 Reached Location saved — '+timeNow+'\n\nNow go inside and tap 🔧 Work Start when you begin work.');
+    try{closeModal('modal-eng-update');openEngUpdate(ticketId);}catch(e){}
+  }});
+}
+
 async function doWorkStart(ticketId){
   const now = new Date();
   const timeIn = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
@@ -12244,6 +12333,18 @@ async function doWorkStart(ticketId){
   // Update ticket
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
+
+    // KM TRACKING — Arrival KM odometer photo at the customer (On Site only, once per ticket per day)
+    if(currentUser.role==='engineer'&&t&&t.service_type==='On Site'){
+      try{
+        var _kmL=await kmTodayLogs();
+        if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
+          openKmCapture({type:'arrival',ticketId:ticketId,onDone:function(){doWorkStart(ticketId);}});
+          return;
+        }
+      }catch(_ke){}
+    }
+
     const sessionNo=(t?.timeline||[]).filter(e=>e.action&&e.action.includes('Work Start')).length+1;
     const tl=[...(t?.timeline||[]),{action:'Work Started',by:currentUser.name,at:now.toISOString(),note:`Session ${sessionNo}: Time In: ${timeIn}`}];
     const wsPatch={status:'In Progress',timeline:tl,updated_at:now.toISOString()};
@@ -17426,6 +17527,16 @@ async function reachedOffice(logId){
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
   const engId=currentUser.eng_id||currentUser.user_id;
+  // KM TRACKING — Closing KM odometer photo when reaching office at day end
+  if(currentUser.role==='engineer'){
+    try{
+      var _kmL=await kmTodayLogs();
+      if(_kmL!==null&&_kmL.length&&!_kmL.some(function(l){return l.entry_type==='closing';})){
+        openKmCapture({type:'closing',ticketId:null,onDone:function(){reachedOffice(logId);}});
+        return;
+      }
+    }catch(_ke){}
+  }
   try{
     await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
     // Write "Reached Office" status entry
@@ -22711,6 +22822,397 @@ function showPhotoFull(encodedSrc){
   ol.onclick=function(){ol.remove();};
   ol.innerHTML='<img src="'+src+'" style="max-width:90vw;max-height:90vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">';
   document.body.appendChild(ol);
+}
+
+// ═══════════════ KM TRACKING MODULE ═══════════════
+// Odometer photo at: Opening (first travel of day), Arrival (each customer,
+// once per ticket per day), Closing (Reached Office / Punch Out when going home).
+// Live camera only (no gallery), auto timestamp + GPS (not editable).
+// Table setup SQL shown in alert if km_logs is missing.
+var KM_SETUP_SQL='CREATE TABLE IF NOT EXISTS public.km_logs (\n  id BIGSERIAL PRIMARY KEY,\n  eng_id TEXT NOT NULL,\n  eng_name TEXT,\n  log_date DATE NOT NULL,\n  entry_type TEXT NOT NULL,\n  ticket_id TEXT,\n  odometer_km NUMERIC,\n  ocr_km NUMERIC,\n  corrected_by TEXT,\n  photo_url TEXT,\n  lat DOUBLE PRECISION,\n  lng DOUBLE PRECISION,\n  gps_accuracy NUMERIC,\n  captured_at TIMESTAMPTZ DEFAULT NOW(),\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nCREATE INDEX IF NOT EXISTS idx_km_logs_eng_date ON public.km_logs(eng_id,log_date);\nALTER TABLE public.tickets ADD COLUMN IF NOT EXISTS jobsheet_photo TEXT;';
+
+// Generic photo upload → Supabase storage (public bucket). Falls back to caller.
+async function uploadCrmPhoto(dataUrl,fname){
+  var blob=await (await fetch(dataUrl)).blob();
+  var res=await fetch(SB_URL+'/storage/v1/object/product-images/'+fname,{method:'POST',headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+  if(!res.ok)throw new Error(await res.text());
+  return SB_URL+'/storage/v1/object/public/product-images/'+fname;
+}
+
+// Today's km_logs for the current user. Returns null if the table is missing /
+// network error — callers treat null as "skip the requirement" so the travel
+// flow is never bricked before the SQL setup is run.
+async function kmTodayLogs(){
+  var engId=currentUser.eng_id||currentUser.user_id;
+  var today=new Date().toLocaleDateString('en-CA');
+  try{return await sb('km_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+today+'&order=captured_at.asc');}
+  catch(e){console.log('km_logs not available:',e&&e.message);return null;}
+}
+
+var _kmCamStream=null,_kmCapOpts=null,_kmPhotoData=null,_kmLoc=null,_kmPrevMax=null;
+function stopKmCamera(){if(_kmCamStream){_kmCamStream.getTracks().forEach(function(t){t.stop();});_kmCamStream=null;}}
+async function startKmCamera(){
+  stopKmCamera();
+  var st=document.getElementById('km-cam-status');
+  try{
+    _kmCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:960}},audio:false});
+    var vid=document.getElementById('km-video');
+    if(vid){vid.srcObject=_kmCamStream;vid.play();}
+    if(st)st.textContent='';
+    return true;
+  }catch(e){
+    if(st)st.innerHTML='<span style="color:#dc2626;font-weight:700;">⚠️ Camera not available — please allow camera permission.</span> <button class="btn btn-outline btn-sm" onclick="startKmCamera()">🔄 Retry</button>';
+    return false;
+  }
+}
+function closeKmCapture(){stopKmCamera();var m=document.getElementById('modal-km-capture');if(m)m.remove();}
+function openKmCapture(opts){
+  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;
+  var titles={opening:'🏢 Opening KM — Day Start',arrival:'📍 Arrival KM — Reached Customer',closing:'🏁 Closing KM — Day End'};
+  var title=titles[opts.type]||'Odometer KM';
+  var sub=opts.type==='arrival'&&opts.ticketId?('Call: '+opts.ticketId):'';
+  var existing=document.getElementById('modal-km-capture');if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='modal-km-capture';m.className='modal-overlay';
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:430px;">'
+    +'<div class="modal-header"><div><h2>'+title+'</h2>'+(sub?'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+sub+'</div>':'')+'</div>'
+    +'<button class="close-btn" onclick="closeKmCapture()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 18px;">'
+    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:10px;">📸 Odometer (meter) photo is <b>mandatory</b>. Live camera only — gallery not allowed. Time & GPS are saved automatically and cannot be edited.</div>'
+    +'<div id="km-cam-status" style="font-size:12px;margin-bottom:6px;"></div>'
+    +'<video id="km-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover;"></video>'
+    +'<div id="km-photo-preview" style="display:none;"></div>'
+    +'<div style="display:flex;gap:8px;margin:10px 0;">'
+    +'<button id="km-capture-btn" class="btn btn-primary" style="flex:1;" onclick="captureKmPhoto()">📸 Capture Odometer</button>'
+    +'<button id="km-retake-btn" class="btn btn-outline" style="flex:1;display:none;" onclick="retakeKmPhoto()">🔄 Retake</button>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:10px;">'
+    +'<label style="font-weight:700;">Odometer Reading (KM) <span class="req">*</span></label>'
+    +'<input type="number" id="km-reading" inputmode="numeric" placeholder="e.g. 25132" style="font-size:16px;font-weight:700;letter-spacing:1px;">'
+    +'</div>'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:10px;">📍 GPS: <span id="km-gps-status">Getting location...</span> &nbsp;|&nbsp; 🕐 <span id="km-time-now"></span></div>'
+    +'<button id="km-save-btn" class="btn btn-success" style="width:100%;" onclick="saveKmEntry()">💾 Save KM Entry</button>'
+    +'</div></div>';
+  document.body.appendChild(m);
+  var tEl=document.getElementById('km-time-now');
+  if(tEl)tEl.textContent=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  startKmCamera();
+  getLocation().then(function(loc){
+    _kmLoc=loc;
+    var g=document.getElementById('km-gps-status');
+    if(g)g.innerHTML=loc?('<span style="color:#15803d;font-weight:700;">✅ Captured (±'+loc.accuracy+'m)</span>'):'<span style="color:#dc2626;">⚠️ Not available</span>';
+  });
+  kmTodayLogs().then(function(logs){
+    var max=null;
+    (logs||[]).forEach(function(l){var n=parseFloat(l.odometer_km);if(!isNaN(n)&&(max===null||n>max))max=n;});
+    _kmPrevMax=max;
+    if(max!==null){var inp=document.getElementById('km-reading');if(inp)inp.placeholder='Last reading today: '+max;}
+  });
+}
+function captureKmPhoto(){
+  var vid=document.getElementById('km-video');if(!vid)return;
+  if(vid.readyState<2||vid.videoWidth===0){alert('⚠️ Camera is still loading — try again in a second.');return;}
+  var w=Math.min(1280,vid.videoWidth);
+  var h=Math.round(vid.videoHeight*(w/vid.videoWidth));
+  var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  canvas.getContext('2d').drawImage(vid,0,0,w,h);
+  _kmPhotoData=canvas.toDataURL('image/jpeg',0.72);
+  vid.style.display='none';
+  var prev=document.getElementById('km-photo-preview');
+  if(prev){prev.style.display='';prev.innerHTML='<img src="'+_kmPhotoData+'" style="width:100%;border-radius:10px;">';}
+  var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='none';
+  var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='';
+  stopKmCamera();
+}
+function retakeKmPhoto(){
+  _kmPhotoData=null;
+  var vid=document.getElementById('km-video');if(vid)vid.style.display='';
+  var prev=document.getElementById('km-photo-preview');if(prev){prev.style.display='none';prev.innerHTML='';}
+  var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='';
+  var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='none';
+  startKmCamera();
+}
+async function saveKmEntry(){
+  if(!_kmPhotoData){alert('📸 Odometer photo is required! Please capture the photo first.');return;}
+  var kmVal=parseFloat(document.getElementById('km-reading')?.value);
+  if(isNaN(kmVal)||kmVal<0){alert('⚠️ Please enter the odometer reading (KM number shown on the meter).');return;}
+  if(_kmPrevMax!==null&&kmVal<_kmPrevMax){alert('⚠️ Reading ('+kmVal+') cannot be LESS than today\'s previous reading ('+_kmPrevMax+').\n\nPlease check the meter and enter the correct number.');return;}
+  var btn=document.getElementById('km-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  var engId=currentUser.eng_id||currentUser.user_id;
+  var now=new Date();
+  var photoUrl;
+  try{photoUrl=await uploadCrmPhoto(_kmPhotoData,'km_'+String(engId).replace(/[^A-Za-z0-9_-]/g,'')+'_'+Date.now()+'.jpg');}
+  catch(e){photoUrl=_kmPhotoData;}
+  var row={
+    eng_id:engId,eng_name:currentUser.name,
+    log_date:now.toLocaleDateString('en-CA'),
+    entry_type:_kmCapOpts.type,
+    ticket_id:_kmCapOpts.ticketId||null,
+    odometer_km:kmVal,photo_url:photoUrl,
+    lat:_kmLoc?_kmLoc.lat:null,lng:_kmLoc?_kmLoc.lng:null,gps_accuracy:_kmLoc?_kmLoc.accuracy:null,
+    captured_at:now.toISOString(),created_at:now.toISOString()
+  };
+  try{
+    await sb('km_logs','POST',row);
+    var cb=_kmCapOpts.onDone;
+    closeKmCapture();
+    if(cb)cb();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='💾 Save KM Entry';}
+    alert('❌ Could not save KM entry.\n\nIf the km_logs table is missing, run this SQL in Supabase:\n\n'+KM_SETUP_SQL+'\n\nError: '+e.message);
+  }
+}
+
+// ── KM REPORT PAGE ──
+async function renderKmReport(){
+  var pc=document.getElementById('page-content');
+  var today=new Date().toLocaleDateString('en-CA');
+  var isEng=currentUser.role==='engineer';
+  if(!isEng&&(!allEngineers||!allEngineers.length)){try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}}
+  var engOpts='<option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+e.name+'</option>';}).join('');
+  pc.innerHTML='<div class="card">'
+    +'<div class="section-header"><h2>🛣️ KM Tracking</h2></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
+    +(isEng?'':'<div class="form-group" style="margin-bottom:0;"><label>Engineer</label><select id="kmr-eng" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;min-width:160px;">'+engOpts+'</select></div>')
+    +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="kmr-from" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" id="kmr-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="loadKmReport()" style="height:36px;">🔍 Load</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="kmrQuick(\'today\')" style="height:36px;">Today</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="kmrQuick(\'week\')" style="height:36px;">This Week</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="kmrQuick(\'month\')" style="height:36px;">This Month</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadKmReport()" style="height:36px;">⬇️ Excel</button>'
+    +'</div>'
+    +'<div id="kmr-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>'
+    +'<div id="kmr-body"></div>'
+    +'</div>';
+  loadKmReport();
+}
+function kmrQuick(type){
+  var today=new Date();
+  var from,to=today.toLocaleDateString('en-CA');
+  if(type==='today')from=to;
+  else if(type==='week'){var d=new Date(today);d.setDate(today.getDate()-today.getDay()+1);from=d.toLocaleDateString('en-CA');}
+  else from=to.substring(0,8)+'01';
+  var fi=document.getElementById('kmr-from');var ti=document.getElementById('kmr-to');
+  if(fi)fi.value=from;if(ti)ti.value=to;
+  loadKmReport();
+}
+window._kmrRows=[];
+async function loadKmReport(){
+  var body=document.getElementById('kmr-body');
+  var summaryEl=document.getElementById('kmr-summary');
+  if(!body)return;
+  var from=document.getElementById('kmr-from')?.value||'';
+  var to=document.getElementById('kmr-to')?.value||'';
+  if(!from||!to){body.innerHTML='';return;}
+  body.innerHTML='<div class="loading">Loading...</div>';
+  var isEng=currentUser.role==='engineer';
+  var engFilter=isEng?(currentUser.eng_id||currentUser.user_id):(document.getElementById('kmr-eng')?.value||'');
+  try{
+    var q='?log_date=gte.'+from+'&log_date=lte.'+to+(engFilter?'&eng_id=eq.'+encodeURIComponent(engFilter):'')+'&order=eng_id.asc,captured_at.asc';
+    var logs=await sbAll('km_logs',q);
+    if(!logs||!logs.length){
+      body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-muted);">No KM entries in this period</div>';
+      if(summaryEl)summaryEl.innerHTML='';
+      window._kmrRows=[];
+      return;
+    }
+    var typeLabel={opening:'🏢 Day Start (Opening)',arrival:'📍 Reached Customer',closing:'🏁 Day End (Closing)'};
+    // Group by engineer + date
+    var groups={};
+    logs.forEach(function(l){
+      var k=l.eng_id+'|'+l.log_date;
+      if(!groups[k])groups[k]={eng_id:l.eng_id,eng_name:l.eng_name||l.eng_id,date:l.log_date,entries:[]};
+      groups[k].entries.push(l);
+    });
+    var grandKm=0,dayCount=0,html='',excelRows=[];
+    Object.keys(groups).sort().forEach(function(k){
+      var g=groups[k];dayCount++;
+      var opening=null,closing=null,prev=null,dayKm=0,rowsHtml='';
+      g.entries.forEach(function(l){
+        var kmN=parseFloat(l.odometer_km);
+        if(l.entry_type==='opening'&&opening===null&&!isNaN(kmN))opening=kmN;
+        if(l.entry_type==='closing'&&!isNaN(kmN))closing=kmN;
+        var seg='';
+        if(prev!==null&&!isNaN(kmN)&&kmN>=prev){seg=(kmN-prev);dayKm+=seg;}
+        var tm=l.captured_at?new Date(l.captured_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
+        var ticketCell=l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>':'—';
+        var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
+        var gpsCell=(l.lat&&l.lng)?'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>':'—';
+        rowsHtml+='<tr><td>'+tm+'</td><td>'+(typeLabel[l.entry_type]||l.entry_type)+'</td><td>'+ticketCell+'</td>'
+          +'<td style="text-align:right;font-weight:700;">'+(isNaN(kmN)?'—':kmN)+'</td>'
+          +'<td style="text-align:right;font-weight:700;color:#0d9488;">'+(seg===''?'—':('+'+seg+' km'))+'</td>'
+          +'<td style="text-align:center;">'+photoCell+'</td><td style="text-align:center;">'+gpsCell+'</td></tr>';
+        excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
+        if(!isNaN(kmN))prev=kmN;
+      });
+      var totalKm=(opening!==null&&closing!==null&&closing>=opening)?(closing-opening):dayKm;
+      grandKm+=totalKm;
+      var dLabel=new Date(g.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
+      html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">'
+        +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">'
+        +'<div style="font-weight:800;font-size:14px;">👷 '+escHtml(g.eng_name)+' <span style="color:var(--text-muted);font-weight:600;font-size:12px;">— '+dLabel+'</span></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:700;">'
+        +'<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:4px 10px;">Opening: '+(opening!==null?opening:'—')+'</span>'
+        +'<span style="background:#fef3c7;color:#92400e;border-radius:8px;padding:4px 10px;">Closing: '+(closing!==null?closing:'—')+'</span>'
+        +'<span style="background:#f0fdf4;color:#15803d;border-radius:8px;padding:4px 10px;">Total: '+totalKm+' km</span>'
+        +'</div></div>'
+        +'<div class="table-wrap"><table><thead><tr><th>Time</th><th>Point</th><th>Call</th><th style="text-align:right;">Odometer</th><th style="text-align:right;">Travel</th><th style="text-align:center;">Photo</th><th style="text-align:center;">GPS</th></tr></thead>'
+        +'<tbody>'+rowsHtml+'</tbody></table></div>'
+        +'</div>';
+    });
+    if(summaryEl)summaryEl.innerHTML=
+      '<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">🛣️ Total KM</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+grandKm+' km</div></div>'
+      +'<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">📅 Days</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+dayCount+'</div></div>'
+      +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">📸 Entries</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+logs.length+'</div></div>';
+    window._kmrRows=excelRows;
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML='<div class="alert alert-danger">Error: '+e.message+'<br><br>If the km_logs table is missing, run this SQL in Supabase:<br><pre style="white-space:pre-wrap;font-size:11px;background:#f8fafc;padding:8px;border-radius:6px;">'+KM_SETUP_SQL+'</pre></div>';
+  }
+}
+function downloadKmReport(){
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
+  var rows=window._kmrRows||[];
+  if(!rows.length){alert('No data to download — load the report first.');return;}
+  var ws=XLSX.utils.json_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'KM Report');
+  XLSX.writeFile(wb,'KM_Report_'+(document.getElementById('kmr-from')?.value||'')+'_to_'+(document.getElementById('kmr-to')?.value||'')+'.xlsx');
+}
+
+// ── CALL PHOTOS VIEWER (Job Sheet + KM photos per call) ──
+async function viewCallPhotos(id){
+  if(!id){alert('No ticket selected');return;}
+  var t={};
+  try{t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=id,cname,jobsheet_photo'))[0]||{};}catch(e){}
+  var kms=[];
+  try{kms=await sb('km_logs','GET',null,'?ticket_id=eq.'+encodeURIComponent(id)+'&order=captured_at.asc');}catch(e){}
+  var typeLabel={opening:'🏢 Opening',arrival:'📍 Arrival at Customer',closing:'🏁 Closing'};
+  var jsHtml=t.jobsheet_photo
+    ?'<img src="'+t.jobsheet_photo+'" style="max-width:150px;max-height:150px;border-radius:10px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(t.jobsheet_photo)+'\')">'
+    :'<div style="color:#b45309;font-size:13px;">No job sheet photo attached yet</div>';
+  var kmHtml=kms.length?kms.map(function(l){
+    var tm=l.captured_at?new Date(l.captured_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    return '<div style="display:flex;gap:10px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;">'
+      +(l.photo_url?'<img src="'+l.photo_url+'" style="width:70px;height:52px;object-fit:cover;border-radius:8px;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">':'<div style="width:70px;height:52px;background:#f1f5f9;border-radius:8px;"></div>')
+      +'<div style="flex:1;font-size:12px;"><b>'+(typeLabel[l.entry_type]||l.entry_type)+'</b><br>🕐 '+tm+' &nbsp; 🛣️ '+(l.odometer_km!=null?l.odometer_km+' km':'—')
+      +((l.lat&&l.lng)?' &nbsp; <a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank">📍 Map</a>':'')+'</div>'
+      +'</div>';
+  }).join(''):'<div style="color:var(--text-muted);font-size:13px;">No KM photos for this call</div>';
+  var existing=document.getElementById('modal-call-photos');if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='modal-call-photos';m.className='modal-overlay';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">'
+    +'<div class="modal-header"><div><h2>📷 Call Photos</h2><div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+escHtml(id)+(t.cname?' — '+escHtml(t.cname):'')+'</div></div>'
+    +'<button class="close-btn" onclick="document.getElementById(\'modal-call-photos\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 18px;">'
+    +'<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;">📄 Job Sheet Photo</h3>'+jsHtml
+    +'<hr class="divider">'
+    +'<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;">🛣️ KM / Odometer Photos</h3>'+kmHtml
+    +'</div></div>';
+  document.body.appendChild(m);
+}
+
+// ── JOB SHEET PHOTO PICK (camera OR gallery, compressed before save) ──
+function onJsPhotoPick(input){
+  var file=input.files&&input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var maxW=1400;var scale=Math.min(1,maxW/img.width);
+      var canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      window._jsPhotoData=canvas.toDataURL('image/jpeg',0.72);
+      var prev=document.getElementById('js-photo-preview');
+      if(prev)prev.innerHTML='<img src="'+window._jsPhotoData+'" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;"> <span style="color:#15803d;font-size:12px;font-weight:700;">✅ Ready — will be saved with this update</span>';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════════ PAYMENT QR (quick access for Eng / WC / Admin) ═══════════════
+function paymentDetailsText(){
+  var p=BHAVI_PAYMENT;
+  return 'BHAVI ELECTRONICS — Payment Details\n'
+    +'🏦 Bank: '+p.bank+'\n'
+    +'🔢 A/C No: '+p.account+' ('+p.type+')\n'
+    +'🏢 Branch: '+p.branch+'\n'
+    +'🔑 IFSC: '+p.ifsc+'\n'
+    +'🧾 GSTIN: '+p.gstin+'\n'
+    +'🆔 PAN: '+p.pan;
+}
+async function showPaymentQR(){
+  var existing=document.getElementById('modal-payment-qr');if(existing)existing.remove();
+  if(!window._upiQrUrl){try{await loadUpiQrUrl();}catch(e){}}
+  var url=window._upiQrUrl||'';
+  var p=BHAVI_PAYMENT;
+  var isAdmin=!!window._appIsAdmin;
+  var qrBlock=url
+    ?'<div style="display:flex;justify-content:center;margin-bottom:10px;"><img src="'+url+'?t='+Date.now()+'" style="width:230px;height:230px;object-fit:contain;border-radius:12px;border:2px solid #bfdbfe;background:#fff;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(url)+'\')"></div>'
+    +'<div style="text-align:center;font-size:12px;color:#64748b;margin-bottom:10px;">Customer can scan & pay via any UPI app (GPay / PhonePe / Paytm / BHIM)</div>'
+    :'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center;font-size:13px;color:#92400e;margin-bottom:10px;">⚠️ Payment QR is not uploaded yet.'+(isAdmin?' Upload it below.':' Ask Admin to upload it.')+'</div>';
+  var detailRows=[['Name','BHAVI ELECTRONICS'],['Bank',p.bank],['A/C No',p.account],['Type',p.type],['Branch',p.branch],['IFSC',p.ifsc],['GSTIN',p.gstin],['PAN',p.pan]]
+    .map(function(r){return '<tr><td style="padding:4px 8px;color:#64748b;font-size:12px;white-space:nowrap;">'+r[0]+'</td><td style="padding:4px 8px;font-size:12px;font-weight:700;word-break:break-all;">'+r[1]+'</td></tr>';}).join('');
+  var m=document.createElement('div');
+  m.id='modal-payment-qr';m.className='modal-overlay';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div class="modal-header"><h2>💳 Payment QR — Bhavi Electronics</h2>'
+    +'<button class="close-btn" onclick="document.getElementById(\'modal-payment-qr\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 18px;">'
+    +qrBlock
+    +'<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;">'
+    +(url?'<button class="btn btn-primary btn-sm" onclick="sharePaymentQR()">📤 Share</button>':'')
+    +'<button class="btn btn-outline btn-sm" onclick="copyPaymentDetails()">📋 Copy Details</button>'
+    +(url?'<button class="btn btn-outline btn-sm" onclick="downloadPaymentQR()">⬇️ Download QR</button>':'')
+    +'</div>'
+    +'<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:6px;margin-bottom:10px;"><table style="width:100%;">'+detailRows+'</table></div>'
+    +(isAdmin?'<div style="border-top:1px dashed var(--border);padding-top:10px;font-size:12px;"><b>'+(url?'Change':'Upload')+' QR (Admin):</b> <input type="file" accept="image/*" onchange="uploadUpiQr(this)" style="font-size:12px;"><div id="upi-qr-status" style="margin-top:6px;"></div></div>':'')
+    +'</div></div>';
+  document.body.appendChild(m);
+}
+async function sharePaymentQR(){
+  var url=window._upiQrUrl||'';
+  var text=paymentDetailsText();
+  // Best: share the QR image itself (works on mobile → WhatsApp etc.)
+  try{
+    if(url&&navigator.canShare){
+      var blob=await (await fetch(url)).blob();
+      var file=new File([blob],'Bhavi_Payment_QR.png',{type:blob.type||'image/png'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:'Bhavi Electronics — Payment',text:text});
+        return;
+      }
+    }
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  // Fallback: text share
+  try{
+    if(navigator.share){await navigator.share({title:'Bhavi Electronics — Payment',text:text+(url?'\n\nQR: '+url:'')});return;}
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  // Last resort: WhatsApp
+  window.open('https://wa.me/?text='+encodeURIComponent(text+(url?'\n\nQR: '+url:'')),'_blank');
+}
+function copyPaymentDetails(){
+  var text=paymentDetailsText();
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){alert('✅ Payment details copied!');}).catch(function(){prompt('Copy the details:',text);});
+  }else prompt('Copy the details:',text);
+}
+async function downloadPaymentQR(){
+  var url=window._upiQrUrl;if(!url)return;
+  try{
+    var blob=await (await fetch(url)).blob();
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Bhavi_Payment_QR.png';
+    document.body.appendChild(a);a.click();a.remove();
+  }catch(e){window.open(url,'_blank');}
 }
 
 // ---- Attendance Add (Admin manual backfill — e.g. app/GPS issue prevented a real punch in/out) ----
