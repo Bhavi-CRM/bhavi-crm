@@ -391,6 +391,16 @@ tr:hover td{background:#f8fafc;}
   <div class="modal modal-lg" onclick="event.stopPropagation()">
     <div class="modal-header"><h2 id="modal-call-title">New Call Log</h2><button class="close-btn" onclick="closeModal('modal-call')">✕</button></div>
     <div class="modal-body">
+      <!-- AI Jobsheet Scan -->
+      <div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border:1px solid #c7d2fe;border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div><div style="font-weight:700;font-size:13px;color:#4338ca;">🤖 Auto-fill from Jobsheet Screenshot</div>
+          <div style="font-size:11px;color:#6366f1;margin-top:2px;">Canon jobsheet no screenshot(s) attach karo — AI badhi field vanchi ne bhari dese. Pachhi review kari ne Save karo.</div></div>
+          <input type="file" id="js-scan-input" accept="image/*" multiple style="display:none;" onchange="scanJobsheetFiles(this)">
+          <button class="btn btn-primary btn-sm" type="button" onclick="document.getElementById('js-scan-input').click()" style="white-space:nowrap;">📷 Scan Jobsheet</button>
+        </div>
+        <div id="js-scan-status" style="font-size:12px;margin-top:8px;"></div>
+      </div>
       <!-- Customer Search - Point 9 -->
       <div class="alert alert-info" style="margin-bottom:14px;">
         <b>Customer Search</b> — Mobile No, Name, or Serial No to search
@@ -25012,6 +25022,117 @@ async function deleteMSCCenter(id){
 // ===== END MSC WORKFLOW =====
 
 // ===== END SALES MODULE =====
+
+// ===== AI JOBSHEET SCAN (auto-fill New Call from screenshot) =====
+const JOBSHEET_SCAN_URL = SB_URL + '/functions/v1/jobsheet-scan';
+
+// Read + downscale an image file to a JPEG data URL (keeps upload small & fast).
+function _jsScanReadFile(file){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var maxW=1600,scale=Math.min(1,maxW/img.width);
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.85));
+      };
+      img.onerror=reject;img.src=e.target.result;
+    };
+    reader.onerror=reject;reader.readAsDataURL(file);
+  });
+}
+async function scanJobsheetFiles(input){
+  var files=input.files;
+  var st=document.getElementById('js-scan-status');
+  if(!files||!files.length)return;
+  if(st)st.innerHTML='<span style="color:#4338ca;font-weight:700;">🤖 Screenshot vanchai rahyu chhe... (thodi var lagse)</span>';
+  try{
+    var imgs=[];
+    for(var i=0;i<files.length&&i<4;i++){imgs.push(await _jsScanReadFile(files[i]));}
+    var resp=await fetch(JOBSHEET_SCAN_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({images:imgs})
+    });
+    var data=await resp.json();
+    if(data.error)throw new Error(data.error);
+    var f=data.fields||{};
+    var filled=applyJobsheetFields(f);
+    if(st)st.innerHTML='<span style="color:#15803d;font-weight:700;">✅ '+filled+' field bharai gaya</span> <span style="color:#64748b;">— niche badhu review kari ne, Model/Problem check kari ne Save karo.</span>';
+  }catch(e){
+    if(st)st.innerHTML='<span style="color:#dc2626;font-weight:700;">⚠️ Vanchi na shakayu:</span> <span style="color:#64748b;">'+(e.message||e)+'</span><br><span style="font-size:11px;color:#94a3b8;">Jo "jobsheet-scan" function deploy na thayu hoy to niche na steps juo, athva fields jate bharo.</span>';
+  }finally{
+    input.value=''; // allow re-selecting the same file
+  }
+}
+// Fill the New Call form from the extracted fields; returns how many were set.
+function applyJobsheetFields(f){
+  var count=0;
+  function setText(id,val){var el=document.getElementById(id);if(el&&val){el.value=val;el.style.background='#fef9c3';count++;}}
+  var mob=(f.mobile||'').replace(/\D/g,'').slice(-10);
+  var alt=(f.alt_mobile||'').replace(/\D/g,'').slice(-10);
+  setText('call-cname',f.caller_name);
+  setText('call-mobile',mob);
+  setText('call-alt',alt);
+  setText('call-serial',f.serial_no);
+  setText('call-se-id',f.jobsheet_no);
+  // Address: combine street; keep locality out (goes to Area)
+  setText('call-address',f.address);
+  setText('call-model',f.model);
+  if(f.model){try{applyModelServiceFields();}catch(e){}}
+  setText('call-problem',f.problem);
+  var emailEl=document.getElementById('call-email');if(emailEl&&f.email){emailEl.value=f.email;count++;}
+  // Brand — match dropdown option by name
+  if(f.brand){
+    var bd=document.getElementById('call-brand-input');
+    if(bd&&bd.tagName==='SELECT'){
+      var bo=Array.prototype.slice.call(bd.options).find(function(o){return o.text.toLowerCase()===String(f.brand).toLowerCase();});
+      if(bo){bd.value=bo.value;try{selectBrandFromDrop(bo.value,bo.text);}catch(e){}count++;}
+    }
+  }
+  // Call type — default Warranty for Canon CSP jobsheets
+  var ct=f.call_type||(String(f.jobsheet_no||'').toUpperCase().indexOf('CSP')!==-1?'Warranty':'');
+  if(ct){var cte=document.getElementById('call-type');if(cte){cte.value=ct;try{handleCallTypeChange();}catch(e){}count++;}}
+  // Call Logged Date → Canon Received Date & Time → TAT auto-counts (+24h)
+  var recvRaw=String(f.logged_date_iso||'').trim().replace(' ','T');
+  if(recvRaw){
+    if(recvRaw.length===10)recvRaw+='T00:00';
+    recvRaw=recvRaw.slice(0,16);
+    var rEl=document.getElementById('call-canon-recv');
+    if(rEl){rEl.value=recvRaw;rEl.style.background='#fef9c3';try{autoCalcCallTAT();}catch(e){}count++;}
+  }
+  // Location: state → city → pin (order matters; city/state resets pin)
+  aiFillLocation(f.state,f.city,f.pin_code,f.locality);
+  if(f.pin_code)count++;
+  return count;
+}
+function aiFillLocation(state,city,pin,area){
+  var stateEl=document.getElementById('call-state');
+  if(stateEl&&state){
+    var so=Array.prototype.slice.call(stateEl.options).find(function(o){return o.value.toLowerCase()===String(state).toLowerCase();});
+    if(so){stateEl.value=so.value;stateEl.style.background='#fef9c3';try{onStateChange();}catch(e){}}
+  }
+  var cityEl=document.getElementById('call-city');
+  if(cityEl&&city){
+    var co=Array.prototype.slice.call(cityEl.options).find(function(o){return o.value.toLowerCase()===String(city).toLowerCase();});
+    if(co){cityEl.value=co.value;cityEl.style.background='#fef9c3';try{onCityChange();}catch(e){}}
+  }
+  // Pin + Area last (onStateChange/onCityChange clear the pin field)
+  if(pin){
+    var pinEl=document.getElementById('call-pin');
+    if(pinEl){pinEl.value=pin;pinEl.dataset.pin=pin;pinEl.style.background='#fef9c3';}
+    // Look up the area name for this pincode; fall back to the OCR'd locality.
+    sb('pincodes','GET',null,'?pincode=eq.'+encodeURIComponent(pin)+'&select=area&limit=1').then(function(rows){
+      var a=document.getElementById('call-area');
+      if(a)a.value=(rows&&rows.length&&rows[0].area)||area||'';
+    }).catch(function(){var a=document.getElementById('call-area');if(a&&area)a.value=area;});
+  }else if(area){
+    var a2=document.getElementById('call-area');if(a2)a2.value=area;
+  }
+}
 
 // ===== AI REMARK ASSISTANT =====
 const AI_ASSIST_URL = SB_URL + '/functions/v1/ai-assist';
