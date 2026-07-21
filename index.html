@@ -463,6 +463,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Name <span class="req">*</span></label><input type="text" id="call-cname"></div>
         <div class="form-group"><label>Mobile <span class="req">*</span></label><input type="tel" id="call-mobile" oninput="debounceCallMobile(this.value)" maxlength="10" inputmode="numeric"><div id="call-cust-hint" style="font-size:11px;margin-top:4px;display:none;"></div></div>
         <div class="form-group"><label>Alternate</label><input type="tel" id="call-alt"></div>
+        <div class="form-group form-full"><label>Email</label><input type="email" id="call-email" placeholder="customer@email.com (optional)"></div>
         <div class="form-group form-full"><label>Address Line 1 <span class="req">*</span></label><input type="text" id="call-address" placeholder="House No, Street, Building..."></div>
         <div class="form-group form-full"><label>Address Line 2</label><input type="text" id="call-address2" placeholder="Society, Landmark, Colony..."></div>
         <div class="form-group">
@@ -5108,7 +5109,7 @@ async function openNewCall(){
     await loadMasterData();
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
-  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date','call-canon-recv'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-email','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date','call-canon-recv'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   var _tp=document.getElementById('call-tat-preview');if(_tp){_tp.style.display='none';_tp.textContent='';}
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
@@ -5142,7 +5143,29 @@ async function openNewCall(){
   document.getElementById('search-customer-q').value='';
   window._fromWalkInId=null;
   var oldBanner=document.getElementById('wi-source-banner');if(oldBanner)oldBanner.remove();
+  // WC002 (CSP Work Controller): default Brand = Canon and Sub-Category = CSP
+  // so calls land under the CSP report. Fully changeable by the user.
+  applyCallDefaultsForWC();
   openModal('modal-call');
+}
+// Pre-select Brand=Canon + Sub-Category=CSP for the CSP work controller (WC002).
+function applyCallDefaultsForWC(){
+  try{
+    var uid=(currentUser&&(currentUser.user_id||currentUser.eng_id))||'';
+    if(uid!=='WC002')return;
+    var brandDrop=document.getElementById('call-brand-input');
+    if(!brandDrop||brandDrop.tagName!=='SELECT')return;
+    var canon=Array.prototype.slice.call(brandDrop.options).find(function(o){return o.text.trim().toLowerCase()==='canon';});
+    if(canon){
+      brandDrop.value=canon.value;
+      selectBrandFromDrop(canon.value,canon.text); // populates sub-categories for Canon
+      var subDrop=document.getElementById('call-subcat-input');
+      if(subDrop){
+        var csp=Array.prototype.slice.call(subDrop.options).find(function(o){return o.text.trim().toUpperCase()==='CSP';});
+        if(csp){subDrop.value=csp.value;selectSubcatFromDrop(csp.value);}
+      }
+    }
+  }catch(e){console.log('WC default error:',e);}
 }
 
 // Engineer creates a new call from site — auto-assigns to self
@@ -5444,7 +5467,7 @@ async function saveCall(){
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
-    alt_mobile:document.getElementById('call-alt').value,address:(function(){var l1=(document.getElementById('call-address').value||'').trim();var l2=((document.getElementById('call-address2')||{}).value||'').trim();return l1+(l2?', '+l2:'');}()),
+    alt_mobile:document.getElementById('call-alt').value,email:document.getElementById('call-email')?.value||'',address:(function(){var l1=(document.getElementById('call-address').value||'').trim();var l2=((document.getElementById('call-address2')||{}).value||'').trim();return l1+(l2?', '+l2:'');}()),
     city:document.getElementById('call-city')?.value||'',pin:(function(){var pe=document.getElementById('call-pin');if(!pe)return'';if(pe.dataset.pin)return pe.dataset.pin;var m=(pe.value||'').match(/\d{5,6}/);return m?m[0]:pe.value||'';}()),state:document.getElementById('call-state')?.value||'',
     area:document.getElementById('call-area').value,problem:document.getElementById('call-problem').value,
     description:document.getElementById('call-desc').value,condition:document.getElementById('call-condition').value,
@@ -5481,8 +5504,14 @@ async function saveCall(){
       await sb('tickets','PATCH',{remarks:data.remarks,updated_at:data.updated_at},`?id=eq.${editingCallId}`);
     }else{
       const id=await generateTicketNo();data.id=id;data.job_sheet=id;
-      await sb('tickets','POST',data);
-      try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
+      try{
+        await sb('tickets','POST',data);
+      }catch(pe){
+        // email column not added yet — don't block call creation; retry without it.
+        if(data.email&&String(pe&&pe.message).indexOf('email')!==-1){delete data.email;await sb('tickets','POST',data);}
+        else throw pe;
+      }
+      try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,email:data.email||'',address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
       tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
       if(engId)tgNotifyEngineer(engId,'🎫 <b>New Ticket Assigned to You</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—'));
