@@ -4341,7 +4341,10 @@ function doPunchOut(){
   // (skipped automatically if Reached Office already captured it, or no travel happened today)
   if(currentUser.role==='engineer'){
     kmTodayLogs().then(function(logs){
-      var needClosing=logs&&logs.some(function(l){return l.entry_type==='opening';})&&!logs.some(function(l){return l.entry_type==='closing';});
+      // Need a closing if the day has an opening AND the latest KM entry is not
+      // already a closing (covers direct-home after an afternoon trip too).
+      var last=logs&&logs.length?logs[logs.length-1]:null;
+      var needClosing=logs&&logs.some(function(l){return l.entry_type==='opening';})&&last&&last.entry_type!=='closing';
       if(needClosing){openKmCapture({type:'closing',ticketId:null,onDone:function(){showPunchOutModal(ps,key);}});}
       else showPunchOutModal(ps,key);
     }).catch(function(){showPunchOutModal(ps,key);});
@@ -17541,11 +17544,14 @@ async function reachedOffice(logId){
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
   const engId=currentUser.eng_id||currentUser.user_id;
-  // KM TRACKING — Closing KM odometer photo when reaching office at day end
+  // KM TRACKING — Closing KM odometer photo when reaching office.
+  // Captured every time the engineer returns to office with un-closed travel
+  // since the last closing (so morning trip AND afternoon trip each get a
+  // closing). Skipped if the most recent KM entry is already a closing.
   if(currentUser.role==='engineer'){
     try{
-      var _kmL=await kmTodayLogs();
-      if(_kmL!==null&&_kmL.length&&!_kmL.some(function(l){return l.entry_type==='closing';})){
+      var _kmL=await kmTodayLogs(); // order=captured_at.asc → last item is most recent
+      if(_kmL!==null&&_kmL.length&&_kmL[_kmL.length-1].entry_type!=='closing'){
         openKmCapture({type:'closing',ticketId:null,onDone:function(){reachedOffice(logId);}});
         return;
       }
@@ -22863,7 +22869,7 @@ async function kmTodayLogs(){
   catch(e){console.log('km_logs not available:',e&&e.message);return null;}
 }
 
-var _kmCamStream=null,_kmCapOpts=null,_kmPhotoData=null,_kmLoc=null,_kmPrevMax=null;
+var _kmCamStream=null,_kmCapOpts=null,_kmPhotoData=null,_kmLoc=null,_kmPrevMax=null,_kmRefMax=null;
 function stopKmCamera(){if(_kmCamStream){_kmCamStream.getTracks().forEach(function(t){t.stop();});_kmCamStream=null;}}
 async function startKmCamera(){
   stopKmCamera();
@@ -22881,7 +22887,7 @@ async function startKmCamera(){
 }
 function closeKmCapture(){stopKmCamera();var m=document.getElementById('modal-km-capture');if(m)m.remove();}
 function openKmCapture(opts){
-  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmOcrValue=null;
+  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmRefMax=null;_kmOcrValue=null;
   loadTesseractLib().catch(function(){}); // warm up OCR lib while engineer frames the shot
   var titles={opening:'🏢 Opening KM — Day Start',arrival:'📍 Arrival KM — Reached Customer',closing:'🏁 Closing KM — Day End'};
   var title=titles[opts.type]||'Odometer KM';
@@ -22898,7 +22904,7 @@ function openKmCapture(opts){
     +'<div style="position:relative;">'
     +'<video id="km-video" autoplay playsinline muted style="width:100%;border-radius:10px;background:#000;aspect-ratio:4/3;object-fit:cover;display:block;"></video>'
     +'<div id="km-guide-box" style="position:absolute;left:15%;right:15%;top:35%;bottom:35%;border:2.5px dashed #fbbf24;border-radius:8px;pointer-events:none;"></div>'
-    +'<div id="km-guide-text" style="position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 3px #000;pointer-events:none;">Meter na numbers ne pila box ma rakho</div>'
+    +'<div id="km-guide-text" style="position:absolute;left:0;right:0;bottom:6px;text-align:center;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 3px #000;pointer-events:none;">Meter na mota numbers box ma rakho (chhello tenths digit chhodi do)</div>'
     +'</div>'
     +'<div id="km-photo-preview" style="display:none;"></div>'
     +'<div style="display:flex;gap:8px;margin:10px 0;">'
@@ -22928,6 +22934,21 @@ function openKmCapture(opts){
     _kmPrevMax=max;
     if(max!==null){var inp=document.getElementById('km-reading');if(inp)inp.placeholder='Last reading today: '+max;}
   });
+  // Engineer's highest reading ever (odometer only goes up) — used to
+  // disambiguate the OCR read on the day's first (Opening) photo, when there
+  // is no today-reading yet.
+  kmLastReadingEver().then(function(v){
+    _kmRefMax=v;
+    if(v!==null&&_kmPrevMax===null){var inp=document.getElementById('km-reading');if(inp&&!inp.placeholder.startsWith('Last reading'))inp.placeholder='Last recorded: '+v;}
+  });
+}
+async function kmLastReadingEver(){
+  var engId=currentUser.eng_id||currentUser.user_id;
+  try{
+    var r=await sb('km_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&odometer_km=not.is.null&order=odometer_km.desc&limit=1');
+    if(r&&r.length)return parseFloat(r[0].odometer_km);
+  }catch(e){}
+  return null;
 }
 function captureKmPhoto(){
   var vid=document.getElementById('km-video');if(!vid)return;
@@ -22982,47 +23003,86 @@ async function getKmOcrWorker(){
   if(_kmOcrWorker)return _kmOcrWorker;
   await loadTesseractLib();
   var w=await Tesseract.createWorker('eng');
-  await w.setParameters({tessedit_char_whitelist:'0123456789'});
+  // digits only, and treat the crop as a uniform block of text (handles the
+  // odometer's 1–2 digit rows) — much more reliable than the default mode.
+  await w.setParameters({tessedit_char_whitelist:'0123456789',tessedit_pageseg_mode:'6'});
   _kmOcrWorker=w;
   return w;
 }
 // Crop the guide-box region (center 70% x 30%) + upscale + grayscale/contrast —
 // big accuracy boost for odometer digits vs feeding the whole photo.
 function kmOcrPrepCanvas(srcCanvas){
+  // Crop the guide-box region (center 70% wide x 34% tall), upscale 3x, then
+  // Otsu-binarize and normalize polarity so the digits always come out solid
+  // black on white — the format Tesseract reads odometer digits most reliably,
+  // whether the meter is dark-on-light (mechanical) or light-on-dark (LCD).
   var sx=Math.round(srcCanvas.width*0.15),sw=Math.round(srcCanvas.width*0.70);
-  var sy=Math.round(srcCanvas.height*0.35),sh=Math.round(srcCanvas.height*0.30);
-  var scale=2;
+  var sy=Math.round(srcCanvas.height*0.33),sh=Math.round(srcCanvas.height*0.34);
+  var scale=3;
   var c=document.createElement('canvas');c.width=sw*scale;c.height=sh*scale;
   var ctx=c.getContext('2d');
   ctx.imageSmoothingEnabled=true;
   ctx.drawImage(srcCanvas,sx,sy,sw,sh,0,0,c.width,c.height);
   var img=ctx.getImageData(0,0,c.width,c.height);
-  var d=img.data,min=255,max=0;
-  for(var i=0;i<d.length;i+=4){
+  var d=img.data,n=d.length/4;
+  var gray=new Uint8Array(n),hist=new Array(256).fill(0);
+  for(var i=0,p=0;i<d.length;i+=4,p++){
     var g=Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-    d[i]=d[i+1]=d[i+2]=g;
-    if(g<min)min=g;if(g>max)max=g;
+    gray[p]=g;hist[g]++;
   }
-  var range=Math.max(1,max-min);
-  for(var j=0;j<d.length;j+=4){
-    var v=Math.round((d[j]-min)*255/range);
-    d[j]=d[j+1]=d[j+2]=v;
+  // Otsu's method — best threshold separating digits from background. When the
+  // histogram has a flat valley (equal variance across a range) we take the
+  // middle of that plateau, else the threshold hugs one edge and washes out.
+  var sum=0;for(var t=0;t<256;t++)sum+=t*hist[t];
+  var sumB=0,wB=0,maxVar=-1,thrLow=127,thrHigh=127;
+  for(var u=0;u<256;u++){
+    wB+=hist[u];if(wB===0)continue;
+    var wF=n-wB;if(wF===0)break;
+    sumB+=u*hist[u];
+    var mB=sumB/wB,mF=(sum-sumB)/wF;
+    var vB=wB*wF*(mB-mF)*(mB-mF);
+    if(vB>maxVar){maxVar=vB;thrLow=thrHigh=u;}
+    else if(vB>=maxVar){thrHigh=u;}
+  }
+  var thr=Math.round((thrLow+thrHigh)/2);
+  // Digits are the minority ink. If dark pixels are the minority they're the
+  // digits (keep); otherwise the light pixels are the digits (invert).
+  var darkCount=0;for(var q=0;q<n;q++)if(gray[q]<thr)darkCount++;
+  var darkIsDigit=darkCount<=n/2;
+  for(var k=0,r=0;k<d.length;k+=4,r++){
+    var isDark=gray[r]<thr;
+    var digit=darkIsDigit?isDark:!isDark;
+    var val=digit?0:255;
+    d[k]=d[k+1]=d[k+2]=val;
   }
   ctx.putImageData(img,0,0);
   return c;
 }
-function pickKmCandidate(text,prevMax){
-  var runs=(String(text||'').match(/\d{3,7}/g)||[]);
+function pickKmCandidate(text,ref){
+  var runs=(String(text||'').match(/\d{3,8}/g)||[]);
   if(!runs.length)return null;
-  var nums=runs.map(Number);
-  // Prefer a number that continues today's series (>= last reading, within ~2000 km)
-  if(prevMax!==null&&prevMax!==undefined){
-    var ok=nums.filter(function(n){return n>=prevMax&&n<=prevMax+2000;});
-    if(ok.length)return Math.min.apply(null,ok);
+  // Bike odometers show a trailing TENTHS drum (0.1 km, often a coloured box) —
+  // the real km reading excludes it (e.g. "99223" + "4" tenths → 99223). We
+  // don't know if OCR captured that digit, so for every run consider BOTH the
+  // full number and the number with its last digit dropped, then pick whichever
+  // best continues the engineer's running odometer.
+  var cands=[];
+  runs.forEach(function(r){
+    cands.push(Number(r));
+    if(r.length>=5)cands.push(Number(r.slice(0,-1))); // drop tenths digit
+  });
+  if(ref!==null&&ref!==undefined){
+    // Closest reading at/above the last recorded odometer, within a day's range.
+    var inRange=cands.filter(function(n){return n>=ref&&n<=ref+5000;});
+    if(inRange.length)return Math.min.apply(null,inRange);
+    var above=cands.filter(function(n){return n>=ref;});
+    if(above.length)return Math.min.apply(null,above);
   }
-  // Otherwise the longest digit run (odometers are the longest number in frame)
+  // No reference (very first reading ever): take the longest run and drop its
+  // trailing tenths digit when it's a full 6+ digit meter reading.
   runs.sort(function(a,b){return b.length-a.length;});
-  return Number(runs[0]);
+  var longest=runs[0];
+  return Number(longest.length>=6?longest.slice(0,-1):longest);
 }
 async function runKmOcr(srcCanvas){
   var st=document.getElementById('km-ocr-status');
@@ -23032,7 +23092,8 @@ async function runKmOcr(srcCanvas){
     var worker=await getKmOcrWorker();
     var prep=kmOcrPrepCanvas(srcCanvas);
     var res=await worker.recognize(prep);
-    var val=pickKmCandidate(res&&res.data&&res.data.text,_kmPrevMax);
+    var _ocrRef=(_kmPrevMax!==null&&_kmPrevMax!==undefined)?_kmPrevMax:_kmRefMax;
+    var val=pickKmCandidate(res&&res.data&&res.data.text,_ocrRef);
     if(val===null){
       if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read fail — reading jate lakhi do.</span>';
       return;
@@ -23049,7 +23110,8 @@ async function saveKmEntry(){
   if(!_kmPhotoData){alert('📸 Odometer photo is required! Please capture the photo first.');return;}
   var kmVal=parseFloat(document.getElementById('km-reading')?.value);
   if(isNaN(kmVal)||kmVal<0){alert('⚠️ Please enter the odometer reading (KM number shown on the meter).');return;}
-  if(_kmPrevMax!==null&&kmVal<_kmPrevMax){alert('⚠️ Reading ('+kmVal+') cannot be LESS than today\'s previous reading ('+_kmPrevMax+').\n\nPlease check the meter and enter the correct number.');return;}
+  var _floorRef=(_kmPrevMax!==null&&_kmPrevMax!==undefined)?_kmPrevMax:_kmRefMax;
+  if(_floorRef!==null&&_floorRef!==undefined&&kmVal<_floorRef){alert('⚠️ Reading ('+kmVal+') cannot be LESS than the last recorded reading ('+_floorRef+').\n\nMeter check karo — chhello (tenths/decimal) digit ganvano nathi.');return;}
   var btn=document.getElementById('km-save-btn');
   if(btn){btn.disabled=true;btn.textContent='Saving...';}
   var engId=currentUser.eng_id||currentUser.user_id;
