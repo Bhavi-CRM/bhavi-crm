@@ -237,7 +237,8 @@ tr:hover td{background:#f8fafc;}
   #mobile-menu-btn{display:flex!important;z-index:10;position:relative;}
   #topbar-logo{display:flex!important;align-items:center;}
   #topbar-logo img{max-height:40px;max-width:110px;object-fit:contain;}
-  #wc-daily-btn,#btn-daily-report,#btn-weekly-report,#walkin-quick-btn,#btn-new-call,#auto-visit-btn{display:none!important;}
+  #wc-daily-btn,#btn-daily-report,#btn-weekly-report,#walkin-quick-btn,#btn-new-call{display:none!important;}
+  #auto-visit-btn{font-size:11px;padding:5px 7px;}
   #topbar-logo .tl-text{font-size:10px;font-weight:800;color:var(--primary);line-height:1.2;}
   #topbar h1{font-size:14px!important;}
   #topbar-user{display:none!important;}
@@ -2726,6 +2727,20 @@ async function doLogin(){
     currentUser=normalizeWCUser(user);
     if(loginRole==='engineer'&&currentUser.role!=='engineer'){showLoginError('Use Engineer tab');return;}
     if(loginRole==='admin'&&currentUser.role==='engineer'){showLoginError('Use Admin/WC tab');return;}
+    // LEAVE BLOCK — an engineer/WC with an APPROVED leave covering today cannot log in.
+    // Admins are never blocked (so they can always manage). Table-missing = no block.
+    if(currentUser.role!=='admin'||currentUser.role_type==='work_controller'){
+      try{
+        var _lvId=currentUser.eng_id||currentUser.user_id;
+        var _today=new Date().toLocaleDateString('en-CA');
+        var _lv=await sb('leave_requests','GET',null,'?eng_id=eq.'+encodeURIComponent(_lvId)+'&status=eq.approved&from_date=lte.'+_today+'&to_date=gte.'+_today+'&limit=1');
+        if(_lv&&_lv.length){
+          currentUser=null;
+          showLoginError('🌴 Aaje tame approved LEAVE par chho ('+(_lv[0].from_date)+' → '+(_lv[0].to_date)+'). Aa divase login nahi thay.');
+          return;
+        }
+      }catch(_le){console.log('leave check:',_le);}
+    }
     const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
     try{await sb('users','PATCH',{session_token:_stok},'?user_id=eq.'+encodeURIComponent(user.user_id));}catch(e){}
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
@@ -2743,6 +2758,7 @@ async function doLogin(){
     await loadMasterData();
     await loadLogoFromDB();
     await loadNavPerms();
+    await loadFieldRules();
     loadTGSettings();
     setupNav();
     await navigate(currentUser.role==='engineer'?'my-calls':'dashboard');
@@ -2966,8 +2982,8 @@ function setupNav(){
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
-      // ENG001 = CSP Manager (Yogesh Suthar): extra access
-      var isCspMgr=currentUser.user_id==='ENG001'||currentUser.eng_id==='ENG001';
+      // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
+      var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
       window._isCspMgr=isCspMgr;
       sv('nav-attendance',true);
       if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);sv('nav-amc',true);}
@@ -3105,6 +3121,38 @@ async function navigate(page){
   const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
+
+// ===== PUNCH-IN GATE (engineers must punch in first) =====
+async function engPunchedInToday(){
+  var today=new Date().toLocaleDateString('en-CA');
+  var ps=JSON.parse(localStorage.getItem('punch_'+currentUser.user_id)||'null');
+  if(ps&&ps.punched_in&&ps.punch_in_date===today)return true;
+  // Fresh login on another device: localStorage empty — confirm from Supabase.
+  try{
+    var engId=currentUser.eng_id||currentUser.user_id;
+    var r=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&punch_in_date=eq.'+today+'&status=eq.active&limit=1');
+    if(r&&r.length){
+      localStorage.setItem('punch_'+currentUser.user_id,JSON.stringify({punched_in:true,punch_in_time:r[0].punch_in_time,punch_in_date:r[0].punch_in_date,start_meter:r[0].start_meter||''}));
+      return true;
+    }
+  }catch(e){console.log('punch gate check:',e);}
+  return false;
+}
+function showEngPunchGate(){
+  if(document.getElementById('eng-punch-gate'))return;
+  var g=document.createElement('div');
+  g.id='eng-punch-gate';
+  g.style.cssText='position:fixed;inset:0;z-index:9000;background:linear-gradient(135deg,#0f172a,#1e293b);display:flex;align-items:center;justify-content:center;padding:20px;';
+  g.innerHTML='<div style="background:#fff;border-radius:16px;padding:30px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.45);">'
+    +'<div style="font-size:46px;margin-bottom:10px;">🔒</div>'
+    +'<h2 style="font-size:19px;font-weight:800;margin-bottom:8px;">Punch In Required</h2>'
+    +'<div style="font-size:13.5px;color:#64748b;margin-bottom:22px;line-height:1.6;">Punch In karo pachhi j CRM vaapri shakso.<br>Tamara calls, data ane attendance — badhu Punch In pachhi j dekhashe.</div>'
+    +'<button onclick="doPunchIn()" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:800;cursor:pointer;">▶ Punch In / Work Start</button>'
+    +'<button onclick="doLogout()" style="width:100%;background:none;color:#94a3b8;border:none;padding:12px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;">Logout</button>'
+    +'</div>';
+  document.body.appendChild(g);
+}
+function hideEngPunchGate(){var g=document.getElementById('eng-punch-gate');if(g)g.remove();}
 
 // STATUS SYSTEM
 const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery','Resolved By Phone'];
@@ -5042,12 +5090,14 @@ async function renderMyCalls(){
           <input type="text" id="my-calls-search" placeholder="🔍 Search ticket, customer, mobile, model, serial..." style="flex:1;min-width:200px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" oninput="filterMyCalls()">
           <select id="my-calls-status" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;" onchange="filterMyCalls()">
             <option value="active" selected>Active Only</option>
-            <option value="">All Status</option>
-            <option value="closed">Closed Only</option>
+            ${window._isCspMgr?'<option value="">All Status</option><option value="closed">Closed Only</option>':''}
           </select>
         </div>
         <div id="my-calls-tbody">${(()=>{
-            const sorted=[...tickets].sort((a,b)=>{
+            // Regular engineers see only their OPEN calls — closed call details are
+            // not available to them. CSP managers can still see everything.
+            const _listT=window._isCspMgr?tickets:tickets.filter(isTicketActive);
+            const sorted=[..._listT].sort((a,b)=>{
               const aOpen=isTicketActive(a);
               const bOpen=isTicketActive(b);
               if(aOpen!==bOpen) return aOpen?-1:1;
@@ -5722,6 +5772,12 @@ async function viewTicket(id,autoPrint=false){
     t=allTickets.find(x=>x.id===id);
   }
   if(!t)return;
+  // Regular engineers cannot view closed/cancelled call details — only their
+  // open calls. CSP managers and admin/WC are exempt.
+  if(currentUser&&currentUser.role==='engineer'&&!window._isCspMgr&&(isTicketClosed(t)||isTicketCancelled(t))){
+    alert('🔒 Closed call ni details engineer ne available nathi.\nFakt open (active) calls j joi shakay.');
+    return;
+  }
   const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   const spares=t.spares||[];const total=spares.reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
@@ -6577,12 +6633,18 @@ async function openEngUpdate(id){
     <div id="estimate-total-bar" style="display:none;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
     <hr class="divider">
     <div class="form-group" style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <label style="font-weight:700;color:#0369a1;font-size:13px;">📄 Job Sheet Photo <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:#64748b;">(required to Close the call — camera or gallery)</span></label>
-      <div id="js-photo-preview" style="margin:8px 0;">${t.jobsheet_photo?`<img src="${t.jobsheet_photo}" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull('${encodeURIComponent(t.jobsheet_photo)}')"> <span style="color:#15803d;font-size:12px;font-weight:700;">✅ Attached</span>`:`<span style="color:#b45309;font-size:12px;">No job sheet photo attached yet</span>`}</div>
-      <input type="file" id="js-photo-input" accept="image/*" onchange="onJsPhotoPick(this)" style="font-size:12px;">
+      <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo farjiyat (Close mate). Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
+      <div id="js-attach-slots" style="margin-top:8px;"></div>
+      <input type="file" id="js-cam-input" accept="image/*" capture="environment" style="display:none;" onchange="onJsPhotoPick(this)">
+      <input type="file" id="js-gal-input" accept="image/*" style="display:none;" onchange="onJsPhotoPick(this)">
     </div>
     <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
-  window._jsPhotoData=null;
+  // Preload existing photos: slot 0 = jobsheet (mandatory), slots 1-2 = extras.
+  window._jsPhotos=[t.jobsheet_photo?{url:t.jobsheet_photo,isNew:false}:null,null,null];
+  var _ex=t.attachments; if(typeof _ex==='string'){try{_ex=JSON.parse(_ex);}catch(e){_ex=[];}}
+  if(Array.isArray(_ex)){_ex.slice(0,2).forEach(function(u,i){if(u)window._jsPhotos[i+1]={url:u,isNew:false};});}
+  window._jsTargetSlot=0;
+  setTimeout(renderJsAttachSlots,0);
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -6828,9 +6890,11 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
-  // Action Taken mandatory always
+  // Action Taken — required unless admin made it optional (Field Rules).
   const workDone=(document.getElementById('upd-work')?.value||'').trim();
-  if(!workDone){alert('❌ Action Taken is required.\nPlease describe what was done.');document.getElementById('upd-work')?.focus();return;}
+  if(!workDone&&isFieldRequired('call_close','action_taken')){alert('❌ Action Taken is required.\nPlease describe what was done.');document.getElementById('upd-work')?.focus();return;}
+  // Fault Code — enforced only if admin marked it compulsory.
+  if(isFieldRequired('call_close','fault_code')&&!(document.getElementById('upd-fault')?.value||'').trim()){alert('❌ Fault Code is required.');document.getElementById('upd-fault')?.focus();return;}
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
   if(status!==t.status && !allowedEng.includes(status)){
@@ -6946,28 +7010,46 @@ async function saveEngUpdate(){
     }
   }
 
-  // JOB SHEET PHOTO — mandatory to Close a call (camera or gallery both allowed).
+  // ATTACHMENTS — Job Sheet (slot 0) & extras are governed by Field Rules.
   // Resolved By Phone is exempt: no visit happened, so there is no job sheet.
-  if(status==='Closed'&&!t.jobsheet_photo&&!window._jsPhotoData){
-    alert('📄 Job Sheet Photo is required to close this call!\n\nPlease attach the job sheet photo (camera or gallery) in the "Job Sheet Photo" section, then save again.');
+  var _photos=window._jsPhotos||[null,null,null];
+  if(status==='Closed'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
+    alert('📄 Job Sheet Photo is required to close this call!\n\nUpar "Attachments" ma Job Sheet no photo (camera ke gallery) attach karo, pachhi Save karo.');
     return;
   }
-  if(window._jsPhotoData){
-    try{data.jobsheet_photo=await uploadCrmPhoto(window._jsPhotoData,'jobsheet_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'_'+Date.now()+'.jpg');}
-    catch(_je){data.jobsheet_photo=window._jsPhotoData;}
-    window._jsPhotoData=null;
+  if(status==='Closed'&&isFieldRequired('call_close','extra_attachments')&&!(_photos[1]&&_photos[1].url)){
+    alert('📎 Extra attachment required chhe (admin e farjiyat karyu chhe).\n\n"Attachments" ma ochha ma ochho 1 extra photo add karo.');
+    return;
   }
+  // SE Call ID — enforced only if admin marked it compulsory, and only for warranty calls.
+  if(status==='Closed'&&isFieldRequired('call_close','se_call_id')&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type||'')&&!(document.getElementById('upd-se-call-id')?.value||t.se_call_id||'').trim()){
+    alert('🔖 SE Call ID required chhe (admin e farjiyat karyu chhe).');document.getElementById('upd-se-call-id')?.focus();return;
+  }
+  // Upload any newly-added photos; keep already-uploaded URLs as-is.
+  async function _resolvePhoto(p,tag){
+    if(!p||!p.url)return '';
+    if(!p.isNew)return p.url;
+    try{return await uploadCrmPhoto(p.url,tag+'_'+String(id).replace(/[^A-Za-z0-9_-]/g,'')+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+'.jpg');}
+    catch(_e){return p.url;}
+  }
+  if(_photos[0]&&_photos[0].url){data.jobsheet_photo=await _resolvePhoto(_photos[0],'jobsheet');}
+  var _extras=[];
+  for(var _pi=1;_pi<3;_pi++){var u=await _resolvePhoto(_photos[_pi],'attach');if(u)_extras.push(u);}
+  data.attachments=_extras;
+  window._jsPhotos=[null,null,null];
 
   try{
     try{
       await sb('tickets','PATCH',data,`?id=eq.${id}`);
     }catch(pe){
-      // tickets.jobsheet_photo column not added yet (setup SQL not run) —
-      // don't brick call closing: retry without the photo field.
-      if(data.jobsheet_photo&&String(pe&&pe.message).indexOf('jobsheet_photo')!==-1){
-        delete data.jobsheet_photo;
+      // jobsheet_photo / attachments column not added yet (setup SQL not run) —
+      // don't brick call closing: retry without the missing field(s).
+      var _msg=String(pe&&pe.message);
+      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)){
+        if(_msg.indexOf('jobsheet_photo')!==-1)delete data.jobsheet_photo;
+        if(_msg.indexOf('attachments')!==-1)delete data.attachments;
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
-        console.log('jobsheet_photo column missing — run KM_SETUP_SQL in Supabase');
+        console.log('photo column(s) missing — run the attachments SQL in Supabase');
       }else throw pe;
     }
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
@@ -10450,12 +10532,107 @@ var _NAV_ALL_ITEMS=[
 
 window._navPerms={users:{}};
 
+// ===== FIELD RULES (admin-configurable required/optional per form field) =====
+// Stored in company_info.field_rules as { call_close:{field:'required'|'optional'}, ... }.
+// Every field has a safe DEFAULT so behaviour is unchanged until an admin overrides it.
+window._fieldRules={};
+// Fields that can be configured per form, with their built-in defaults.
+var _FIELD_RULE_DEFS={
+  call_close:{
+    label:'Call Close (Engineer)',
+    fields:[
+      {key:'action_taken',   label:'Action Taken',           def:'required'},
+      {key:'jobsheet_photo', label:'Job Sheet Photo',        def:'required'},
+      {key:'extra_attachments',label:'Extra Attachments',    def:'optional'},
+      {key:'fault_code',     label:'Fault Code',             def:'optional'},
+      {key:'km_arrival_photo',label:'KM Arrival Photo',      def:'required'},
+      {key:'se_call_id',     label:'SE Call ID (Warranty)',  def:'optional'},
+    ]
+  }
+};
+async function loadFieldRules(){
+  try{
+    var r=await sb('company_info','GET',null,'?id=eq.1&select=field_rules');
+    window._fieldRules=(r&&r[0]&&r[0].field_rules)||{};
+  }catch(e){window._fieldRules=window._fieldRules||{};}
+}
+// Effective rule for a field: admin override if set, else the built-in default.
+function fieldRule(form,key){
+  var def='optional';
+  var fd=(_FIELD_RULE_DEFS[form]&&_FIELD_RULE_DEFS[form].fields||[]).find(function(f){return f.key===key;});
+  if(fd)def=fd.def;
+  var ov=window._fieldRules&&window._fieldRules[form]&&window._fieldRules[form][key];
+  return ov||def;
+}
+function isFieldRequired(form,key){return fieldRule(form,key)==='required';}
+
 async function loadNavPerms(){
   try{
     var r=await sb('company_info','GET',null,'?id=eq.1&select=nav_permissions');
     if(r&&r[0]&&r[0].nav_permissions){window._navPerms=r[0].nav_permissions||{users:{}};}
     if(!window._navPerms.users)window._navPerms.users={};
   }catch(e){}
+}
+
+// ── FIELD RULES admin panel: per-form, mark each field Compulsory / Optional ──
+async function renderFieldRulesTab(){
+  await loadFieldRules();
+  var formKeys=Object.keys(_FIELD_RULE_DEFS);
+  var formOpts=formKeys.map(function(k){return '<option value="'+k+'">'+_FIELD_RULE_DEFS[k].label+'</option>';}).join('');
+  document.getElementById('settings-content').innerHTML=
+    '<div class="card"><div class="section-header"><h3>📋 Field Rules — Compulsory / Optional</h3></div>'
+    +'<p style="font-size:12px;color:#64748b;margin-bottom:14px;">Form select karo → dareka field ne <b>Compulsory</b> (farjiyat) ke <b>Optional</b> karo → Save. Badha engineers ne turant apply thay. Coding ni jarur nahi.</p>'
+    +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">'
+    +'<select id="fr-form-sel" onchange="loadFieldRulesForm()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;min-width:220px;">'+formOpts+'</select>'
+    +'<button onclick="saveFieldRulesForm()" class="btn btn-primary btn-sm">💾 Save</button>'
+    +'<button onclick="resetFieldRulesForm()" class="btn btn-outline btn-sm" style="color:#dc2626;">↩ Reset to Default</button>'
+    +'</div>'
+    +'<div id="fr-fields" style="max-width:520px;"></div>'
+    +'</div>';
+  loadFieldRulesForm();
+}
+function loadFieldRulesForm(){
+  var sel=document.getElementById('fr-form-sel');if(!sel)return;
+  var form=sel.value;var def=_FIELD_RULE_DEFS[form];if(!def)return;
+  var html=def.fields.map(function(f){
+    var cur=fieldRule(form,f.key);
+    var isDefault=!(window._fieldRules&&window._fieldRules[form]&&window._fieldRules[form][f.key]);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">'
+      +'<div style="font-size:13px;font-weight:600;">'+f.label
+        +' <span style="font-size:10px;font-weight:400;color:#94a3b8;">(default: '+f.def+(isDefault?'':' · overridden')+')</span></div>'
+      +'<select class="fr-cb" data-key="'+f.key+'" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;color:'+(cur==='required'?'#b91c1c':'#0d9488')+';">'
+        +'<option value="required"'+(cur==='required'?' selected':'')+'>Compulsory</option>'
+        +'<option value="optional"'+(cur==='optional'?' selected':'')+'>Optional</option>'
+      +'</select>'
+      +'</div>';
+  }).join('');
+  document.getElementById('fr-fields').innerHTML=html;
+}
+async function saveFieldRulesForm(){
+  var sel=document.getElementById('fr-form-sel');if(!sel)return;
+  var form=sel.value;
+  var rules={};
+  document.querySelectorAll('.fr-cb').forEach(function(s){rules[s.dataset.key]=s.value;});
+  if(!window._fieldRules)window._fieldRules={};
+  window._fieldRules[form]=rules;
+  try{
+    await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,field_rules:window._fieldRules,updated_at:new Date().toISOString()})});
+    alert('✅ Field rules saved for '+_FIELD_RULE_DEFS[form].label+'! Engineers ne turant apply thashe (page refresh pachhi).');
+  }catch(e){alert('Error: '+e.message+'\n\nJo "field_rules" column na hoy to Supabase ma aa run karo:\nALTER TABLE public.company_info ADD COLUMN IF NOT EXISTS field_rules JSONB DEFAULT \'{}\'::jsonb;');}
+}
+async function resetFieldRulesForm(){
+  var sel=document.getElementById('fr-form-sel');if(!sel)return;
+  var form=sel.value;
+  if(!confirm('Reset '+_FIELD_RULE_DEFS[form].label+' na badha fields ne default par?'))return;
+  if(window._fieldRules)delete window._fieldRules[form];
+  try{
+    await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,field_rules:window._fieldRules,updated_at:new Date().toISOString()})});
+    alert('↩ Reset to default!');loadFieldRulesForm();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 async function renderNavPermsTab(){
@@ -10731,6 +10908,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('msc',this)">🏭 MSC Centers</button>
       <button class="tab" onclick="switchSettings('telegram',this)">📱 Telegram</button>
       <button class="tab" onclick="switchSettings('navperms',this)">🔐 Nav Permissions</button>
+      <button class="tab" onclick="switchSettings('fieldrules',this)">📋 Field Rules</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -10743,6 +10921,7 @@ function switchSettings(tab,el){
   else if(tab==='msc') renderMSCTab();
   else if(tab==='telegram') renderTelegramSettings();
   else if(tab==='navperms') renderNavPermsTab();
+  else if(tab==='fieldrules') renderFieldRulesTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -12390,8 +12569,10 @@ async function doWorkStart(ticketId){
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
 
-    // KM TRACKING — Arrival KM odometer photo at the customer (On Site only, once per ticket per day)
-    if(currentUser.role==='engineer'&&t&&t.service_type==='On Site'){
+    // KM TRACKING — Arrival KM odometer photo at the customer (On Site only, once
+    // per ticket per day). Forced only if admin keeps it compulsory (Field Rules);
+    // if optional, the engineer can still use the "Reached Location" button.
+    if(currentUser.role==='engineer'&&t&&t.service_type==='On Site'&&isFieldRequired('call_close','km_arrival_photo')){
       try{
         var _kmL=await kmTodayLogs();
         if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
@@ -12676,22 +12857,40 @@ function openDailyReport(){
   document.getElementById('dr-eng-name').textContent=currentUser.name;
   document.getElementById('dr-date').value=new Date().toLocaleDateString('en-CA');
   document.getElementById('dr-petrol-km').value='';
-  // Auto-fill GPS KM from today's location tracking
+  // Auto-fill KM: prefer the odometer KM Tracking total (opening → highest
+  // reading today, same as the KM report) — it's the accurate figure. Fall
+  // back to GPS-track distance only if no odometer entries exist.
   (async function(){
     try{
       var today=new Date().toLocaleDateString('en-CA');
       var engId=currentUser.eng_id||currentUser.user_id;
+      var el=document.getElementById('dr-petrol-km');
+      var hint=document.getElementById('dr-km-hint');
+      // 1) Odometer KM logs
+      try{
+        var kmLogs=await sb('km_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+today+'&order=captured_at.asc');
+        if(kmLogs&&kmLogs.length){
+          var opening=null,maxRead=null;
+          kmLogs.forEach(function(l){var n=parseFloat(l.odometer_km);if(isNaN(n))return;if(l.entry_type==='opening'&&opening===null)opening=n;if(maxRead===null||n>maxRead)maxRead=n;});
+          if(opening===null){var first=parseFloat(kmLogs[0].odometer_km);if(!isNaN(first))opening=first;}
+          var odoKm=(opening!==null&&maxRead!==null&&maxRead>=opening)?(maxRead-opening):0;
+          if(odoKm>0){
+            if(el){el.value=odoKm;el.style.borderColor='#0d9488';el.title='Auto-filled from KM Tracking (odometer)';}
+            if(hint)hint.textContent='🛣️ KM Tracking thi auto: '+odoKm+' km (edit kari shako)';
+            return; // odometer wins — skip GPS fallback
+          }
+        }
+      }catch(_ke){console.log('odometer KM autofill:',_ke);}
+      // 2) GPS fallback
       var locs=await sbAll('engineer_locations','?eng_id=eq.'+encodeURIComponent(engId)+'&session_date=eq.'+today+'&order=recorded_at.asc',2000);
       if(locs&&locs.length>1){
         function hkm(la1,ln1,la2,ln2){var R=6371;var dL=(la2-la1)*Math.PI/180;var dN=(ln2-ln1)*Math.PI/180;var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
         var km=0;for(var i=1;i<locs.length;i++){var d=hkm(locs[i-1].lat,locs[i-1].lng,locs[i].lat,locs[i].lng);if(d>=0.1&&d<5)km+=d;}
         km=Math.round(km*10)/10;
-        var el=document.getElementById('dr-petrol-km');
         if(el&&km>0){el.value=km;el.style.borderColor='#7c3aed';el.title='Auto-filled from GPS tracking ('+locs.length+' points)';
-          var hint=document.getElementById('dr-km-hint');
           if(hint)hint.textContent='📍 GPS thi auto: '+km+' km (edit kari shako)';}
       }
-    }catch(e){console.log('GPS KM autofill error:',e);}
+    }catch(e){console.log('KM autofill error:',e);}
   })();
   var kh=document.getElementById('dr-km-hint');if(kh)kh.textContent='';
   document.getElementById('dr-remarks').value='';
@@ -22661,7 +22860,7 @@ async function renderAttendanceReport(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
   var isAdminHdr=currentUser.role==='admin'||window._isCspMgr;
-  pc.innerHTML='<div class="card">'
+  pc.innerHTML='<div id="att-leave-section" style="margin-bottom:16px;"></div><div class="card">'
     +'<div class="section-header"><h2>🗓️ Attendance Report</h2><div style="display:flex;gap:8px;">'
     +(isAdminHdr?'<button class="btn btn-outline btn-sm" onclick="openAttAddModal()">➕ Add Attendance</button>':'')
     +'<button class="btn btn-primary btn-sm" onclick="downloadAttendanceExcel()">⬇ Download Excel</button></div></div>'
@@ -22682,7 +22881,105 @@ async function renderAttendanceReport(){
     var sel=document.getElementById('att-emp');
     if(sel)emps.filter(function(e){return!ATT_EXCLUDED_IDS.includes(e.eng_id||e.user_id);}).forEach(function(e){var o=document.createElement('option');o.value=e.user_id;o.textContent=e.name+(e.role==='engineer'?' (Eng)':' (WC)');sel.appendChild(o);});
   }catch(e){}
+  renderLeaveSection();
   loadAttendanceReport();
+}
+
+// ===== LEAVE APPLICATION / APPROVAL =====
+// Engineers & WCs apply for leave; admin/managers approve or reject. An
+// approved leave covering today blocks that user's login (see doLogin).
+async function renderLeaveSection(){
+  var box=document.getElementById('att-leave-section');if(!box)return;
+  var canApprove=currentUser.role==='admin'||window._isCspMgr;
+  var isAdminPure=currentUser.role==='admin'&&currentUser.role_type!=='work_controller';
+  var myId=currentUser.eng_id||currentUser.user_id;
+  var mine=[],pending=[];
+  try{
+    if(canApprove){
+      pending=await sb('leave_requests','GET',null,'?status=eq.pending&order=applied_at.desc')||[];
+      mine=await sb('leave_requests','GET',null,'?eng_id=eq.'+encodeURIComponent(myId)+'&order=applied_at.desc&limit=20')||[];
+    }else{
+      mine=await sb('leave_requests','GET',null,'?eng_id=eq.'+encodeURIComponent(myId)+'&order=applied_at.desc&limit=20')||[];
+    }
+  }catch(e){
+    box.innerHTML='<div class="card"><div style="font-size:13px;color:#b45309;">🌴 Leave module: <b>leave_requests</b> table hajı banela nathi. Supabase ma LEAVE_TABLE.sql run karo.</div></div>';
+    return;
+  }
+  function statusBadge(s){
+    var m={pending:['#92400e','#fef3c7','⏳ Pending'],approved:['#065f46','#d1fae5','✅ Approved'],rejected:['#991b1b','#fee2e2','❌ Rejected']};
+    var c=m[s]||m.pending;
+    return '<span style="background:'+c[1]+';color:'+c[0]+';padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">'+c[2]+'</span>';
+  }
+  function row(l,withActions){
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;">'
+      +'<div style="font-weight:700;font-size:13px;">'+(withActions?escHtml(l.eng_name||l.eng_id)+' — ':'')+l.from_date+' → '+l.to_date+'</div>'
+      +statusBadge(l.status)+'</div>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📝 '+escHtml(l.reason||'—')+'</div>'
+      +(l.review_note?'<div style="font-size:11px;color:#64748b;margin-top:2px;">Note: '+escHtml(l.review_note)+(l.reviewed_by?' — '+escHtml(l.reviewed_by):'')+'</div>':'')
+      +(withActions&&l.status==='pending'?'<div style="display:flex;gap:8px;margin-top:8px;">'
+        +'<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="reviewLeave('+l.id+',\'approved\')">✅ Approve</button>'
+        +'<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;" onclick="reviewLeave('+l.id+',\'rejected\')">❌ Reject</button>'
+        +'</div>':'')
+      +'</div>';
+  }
+  var html='<div class="card">'
+    +'<div class="section-header"><h2>🌴 Leave</h2>'
+    +(isAdminPure?'':'<button class="btn btn-primary btn-sm" onclick="openLeaveModal()">➕ Apply for Leave</button>')
+    +'</div>';
+  if(canApprove){
+    html+='<div style="font-size:13px;font-weight:700;color:#92400e;margin:6px 0 8px;">⏳ Pending Approvals ('+pending.length+')</div>';
+    html+=pending.length?pending.map(function(l){return row(l,true);}).join(''):'<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">No pending leave requests.</div>';
+  }
+  html+='<div style="font-size:13px;font-weight:700;color:#334155;margin:10px 0 8px;">My Leave Requests</div>';
+  html+=mine.length?mine.map(function(l){return row(l,false);}).join(''):'<div style="font-size:13px;color:var(--text-muted);">No leave requests yet.</div>';
+  html+='</div>';
+  box.innerHTML=html;
+}
+function openLeaveModal(){
+  var ex=document.getElementById('modal-leave');if(ex)ex.remove();
+  var today=new Date().toLocaleDateString('en-CA');
+  var m=document.createElement('div');
+  m.id='modal-leave';m.className='modal-overlay';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:400px;">'
+    +'<div class="modal-header"><h2>🌴 Apply for Leave</h2><button class="close-btn" onclick="document.getElementById(\'modal-leave\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:16px 18px;">'
+    +'<div class="form-group"><label>From Date <span class="req">*</span></label><input type="date" id="lv-from" value="'+today+'"></div>'
+    +'<div class="form-group"><label>To Date <span class="req">*</span></label><input type="date" id="lv-to" value="'+today+'"></div>'
+    +'<div class="form-group"><label>Reason <span class="req">*</span></label><textarea id="lv-reason" rows="3" placeholder="Leave nu karan..."></textarea></div>'
+    +'<button class="btn btn-primary" style="width:100%;" onclick="submitLeave()">📤 Submit Request</button>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:8px;text-align:center;">Manager/Admin approve kare pachhi j lagu thashe. Approved leave na divase login nahi thay.</div>'
+    +'</div></div>';
+  document.body.appendChild(m);
+}
+async function submitLeave(){
+  var from=document.getElementById('lv-from')?.value;
+  var to=document.getElementById('lv-to')?.value;
+  var reason=(document.getElementById('lv-reason')?.value||'').trim();
+  if(!from||!to){alert('From ane To date nakho.');return;}
+  if(to<from){alert('To date From karta pehla na hoy shakay.');return;}
+  if(!reason){alert('Reason lakho.');return;}
+  try{
+    await sb('leave_requests','POST',{
+      eng_id:currentUser.eng_id||currentUser.user_id,
+      eng_name:currentUser.name,
+      role:currentUser.role,
+      from_date:from,to_date:to,reason:reason,
+      status:'pending',applied_at:new Date().toISOString()
+    });
+    document.getElementById('modal-leave')?.remove();
+    alert('✅ Leave request submitted! Manager/Admin approval ni raah juo.');
+    renderLeaveSection();
+  }catch(e){alert('Error: '+e.message+'\n\nJo table na hoy to LEAVE_TABLE.sql run karo.');}
+}
+async function reviewLeave(id,decision){
+  var note='';
+  if(decision==='rejected'){note=prompt('Reject nu karan (optional):')||'';}
+  try{
+    await sb('leave_requests','PATCH',{status:decision,review_note:note,reviewed_by:currentUser.name,reviewed_at:new Date().toISOString()},'?id=eq.'+id);
+    renderLeaveSection();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 function attQuick(type){
@@ -22976,10 +23273,11 @@ function openKmCapture(opts){
   // Engineer's highest reading ever (odometer only goes up) — used to
   // disambiguate the OCR read on the day's first (Opening) photo, when there
   // is no today-reading yet.
-  kmLastReadingEver().then(function(v){
-    _kmRefMax=v;
-    if(v!==null&&_kmPrevMax===null){var inp=document.getElementById('km-reading');if(inp&&!inp.placeholder.startsWith('Last reading'))inp.placeholder='Last recorded: '+v;}
-  });
+  // NOTE: we deliberately do NOT use the all-time previous reading as a floor.
+  // An engineer may come on a different vehicle on some days, whose odometer is
+  // lower — the day's own Opening reading (whatever it is) is the reference for
+  // the rest of that day. So _kmRefMax stays null and only today's readings gate.
+  _kmRefMax=null;
 }
 async function kmLastReadingEver(){
   var engId=currentUser.eng_id||currentUser.user_id;
@@ -23131,8 +23429,9 @@ async function runKmOcr(srcCanvas){
     var worker=await getKmOcrWorker();
     var prep=kmOcrPrepCanvas(srcCanvas);
     var res=await worker.recognize(prep);
-    var _ocrRef=(_kmPrevMax!==null&&_kmPrevMax!==undefined)?_kmPrevMax:_kmRefMax;
-    var val=pickKmCandidate(res&&res.data&&res.data.text,_ocrRef);
+    // OCR reference = today's readings only (null on the day's first/Opening
+    // photo, so no cross-day/cross-vehicle number misleads the auto-read).
+    var val=pickKmCandidate(res&&res.data&&res.data.text,_kmPrevMax);
     if(val===null){
       if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read fail — reading jate lakhi do.</span>';
       return;
@@ -23149,8 +23448,10 @@ async function saveKmEntry(){
   if(!_kmPhotoData){alert('📸 Odometer photo is required! Please capture the photo first.');return;}
   var kmVal=parseFloat(document.getElementById('km-reading')?.value);
   if(isNaN(kmVal)||kmVal<0){alert('⚠️ Please enter the odometer reading (KM number shown on the meter).');return;}
-  var _floorRef=(_kmPrevMax!==null&&_kmPrevMax!==undefined)?_kmPrevMax:_kmRefMax;
-  if(_floorRef!==null&&_floorRef!==undefined&&kmVal<_floorRef){alert('⚠️ Reading ('+kmVal+') cannot be LESS than the last recorded reading ('+_floorRef+').\n\nMeter check karo — chhello (tenths/decimal) digit ganvano nathi.');return;}
+  // Floor = today's highest reading only. The day's Opening (no today reading
+  // yet) is accepted as-is — allows a different vehicle on some days. Within the
+  // day, readings still can't go below what was already recorded today.
+  if(_kmPrevMax!==null&&_kmPrevMax!==undefined&&kmVal<_kmPrevMax){alert('⚠️ Reading ('+kmVal+') aaje na aagla reading ('+_kmPrevMax+') karta ochho na hoy shakay.\n\nMeter check karo — chhello (tenths/decimal) digit ganvano nathi.');return;}
   var btn=document.getElementById('km-save-btn');
   if(btn){btn.disabled=true;btn.textContent='Saving...';}
   var engId=currentUser.eng_id||currentUser.user_id;
@@ -23245,11 +23546,12 @@ async function loadKmReport(){
     var grandKm=0,dayCount=0,html='',excelRows=[];
     Object.keys(groups).sort().forEach(function(k){
       var g=groups[k];dayCount++;
-      var opening=null,closing=null,prev=null,dayKm=0,rowsHtml='';
+      var opening=null,closing=null,prev=null,dayKm=0,maxRead=null,rowsHtml='';
       g.entries.forEach(function(l){
         var kmN=parseFloat(l.odometer_km);
         if(l.entry_type==='opening'&&opening===null&&!isNaN(kmN))opening=kmN;
         if(l.entry_type==='closing'&&!isNaN(kmN))closing=kmN;
+        if(!isNaN(kmN)&&(maxRead===null||kmN>maxRead))maxRead=kmN;
         var seg='';
         if(prev!==null&&!isNaN(kmN)&&kmN>=prev){seg=(kmN-prev);dayKm+=seg;}
         var tm=l.captured_at?new Date(l.captured_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
@@ -23263,7 +23565,10 @@ async function loadKmReport(){
         excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
         if(!isNaN(kmN))prev=kmN;
       });
-      var totalKm=(opening!==null&&closing!==null&&closing>=opening)?(closing-opening):dayKm;
+      // Live-aware day total: highest reading so far minus opening. This counts
+      // an in-progress afternoon trip (arrivals recorded, not yet closed) too —
+      // so the total updates live, not only after the final closing photo.
+      var totalKm=(opening!==null&&maxRead!==null&&maxRead>=opening)?(maxRead-opening):dayKm;
       grandKm+=totalKm;
       var dLabel=new Date(g.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
       html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">'
@@ -23302,13 +23607,15 @@ function downloadKmReport(){
 async function viewCallPhotos(id){
   if(!id){alert('No ticket selected');return;}
   var t={};
-  try{t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=id,cname,jobsheet_photo'))[0]||{};}catch(e){}
+  try{t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=id,cname,jobsheet_photo,attachments'))[0]||{};}catch(e){try{t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=id,cname,jobsheet_photo'))[0]||{};}catch(e2){}}
   var kms=[];
   try{kms=await sb('km_logs','GET',null,'?ticket_id=eq.'+encodeURIComponent(id)+'&order=captured_at.asc');}catch(e){}
   var typeLabel={opening:'🏢 Opening',arrival:'📍 Arrival at Customer',closing:'🏁 Closing'};
-  var jsHtml=t.jobsheet_photo
-    ?'<img src="'+t.jobsheet_photo+'" style="max-width:150px;max-height:150px;border-radius:10px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(t.jobsheet_photo)+'\')">'
-    :'<div style="color:#b45309;font-size:13px;">No job sheet photo attached yet</div>';
+  function _photoImg(u){return '<img src="'+u+'" style="max-width:150px;max-height:150px;border-radius:10px;border:1px solid #e2e8f0;cursor:pointer;margin:0 6px 6px 0;" onclick="showPhotoFull(\''+encodeURIComponent(u)+'\')">';}
+  var _extras=t.attachments;if(typeof _extras==='string'){try{_extras=JSON.parse(_extras);}catch(e){_extras=[];}}
+  if(!Array.isArray(_extras))_extras=[];
+  var jsHtml=(t.jobsheet_photo?_photoImg(t.jobsheet_photo):'')+_extras.map(_photoImg).join('');
+  if(!jsHtml)jsHtml='<div style="color:#b45309;font-size:13px;">No job sheet photo attached yet</div>';
   var kmHtml=kms.length?kms.map(function(l){
     var tm=l.captured_at?new Date(l.captured_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
     return '<div style="display:flex;gap:10px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;">'
@@ -23332,9 +23639,53 @@ async function viewCallPhotos(id){
   document.body.appendChild(m);
 }
 
-// ── JOB SHEET PHOTO PICK (camera OR gallery, compressed before save) ──
+// ── JOB SHEET + EXTRA ATTACHMENTS (slot 0 = jobsheet mandatory, 1-2 optional) ──
+// Each slot can be filled from the live camera OR the gallery. Photos are
+// compressed client-side before upload.
+window._jsPhotos=window._jsPhotos||[null,null,null];
+window._jsTargetSlot=0;
+function renderJsAttachSlots(){
+  var wrap=document.getElementById('js-attach-slots');if(!wrap)return;
+  var html='';
+  for(var i=0;i<3;i++){
+    // Progressive: show an empty extra slot only once the previous slot is filled.
+    var prevFilled=i===0||(window._jsPhotos[i-1]&&window._jsPhotos[i-1].url);
+    var cur=window._jsPhotos[i];
+    if(i>0&&!prevFilled&&!(cur&&cur.url))continue;
+    var isMain=i===0;
+    var title=isMain?'📄 Job Sheet Photo *':'➕ Extra '+i+' (optional)';
+    html+='<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;">'
+      +'<div style="font-size:12px;font-weight:700;color:'+(isMain?'#0369a1':'#475569')+';margin-bottom:6px;">'+title+'</div>';
+    if(cur&&cur.url){
+      html+='<div style="display:flex;align-items:center;gap:8px;">'
+        +'<img src="'+cur.url+'" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(cur.url)+'\')">'
+        +'<span style="color:#15803d;font-size:12px;font-weight:700;">✅ Attached</span>'
+        +'<button type="button" onclick="jsRemovePhoto('+i+')" style="margin-left:auto;background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">✕ Remove</button>'
+        +'</div>';
+    }else{
+      html+='<div style="display:flex;gap:8px;">'
+        +'<button type="button" onclick="jsPick('+i+',true)" style="flex:1;background:#0d9488;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">📷 Camera</button>'
+        +'<button type="button" onclick="jsPick('+i+',false)" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">🖼️ Gallery</button>'
+        +'</div>';
+    }
+    html+='</div>';
+  }
+  wrap.innerHTML=html;
+}
+function jsPick(slot,useCamera){
+  window._jsTargetSlot=slot;
+  var inp=document.getElementById(useCamera?'js-cam-input':'js-gal-input');
+  if(inp){inp.value='';inp.click();}
+}
+function jsRemovePhoto(i){
+  window._jsPhotos[i]=null;
+  // Collapse a gap so extras stay contiguous (e.g. removing extra 1 keeps extra 2).
+  if(i===1&&window._jsPhotos[2]){window._jsPhotos[1]=window._jsPhotos[2];window._jsPhotos[2]=null;}
+  renderJsAttachSlots();
+}
 function onJsPhotoPick(input){
   var file=input.files&&input.files[0];if(!file)return;
+  var slot=window._jsTargetSlot||0;
   var reader=new FileReader();
   reader.onload=function(e){
     var img=new Image();
@@ -23343,13 +23694,13 @@ function onJsPhotoPick(input){
       var canvas=document.createElement('canvas');
       canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
       canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      window._jsPhotoData=canvas.toDataURL('image/jpeg',0.72);
-      var prev=document.getElementById('js-photo-preview');
-      if(prev)prev.innerHTML='<img src="'+window._jsPhotoData+'" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;"> <span style="color:#15803d;font-size:12px;font-weight:700;">✅ Ready — will be saved with this update</span>';
+      window._jsPhotos[slot]={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
+      renderJsAttachSlots();
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
+  input.value='';
 }
 
 // ═══════════════ PAYMENT QR (quick access for Eng / WC / Admin) ═══════════════
