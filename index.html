@@ -4738,7 +4738,7 @@ async function renderTickets(){
   }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
-const TERMINAL_TICKET_STATUSES=['Closed','Customer Reject','Call Cancel','Delivered'];
+const TERMINAL_TICKET_STATUSES=['Closed','Customer Reject','Call Cancel','Delivered','Resolved By Phone'];
 // Problem filter suggestions: union of the master Problem Types list AND every
 // distinct value actually typed into tickets' problem field. The New Call
 // form's problem input is free-text with autocomplete (not a locked dropdown),
@@ -4769,7 +4769,7 @@ function renderTicketTable(filtered){
           <option>Customer Reject</option><option>Pending Parts</option><option>Pending Engineer Stock</option>
           <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
           <option>Repaired</option><option>Delivered</option><option>Sent to MSC</option><option>Pending for Delivery</option>
-          <option>Call Cancel</option><option>Closed</option>
+          <option>Resolved By Phone</option><option>Call Cancel</option><option>Closed</option>
         </select>
         <select id="ticket-type-filter" onchange="filterTickets()">
           <option value="">All Types</option><option>Warranty</option><option>Non-Warranty</option><option>AMC</option>
@@ -7194,12 +7194,14 @@ async function saveEngUpdate(){
         for(const ol of (openLogs||[])){
           await sb('work_logs','PATCH',{to_time:closeTime},'?id=eq.'+ol.id).catch(()=>{});
         }
-        // Auto status log entry for Call Closed
+        // Auto status log entry — label Resolved By Phone distinctly so the
+        // Work Log makes clear there was no Work Start (hence the shorter time).
         const _clModel=t?.model?(' | '+t.model):'';
+        const _clLabel=(status==='Resolved By Phone')?'📞 Resolved By Phone (no visit) — ':'✅ Call Closed — ';
         await sb('work_logs','POST',{
           eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
           log_date:closeDate,from_time:closeTime,to_time:closeTime,
-          task_description:'✅ Call Closed — '+ticketLabel+_clModel,
+          task_description:_clLabel+ticketLabel+_clModel,
           ticket_id:id,log_type:'work',created_at:closeNow.toISOString()
         }).catch(()=>{});
       }catch(ex){console.log('WorkLog auto error:',ex);}
@@ -12365,8 +12367,22 @@ async function doVisitStart(ticketId){
     }
   }catch(ex){}
 
+  // Carry In calls need no KM/GPS tracking — the engineer isn't travelling for
+  // them, so skip all KM prompts (catch-up + opening) for a Carry In ticket.
+  var _vsSvc='';try{var _vsT=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(ticketId)+'&select=service_type'))[0];_vsSvc=_vsT&&_vsT.service_type||'';}catch(e){}
+  var _vsKmOk=currentUser.role==='engineer'&&_vsSvc!=='Carry In';
+  // KM CATCH-UP — if the engineer SKIPPED an arrival KM at a previous call's
+  // "Reached Location", it becomes mandatory now, at this next travel start.
+  if(_vsKmOk){
+    var _skipKey='kmSkip_'+memberId+'_'+dateNow;
+    var _skipTicket=localStorage.getItem(_skipKey);
+    if(_skipTicket){
+      openKmCapture({type:'arrival',ticketId:(_skipTicket==='1'?null:_skipTicket),onDone:function(){localStorage.removeItem(_skipKey);doVisitStart(ticketId);}});
+      return;
+    }
+  }
   // KM TRACKING — first travel of the day requires Opening KM odometer photo (office/home)
-  if(currentUser.role==='engineer'){
+  if(_vsKmOk){
     try{
       var _kmL=await kmTodayLogs();
       if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='opening';})){
@@ -12505,23 +12521,23 @@ async function doReachedLocation(ticketId){
     alert('✅ Arrival KM is already recorded for this call today.');
     return;
   }
-  openKmCapture({type:'arrival',ticketId:ticketId,onDone:async function(){
+  openKmCapture({type:'arrival',ticketId:ticketId,allowSkip:true,onDone:async function(skipped){
     var now=new Date();
     var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     var dateNow=now.toLocaleDateString('en-CA');
     var engId=currentUser.eng_id||currentUser.user_id;
-    // Close the open traveling log — travel ends at arrival, not at Work Start
+    // Close the open traveling log — travel ends at arrival, not at Work Start.
+    // This runs even on Skip so travel/repair timing stays correct.
     try{
       var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN&log_type=eq.travel');
       for(var i=0;i<(openLogs||[]).length;i++){await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+openLogs[i].id).catch(function(){});}
     }catch(e){}
-    // Timeline entry so the modal shows ✅ Reached and reports can use arrival time
     try{
       var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
-      var tl=[...(t?.timeline||[]),{action:'Reached Location',by:currentUser.name,at:now.toISOString(),note:'Arrival KM recorded at '+timeNow}];
+      var tl=[...(t?.timeline||[]),{action:'Reached Location',by:currentUser.name,at:now.toISOString(),note:skipped?('Reached at '+timeNow+' — KM skipped (next travel start ma karse)'):('Arrival KM recorded at '+timeNow)}];
       await sb('tickets','PATCH',{timeline:tl,updated_at:now.toISOString()},'?id=eq.'+ticketId);
     }catch(e){}
-    alert('📍 Reached Location saved — '+timeNow+'\n\nNow go inside and tap 🔧 Work Start when you begin work.');
+    alert('📍 Reached Location saved — '+timeNow+(skipped?'\n\n⏭️ KM skip karyu — next call na Visit Start (travel start) par farjiyat KM levase.':'')+'\n\nNow go inside and tap 🔧 Work Start when you begin work.');
     try{closeModal('modal-eng-update');openEngUpdate(ticketId);}catch(e){}
   }});
 }
@@ -15630,10 +15646,14 @@ async function fetchWalkInCustomer(){
 }
 
 async function getNextWalkInToken(today){
-  // Count today's entries → always starts from 1 each day
+  // Next token = today's HIGHEST token_no + 1 (resets to 1 each new day).
+  // Must match the self-check-in portal (walkin.html), which also uses max+1.
+  // The old count+1 method diverged from the portal after any deletion —
+  // count dropped but the portal kept climbing from the surviving max — which
+  // produced two mismatched series (low CRM tokens vs high portal tokens).
   try{
-    var rows=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=id');
-    return (rows?rows.length:0)+1;
+    var rows=await sb('walkin_log','GET',null,'?visit_date=eq.'+today+'&select=token_no&order=token_no.desc.nullslast&limit=1');
+    return ((rows&&rows.length&&rows[0].token_no)||0)+1;
   }catch(e){return 1;}
 }
 
@@ -19917,6 +19937,17 @@ async function loadWorkLogReport(){
     var logs=await sb('work_logs','GET',null,q);
     window._wlrLogs=logs;
     if(!logs.length){res.innerHTML='<div class="alert alert-info">No work logs found for selected filters.</div>';return;}
+    // Area lookup: show each ticket's customer area/city so it's clear where
+    // the engineer travelled to. Fetched once from the referenced tickets.
+    var _wlrAreaMap={};
+    try{
+      var _wtids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
+      if(_wtids.length){
+        var _wtk=await sbAll('tickets','?id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city');
+        (_wtk||[]).forEach(function(t){_wlrAreaMap[t.id]=t.area||t.city||'';});
+      }
+    }catch(e){}
+    window._wlrAreaMap=_wlrAreaMap;
     var byEng={};
     logs.forEach(function(l){
       var k=l.eng_name||l.eng_id;
@@ -19961,9 +19992,10 @@ async function loadWorkLogReport(){
           var timeBg=isTravel?'#fef3c7':isStatus?'#d1fae5':'#ede9fe';
           var timeColor=isTravel?'#92400e':isStatus?'#065f46':'#4c1d95';
           var timeLabel=isStatus?l.from_time:(isOpen?(isToday?l.from_time+' – Running ⏳':l.from_time):l.from_time+' – '+l.to_time);
+          var _wArea=(l.ticket_id&&window._wlrAreaMap&&window._wlrAreaMap[l.ticket_id])?' <span style="color:#0d9488;font-weight:700;white-space:nowrap;">📍 '+escHtml(window._wlrAreaMap[l.ticket_id])+'</span>':'';
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
-            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+'</div>'
             +'</div>';
         });
         html+='</div>';
@@ -23304,6 +23336,7 @@ function openKmCapture(opts){
     +'</div>'
     +'<div style="font-size:12px;color:#64748b;margin-bottom:10px;">📍 GPS: <span id="km-gps-status">Getting location...</span> &nbsp;|&nbsp; 🕐 <span id="km-time-now"></span></div>'
     +'<button id="km-save-btn" class="btn btn-success" style="width:100%;" onclick="saveKmEntry()">💾 Save KM Entry</button>'
+    +((_kmCapOpts&&_kmCapOpts.allowSkip)?'<button class="btn btn-outline" style="width:100%;margin-top:8px;color:#b45309;border-color:#fde68a;" onclick="skipKmEntry()">⏭️ Skip — next call na Visit Start ma karish</button>':'')
     +'</div></div>';
   document.body.appendChild(m);
   var tEl=document.getElementById('km-time-now');
@@ -23530,6 +23563,16 @@ async function saveKmEntry(){
     alert('❌ Could not save KM entry.\n\nIf the km_logs table is missing, run this SQL in Supabase:\n\n'+KM_SETUP_SQL+'\n\nError: '+e.message);
   }
 }
+// Skip the KM photo at Reached Location — sets a flag so it becomes mandatory
+// at the NEXT call's Visit Start (travel start). Timing flow is not broken.
+function skipKmEntry(){
+  var engId=currentUser.eng_id||currentUser.user_id;
+  var today=new Date().toLocaleDateString('en-CA');
+  localStorage.setItem('kmSkip_'+engId+'_'+today,(_kmCapOpts&&_kmCapOpts.ticketId)||'1');
+  var cb=_kmCapOpts&&_kmCapOpts.onDone;
+  closeKmCapture();
+  if(cb)cb(true); // pass skipped=true so the caller records it correctly
+}
 
 // ── KM REPORT PAGE ──
 async function renderKmReport(){
@@ -23586,6 +23629,16 @@ async function loadKmReport(){
       return;
     }
     var typeLabel={opening:'🏢 Day Start (Opening)',arrival:'📍 Reached Customer',closing:'🏁 Day End (Closing)'};
+    // Area lookup — show each reached-customer call's area so it's clear where
+    // the engineer travelled to.
+    var _kmAreaMap={};
+    try{
+      var _ktids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
+      if(_ktids.length){
+        var _ktk=await sbAll('tickets','?id=in.('+_ktids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city,cname');
+        (_ktk||[]).forEach(function(t){_kmAreaMap[t.id]={area:t.area||t.city||'',cname:t.cname||''};});
+      }
+    }catch(e){}
     // Group by engineer + date
     var groups={};
     logs.forEach(function(l){
@@ -23605,14 +23658,16 @@ async function loadKmReport(){
         var seg='';
         if(prev!==null&&!isNaN(kmN)&&kmN>=prev){seg=(kmN-prev);dayKm+=seg;}
         var tm=l.captured_at?new Date(l.captured_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
-        var ticketCell=l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>':'—';
+        var _kInfo=l.ticket_id&&_kmAreaMap[l.ticket_id]||null;
+        var _kArea=_kInfo&&_kInfo.area?_kInfo.area:'';
+        var ticketCell=l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—';
         var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
         var gpsCell=(l.lat&&l.lng)?'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>':'—';
         rowsHtml+='<tr><td>'+tm+'</td><td>'+(typeLabel[l.entry_type]||l.entry_type)+'</td><td>'+ticketCell+'</td>'
           +'<td style="text-align:right;font-weight:700;">'+(isNaN(kmN)?'—':kmN)+'</td>'
           +'<td style="text-align:right;font-weight:700;color:#0d9488;">'+(seg===''?'—':('+'+seg+' km'))+'</td>'
           +'<td style="text-align:center;">'+photoCell+'</td><td style="text-align:center;">'+gpsCell+'</td></tr>';
-        excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
+        excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
         if(!isNaN(kmN))prev=kmN;
       });
       // Live-aware day total: highest reading so far minus opening. This counts
