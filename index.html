@@ -22982,6 +22982,24 @@ async function reviewLeave(id,decision){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// Admin: toggle Sunday (weekly-off) paid-counting for an employee for the
+// month(s) covered by the current range. Stored in company_info.sunday_exclude
+// keyed 'empId|YYYY-MM'. Does NOT touch any existing attendance calculation.
+async function toggleSundayExclude(empId,fromDate,toDate){
+  var months={};var c=new Date(fromDate+'T00:00:00'),e=new Date(toDate+'T00:00:00');
+  while(c<=e){months[c.toLocaleDateString('en-CA').slice(0,7)]=true;c.setDate(c.getDate()+1);}
+  var keys=Object.keys(months).map(function(m){return empId+'|'+m;});
+  window._sundayExclude=window._sundayExclude||{};
+  var anyExcluded=keys.some(function(k){return window._sundayExclude[k];});
+  keys.forEach(function(k){if(anyExcluded)delete window._sundayExclude[k];else window._sundayExclude[k]=true;});
+  try{
+    await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,sunday_exclude:window._sundayExclude,updated_at:new Date().toISOString()})});
+    loadAttendanceReport();
+  }catch(e){alert('Error: '+e.message+'\n\nJo column na hoy to Supabase ma run karo:\nALTER TABLE public.company_info ADD COLUMN IF NOT EXISTS sunday_exclude JSONB DEFAULT \'{}\'::jsonb;');}
+}
+
 function attQuick(type){
   var today=new Date();
   var from,to=today.toLocaleDateString('en-CA');
@@ -23077,6 +23095,33 @@ async function loadAttendanceReport(){
       leavesCount=Math.max(0,workingDays-presentInRange);
     }
 
+    // ── SUNDAY (weekly-off) PAID DAYS — additive only. Existing totals above are
+    // NOT touched; this is shown as separate tiles + a combined figure. Admin can
+    // exclude Sundays for an employee for a given month (config in company_info).
+    var sundayInfo=null,sundayAnyExcluded=false;
+    if(showLeaves){
+      try{var _sc=await sb('company_info','GET',null,'?id=eq.1&select=sunday_exclude');window._sundayExclude=(_sc&&_sc[0]&&_sc[0].sunday_exclude)||{};}
+      catch(e){window._sundayExclude=window._sundayExclude||{};}
+      var _empS=shiftMap[effectiveEmpId];
+      var _offDays=(_empS&&_empS.weekly_off&&_empS.weekly_off!=='None')?_empS.weekly_off.split(','):['Sunday'];
+      var _shiftMin=0;
+      if(_empS&&_empS.shift_start&&_empS.shift_end){var _ss=attToMin(_empS.shift_start),_se=attToMin(_empS.shift_end);if(_ss!=null&&_se!=null&&_se>_ss)_shiftMin=_se-_ss;}
+      var _dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      var _c=new Date(from+'T00:00:00'),_e=new Date(to+'T00:00:00');
+      var _offTotal=0,_offCounted=0;
+      while(_c<=_e){
+        var _wd=_dN[_c.getDay()];
+        if(_offDays.indexOf(_wd)!==-1){
+          _offTotal++;
+          var _ym=_c.toLocaleDateString('en-CA').slice(0,7);
+          if(window._sundayExclude[effectiveEmpId+'|'+_ym])sundayAnyExcluded=true;
+          else _offCounted++;
+        }
+        _c.setDate(_c.getDate()+1);
+      }
+      sundayInfo={total:_offTotal,counted:_offCounted,mins:_offCounted*_shiftMin,shiftMin:_shiftMin};
+    }
+
     if(sumDiv)sumDiv.innerHTML=
       '<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1d4ed8;">'+totalDays+'</div><div style="font-size:11px;color:#64748b;">Days Present</div></div>'
       +(leavesCount!=null?'<div style="background:#fdf2f8;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#be185d;">'+leavesCount+'</div><div style="font-size:11px;color:#64748b;">Leaves</div></div>':'')
@@ -23085,7 +23130,12 @@ async function loadAttendanceReport(){
       +'<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1d4ed8;">'+fmtH(totalOfficeMins)+'</div><div style="font-size:11px;color:#64748b;">Office Hours Total</div></div>'
       +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+fmtH(totalShortfallMins)+'</div><div style="font-size:11px;color:#64748b;">Late/Early Total</div></div>'
       +'<div style="background:#f0fdf4;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#059669;">'+fmtH(totalAdjustMins)+'</div><div style="font-size:11px;color:#64748b;">Adjust Hours Total</div></div>'
-      +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>';
+      +'<div style="background:#fff0f0;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#dc2626;">'+lateCount+'</div><div style="font-size:11px;color:#64748b;">Late Punch Out</div></div>'
+      // ── Sunday (weekly-off) paid — SEPARATE tiles; existing totals above unchanged ──
+      +(sundayInfo?'<div style="background:#f5f3ff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6d28d9;">'+sundayInfo.counted+(sundayInfo.total!==sundayInfo.counted?' / '+sundayInfo.total:'')+'</div><div style="font-size:11px;color:#64748b;">Sundays Paid'+(sundayAnyExcluded?' (excl.)':'')+'</div></div>':'')
+      +(sundayInfo&&sundayInfo.shiftMin?'<div style="background:#ecfeff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#0e7490;">'+fmtH(totalOfficeMins+sundayInfo.mins)+'</div><div style="font-size:11px;color:#64748b;">Office Hrs + Sundays</div></div>':'')
+      +(sundayInfo&&sundayInfo.shiftMin?'<div style="background:#ecfeff;border-radius:10px;padding:12px 16px;min-width:110px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#0e7490;">'+fmtH(totalWorkMins+sundayInfo.mins)+'</div><div style="font-size:11px;color:#64748b;">Work + Sundays</div></div>':'')
+      +((isAdminView&&sundayInfo)?'<div style="min-width:130px;display:flex;align-items:center;"><button class="btn btn-sm" onclick="toggleSundayExclude(\''+effectiveEmpId+'\',\''+from+'\',\''+to+'\')" style="background:'+(sundayAnyExcluded?'#16a34a':'#dc2626')+';color:#fff;border:none;font-size:11px;padding:8px 10px;">'+(sundayAnyExcluded?'✓ Include Sundays':'🚫 Exclude Sundays (this month)')+'</button></div>':'');
     // Table
     if(!logs.length&&!rosterRows.length){wrap.innerHTML='<div class="alert alert-info">No records found</div>';return;}
     var isAdmin=currentUser.role==='admin'||window._isCspMgr;
@@ -23583,15 +23633,26 @@ async function loadKmReport(){
         +'<tbody>'+rowsHtml+'</tbody></table></div>'
         +'</div>';
     });
+    window._kmrGrandKm=grandKm;
     if(summaryEl)summaryEl.innerHTML=
       '<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">🛣️ Total KM</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+grandKm+' km</div></div>'
+      +'<div style="background:#fef9c3;border-radius:10px;padding:10px 16px;display:flex;flex-direction:column;justify-content:center;"><div style="font-size:11px;color:#a16207;font-weight:700;margin-bottom:2px;">⛽ Per KM ₹</div><input type="number" id="kmr-rate" value="3" min="0" step="0.5" oninput="kmrRecalcPetrol()" style="width:70px;font-size:18px;font-weight:800;color:#a16207;border:1px solid #fde68a;border-radius:6px;padding:2px 6px;text-align:center;"></div>'
+      +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">💰 Total Petrol ₹</div><div id="kmr-petrol-val" style="font-size:20px;font-weight:800;color:#c2410c;">₹'+(grandKm*3)+'</div></div>'
       +'<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">📅 Days</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+dayCount+'</div></div>'
-      +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">📸 Entries</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+logs.length+'</div></div>';
+      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">📸 Entries</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+logs.length+'</div></div>';
     window._kmrRows=excelRows;
     body.innerHTML=html;
   }catch(e){
     body.innerHTML='<div class="alert alert-danger">Error: '+e.message+'<br><br>If the km_logs table is missing, run this SQL in Supabase:<br><pre style="white-space:pre-wrap;font-size:11px;background:#f8fafc;padding:8px;border-radius:6px;">'+KM_SETUP_SQL+'</pre></div>';
   }
+}
+// Recompute the petrol amount when the per-KM rate changes (default ₹3).
+function kmrRecalcPetrol(){
+  var rate=parseFloat(document.getElementById('kmr-rate')?.value);
+  if(isNaN(rate)||rate<0)rate=0;
+  var km=window._kmrGrandKm||0;
+  var el=document.getElementById('kmr-petrol-val');
+  if(el)el.textContent='₹'+Math.round(km*rate*100)/100;
 }
 function downloadKmReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
