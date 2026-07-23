@@ -23670,7 +23670,7 @@ function skipKmEntry(){
 async function renderKmReport(){
   var pc=document.getElementById('page-content');
   var today=new Date().toLocaleDateString('en-CA');
-  var isEng=currentUser.role==='engineer';
+  var isEng=currentUser.role==='engineer'&&!window._isCspMgr;
   if(!isEng&&(!allEngineers||!allEngineers.length)){try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}}
   var engOpts='<option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+e.name+'</option>';}).join('');
   pc.innerHTML='<div class="card">'
@@ -23709,7 +23709,7 @@ async function loadKmReport(){
   var to=document.getElementById('kmr-to')?.value||'';
   if(!from||!to){body.innerHTML='';return;}
   body.innerHTML='<div class="loading">Loading...</div>';
-  var isEng=currentUser.role==='engineer';
+  var isEng=currentUser.role==='engineer'&&!window._isCspMgr;
   var _kmIsAdmin=currentUser.role==='admin'||window._isCspMgr;
   var engFilter=isEng?(currentUser.eng_id||currentUser.user_id):(document.getElementById('kmr-eng')?.value||'');
   try{
@@ -24474,7 +24474,7 @@ async function renderPendingList(){
   pc.innerHTML='<div style="padding:20px;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
   try{
     var tickets=await sb('tickets','GET',null,
-      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired'
+      '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired&status=neq.Resolved+By+Phone&status=neq.Pending+for+Delivery'
       +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
