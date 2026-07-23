@@ -3910,7 +3910,7 @@ async function renderDashboard(){
       </div>
       ${engChartHtml}
       ${chartHtml}
-      ${(currentUser.role==='admin'||currentUser.role_type==='work_controller')?`<div class="card" id="eng-live-status-card">
+      ${(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)?`<div class="card" id="eng-live-status-card">
         <div class="section-header" style="margin-bottom:12px;">
           <h2>👷 Engineer Live Status</h2>
           <button class="btn btn-primary btn-sm" onclick="loadEngLiveStatus()">🔄 Refresh</button>
@@ -3931,7 +3931,7 @@ async function renderDashboard(){
         </table></div>
       </div>`;
     // Load engineer live status for admin
-    if(currentUser.role==='admin'||currentUser.role_type==='work_controller'){loadEngLiveStatus();}
+    if(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr){loadEngLiveStatus();}
     // Inquiry followup check — only for Admin and ENG002/ENG008
     var canInqAlert=(currentUser.role==='admin'&&currentUser.role_type!=='work_controller')||(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
     if(canInqAlert) try{
@@ -4174,7 +4174,9 @@ async function doPunchIn(){
   var statusRow=document.createElement('div');
   statusRow.style.cssText='display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;';
   statusRow.innerHTML='<span id="pin-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS (move outdoors for best accuracy)...</span>'
-    +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>';
+    +'<span id="pin-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>'
+    +'<button id="pin-gps-retry" onclick="pinFetchGPS()" style="display:none;font-size:12px;background:#1d4ed8;color:#fff;border:none;padding:4px 12px;border-radius:20px;font-weight:700;cursor:pointer;">🔄 Retry GPS</button>'
+    +'<button id="pin-gps-nogps" onclick="pinAllowNoGps()" style="display:none;font-size:12px;background:#dc2626;color:#fff;border:none;padding:4px 12px;border-radius:20px;font-weight:700;cursor:pointer;">⚠️ Punch without GPS</button>';
   box.appendChild(statusRow);
 
   // Camera video
@@ -4319,45 +4321,55 @@ async function doPunchIn(){
   autoBar.innerHTML='✅ Face detected! Punching in automatically in <b id="pin-countdown">3</b>s...<br><button onclick="clearInterval(window._autoSubmitTimer);this.closest(\'#pin-auto-submit-bar\').style.display=\'none\';" style="margin-top:6px;padding:4px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;">Cancel Auto-Punch</button>';
   box.insertBefore(autoBar,btnRow);
 
-  // Get GPS (mandatory)
+  // Get GPS (mandatory) — with Retry + a "without GPS" fallback after 3 fails.
   window._pinLocCache=null;
   window._pinGpsReady=false;
+  window._pinGpsAttempts=0;
+  window._pinAllowNoGps=false;
+  pinFetchGPS();
+}
+// Fetch GPS for the Punch In modal; on repeated failure, offer Retry and (after
+// 3 attempts) a "Punch without GPS" fallback so an engineer is never fully stuck.
+function pinFetchGPS(){
+  window._pinGpsAttempts=(window._pinGpsAttempts||0)+1;
+  var gEl=document.getElementById('pin-gps-status');
+  if(gEl){gEl.style.background='#fef3c7';gEl.style.color='#92400e';gEl.textContent='📍 Fetching GPS...';}
+  var rb=document.getElementById('pin-gps-retry');if(rb)rb.style.display='none';
   getLocation().then(function(loc){
     window._pinLocCache=loc;
     window._pinGpsReady=!!loc;
-    var gEl=document.getElementById('pin-gps-status');
-    if(gEl){
+    var g=document.getElementById('pin-gps-status');
+    if(g){
       if(loc){
         var accLabel=loc.accuracy<=50?'✅ High Accuracy (±'+loc.accuracy+'m)':loc.accuracy<=200?'⚠️ Medium (±'+loc.accuracy+'m)':'⚠️ Low Accuracy (±'+loc.accuracy+'m — Move outdoors)';
         var accBg=loc.accuracy<=200?'#d1fae5':'#fef3c7';var accClr=loc.accuracy<=200?'#065f46':'#92400e';
-        gEl.style.background=accBg;gEl.style.color=accClr;gEl.textContent='📍 GPS: '+accLabel;
-      }else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
+        g.style.background=accBg;g.style.color=accClr;g.textContent='📍 GPS: '+accLabel;
+      }else{g.style.background='#fee2e2';g.style.color='#991b1b';g.textContent='❌ GPS Not Available — Location ON karo / Retry karo';}
     }
-    if(loc&&window._punchSelfieIn){
+    // Show Retry always on failure; show the no-GPS fallback after 3 attempts.
+    if(!loc){
+      var r=document.getElementById('pin-gps-retry');if(r)r.style.display='';
+      if(window._pinGpsAttempts>=3){var ng=document.getElementById('pin-gps-nogps');if(ng)ng.style.display='';}
+    }
+    if((loc||window._pinAllowNoGps)&&window._punchSelfieIn){
       var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;
-      // If selfie already captured (face detected), start auto-submit
-      var autoBar2=document.getElementById('pin-auto-submit-bar');
-      if(autoBar2&&autoBar2.style.display==='none'&&window._punchSelfieIn){
-        autoBar2.style.display='block';
-        var _countdown2=3;
-        window._autoSubmitTimer=setInterval(function(){
-          var cb=document.getElementById('pin-countdown');
-          if(cb)cb.textContent=_countdown2;
-          if(_countdown2<=0){
-            clearInterval(window._autoSubmitTimer);
-            var sm=document.getElementById('punch-in-modal');
-            if(sm){clearInterval(_pinTimer);doSavePunchIn(window._pinLocCache||null);sm.remove();}
-          }
-          _countdown2--;
-        },1000);
-      }
     }
   });
+}
+// Fallback: allow punch-in without a GPS fix (marked location-unavailable).
+function pinAllowNoGps(){
+  window._pinAllowNoGps=true;
+  var g=document.getElementById('pin-gps-status');
+  if(g){g.style.background='#fee2e2';g.style.color='#991b1b';g.textContent='⚠️ Punching WITHOUT GPS (location unavailable)';}
+  var ng=document.getElementById('pin-gps-nogps');if(ng)ng.style.display='none';
+  if(window._punchSelfieIn){var sb2=document.getElementById('pin-submit-btn');if(sb2)sb2.disabled=false;}
 }
 
 async function doSavePunchIn(loc){
   if(!window._punchSelfieIn){alert('📸 Selfie is required! Please take a selfie first.');return;}
-  if(!loc){alert('📍 GPS Location is required! Please allow location access and try again.');return;}
+  // GPS is required UNLESS the engineer used the "Punch without GPS" fallback
+  // after repeated failures (location then saved as unavailable).
+  if(!loc&&!window._pinAllowNoGps){alert('📍 GPS Location is required!\n\nLocation ON karo, permission Allow karo, ne 🔄 Retry karo.\n(3 var fail thay to "Punch without GPS" option aavse.)');return;}
   const key='punch_'+currentUser.user_id;
   const today=new Date().toLocaleDateString('en-CA');
   const now=new Date();
@@ -4404,13 +4416,54 @@ function doPunchOut(){
       // already a closing (covers direct-home after an afternoon trip too).
       var last=logs&&logs.length?logs[logs.length-1]:null;
       var needClosing=logs&&logs.some(function(l){return l.entry_type==='opening';})&&last&&last.entry_type!=='closing';
-      if(needClosing){openKmCapture({type:'closing',ticketId:null,onDone:function(){showPunchOutModal(ps,key);}});}
-      else showPunchOutModal(ps,key);
-    }).catch(function(){showPunchOutModal(ps,key);});
+      if(needClosing){openKmCapture({type:'closing',ticketId:null,onDone:function(){startPunchOutDailyReport(ps,key);}});}
+      else startPunchOutDailyReport(ps,key);
+    }).catch(function(){startPunchOutDailyReport(ps,key);});
     return;
   }
   // Show punch out modal
   showPunchOutModal(ps,key);
+}
+// At punch-out (engineers): show the Daily Report (auto-filled, with total KM)
+// FIRST — engineer submits & shares, or skips — then the regular punch-out
+// selfie flow runs. This is so the daily report is never forgotten.
+async function startPunchOutDailyReport(ps,key){
+  window._punchOutAfterReport={ps:ps,key:key};
+  // If today's Daily Report is already submitted, skip the popup entirely and
+  // go straight to the punch-out selfie (same idea as the KM auto-skip).
+  try{
+    var _drEng=currentUser.eng_id||currentUser.user_id;
+    var _drToday=new Date().toLocaleDateString('en-CA');
+    var _drDone=await sb('daily_reports','GET',null,'?eng_id=eq.'+encodeURIComponent(_drEng)+'&report_date=eq.'+_drToday+'&limit=1');
+    if(_drDone&&_drDone.length){_proceedPunchOutSelfie();return;}
+  }catch(e){/* on error, still show the report so it's never silently missed */}
+  openDailyReport();
+  // Add a Skip button + hint into the report modal footer (punch-out mode only).
+  setTimeout(function(){
+    var footer=document.querySelector('#modal-daily-report .modal-footer');
+    if(footer&&!document.getElementById('dr-skip-btn')){
+      var skip=document.createElement('button');
+      skip.id='dr-skip-btn';skip.className='btn btn-outline';
+      skip.style.cssText='color:#b45309;border-color:#fde68a;';
+      skip.textContent='⏭️ Skip (pachhi karish)';
+      skip.onclick=function(){closeModal('modal-daily-report');_proceedPunchOutSelfie();};
+      footer.insertBefore(skip,footer.firstChild);
+    }
+    var body=document.querySelector('#modal-daily-report .modal-body');
+    if(body&&!document.getElementById('dr-punchout-hint')){
+      var hint=document.createElement('div');
+      hint.id='dr-punchout-hint';
+      hint.style.cssText='background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 12px;font-size:12px;color:#4338ca;font-weight:600;margin-bottom:10px;';
+      hint.textContent='🕐 Punch Out — pehla Daily Report submit/share karo (auto bharai gayu chhe), pachhi selfie aavse. Athva Skip karo.';
+      body.insertBefore(hint,body.firstChild);
+    }
+  },60);
+}
+// Continue to the regular punch-out selfie after the report is submitted/shared/skipped.
+function _proceedPunchOutSelfie(){
+  var ctx=window._punchOutAfterReport;
+  window._punchOutAfterReport=null;
+  if(ctx&&ctx.ps&&ctx.key)showPunchOutModal(ctx.ps,ctx.key);
 }
 async function showPunchOutModal(ps,key){
   // Remove existing
@@ -4524,7 +4577,9 @@ async function showPunchOutModal(ps,key){
   var poutStatusRow=document.createElement('div');
   poutStatusRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
   poutStatusRow.innerHTML='<span id="pout-gps-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📍 Fetching GPS...</span>'
-    +'<span id="pout-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>';
+    +'<span id="pout-selfie-status" style="font-size:12px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:20px;font-weight:600;">📸 Selfie Pending</span>'
+    +'<button id="pout-gps-retry" onclick="poutFetchGPS()" style="display:none;font-size:12px;background:#1d4ed8;color:#fff;border:none;padding:4px 12px;border-radius:20px;font-weight:700;cursor:pointer;">🔄 Retry GPS</button>'
+    +'<button id="pout-gps-nogps" onclick="poutAllowNoGps()" style="display:none;font-size:12px;background:#dc2626;color:#fff;border:none;padding:4px 12px;border-radius:20px;font-weight:700;cursor:pointer;">⚠️ Punch out without GPS</button>';
   box.appendChild(poutStatusRow);
   // --- End Selfie Section ---
 
@@ -4553,23 +4608,43 @@ async function showPunchOutModal(ps,key){
   // Start punch-out selfie camera after modal is in DOM
   window._poutLocCache=null;
   window._poutGpsReady=false;
+  window._poutGpsAttempts=0;
+  window._poutAllowNoGps=false;
   setTimeout(function(){
     startPunchCamera('pout-selfie-video');
-    // Pre-fetch GPS (mandatory)
-    getLocation().then(function(loc){
-      window._poutLocCache=loc;
-      window._poutGpsReady=!!loc;
-      var gEl=document.getElementById('pout-gps-status');
-      if(gEl){
-        if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
-        else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available';}
-      }
-      if(loc&&window._punchSelfieOut){
-        var cb=document.getElementById('pout-confirm-btn');
-        if(cb){cb.disabled=false;cb.style.opacity='1';}
-      }
-    });
+    poutFetchGPS();
   },200);
+}
+// Punch-Out GPS fetch with Retry + a "without GPS" fallback after 3 fails.
+function poutFetchGPS(){
+  window._poutGpsAttempts=(window._poutGpsAttempts||0)+1;
+  var g0=document.getElementById('pout-gps-status');
+  if(g0){g0.style.background='#fef3c7';g0.style.color='#92400e';g0.textContent='📍 Fetching GPS...';}
+  var rb=document.getElementById('pout-gps-retry');if(rb)rb.style.display='none';
+  getLocation().then(function(loc){
+    window._poutLocCache=loc;
+    window._poutGpsReady=!!loc;
+    var gEl=document.getElementById('pout-gps-status');
+    if(gEl){
+      if(loc){gEl.style.background='#d1fae5';gEl.style.color='#065f46';gEl.textContent='📍 GPS Ready ✅';}
+      else{gEl.style.background='#fee2e2';gEl.style.color='#991b1b';gEl.textContent='❌ GPS Not Available — Location ON karo / Retry';}
+    }
+    if(!loc){
+      var r=document.getElementById('pout-gps-retry');if(r)r.style.display='';
+      if(window._poutGpsAttempts>=3){var ng=document.getElementById('pout-gps-nogps');if(ng)ng.style.display='';}
+    }
+    if((loc||window._poutAllowNoGps)&&window._punchSelfieOut){
+      var cb=document.getElementById('pout-confirm-btn');
+      if(cb){cb.disabled=false;cb.style.opacity='1';}
+    }
+  });
+}
+function poutAllowNoGps(){
+  window._poutAllowNoGps=true;
+  var g=document.getElementById('pout-gps-status');
+  if(g){g.style.background='#fee2e2';g.style.color='#991b1b';g.textContent='⚠️ Punching out WITHOUT GPS (location unavailable)';}
+  var ng=document.getElementById('pout-gps-nogps');if(ng)ng.style.display='none';
+  if(window._punchSelfieOut){var cb=document.getElementById('pout-confirm-btn');if(cb){cb.disabled=false;cb.style.opacity='1';}}
 }
 function previewPunchPhoto(input){
   const f=input.files[0];if(!f)return;
@@ -4582,7 +4657,7 @@ function previewPunchPhoto(input){
 }
 async function savePunchOut(key){
   if(!window._punchSelfieOut){alert('📸 Selfie is required! Please take a selfie first.');return;}
-  if(!window._poutLocCache){alert('📍 GPS Location is required! Location not found, please try again.');return;}
+  if(!window._poutLocCache&&!window._poutAllowNoGps){alert('📍 GPS Location is required!\n\nLocation ON karo, permission Allow karo, ne 🔄 Retry karo.\n(3 var fail thay to "Punch out without GPS" option aavse.)');return;}
   var outLoc=window._poutLocCache;
   const meter=document.getElementById('pout-meter')?.value||'';
 
@@ -8245,7 +8320,10 @@ async function renderReportOverview(c){
       if(!byEng[k])byEng[k]={total:0,closed:0,rev:0,cancel:0,parts:0,service:0,labor:0,count:0};
       byEng[k].total++;
       byEng[k].count++;
-      if(t.status==='Closed')byEng[k].closed++;
+      // Count ALL done statuses as closed (Closed/Delivered/Repaired/Pending for
+      // Delivery/Resolved By Phone) so the engineer closed count & rate match the
+      // Engineer Daily Report, instead of only exact 'Closed'.
+      if(isTicketClosed(t))byEng[k].closed++;
       if(t.status==='Call Cancel')byEng[k].cancel++;
       // Parts — all spares (requested + manual)
       const sp=(t.spares||[]).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
@@ -8267,7 +8345,7 @@ async function renderReportOverview(c){
       const m=new Date(t.created_at).toLocaleString('en-IN',{month:'short',year:'numeric'});
       if(!byMonth[m])byMonth[m]={total:0,closed:0,warranty:0,nw:0};
       byMonth[m].total++;
-      if(t.status==='Closed')byMonth[m].closed++;
+      if(isTicketClosed(t))byMonth[m].closed++;
       if(t.call_type&&t.call_type.includes('Warranty'))byMonth[m].warranty++;
       if(t.call_type&&(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat'))byMonth[m].nw++;
     });
@@ -8397,7 +8475,7 @@ async function renderReportOverview(c){
               const fin=parseFloat(t.final_charges)||0;
               return a+(fin>0?fin:(svc+sp));
             },0);
-            const nwClosed=nwTickets.filter(t=>t.status==='Closed').length;
+            const nwClosed=nwTickets.filter(isTicketClosed).length;
             const avgNwRev=nwClosed?Math.round(nwRev/nwClosed):0;
             // Warranty mix
             const wCount=allTickets.filter(t=>(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC')&&t.warranty_coverage!=='Out of Coverage').length;
@@ -12588,7 +12666,10 @@ async function doWorkStart(ticketId){
     // KM TRACKING — Arrival KM odometer photo at the customer (On Site only, once
     // per ticket per day). Forced only if admin keeps it compulsory (Field Rules);
     // if optional, the engineer can still use the "Reached Location" button.
-    if(currentUser.role==='engineer'&&t&&t.service_type==='On Site'&&isFieldRequired('call_close','km_arrival_photo')){
+    // If the engineer already SKIPPED the arrival KM (at Reached Location), do
+    // NOT ask again here — the skip is deferred to the next call's Visit Start.
+    var _wsSkipPending=!!localStorage.getItem('kmSkip_'+(currentUser.eng_id||currentUser.user_id)+'_'+dateIn);
+    if(!_wsSkipPending&&currentUser.role==='engineer'&&t&&t.service_type==='On Site'&&isFieldRequired('call_close','km_arrival_photo')){
       try{
         var _kmL=await kmTodayLogs();
         if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
@@ -13507,7 +13588,7 @@ function showDailyReportShare(d){
     '<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
     +'<div style="padding:16px 18px 12px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">'
     +'<span style="font-size:16px;font-weight:700;">✅ Report Submitted!</span>'
-    +'<button onclick="document.getElementById(\'dr-share-panel\').remove();" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
+    +'<button onclick="closeDailyShare()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>'
     +'</div>'
     +'<div style="padding:14px 18px;flex:1;overflow-y:auto;">'
     +'<p style="font-size:12px;color:#6b7280;margin-bottom:8px;">The following message will be copied to share on WhatsApp:</p>'
@@ -13521,6 +13602,16 @@ function showDailyReportShare(d){
   document.body.appendChild(panel);
   document.getElementById('dr-share-text').textContent=text;
   document.getElementById('dr-wa-btn').href='https://wa.me/?text='+encodeURIComponent(text);
+  // In punch-out mode, add a clear "Done → Punch Out" note on the WhatsApp button.
+  if(window._punchOutAfterReport){
+    var wa=document.getElementById('dr-wa-btn');
+    if(wa)wa.addEventListener('click',function(){setTimeout(closeDailyShare,400);});
+  }
+}
+// Close the share panel; if this was part of punch-out, continue to the selfie.
+function closeDailyShare(){
+  var p=document.getElementById('dr-share-panel');if(p)p.remove();
+  _proceedPunchOutSelfie();
 }
 
 function drCopyReport(){
@@ -13868,7 +13959,7 @@ function capturePunchSelfie(videoId,previewId,captureBtn,retakeBtn,submitBtn){
   var sEl=document.getElementById('pin-selfie-status');
   if(sEl){sEl.style.background='#d1fae5';sEl.style.color='#065f46';sEl.textContent='📸 Selfie Done ✅';}
   // Enable submit only when GPS is also ready
-  if(submitBtn)submitBtn.disabled=!window._pinGpsReady;
+  if(submitBtn)submitBtn.disabled=!(window._pinGpsReady||window._pinAllowNoGps);
 }
 function capturePunchOutSelfie(){
   var vid=document.getElementById('pout-selfie-video');if(!vid)return;
@@ -13893,7 +13984,8 @@ function capturePunchOutSelfie(){
   if(sEl){sEl.style.background='#d1fae5';sEl.style.color='#065f46';sEl.textContent='📸 Selfie Done ✅';}
   // Enable confirm only when GPS is also ready
   var cb=document.getElementById('pout-confirm-btn');
-  if(cb){cb.disabled=!window._poutGpsReady;cb.style.opacity=window._poutGpsReady?'1':'0.5';}
+  var _poutOk=window._poutGpsReady||window._poutAllowNoGps;
+  if(cb){cb.disabled=!_poutOk;cb.style.opacity=_poutOk?'1':'0.5';}
 }
 
 // ===== ADMIN LIVE MAP =====
@@ -23306,7 +23398,7 @@ async function startKmCamera(){
 function closeKmCapture(){stopKmCamera();var m=document.getElementById('modal-km-capture');if(m)m.remove();}
 function openKmCapture(opts){
   _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmRefMax=null;_kmOcrValue=null;
-  loadTesseractLib().catch(function(){}); // warm up OCR lib while engineer frames the shot
+  // OCR removed — engineer types the reading manually (auto-read gave wrong values).
   var titles={opening:'🏢 Opening KM — Day Start',arrival:'📍 Arrival KM — Reached Customer',closing:'🏁 Closing KM — Day End'};
   var title=titles[opts.type]||'Odometer KM';
   var sub=opts.type==='arrival'&&opts.ticketId?('Call: '+opts.ticketId):'';
@@ -23386,7 +23478,7 @@ function captureKmPhoto(){
   var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='none';
   var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='';
   stopKmCamera();
-  runKmOcr(canvas); // auto-read the meter digits → pre-fills the reading field
+  // (OCR removed — reading is typed manually.)
 }
 function retakeKmPhoto(){
   _kmPhotoData=null;_kmOcrValue=null;
@@ -23618,6 +23710,7 @@ async function loadKmReport(){
   if(!from||!to){body.innerHTML='';return;}
   body.innerHTML='<div class="loading">Loading...</div>';
   var isEng=currentUser.role==='engineer';
+  var _kmIsAdmin=currentUser.role==='admin'||window._isCspMgr;
   var engFilter=isEng?(currentUser.eng_id||currentUser.user_id):(document.getElementById('kmr-eng')?.value||'');
   try{
     var q='?log_date=gte.'+from+'&log_date=lte.'+to+(engFilter?'&eng_id=eq.'+encodeURIComponent(engFilter):'')+'&order=eng_id.asc,captured_at.asc';
@@ -23663,8 +23756,10 @@ async function loadKmReport(){
         var ticketCell=l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—';
         var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
         var gpsCell=(l.lat&&l.lng)?'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>':'—';
+        var _kmEdited=l.edit_remark?' <span title="Edited: '+escHtml(l.edit_remark)+(l.corrected_by?' — '+escHtml(l.corrected_by):'')+'" style="color:#d97706;cursor:help;">✎</span>':'';
+        var _kmEditBtn=_kmIsAdmin?' <button class="btn-icon" title="Edit reading (with remark)" onclick="editKmReading('+l.id+','+(isNaN(kmN)?0:kmN)+')" style="font-size:12px;">✏️</button>':'';
         rowsHtml+='<tr><td>'+tm+'</td><td>'+(typeLabel[l.entry_type]||l.entry_type)+'</td><td>'+ticketCell+'</td>'
-          +'<td style="text-align:right;font-weight:700;">'+(isNaN(kmN)?'—':kmN)+'</td>'
+          +'<td style="text-align:right;font-weight:700;">'+(isNaN(kmN)?'—':kmN)+_kmEdited+_kmEditBtn+'</td>'
           +'<td style="text-align:right;font-weight:700;color:#0d9488;">'+(seg===''?'—':('+'+seg+' km'))+'</td>'
           +'<td style="text-align:center;">'+photoCell+'</td><td style="text-align:center;">'+gpsCell+'</td></tr>';
         excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
@@ -23708,6 +23803,27 @@ function kmrRecalcPetrol(){
   var km=window._kmrGrandKm||0;
   var el=document.getElementById('kmr-petrol-val');
   if(el)el.textContent='₹'+Math.round(km*rate*100)/100;
+}
+// Admin: edit a KM reading with a mandatory remark (for wrong/mistyped readings).
+async function editKmReading(id,curKm){
+  var nv=prompt('Navu odometer reading (KM):',curKm||'');
+  if(nv===null)return;
+  var num=parseFloat(nv);
+  if(isNaN(num)||num<0){alert('⚠️ Barabar number nakho.');return;}
+  var remark=prompt('Edit nu karan / remark (farjiyat):','');
+  if(remark===null)return;
+  if(!remark.trim()){alert('⚠️ Remark farjiyat chhe — kem edit karyu ae lakho.');return;}
+  try{
+    await sb('km_logs','PATCH',{odometer_km:num,edit_remark:remark.trim(),corrected_by:currentUser.name,edited_at:new Date().toISOString()},'?id=eq.'+id);
+    loadKmReport();
+  }catch(e){
+    // edit_remark/edited_at column may be missing — retry with just the reading + editor.
+    if(String(e&&e.message).indexOf('edit_remark')!==-1||String(e&&e.message).indexOf('edited_at')!==-1){
+      try{await sb('km_logs','PATCH',{odometer_km:num,corrected_by:currentUser.name},'?id=eq.'+id);loadKmReport();
+        alert('Reading update thai — pan remark save mate Supabase ma aa run karo:\nALTER TABLE public.km_logs ADD COLUMN IF NOT EXISTS edit_remark TEXT;\nALTER TABLE public.km_logs ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;');
+      }catch(e2){alert('Error: '+e2.message);}
+    }else alert('Error: '+e.message);
+  }
 }
 function downloadKmReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
