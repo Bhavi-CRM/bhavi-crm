@@ -513,7 +513,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Physical JS No</label><input type="text" id="call-phys-js"></div>
         <div class="form-group" style="grid-column:1/-1;">
           <label>Canon Call Received Date &amp; Time <small style="color:var(--text-muted);">(CSP/Warranty)</small></label>
-          <input type="datetime-local" id="call-canon-recv" oninput="autoCalcCallTAT()" style="width:100%;border:1px solid #86efac;border-radius:8px;padding:7px 12px;font-size:13px;outline:none;box-sizing:border-box;">
+          <div id="call-canon-recv-wrap"></div>
           <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours</div>
           <div id="call-tat-preview" style="display:none;margin-top:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:12px;color:#166534;font-weight:600;"></div>
           <input type="hidden" id="call-tat-date">
@@ -3980,7 +3980,7 @@ async function loadEngLiveStatus(){
     const ticketIds=[...new Set((openLogs||[]).filter(l=>l.ticket_id).map(l=>l.ticket_id))];
     let ticketMap={};
     if(ticketIds.length){
-      const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,area,address,pin,model,problem,status').catch(()=>[]);
+      const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,area,address,pin,model,problem,status,service_type').catch(()=>[]);
       tks.forEach(t=>{ticketMap[t.id]=t;});
     }
     const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
@@ -4020,8 +4020,10 @@ async function loadEngLiveStatus(){
       if(ol){
         const isTravel=ol.log_type==='travel';
         const isWork=ol.log_type==='work';
+        const _olTk=ol.ticket_id?ticketMap[ol.ticket_id]:null;
+        const _isCarryIn=_olTk&&_olTk.service_type==='Carry In';
         if(isTravel) statusHtml='<span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">🚗 Traveling</span>';
-        else if(isWork) statusHtml='<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">🔧 On Site / Working</span>';
+        else if(isWork) statusHtml=_isCarryIn?'<span style="background:#ede9fe;color:#6d28d9;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">📦 Carry In / Working</span>':'<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">🔧 On Site / Working</span>';
         else statusHtml='<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:700;">⚙️ Active</span>';
         if(ol.ticket_id){
           const tk=ticketMap[ol.ticket_id];
@@ -5131,13 +5133,19 @@ async function renderMyCalls(){
               tatHtml='<span style="background:'+tbg+';color:'+tcol+';padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;">'+tlabel+'</span><div style="font-size:10px;color:'+tcol+';">⏰ '+tleft+'</div>';
             }
           }
+          // Route-sequence badge like the pending list: engineer initial + seq
+          // (e.g. Yogesh → Y1, Y2 · Gaurav → G1, G2). Falls back to position.
+          var _seqN=t.sequence_no||(i+1);
+          var _pfx=((t.assigned_name||currentUser.name||'').trim().charAt(0)||'#').toUpperCase();
           return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
-            +'<div style="width:28px;height:28px;background:#1d4ed8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">'+(i+1)+'</div>'
+            +'<div style="min-width:34px;height:34px;padding:0 6px;background:#1d4ed8;color:#fff;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">'+_pfx+_seqN+'</div>'
             +'<div style="flex:1;min-width:0;">'
-            +'<div style="font-weight:700;font-size:13px;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
-            +'<div style="font-size:12px;color:var(--text-muted);">'+(t.cname||'-')+' &nbsp;·&nbsp; '+(t.area||t.city||'-')+'</div>'
-            +'<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'+(t.model||'-')+'</div>'
-            +((t.address||t.area||t.city)?'<div style="font-size:11px;color:#166534;margin-top:2px;">📍 '+[t.address,t.area,t.city].filter(Boolean).join(', ')+'&nbsp;<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([t.address,t.area,t.city,t.state].filter(Boolean).join(', '))+'" target="_blank" style="color:#1d4ed8;font-weight:600;">🗺️ Maps</a></div>':'')
+            +'<div style="font-weight:700;font-size:11px;color:#1d4ed8;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
+            +'<div style="font-weight:800;font-size:15px;margin-top:1px;">'+(t.cname||'-')+'</div>'
+            +'<div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+            +'<span style="background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;">📱 '+(t.model||'-')+'</span>'
+            +'<span style="background:#ecfeff;color:#0369a1;font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;">📍 '+(t.area||t.city||'-')+'</span>'
+            +'</div>'
             +(tatHtml?'<div style="margin-top:4px;">'+tatHtml+'</div>':'')
             +'</div>'
             +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'
@@ -5234,7 +5242,11 @@ async function openNewCall(){
     await loadMasterData();
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
-  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-email','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date','call-canon-recv'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-email','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Canon received time — 12-hour (AM/PM) picker, injected once into its wrap.
+  var _crWrap=document.getElementById('call-canon-recv-wrap');
+  if(_crWrap&&!document.getElementById('call-canon-recv-date')){_crWrap.innerHTML=_tat12Controls('call-canon-recv','autoCalcCallTAT()');}
+  _tat12Clear('call-canon-recv');
   var _tp=document.getElementById('call-tat-preview');if(_tp){_tp.style.display='none';_tp.textContent='';}
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
@@ -5273,11 +5285,15 @@ async function openNewCall(){
   applyCallDefaultsForWC();
   openModal('modal-call');
 }
-// Pre-select Brand=Canon + Sub-Category=CSP for the CSP work controller (WC002).
+// Pre-select Brand=Canon + Sub-Category=CSP for the CSP work controller (WC002)
+// and for the field engineers who mostly log Canon/CSP calls (ENG001, ENG003,
+// ENG004, ENG005, ENG006). Fully changeable by the user afterwards.
 function applyCallDefaultsForWC(){
   try{
-    var uid=(currentUser&&(currentUser.user_id||currentUser.eng_id))||'';
-    if(uid!=='WC002')return;
+    var uid=(currentUser&&currentUser.user_id)||'';
+    var eid=(currentUser&&currentUser.eng_id)||'';
+    var _canonIds=['WC002','ENG001','ENG003','ENG004','ENG005','ENG006'];
+    if(_canonIds.indexOf(uid)<0&&_canonIds.indexOf(eid)<0)return;
     var brandDrop=document.getElementById('call-brand-input');
     if(!brandDrop||brandDrop.tagName!=='SELECT')return;
     var canon=Array.prototype.slice.call(brandDrop.options).find(function(o){return o.text.trim().toLowerCase()==='canon';});
@@ -5753,57 +5769,96 @@ async function checkTATReminder(){
     document.body.appendChild(m);
   }catch(e){}
 }
+// ── 12-hour date+time picker helpers (AM/PM) ──────────────────────────────
+// Native datetime-local shows 24h on many devices (locale-driven, not
+// controllable from HTML). These build an explicit 12-hour picker: a date box
+// + hour (1-12) + minute + AM/PM, so WC always sees / sets AM · PM.
+function _tat12Controls(prefix,onchange){
+  var hopts='';for(var h=1;h<=12;h++)hopts+='<option value="'+h+'">'+h+'</option>';
+  var oc=onchange?(' oninput="'+onchange+'" onchange="'+onchange+'"'):'';
+  return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
+    +'<input type="date" id="'+prefix+'-date"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">'
+    +'<select id="'+prefix+'-hh"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;outline:none;font-weight:700;">'+hopts+'</select>'
+    +'<span style="font-weight:800;">:</span>'
+    +'<input type="number" id="'+prefix+'-mm" min="0" max="59" value="00" placeholder="mm"'+oc+' style="width:58px;border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;outline:none;text-align:center;">'
+    +'<select id="'+prefix+'-ap"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 8px;font-size:13px;outline:none;font-weight:800;color:#1d4ed8;"><option value="AM">AM</option><option value="PM">PM</option></select>'
+    +'</div>';
+}
+function _tat12Read(prefix){
+  var dv=document.getElementById(prefix+'-date');
+  if(!dv||!dv.value)return null;
+  var hh=document.getElementById(prefix+'-hh');
+  var mm=document.getElementById(prefix+'-mm');
+  var ap=document.getElementById(prefix+'-ap');
+  var h=parseInt(hh&&hh.value)||12;
+  var m=parseInt(mm&&mm.value);if(isNaN(m)||m<0)m=0;if(m>59)m=59;
+  var apv=(ap&&ap.value)||'AM';
+  var h24=h%12;if(apv==='PM')h24+=12;
+  var p=dv.value.split('-');
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]),h24,m,0,0);
+  return isNaN(d)?null:d;
+}
+function _tat12Write(prefix,d){
+  if(!d)return;
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var dv=document.getElementById(prefix+'-date');if(dv)dv.value=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var h=d.getHours();var apv=h>=12?'PM':'AM';var h12=h%12;if(h12===0)h12=12;
+  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value=String(h12);
+  var mm=document.getElementById(prefix+'-mm');if(mm)mm.value=pad(d.getMinutes());
+  var ap=document.getElementById(prefix+'-ap');if(ap)ap.value=apv;
+}
+function _tat12Clear(prefix){
+  var dv=document.getElementById(prefix+'-date');if(dv)dv.value='';
+  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value='12';
+  var mm=document.getElementById(prefix+'-mm');if(mm)mm.value='00';
+  var ap=document.getElementById(prefix+'-ap');if(ap)ap.value='AM';
+}
 function openSetTAT(ticketId, currentTAT){
   var pad=function(n){return String(n).padStart(2,'0');};
-  var existing='';
+  var existingDate=null;
   if(currentTAT){
-    var isDO=/T00:00:00/.test(currentTAT);
-    var dx=new Date(currentTAT);
-    if(isDO){existing=dx.getUTCFullYear()+'-'+pad(dx.getUTCMonth()+1)+'-'+pad(dx.getUTCDate())+'T23:59';}
-    else{existing=dx.getFullYear()+'-'+pad(dx.getMonth()+1)+'-'+pad(dx.getDate())+'T'+pad(dx.getHours())+':'+pad(dx.getMinutes());}
+    var _isDO=/T00:00:00/.test(currentTAT);var _dx=new Date(currentTAT);
+    existingDate=_isDO?new Date(_dx.getUTCFullYear(),_dx.getUTCMonth(),_dx.getUTCDate(),23,59):new Date(currentTAT);
   }
   var existingDisplay=currentTAT?new Date(currentTAT).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'';
   var old=document.getElementById('modal-set-tat');if(old)old.remove();
   var m=document.createElement('div');m.className='modal-overlay';m.id='modal-set-tat';
-  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">'
     +'<div class="modal-header"><h2>⏱ Set TAT Deadline</h2><button class="close-btn" onclick="document.getElementById(\'modal-set-tat\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +(existing?'<div style="font-size:12px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 10px;margin-bottom:12px;">Current TAT: <b>'+existingDisplay+'</b></div>':'')
+    +(currentTAT?'<div style="font-size:12px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 10px;margin-bottom:12px;">Current TAT: <b>'+existingDisplay+'</b></div>':'')
     +'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-bottom:14px;">'
     +'<div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:6px;">📅 Canon Portal — Call Received Date &amp; Time</div>'
-    +'<input type="datetime-local" id="tat-received-input" oninput="autoCalcTAT()" style="border:1px solid #86efac;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'
+    +_tat12Controls('tat-received','autoCalcTAT()')
     +'<div style="font-size:11px;color:#166534;margin-top:5px;">Enter exact time from Canon system → TAT deadline auto-set to next day same time</div>'
     +'</div>'
     +'<div class="form-group">'
     +'<label>TAT Deadline Date &amp; Time <span style="font-size:11px;color:#6b7280;">(auto-filled above, or set manually)</span></label>'
-    +'<input type="datetime-local" id="tat-set-input" value="'+existing+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;outline:none;box-sizing:border-box;">'
+    +_tat12Controls('tat-set',null)
     +'</div>'
-    +'<div style="font-size:12px;color:#6b7280;margin-top:4px;">⚠️ Overdue = red &nbsp;|&nbsp; &lt;24h left = yellow with countdown &nbsp;|&nbsp; Leave blank to clear.</div>'
+    +'<div style="font-size:12px;color:#6b7280;margin-top:4px;">⚠️ Overdue = red &nbsp;|&nbsp; &lt;24h left = yellow with countdown &nbsp;|&nbsp; Leave date blank to clear.</div>'
     +'</div>'
     +'<div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-set-tat\').remove()">Cancel</button>'
     +'<button class="btn btn-primary" onclick="saveTATDate(\''+ticketId+'\')">💾 Save TAT</button>'
     +'</div></div>';
   document.body.appendChild(m);
+  _tat12Clear('tat-received');_tat12Clear('tat-set');
+  if(existingDate)_tat12Write('tat-set',existingDate);
 }
 function autoCalcTAT(){
-  var recv=document.getElementById('tat-received-input')?.value;
-  if(!recv)return;
-  var d=new Date(recv);
-  d.setDate(d.getDate()+1); // next day, same time
-  var pad=function(n){return String(n).padStart(2,'0');};
-  var nextDT=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
-  var tatInput=document.getElementById('tat-set-input');
-  if(tatInput)tatInput.value=nextDT;
+  var d=_tat12Read('tat-received');
+  if(!d)return;
+  var nd=new Date(d.getTime());
+  nd.setDate(nd.getDate()+1); // next day, same time
+  _tat12Write('tat-set',nd);
 }
 function autoCalcCallTAT(){
-  var recv=document.getElementById('call-canon-recv')?.value;
+  var recvD=_tat12Read('call-canon-recv');
   var preview=document.getElementById('call-tat-preview');
   var hidden=document.getElementById('call-tat-date');
-  if(!recv){if(preview)preview.style.display='none';if(hidden)hidden.value='';return;}
-  var d=new Date(recv);
-  d.setTime(d.getTime()+24*3600000); // +24 hours exactly
-  var pad=function(n){return String(n).padStart(2,'0');};
+  if(!recvD){if(preview)preview.style.display='none';if(hidden)hidden.value='';return;}
+  var d=new Date(recvD.getTime()+24*3600000); // +24 hours exactly
   var iso=d.toISOString();
   if(hidden)hidden.value=iso;
   if(preview){
@@ -5813,10 +5868,10 @@ function autoCalcCallTAT(){
   }
 }
 async function saveTATDate(ticketId){
-  var val=document.getElementById('tat-set-input')?.value;
-  var recv=document.getElementById('tat-received-input')?.value;
-  var tatIso=val?new Date(val).toISOString():null;
-  var recvNote=recv?' | Canon received: '+new Date(recv).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
+  var setD=_tat12Read('tat-set');
+  var recvD=_tat12Read('tat-received');
+  var tatIso=setD?setD.toISOString():null;
+  var recvNote=recvD?' | Canon received: '+recvD.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
   try{
     var t=(await sb('tickets','GET',null,'?id=eq.'+ticketId))[0];
     var tatDisplay=tatIso?new Date(tatIso).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'';
@@ -25779,8 +25834,8 @@ function applyJobsheetFields(f){
   if(recvRaw){
     if(recvRaw.length===10)recvRaw+='T00:00';
     recvRaw=recvRaw.slice(0,16);
-    var rEl=document.getElementById('call-canon-recv');
-    if(rEl){rEl.value=recvRaw;rEl.style.background='#fef9c3';try{autoCalcCallTAT();}catch(e){}count++;}
+    var _rd=new Date(recvRaw);
+    if(!isNaN(_rd)&&document.getElementById('call-canon-recv-date')){_tat12Write('call-canon-recv',_rd);try{autoCalcCallTAT();}catch(e){}count++;}
   }
   // Location: state → city → pin (order matters; city/state resets pin)
   aiFillLocation(f.state,f.city,f.pin_code,f.locality);
