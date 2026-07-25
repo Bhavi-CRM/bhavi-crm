@@ -8745,11 +8745,65 @@ async function downloadFilteredReport(format){
     const _fmtT=iso=>{if(!iso)return '';return new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});};
     const _dur=(isoFrom,dateStr,hhMM)=>{if(!isoFrom||!hhMM||!dateStr)return '';try{const from=new Date(isoFrom);const to=new Date(dateStr+'T'+hhMM+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
     const _dur2=(dateStr,h1,h2)=>{if(!h1||!h2||!dateStr)return '';try{const from=new Date(dateStr+'T'+h1+':00');const to=new Date(dateStr+'T'+h2+':00');const m=Math.round((to-from)/60000);if(m<=0)return '';const h=Math.floor(m/60),mn=m%60;return h>0?h+'h '+(mn>0?mn+'m':''):(mn+'m');}catch(e){return '';}};
+    // ── KM enrichment (additive, fully guarded) ──────────────────────────────
+    // Fill Meter Start / Meter End and add a "Call KM" column straight from the
+    // KM tracking module (km_logs). For each call, the engineer's "arrival"
+    // reading is the Meter End; the reading captured just before it (same
+    // engineer, same day) is the Meter Start; the difference is the KM travelled
+    // for that call. If km_logs is unavailable the export silently falls back to
+    // the old ticket fields, so this can never break the existing report.
+    var _kmMap={};
+    try{
+      var _tids=tickets.map(t=>t.id).filter(Boolean);
+      if(_tids.length){
+        var _arr=[];
+        for(var _i=0;_i<_tids.length;_i+=80){
+          var _chunk=_tids.slice(_i,_i+80).map(x=>'"'+String(x).replace(/"/g,'')+'"').join(',');
+          var _part=await sbAll('km_logs','?entry_type=eq.arrival&ticket_id=in.('+_chunk+')&select=id,ticket_id,eng_id,log_date,captured_at,odometer_km');
+          if(_part&&_part.length)_arr=_arr.concat(_part);
+        }
+        if(_arr.length){
+          var _engSet={},_minD=null,_maxD=null;
+          _arr.forEach(a=>{if(a.eng_id)_engSet[a.eng_id]=1;if(a.log_date){if(!_minD||a.log_date<_minD)_minD=a.log_date;if(!_maxD||a.log_date>_maxD)_maxD=a.log_date;}});
+          var _engIds=Object.keys(_engSet),_allLogs=[];
+          if(_engIds.length&&_minD&&_maxD){
+            var _eq=_engIds.map(x=>'"'+String(x).replace(/"/g,'')+'"').join(',');
+            _allLogs=await sbAll('km_logs','?eng_id=in.('+_eq+')&log_date=gte.'+_minD+'&log_date=lte.'+_maxD+'&odometer_km=not.is.null&select=id,ticket_id,eng_id,log_date,captured_at,odometer_km&order=captured_at.asc');
+          }
+          var _grp={};
+          (_allLogs||[]).forEach(l=>{var k=l.eng_id+'|'+l.log_date;(_grp[k]=_grp[k]||[]).push(l);});
+          Object.keys(_grp).forEach(k=>_grp[k].sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at)));
+          // per-arrival segment: previous valid reading → this arrival reading
+          var _segById={};
+          _arr.forEach(a=>{
+            var seq=_grp[a.eng_id+'|'+a.log_date]||[];
+            var end=parseFloat(a.odometer_km),start=null,idx=-1;
+            for(var j=0;j<seq.length;j++){if(seq[j].id===a.id){idx=j;break;}}
+            for(var p=idx-1;p>=0;p--){var pv=parseFloat(seq[p].odometer_km);if(!isNaN(pv)){start=pv;break;}}
+            _segById[a.id]={start:start,end:isNaN(end)?null:end,at:a.captured_at,km:(start!==null&&!isNaN(end)&&end>=start)?(end-start):null};
+          });
+          // aggregate per ticket (a ticket may have multiple visits/arrivals)
+          _arr.forEach(a=>{
+            var s=_segById[a.id];if(!s)return;
+            var m=_kmMap[a.ticket_id];
+            if(!m){m={start:null,end:null,km:0,has:false,firstAt:null,lastAt:null};_kmMap[a.ticket_id]=m;}
+            if(m.firstAt===null||(s.at&&new Date(s.at)<new Date(m.firstAt))){m.firstAt=s.at;m.start=s.start;}
+            if(m.lastAt===null||(s.at&&new Date(s.at)>new Date(m.lastAt))){m.lastAt=s.at;m.end=s.end;}
+            if(s.km!==null)m.km+=s.km;
+            m.has=true;
+          });
+        }
+      }
+    }catch(_ke){console.log('KM export enrich skipped:',_ke&&_ke.message);_kmMap={};}
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
       const grand=partsTotal+(parseFloat(t.labor)||0)+(parseFloat(t.other_charge)||0);
       const vsISO=_getVS(t);
+      const _km=_kmMap[t.id];
+      const _mStart=(_km&&_km.start!=null)?_km.start:(t.meter_start||'');
+      const _mEnd=(_km&&_km.end!=null)?_km.end:(t.meter_end||'');
+      const _callKm=(_km&&_km.has&&_km.km>0)?_km.km:'';
       return {
         'Ticket No':t.id,'Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-',
         'Customer':t.cname,'Mobile':t.mobile,'Alt Mobile':t.alt_mobile||'',
@@ -8764,7 +8818,7 @@ async function downloadFilteredReport(format){
         'Travel Time':_dur(vsISO,t.visit_date,t.visit_in),
         'Time Out':t.visit_out||'',
         'Repair Time':_dur2(t.visit_date,t.visit_in,t.visit_out),
-        'Meter Start':t.meter_start||'','Meter End':t.meter_end||'',
+        'Meter Start':_mStart,'Meter End':_mEnd,'Call KM':_callKm,
         'Parts Used':sp.map(s=>s.code+' '+s.name+' x'+s.qty).join('; '),
         'Parts Total':partsTotal.toFixed(2),'Labor':t.labor||0,'Other':t.other_charge||0,
         'Grand Total':grand.toFixed(2)
