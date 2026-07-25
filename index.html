@@ -12717,18 +12717,21 @@ async function doWorkStart(ticketId){
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
 
-    // KM TRACKING — Arrival KM odometer photo at the customer (On Site only, once
-    // per ticket per day). Forced only if admin keeps it compulsory (Field Rules);
-    // if optional, the engineer can still use the "Reached Location" button.
-    // If the engineer already SKIPPED the arrival KM (at Reached Location), do
-    // NOT ask again here — the skip is deferred to the next call's Visit Start.
-    var _wsSkipPending=!!localStorage.getItem('kmSkip_'+(currentUser.eng_id||currentUser.user_id)+'_'+dateIn);
-    if(!_wsSkipPending&&currentUser.role==='engineer'&&t&&t.service_type==='On Site'&&isFieldRequired('call_close','km_arrival_photo')){
+    // KM TRACKING — Work Start NEVER opens a KM popup. (Earlier it re-asked the
+    // arrival KM here, which blocked work even after Reached Location / Skip.)
+    // Arrival KM is captured only at the "📍 Reached Location" button (skippable).
+    // If the engineer jumped straight to Work Start without recording it — and
+    // hasn't already skipped — we just defer the arrival KM to the NEXT call's
+    // Visit Start (travel start), where it is mandatory, by setting the same
+    // skip flag. So Work Start is never blocked, yet the KM is still collected.
+    if(currentUser.role==='engineer'&&t&&t.service_type==='On Site'&&isFieldRequired('call_close','km_arrival_photo')){
       try{
-        var _kmL=await kmTodayLogs();
-        if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
-          openKmCapture({type:'arrival',ticketId:ticketId,onDone:function(){doWorkStart(ticketId);}});
-          return;
+        var _skipKey='kmSkip_'+(currentUser.eng_id||currentUser.user_id)+'_'+dateIn;
+        if(!localStorage.getItem(_skipKey)){
+          var _kmL=await kmTodayLogs();
+          if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id===ticketId;})){
+            localStorage.setItem(_skipKey,ticketId);
+          }
         }
       }catch(_ke){}
     }
@@ -20086,14 +20089,16 @@ async function loadWorkLogReport(){
     // Area lookup: show each ticket's customer area/city so it's clear where
     // the engineer travelled to. Fetched once from the referenced tickets.
     var _wlrAreaMap={};
+    var _wlrSvcMap={};
     try{
       var _wtids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
       if(_wtids.length){
-        var _wtk=await sbAll('tickets','?id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city');
-        (_wtk||[]).forEach(function(t){_wlrAreaMap[t.id]=t.area||t.city||'';});
+        var _wtk=await sbAll('tickets','?id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city,service_type');
+        (_wtk||[]).forEach(function(t){_wlrAreaMap[t.id]=t.area||t.city||'';_wlrSvcMap[t.id]=t.service_type||'';});
       }
     }catch(e){}
     window._wlrAreaMap=_wlrAreaMap;
+    window._wlrSvcMap=_wlrSvcMap;
     var byEng={};
     logs.forEach(function(l){
       var k=l.eng_name||l.eng_id;
@@ -20138,7 +20143,14 @@ async function loadWorkLogReport(){
           var timeBg=isTravel?'#fef3c7':isStatus?'#d1fae5':'#ede9fe';
           var timeColor=isTravel?'#92400e':isStatus?'#065f46':'#4c1d95';
           var timeLabel=isStatus?l.from_time:(isOpen?(isToday?l.from_time+' – Running ⏳':l.from_time):l.from_time+' – '+l.to_time);
-          var _wArea=(l.ticket_id&&window._wlrAreaMap&&window._wlrAreaMap[l.ticket_id])?' <span style="color:#0d9488;font-weight:700;white-space:nowrap;">📍 '+escHtml(window._wlrAreaMap[l.ticket_id])+'</span>':'';
+          // Carry In calls: the customer brought the unit to the office, so the
+          // engineer did NOT travel to the customer's area. Show a clear "Carry In"
+          // badge instead of the green travel pin, so it doesn't look like a field
+          // call was closed in that area.
+          var _wSvc=(l.ticket_id&&window._wlrSvcMap&&window._wlrSvcMap[l.ticket_id])||'';
+          var _wArea=(_wSvc==='Carry In')
+            ?' <span style="background:#ede9fe;color:#6d28d9;font-weight:800;border-radius:6px;padding:1px 7px;font-size:11px;white-space:nowrap;">📦 Carry In</span>'
+            :((l.ticket_id&&window._wlrAreaMap&&window._wlrAreaMap[l.ticket_id])?' <span style="color:#0d9488;font-weight:700;white-space:nowrap;">📍 '+escHtml(window._wlrAreaMap[l.ticket_id])+'</span>':'');
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+'</div>'
