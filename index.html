@@ -5644,14 +5644,26 @@ async function saveCall(){
       // Point 13: Edit only allows remark — no customer/product change
       await sb('tickets','PATCH',{remarks:data.remarks,updated_at:data.updated_at},`?id=eq.${editingCallId}`);
     }else{
-      const id=await generateTicketNo();data.id=id;data.job_sheet=id;
-      try{
-        await sb('tickets','POST',data);
-      }catch(pe){
-        // email column not added yet — don't block call creation; retry without it.
-        if(data.email&&String(pe&&pe.message).indexOf('email')!==-1){delete data.email;await sb('tickets','POST',data);}
-        else throw pe;
+      let id=await generateTicketNo();data.id=id;data.job_sheet=id;
+      // Collision-safe insert: if the generated number was just taken by another
+      // device/tab (duplicate primary key, PG code 23505), fetch the next free
+      // number and retry — so a same-day call is never blocked by a numbering clash.
+      let _posted=false,_lastErr=null;
+      for(let _try=0;_try<8&&!_posted;_try++){
+        try{
+          await sb('tickets','POST',data);
+          _posted=true;
+        }catch(pe){
+          var _pm=String(pe&&pe.message||'');
+          // email column not added yet — don't block call creation; retry without it.
+          if(data.email&&_pm.indexOf('email')!==-1){delete data.email;continue;}
+          if(_pm.indexOf('23505')!==-1||_pm.toLowerCase().indexOf('duplicate key')!==-1||_pm.indexOf('tickets_pkey')!==-1){
+            id=await generateTicketNo();data.id=id;data.job_sheet=id;_lastErr=pe;continue;
+          }
+          throw pe;
+        }
       }
+      if(!_posted)throw(_lastErr||new Error('Could not create ticket — please retry.'));
       try{await sb('customers','POST',{serial:data.serial,model:data.model,cname:data.cname,mobile:data.mobile,alt_mobile:data.alt_mobile,email:data.email||'',address:data.address,city:data.city,pin:data.pin,area:data.area,updated_at:new Date().toISOString()});}catch(e){}
       // Telegram: new ticket notification
       tgNotifyAll('🎫 <b>New Ticket Created</b>\n🎫 #'+id+'\n👤 '+data.cname+' | 📱 '+(data.mobile||'—')+'\n📍 '+(data.city||'')+'\n🔧 '+data.model+' | S/N: '+(data.serial||'—')+'\n❗ '+(data.problem||'—')+(engName?'\n👷 Assigned: '+engName:'\n👷 Unassigned'));
@@ -5672,14 +5684,18 @@ async function saveCall(){
 }
 async function generateTicketNo(){
   // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-1028). Series runs across months and resets only on year change.
-  // Numeric max over all of this year's tickets (old BEA-YYYY-N and new BEA-YYYYMM-N both counted),
-  // because string sort misorders unpadded legacy numbers (e.g. "999" above "1027").
+  // Ticket numbers are assigned in creation order, so the highest number is always
+  // among the most-recently created tickets. We ORDER BY created_at DESC and take a
+  // window of the latest rows — this guarantees the true max is seen even if the
+  // server caps the row count. (The old unordered limit=5000 fetch could silently
+  // drop the highest ticket once the table grew, producing a number that already
+  // existed → "duplicate key ... tickets_pkey" and a blocked call.)
   const now=new Date();
   const year=now.getFullYear();
   const ym=year+String(now.getMonth()+1).padStart(2,'0');
-  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&limit=5000`);
+  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&order=created_at.desc&limit=300`);
   let max=0;
-  for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(n>max)max=n;}
+  for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(!isNaN(n)&&n>max)max=n;}
   return `BEA-${ym}-${String(max+1).padStart(4,'0')}`;
 }
 
