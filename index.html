@@ -5785,19 +5785,21 @@ async function checkTATReminder(){
     document.body.appendChild(m);
   }catch(e){}
 }
-// ── 12-hour date+time picker helpers (AM/PM) ──────────────────────────────
-// Native datetime-local shows 24h on many devices (locale-driven, not
-// controllable from HTML). These build an explicit 12-hour picker: a date box
-// + hour (1-12) + minute + AM/PM, so WC always sees / sets AM · PM.
+// ── 24-hour date+time picker helpers ──────────────────────────────────────
+// Native datetime-local's time format is locale-driven and may show AM/PM on
+// some devices. These build an explicit 24-hour picker: a date box + hour
+// (00-23) + minute, no AM/PM — so every device shows the same 24-hour module.
+// (Function names kept as _tat12* so existing call sites don't change.)
 function _tat12Controls(prefix,onchange){
-  var hopts='';for(var h=1;h<=12;h++)hopts+='<option value="'+h+'">'+h+'</option>';
+  var pad2=function(n){return String(n).padStart(2,'0');};
+  var hopts='';for(var h=0;h<=23;h++)hopts+='<option value="'+h+'">'+pad2(h)+'</option>';
   var oc=onchange?(' oninput="'+onchange+'" onchange="'+onchange+'"'):'';
   return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
     +'<input type="date" id="'+prefix+'-date"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;">'
     +'<select id="'+prefix+'-hh"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;outline:none;font-weight:700;">'+hopts+'</select>'
     +'<span style="font-weight:800;">:</span>'
     +'<input type="number" id="'+prefix+'-mm" min="0" max="59" value="00" placeholder="mm"'+oc+' style="width:58px;border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:13px;outline:none;text-align:center;">'
-    +'<select id="'+prefix+'-ap"'+oc+' style="border:1px solid var(--border);border-radius:8px;padding:8px 8px;font-size:13px;outline:none;font-weight:800;color:#1d4ed8;"><option value="AM">AM</option><option value="PM">PM</option></select>'
+    +'<span style="font-size:11px;color:#6b7280;font-weight:700;">(24h)</span>'
     +'</div>';
 }
 function _tat12Read(prefix){
@@ -5805,29 +5807,23 @@ function _tat12Read(prefix){
   if(!dv||!dv.value)return null;
   var hh=document.getElementById(prefix+'-hh');
   var mm=document.getElementById(prefix+'-mm');
-  var ap=document.getElementById(prefix+'-ap');
-  var h=parseInt(hh&&hh.value)||12;
+  var h=parseInt(hh&&hh.value);if(isNaN(h)||h<0)h=0;if(h>23)h=23;
   var m=parseInt(mm&&mm.value);if(isNaN(m)||m<0)m=0;if(m>59)m=59;
-  var apv=(ap&&ap.value)||'AM';
-  var h24=h%12;if(apv==='PM')h24+=12;
   var p=dv.value.split('-');
-  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]),h24,m,0,0);
+  var d=new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]),h,m,0,0);
   return isNaN(d)?null:d;
 }
 function _tat12Write(prefix,d){
   if(!d)return;
   var pad=function(n){return String(n).padStart(2,'0');};
   var dv=document.getElementById(prefix+'-date');if(dv)dv.value=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-  var h=d.getHours();var apv=h>=12?'PM':'AM';var h12=h%12;if(h12===0)h12=12;
-  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value=String(h12);
+  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value=String(d.getHours());
   var mm=document.getElementById(prefix+'-mm');if(mm)mm.value=pad(d.getMinutes());
-  var ap=document.getElementById(prefix+'-ap');if(ap)ap.value=apv;
 }
 function _tat12Clear(prefix){
   var dv=document.getElementById(prefix+'-date');if(dv)dv.value='';
-  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value='12';
+  var hh=document.getElementById(prefix+'-hh');if(hh)hh.value='0';
   var mm=document.getElementById(prefix+'-mm');if(mm)mm.value='00';
-  var ap=document.getElementById(prefix+'-ap');if(ap)ap.value='AM';
 }
 function openSetTAT(ticketId, currentTAT){
   var pad=function(n){return String(n).padStart(2,'0');};
@@ -7129,7 +7125,10 @@ async function saveEngUpdate(){
     const now=new Date();
     const timeOut=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     const outEl=document.getElementById('upd-out');
-    if(outEl&&!outEl.value) outEl.value=timeOut;
+    // Auto-fill is NOT a manual edit — keep dataset.orig in sync so that if this
+    // save later fails (e.g. jobsheet not attached yet / upload error) and the
+    // engineer retries, the manual-time-change check doesn't falsely fire.
+    if(outEl&&!outEl.value){outEl.value=timeOut;if(outEl.dataset)outEl.dataset.orig=timeOut;}
     data.visit_out=outEl?.value||timeOut;
   }
   
@@ -8707,6 +8706,27 @@ async function renderReportFilter(c){
   }catch(e){c.innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
 
+// Engineer's completion date for a ticket = the date its timeline was set to a
+// real completion status by the engineer: Closed, Repaired / Pending for
+// Delivery, or Resolved By Phone. Delivered (handover) and Invoice edits are
+// explicitly ignored — they are not the engineer's completion and happen later,
+// so a call delivered/invoiced today must NOT count as "closed today". Returns
+// en-CA date string or null if the call was never completed.
+function _engCompletionDate(t){
+  var tl=t&&t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  if(!Array.isArray(tl))return null;
+  var COMPLETION=['Closed','Repaired','Pending for Delivery','Resolved By Phone'];
+  var last=null;
+  tl.forEach(function(e){
+    if(!e||!e.action||!e.at)return;
+    var a=e.action;
+    if(a.indexOf('Delivered')!==-1||a.indexOf('Invoice')!==-1)return; // never the completion
+    for(var i=0;i<COMPLETION.length;i++){if(a.indexOf(COMPLETION[i])!==-1){last=e;break;}}
+  });
+  // Legacy Non-Warranty closes wrote only a 'Charges Set' entry at close time.
+  if(!last){tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Charges Set')!==-1&&e.at)last=e;});}
+  return last?new Date(last.at).toLocaleDateString('en-CA'):null;
+}
 async function runFilteredReport(){
   const from=document.getElementById('f-from').value;
   const to=document.getElementById('f-to').value;
@@ -8724,11 +8744,12 @@ async function runFilteredReport(){
   try{
     let q='?order=created_at.desc';
     if(dateType==='closed'){
-      // Filter by updated_at (closed date) — client-side for closed tickets
+      // Completion date = the engineer's Closed / Pending-for-Delivery / Resolved
+      // event date (see _engCompletionDate). A call completed on day X but
+      // delivered/invoiced later has a later updated_at, so we fetch everything
+      // touched since `from` (no upper bound, no status restriction) and keep only
+      // those whose COMPLETION date falls in [from,to] — done client-side below.
       if(from) q+=`&updated_at=gte.${from}T00:00:00`;
-      if(to) q+=`&updated_at=lte.${to}T23:59:59`;
-      // Force status filter to closed statuses if no specific status chosen
-      if(!status) q+=`&status=in.(Closed,Delivered,Call Cancel,Customer Reject)`;
     } else {
       if(from) q+=`&created_at=gte.${from}T00:00:00`;
       if(to) q+=`&created_at=lte.${to}T23:59:59`;
@@ -8741,25 +8762,14 @@ async function runFilteredReport(){
     
     let tickets=await sbAll('tickets',q);
 
-    // "Closed Date" filtering used updated_at directly, which bumps on ANY edit
-    // (e.g. WC adding an invoice number weeks after the real close) - that
-    // doesn't mean the ticket's status actually changed within this date range.
-    // Verify against the ticket's own timeline: find the most recent entry
-    // whose action mentions the ticket's current status (covers every status
-    // label variant used across the app - "Updated — Closed", "Force Status →
-    // Closed", "Call Cancelled by Engineer", "Closed (Back-Date)", etc., since
-    // they all embed the status name) and only keep it if THAT date falls in
-    // the selected range.
+    // Keep only tickets whose ENGINEER COMPLETION date (Closed / Pending for
+    // Delivery / Resolved By Phone — never Delivered or Invoice) falls in range.
+    // This fixes calls that were delivered/invoiced today showing up as "closed
+    // today" when the engineer actually finished them on an earlier day.
     if(dateType==='closed'){
       tickets=tickets.filter(function(t){
-        var keyword=t.status;
-        if(!keyword)return false;
-        var tl=t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
-        if(!Array.isArray(tl))return false;
-        var lastMatch=null;
-        tl.forEach(function(entry){if(entry&&entry.action&&entry.action.indexOf(keyword)!==-1&&entry.at)lastMatch=entry;});
-        if(!lastMatch)return false;
-        var d=new Date(lastMatch.at).toLocaleDateString('en-CA');
+        var d=_engCompletionDate(t);
+        if(!d)return false;
         return (!from||d>=from)&&(!to||d<=to);
       });
     }
@@ -23534,8 +23544,9 @@ async function startKmCamera(){
 }
 function closeKmCapture(){stopKmCamera();var m=document.getElementById('modal-km-capture');if(m)m.remove();}
 function openKmCapture(opts){
-  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmRefMax=null;_kmOcrValue=null;
-  // OCR removed — engineer types the reading manually (auto-read gave wrong values).
+  _kmCapOpts=opts||{};_kmPhotoData=null;_kmLoc=null;_kmPrevMax=null;_kmRefMax=null;
+  // OCR fully removed — engineer types the reading manually. The reading box
+  // stays blank; nothing is auto-read or auto-filled from the photo.
   var titles={opening:'🏢 Opening KM — Day Start',arrival:'📍 Arrival KM — Reached Customer',closing:'🏁 Closing KM — Day End'};
   var title=titles[opts.type]||'Odometer KM';
   var sub=opts.type==='arrival'&&opts.ticketId?('Call: '+opts.ticketId):'';
@@ -23561,7 +23572,7 @@ function openKmCapture(opts){
     +'<div class="form-group" style="margin-bottom:10px;">'
     +'<label style="font-weight:700;">Odometer Reading (KM) <span class="req">*</span></label>'
     +'<input type="number" id="km-reading" inputmode="numeric" placeholder="e.g. 25132" style="font-size:16px;font-weight:700;letter-spacing:1px;">'
-    +'<div id="km-ocr-status" style="font-size:12px;margin-top:4px;"></div>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:4px;">Meter na photo par dekhati reading jate lakho (chhello tenths digit chhodi do).</div>'
     +'</div>'
     +'<div style="font-size:12px;color:#64748b;margin-bottom:10px;">📍 GPS: <span id="km-gps-status">Getting location...</span> &nbsp;|&nbsp; 🕐 <span id="km-time-now"></span></div>'
     +'<button id="km-save-btn" class="btn btn-success" style="width:100%;" onclick="saveKmEntry()">💾 Save KM Entry</button>'
@@ -23615,147 +23626,24 @@ function captureKmPhoto(){
   var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='none';
   var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='';
   stopKmCamera();
-  // (OCR removed — reading is typed manually.)
+  // Reading is typed manually — the box stays blank after capture (no auto-read).
 }
 function retakeKmPhoto(){
-  _kmPhotoData=null;_kmOcrValue=null;
+  _kmPhotoData=null;
   var vid=document.getElementById('km-video');if(vid)vid.style.display='';
   var gb=document.getElementById('km-guide-box');if(gb)gb.style.display='';
   var gt=document.getElementById('km-guide-text');if(gt)gt.style.display='';
   var prev=document.getElementById('km-photo-preview');if(prev){prev.style.display='none';prev.innerHTML='';}
   var cb=document.getElementById('km-capture-btn');if(cb)cb.style.display='';
   var rb=document.getElementById('km-retake-btn');if(rb)rb.style.display='none';
-  var os=document.getElementById('km-ocr-status');if(os)os.innerHTML='';
   var inp=document.getElementById('km-reading');if(inp)inp.value='';
   startKmCamera();
 }
 
-// ── ODOMETER OCR (auto-read meter digits from the photo) ──
-// Tesseract.js is lazy-loaded from CDN only when a KM photo is captured.
-// The OCR value pre-fills the reading box; the engineer just confirms, or
-// corrects it if the auto-read is wrong (raw OCR + correction both saved).
-var _kmOcrValue=null,_kmOcrLibPromise=null,_kmOcrWorker=null;
-function loadTesseractLib(){
-  if(window.Tesseract)return Promise.resolve();
-  if(_kmOcrLibPromise)return _kmOcrLibPromise;
-  _kmOcrLibPromise=new Promise(function(resolve,reject){
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-    s.onload=function(){resolve();};
-    s.onerror=function(){_kmOcrLibPromise=null;reject(new Error('OCR library load failed'));};
-    document.head.appendChild(s);
-    setTimeout(function(){if(!window.Tesseract){_kmOcrLibPromise=null;reject(new Error('OCR library load timeout'));}},20000);
-  });
-  return _kmOcrLibPromise;
-}
-async function getKmOcrWorker(){
-  if(_kmOcrWorker)return _kmOcrWorker;
-  await loadTesseractLib();
-  var w=await Tesseract.createWorker('eng');
-  // digits only, and treat the crop as a uniform block of text (handles the
-  // odometer's 1–2 digit rows) — much more reliable than the default mode.
-  await w.setParameters({tessedit_char_whitelist:'0123456789',tessedit_pageseg_mode:'6'});
-  _kmOcrWorker=w;
-  return w;
-}
-// Crop the guide-box region (center 70% x 30%) + upscale + grayscale/contrast —
-// big accuracy boost for odometer digits vs feeding the whole photo.
-function kmOcrPrepCanvas(srcCanvas){
-  // Crop the guide-box region (center 70% wide x 34% tall), upscale 3x, then
-  // Otsu-binarize and normalize polarity so the digits always come out solid
-  // black on white — the format Tesseract reads odometer digits most reliably,
-  // whether the meter is dark-on-light (mechanical) or light-on-dark (LCD).
-  var sx=Math.round(srcCanvas.width*0.15),sw=Math.round(srcCanvas.width*0.70);
-  var sy=Math.round(srcCanvas.height*0.33),sh=Math.round(srcCanvas.height*0.34);
-  var scale=3;
-  var c=document.createElement('canvas');c.width=sw*scale;c.height=sh*scale;
-  var ctx=c.getContext('2d');
-  ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(srcCanvas,sx,sy,sw,sh,0,0,c.width,c.height);
-  var img=ctx.getImageData(0,0,c.width,c.height);
-  var d=img.data,n=d.length/4;
-  var gray=new Uint8Array(n),hist=new Array(256).fill(0);
-  for(var i=0,p=0;i<d.length;i+=4,p++){
-    var g=Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-    gray[p]=g;hist[g]++;
-  }
-  // Otsu's method — best threshold separating digits from background. When the
-  // histogram has a flat valley (equal variance across a range) we take the
-  // middle of that plateau, else the threshold hugs one edge and washes out.
-  var sum=0;for(var t=0;t<256;t++)sum+=t*hist[t];
-  var sumB=0,wB=0,maxVar=-1,thrLow=127,thrHigh=127;
-  for(var u=0;u<256;u++){
-    wB+=hist[u];if(wB===0)continue;
-    var wF=n-wB;if(wF===0)break;
-    sumB+=u*hist[u];
-    var mB=sumB/wB,mF=(sum-sumB)/wF;
-    var vB=wB*wF*(mB-mF)*(mB-mF);
-    if(vB>maxVar){maxVar=vB;thrLow=thrHigh=u;}
-    else if(vB>=maxVar){thrHigh=u;}
-  }
-  var thr=Math.round((thrLow+thrHigh)/2);
-  // Digits are the minority ink. If dark pixels are the minority they're the
-  // digits (keep); otherwise the light pixels are the digits (invert).
-  var darkCount=0;for(var q=0;q<n;q++)if(gray[q]<thr)darkCount++;
-  var darkIsDigit=darkCount<=n/2;
-  for(var k=0,r=0;k<d.length;k+=4,r++){
-    var isDark=gray[r]<thr;
-    var digit=darkIsDigit?isDark:!isDark;
-    var val=digit?0:255;
-    d[k]=d[k+1]=d[k+2]=val;
-  }
-  ctx.putImageData(img,0,0);
-  return c;
-}
-function pickKmCandidate(text,ref){
-  var runs=(String(text||'').match(/\d{3,8}/g)||[]);
-  if(!runs.length)return null;
-  // Bike odometers show a trailing TENTHS drum (0.1 km, often a coloured box) —
-  // the real km reading excludes it (e.g. "99223" + "4" tenths → 99223). We
-  // don't know if OCR captured that digit, so for every run consider BOTH the
-  // full number and the number with its last digit dropped, then pick whichever
-  // best continues the engineer's running odometer.
-  var cands=[];
-  runs.forEach(function(r){
-    cands.push(Number(r));
-    if(r.length>=5)cands.push(Number(r.slice(0,-1))); // drop tenths digit
-  });
-  if(ref!==null&&ref!==undefined){
-    // Closest reading at/above the last recorded odometer, within a day's range.
-    var inRange=cands.filter(function(n){return n>=ref&&n<=ref+5000;});
-    if(inRange.length)return Math.min.apply(null,inRange);
-    var above=cands.filter(function(n){return n>=ref;});
-    if(above.length)return Math.min.apply(null,above);
-  }
-  // No reference (very first reading ever): take the longest run and drop its
-  // trailing tenths digit when it's a full 6+ digit meter reading.
-  runs.sort(function(a,b){return b.length-a.length;});
-  var longest=runs[0];
-  return Number(longest.length>=6?longest.slice(0,-1):longest);
-}
-async function runKmOcr(srcCanvas){
-  var st=document.getElementById('km-ocr-status');
-  _kmOcrValue=null;
-  if(st)st.innerHTML='<span style="color:#1d4ed8;font-weight:700;">🤖 Reading meter from photo...</span>';
-  try{
-    var worker=await getKmOcrWorker();
-    var prep=kmOcrPrepCanvas(srcCanvas);
-    var res=await worker.recognize(prep);
-    // OCR reference = today's readings only (null on the day's first/Opening
-    // photo, so no cross-day/cross-vehicle number misleads the auto-read).
-    var val=pickKmCandidate(res&&res.data&&res.data.text,_kmPrevMax);
-    if(val===null){
-      if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read fail — reading jate lakhi do.</span>';
-      return;
-    }
-    _kmOcrValue=val;
-    var inp=document.getElementById('km-reading');
-    if(inp&&!inp.value)inp.value=val;
-    if(st)st.innerHTML='<span style="color:#15803d;font-weight:700;">🤖 Auto reading: '+val+'</span> <span style="color:#64748b;">— check karo, khotu hoy to sudhari lo</span>';
-  }catch(e){
-    if(st)st.innerHTML='<span style="color:#b45309;">⚠️ Auto-read not available — reading jate lakhi do.</span>';
-  }
-}
+// ── ODOMETER OCR fully removed ──────────────────────────────────────────────
+// The engineer types the odometer reading manually. Nothing is auto-read or
+// auto-filled from the photo (auto-read produced wrong values), and no OCR
+// library is loaded.
 async function saveKmEntry(){
   if(!_kmPhotoData){alert('📸 Odometer photo is required! Please capture the photo first.');return;}
   var kmVal=parseFloat(document.getElementById('km-reading')?.value);
@@ -23777,8 +23665,8 @@ async function saveKmEntry(){
     entry_type:_kmCapOpts.type,
     ticket_id:_kmCapOpts.ticketId||null,
     odometer_km:kmVal,photo_url:photoUrl,
-    ocr_km:_kmOcrValue,
-    corrected_by:(_kmOcrValue!==null&&kmVal!==_kmOcrValue)?currentUser.name:null,
+    ocr_km:null,
+    corrected_by:null,
     lat:_kmLoc?_kmLoc.lat:null,lng:_kmLoc?_kmLoc.lng:null,gps_accuracy:_kmLoc?_kmLoc.accuracy:null,
     captured_at:now.toISOString(),created_at:now.toISOString()
   };
