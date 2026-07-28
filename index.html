@@ -12967,7 +12967,7 @@ async function loadMyReport(){
     (tickets||[]).forEach(function(t){
       var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
       if(MYRPT_DONE_STATUSES.indexOf(t.status)!==-1){
-        var d=myRptStatusEventDate(t);
+        var d=_engClosedDate(t);
         if(d&&d>=from&&d<=to){var row=ensure(d);if(isW)row.w++;else row.ow++;}
       }else if(MYRPT_PENDING_STATUSES.indexOf(t.status)!==-1){
         var d2=myRptStatusEventDate(t);
@@ -13061,13 +13061,16 @@ async function loadEngDailyReport(){
     q+=engFilter?('&assigned_to=eq.'+encodeURIComponent(engFilter)):'&assigned_to=not.is.null';
     var tickets=await sbAll('tickets',q);
     var byEng={};
-    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0};return byEng[id];}
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0,list:[]};return byEng[id];}
     (tickets||[]).forEach(function(t){
       if(!t.assigned_to)return;
       var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
       if(MYRPT_DONE_STATUSES.indexOf(t.status)!==-1){
-        var d=myRptStatusEventDate(t);
-        if(d&&d>=from&&d<=to){var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;}
+        // Attribute the close to the engineer's COMPLETION date (Closed / Repaired /
+        // Pending for Delivery / Resolved By Phone / Customer Reject) — never the
+        // later Delivered or invoice date. Same rule as the Reports "Closed Date".
+        var d=_engClosedDate(t);
+        if(d&&d>=from&&d<=to){var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;row.list.push({id:t.id,date:d,type:isW?'Warranty':'Non-Warranty',status:t.status,call_type:t.call_type||''});}
       }else if(MYRPT_PENDING_STATUSES.indexOf(t.status)!==-1){
         var d2=myRptStatusEventDate(t);
         if(d2&&d2>=from&&d2<=to)ensure(t.assigned_to,t.assigned_name).pending++;
@@ -13091,7 +13094,8 @@ async function loadEngDailyReport(){
       +'<div style="background:#fefce8;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#a16207;font-weight:700;">⏳ Total Pending</div><div style="font-size:20px;font-weight:800;color:#a16207;">'+totPending+'</div></div>'
       +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">🧾 Payment/Invoice Done</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+totInvoice+'</div></div>';
     var rowsHtml=rows.map(function(r){
-      return '<tr><td style="font-weight:600;">'+r.name+'</td><td style="text-align:center;">'+r.w+'</td><td style="text-align:center;">'+r.ow+'</td>'
+      var clk=r.total>0?' style="cursor:pointer;" onclick="showEdrClosedDetail(\''+String(r.id).replace(/'/g,"\\'")+'\')" title="Click to see which '+r.total+' calls are counted"':'';
+      return '<tr'+clk+'><td style="font-weight:600;">'+escHtml(r.name)+(r.total>0?' <span style="color:#1d4ed8;font-size:11px;">🔍</span>':'')+'</td><td style="text-align:center;">'+r.w+'</td><td style="text-align:center;">'+r.ow+'</td>'
         +'<td style="text-align:center;font-weight:700;color:#15803d;">'+r.total+'</td>'
         +'<td style="text-align:center;">'+r.pending+'</td>'
         +'<td style="text-align:center;">'+r.invoice+'</td></tr>';
@@ -13103,6 +13107,36 @@ async function loadEngDailyReport(){
   }catch(e){if(wrap)wrap.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
 }
 
+// Drill-down: show exactly which closed calls make up an engineer's Total Closed
+// in the selected date range, so the numbers can be verified ticket-by-ticket.
+function closeEdrDetail(){var m=document.getElementById('edr-detail-modal');if(m)m.remove();}
+function showEdrClosedDetail(engId){
+  var rows=window._edrRows||[];var rg=window._edrRange||{};
+  var r=rows.find(function(x){return String(x.id)===String(engId);});
+  if(!r||!r.list||!r.list.length){alert('No closed calls in this range.');return;}
+  var list=r.list.slice().sort(function(a,b){return (a.date<b.date?-1:a.date>b.date?1:0);});
+  var wc=list.filter(function(x){return x.type==='Warranty';}).length;
+  var rowsH=list.map(function(x,i){
+    return '<tr style="border-bottom:1px solid #eef2f7;"><td style="padding:6px 8px;">'+(i+1)+'</td>'
+      +'<td style="padding:6px 8px;"><a href="javascript:void(0)" onclick="closeEdrDetail();viewTicket(\''+x.id+'\')" style="color:#1d4ed8;font-weight:700;">'+escHtml(x.id)+'</a></td>'
+      +'<td style="padding:6px 8px;">'+new Date(x.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+'</td>'
+      +'<td style="padding:6px 8px;">'+escHtml(x.call_type||x.type)+'</td>'
+      +'<td style="padding:6px 8px;"><span style="background:#f0fdf4;color:#15803d;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">'+escHtml(x.status)+'</span></td></tr>';
+  }).join('');
+  var ex=document.getElementById('edr-detail-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='edr-detail-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:580px;">'
+    +'<div class="modal-header"><div><h2>✅ '+escHtml(r.name)+' — Closed Calls</h2>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+(rg.from||'')+' → '+(rg.to||'')+' &nbsp;|&nbsp; Total '+r.total+' (Warranty '+wc+', Non-Warranty '+(r.total-wc)+')</div></div>'
+    +'<button class="close-btn" onclick="closeEdrDetail()">✕</button></div>'
+    +'<div class="modal-body" style="padding:12px 16px;"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">#</th><th style="padding:6px 8px;">Ticket</th><th style="padding:6px 8px;">Closed Date</th><th style="padding:6px 8px;">Type</th><th style="padding:6px 8px;">Status</th></tr></thead>'
+    +'<tbody>'+rowsH+'</tbody></table></div>'
+    +'<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">"Closed Date" = the day the engineer completed the call (Closed / Pending for Delivery / Repaired / Resolved By Phone / Customer Reject) — not the delivery or invoice date.</div>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)closeEdrDetail();};
+  document.body.appendChild(ov);
+}
 function downloadEngDailyReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
   var rows=window._edrRows||[];
