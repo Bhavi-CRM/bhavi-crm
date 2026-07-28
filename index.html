@@ -8125,7 +8125,7 @@ async function showPartHistoryTab(tab){
     try{
       var partCode=window._phPartCode;
       if(!partCode){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Part code not found</div>';return;}
-      const tickets=await sbAll('tickets','?order=created_at.desc');
+      const tickets=await sbAll('tickets','?select=id,cname,model,assigned_name,spares,created_at,status&order=created_at.desc');
       const used=tickets.filter(t=>(t.spares||[]).some(s=>s.code===partCode));
       if(!used.length){content.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Not used in any ticket</div>';return;}
       const totalQty=used.reduce((a,t)=>{const s=(t.spares||[]).find(x=>x.code===partCode);return a+(s?.qty||1);},0);
@@ -8382,7 +8382,7 @@ async function switchReportTab(tab, el){
 
 async function renderReportOverview(c){
   try{
-    const tickets=await sbAll('tickets','?order=created_at.desc');
+    const tickets=await sbAll('tickets','?select=id,status,call_type,spares,service_charges,labor,final_charges,other_charge,assigned_name,created_at&order=created_at.desc');
     const total=tickets.length,closed=tickets.filter(isTicketClosed).length;
     const active=tickets.filter(isTicketActive).length;
     const warranty=tickets.filter(t=>t.call_type&&t.call_type.includes('Warranty')).length;
@@ -8962,7 +8962,7 @@ async function downloadFilteredReport(format){
 
 async function renderReportRevenue(c){
   try{
-    const tickets=await sbAll('tickets','?order=created_at.desc');
+    const tickets=await sbAll('tickets','?select=id,status,warranty_coverage,call_type,assigned_name,created_at,service_charges,labor,final_charges,other_charge,spares&order=created_at.desc');
     const revTickets=tickets.filter(t=>t.status==='Closed'||(t.warranty_coverage==='Out of Coverage'));
     
     // Monthly revenue
@@ -9057,7 +9057,7 @@ async function renderReportRevenue(c){
 
 async function downloadRevenueExcel(){
   try{
-    const tickets=await sb('tickets','GET',null,'?status=eq.Closed&order=created_at.desc');
+    const tickets=await sb('tickets','GET',null,'?status=eq.Closed&select=id,created_at,cname,model,assigned_name,call_type,labor,other_charge,spares&order=created_at.desc');
     const data=tickets.map(t=>{
       const sp=(t.spares||[]).filter(s=>!s.requested);
       const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
