@@ -11886,7 +11886,7 @@ async function renderAIAnalysis(){
     // Last 30 days — for Attendance Punctuality.
     const d30=new Date();d30.setDate(d30.getDate()-30);
     const [tickets,wlogs,trendTickets,shiftRows,punchRows]=await Promise.all([
-      sb('tickets','GET',null,'?created_at=gte.'+since+'&order=created_at.desc&limit=2000'),
+      sb('tickets','GET',null,'?created_at=gte.'+since+'&select=id,area,assigned_name,call_type,city,cname,created_at,mobile,model,serial,service_charges,service_type,spares,status,timeline,updated_at&order=created_at.desc&limit=2000'),
       sb('work_logs','GET',null,'?log_date=gte.'+d90.toLocaleDateString('en-CA')+'&order=log_date.desc&limit=3000'),
       sb('tickets','GET',null,'?created_at=gte.'+d400.toISOString()+'&select=id,status,created_at,service_type,call_type,service_charges&order=created_at.asc&limit=6000'),
       sb('shift_settings','GET',null,'').catch(()=>[]),
