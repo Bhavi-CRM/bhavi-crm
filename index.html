@@ -3161,8 +3161,11 @@ const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','I
 // "closed status" list, so the same ticket could show as Closed on one page
 // and Active on another. Use these everywhere a KPI count needs to agree
 // with Dashboard rather than inlining a fresh status array.
-const TICKET_DONE_STATUSES=['Closed','Delivered','Repaired','Pending for Delivery','Resolved By Phone'];
-const TICKET_CANCELLED_STATUSES=['Call Cancel','Customer Reject'];
+// Customer Reject counts as a CLOSED (done) call — the engineer visited and gave
+// an estimate (with inspection charges), so it is real completed work, not a
+// no-work cancel. Call Cancel stays cancelled (call dropped, no work done).
+const TICKET_DONE_STATUSES=['Closed','Delivered','Repaired','Pending for Delivery','Resolved By Phone','Customer Reject'];
+const TICKET_CANCELLED_STATUSES=['Call Cancel'];
 function isTicketClosed(t){return TICKET_DONE_STATUSES.includes(t.status);}
 function isTicketCancelled(t){return TICKET_CANCELLED_STATUSES.includes(t.status);}
 function isTicketActive(t){return !isTicketClosed(t)&&!isTicketCancelled(t);}
@@ -3736,11 +3739,13 @@ async function renderDashboard(){
     const dashTix=_dpr?allTickets.filter(t=>{if(!t.created_at)return false;const d=new Date(t.created_at);return d>=_dpr[0]&&d<=_dpr[1];}):allTickets;
     const _dpLabel=(()=>{if(_dpf==='today')return'Today';if(_dpf==='week')return'This Week';if(_dpf==='month')return'This Month';if(_dpf==='lastmonth')return'Last Month';if(_dpf==='custom'&&_dpFrom&&_dpTo)return _dpFrom+' to '+_dpTo;return'All Time';})();
     const total=dashTix.length;
-    const _doneStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
     window._dashTix=dashTix;
-    const active=dashTix.filter(t=>!_doneStatuses.includes(t.status)).length;
-    const closed=dashTix.filter(t=>['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status)).length;
-    const unalloc=dashTix.filter(t=>!_doneStatuses.includes(t.status)&&(!t.assigned_to||t.assigned_to==='')).length;
+    // Use the central helpers (TICKET_DONE_STATUSES) so Resolved By Phone — a
+    // closed status — is never miscounted as Active. Closed = done statuses;
+    // Active = not done & not cancelled; Unassigned = active with no engineer.
+    const active=dashTix.filter(isTicketActive).length;
+    const closed=dashTix.filter(isTicketClosed).length;
+    const unalloc=dashTix.filter(t=>isTicketActive(t)&&(!t.assigned_to||t.assigned_to==='')).length;
     const pendingApproval=dashTix.filter(t=>t.status==='Pending Customer Approval').length;
     const invoicePending=dashTix.filter(t=>(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'&&!t.invoice_done).length;
 
@@ -3754,7 +3759,7 @@ async function renderDashboard(){
       const inProgress=dashTix.filter(t=>t.status==='In Progress').length;
       const pendParts=dashTix.filter(t=>t.status==='Pending Parts').length;
       const pendRepair=dashTix.filter(t=>['Pending Repair Carry In','Pending Repair On Site'].includes(t.status)).length;
-      const cancelled=dashTix.filter(t=>['Call Cancel','Customer Reject'].includes(t.status)).length;
+      const cancelled=dashTix.filter(isTicketCancelled).length;
       const warranty=dashTix.filter(t=>t.call_type==='Warranty'||t.call_type==='Warranty Repeat').length;
       const nonWarranty=dashTix.filter(t=>t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat').length;
       const amc=dashTix.filter(t=>t.call_type==='AMC').length;
@@ -3796,7 +3801,7 @@ async function renderDashboard(){
         <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('In Progress',allTickets.filter(function(t){return t.status==='In Progress';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">In Progress</div><span class="kp-icon">⚡</span></div><div class="kp-val">${inProgress}</div><div class="kp-sub">Being worked on</div></div>
         <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Pending Parts',allTickets.filter(function(t){return t.status==='Pending Parts';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Parts</div><span class="kp-icon">🔩</span></div><div class="kp-val">${pendParts}</div><div class="kp-sub">Awaiting spare parts</div></div>
         <div class="kpi-prem kpi-prem-cyan" style="cursor:pointer;" onclick="showKpiDetail('Pending Repair',allTickets.filter(function(t){return t.status==='Pending Repair Carry In'||t.status==='Pending Repair On Site';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Repair</div><span class="kp-icon">🔧</span></div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Repair scheduled</div></div>
-        <div class="kpi-prem kpi-prem-slate" style="cursor:pointer;" onclick="showKpiDetail('Cancelled',allTickets.filter(function(t){return t.status==='Call Cancel'||t.status==='Customer Reject';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancelled</div><span class="kp-icon">🚫</span></div><div class="kp-val">${cancelled}</div><div class="kp-sub">Rejected / Cancelled</div></div>
+        <div class="kpi-prem kpi-prem-slate" style="cursor:pointer;" onclick="showKpiDetail('Cancelled',allTickets.filter(isTicketCancelled))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancelled</div><span class="kp-icon">🚫</span></div><div class="kp-val">${cancelled}</div><div class="kp-sub">Call cancelled</div></div>
       </div>
       <!-- Charts Row 1: Engineer vertical bars + Call type pie -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
@@ -3904,9 +3909,9 @@ async function renderDashboard(){
       </div>
       <div class="kpi-prem-grid">
         <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('Total Tickets (${_dpLabel})',window._dashTix)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Total Tickets</div><span class="kp-icon">🎫</span></div><div class="kp-val">${total}</div><div class="kp-sub">${_dpLabel}</div></div>
-        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets (${_dpLabel})',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
-        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets (${_dpLabel})',window._dashTix.filter(function(t){return ['Closed','Delivered','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
-        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets (${_dpLabel})',window._dashTix.filter(function(t){return !['Closed','Customer Reject','Call Cancel','Delivered','Repaired'].includes(t.status)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
+        <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Active Tickets (${_dpLabel})',window._dashTix.filter(isTicketActive))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Active</div><span class="kp-icon">🔥</span></div><div class="kp-val">${active}</div><div class="kp-sub">In pipeline</div></div>
+        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Closed Tickets (${_dpLabel})',window._dashTix.filter(isTicketClosed))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Closed</div><span class="kp-icon">✅</span></div><div class="kp-val">${closed}</div><div class="kp-sub">Successfully resolved</div></div>
+        <div class="kpi-prem kpi-prem-violet" style="cursor:pointer;" onclick="showKpiDetail('Unassigned Tickets (${_dpLabel})',window._dashTix.filter(function(t){return isTicketActive(t)&&(!t.assigned_to||t.assigned_to==='');}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Unassigned</div><span class="kp-icon">⏳</span></div><div class="kp-val">${unalloc}</div><div class="kp-sub">Needs attention</div></div>
       </div>
       ${engChartHtml}
       ${chartHtml}
@@ -3983,7 +3988,7 @@ async function loadEngLiveStatus(){
       const tks=await sb('tickets','GET',null,'?id=in.('+ticketIds.join(',')+')'+'&select=id,cname,city,area,address,pin,model,problem,status,service_type').catch(()=>[]);
       tks.forEach(t=>{ticketMap[t.id]=t;});
     }
-    const closedTicketStatuses=['Closed','Customer Reject','Call Cancel','Delivered','Repaired','Pending for Delivery'];
+    const closedTicketStatuses=TERMINAL_TICKET_STATUSES;
     // Auto-close stale open logs where ticket is already closed, build valid openByEng
     const openByEng={};
     for(const l of (openLogs||[])){
@@ -4815,7 +4820,9 @@ async function renderTickets(){
   }
   catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
-const TERMINAL_TICKET_STATUSES=['Closed','Customer Reject','Call Cancel','Delivered','Resolved By Phone'];
+// Terminal = every done status (incl. Repaired / Pending for Delivery / Resolved
+// By Phone) plus cancelled. Built from the central lists so it can never drift.
+const TERMINAL_TICKET_STATUSES=TICKET_DONE_STATUSES.concat(TICKET_CANCELLED_STATUSES);
 // Problem filter suggestions: union of the master Problem Types list AND every
 // distinct value actually typed into tickets' problem field. The New Call
 // form's problem input is free-text with autocomplete (not a locked dropdown),
@@ -5731,7 +5738,9 @@ async function checkTATReminder(){
   try{
     var now=new Date();var soon=new Date(now.getTime()+4*3600000);
     var engFilter=isEng?'&assigned_to=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id):'';
-    var rows=await sb('tickets','GET',null,'?tat_date=not.is.null&status=not.in.(Closed,Delivered,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to&limit=20'+engFilter);
+    // Exclude EVERY done status (incl. Resolved By Phone, Repaired, Pending for
+    // Delivery) plus cancelled — a closed call must never appear in TAT reminders.
+    var rows=await sb('tickets','GET',null,'?tat_date=not.is.null&status=not.in.(Closed,Delivered,Repaired,Pending for Delivery,Resolved By Phone,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to&limit=20'+engFilter);
     if(!rows||!rows.length)return;
     function tatDL(t){var d=new Date(t.tat_date);return /T00:00:00/.test(t.tat_date)?new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),23,59,59):d;}
     var overdue=rows.filter(function(t){return tatDL(t)<now;});
@@ -5978,6 +5987,12 @@ async function viewTicket(id,autoPrint=false){
           ✅ <b>Device is Repaired.</b> When customer collects the device, click Mark Delivered below.
         </div>
         <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Delivered')" style="background:#15803d;font-size:13px;padding:8px 18px;">📦 Mark Delivered</button>
+      `:''}
+      ${(t.status==='Customer Reject'&&t.service_type==='Carry In')?`
+        <div style="width:100%;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-bottom:4px;font-size:12px;color:#92400e;">
+          ❌ <b>Customer rejected the estimate.</b> The device is still in the office (Carry In). When the customer collects it, click Mark Delivered below.
+        </div>
+        <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Delivered')" style="background:#15803d;font-size:13px;padding:8px 18px;">📦 Mark Delivered (Customer Collected)</button>
       `:''}
       ${!isPendingArrival&&!isPendingApproval&&!isRepaired&&!isClosed?`
         <select onchange="if(this.value&&confirm('Change status to: '+this.value+'?')){quickStatusChange('${t.id}',this.value);this.value='';}" style="border:1.5px solid #f59e0b;border-radius:8px;padding:6px 10px;font-size:13px;background:#fffbeb;color:#92400e;font-weight:600;">
@@ -8727,6 +8742,19 @@ function _engCompletionDate(t){
   if(!last){tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Charges Set')!==-1&&e.at)last=e;});}
   return last?new Date(last.at).toLocaleDateString('en-CA'):null;
 }
+// Date the engineer rejected the customer's estimate (Customer Reject) — that is
+// also a completed call for the engineer. Kept separate from _engCompletionDate
+// so the daily report's dedicated Customer-Reject line doesn't double-count.
+function _engRejectDate(t){
+  var tl=t&&t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  if(!Array.isArray(tl))return null;
+  var last=null;
+  tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Reject')!==-1&&e.at)last=e;});
+  return last?new Date(last.at).toLocaleDateString('en-CA'):null;
+}
+// The date a call is "closed" from the engineer's side, for reports: repair
+// completion OR estimate rejection.
+function _engClosedDate(t){return _engCompletionDate(t)||_engRejectDate(t);}
 async function runFilteredReport(){
   const from=document.getElementById('f-from').value;
   const to=document.getElementById('f-to').value;
@@ -8768,7 +8796,7 @@ async function runFilteredReport(){
     // today" when the engineer actually finished them on an earlier day.
     if(dateType==='closed'){
       tickets=tickets.filter(function(t){
-        var d=_engCompletionDate(t);
+        var d=_engClosedDate(t);
         if(!d)return false;
         return (!from||d>=from)&&(!to||d<=to);
       });
@@ -12889,7 +12917,7 @@ function myRptInvoiceDates(t){
   if(!Array.isArray(tl))return[];
   return tl.filter(function(e){return e&&e.action==='Invoice Done'&&e.at;}).map(function(e){return new Date(e.at).toLocaleDateString('en-CA');});
 }
-var MYRPT_DONE_STATUSES=['Closed','Delivered','Pending for Delivery','Repaired','Resolved By Phone'];
+var MYRPT_DONE_STATUSES=['Closed','Delivered','Pending for Delivery','Repaired','Resolved By Phone','Customer Reject'];
 var MYRPT_PENDING_STATUSES=['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold','Pending Repair Carry In','Pending Repair On Site','Pending Allocation','Pending Customer Arrival'];
 
 async function renderMyReport(){
@@ -13386,13 +13414,12 @@ async function drAutoFillCalls(){
   try{
     var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
     var engId=currentUser.eng_id||currentUser.user_id;
-    // Closed calls: fetch by updated_at (touched today) — but see filter below,
-    // touched-today is only a candidate net, not proof the call was actually
-    // closed/repaired today.
-    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&updated_at=lte.'+date+'T23:59:59&select=call_type,problem,status,timeline').catch(()=>[]);
-    if(!tickets||!tickets.length){
-      tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&created_at=gte.'+date+'T00:00:00&created_at=lte.'+date+'T23:59:59&select=call_type,problem,status,timeline').catch(()=>[]);
-    }
+    // Candidate net: every ticket touched on/after `date` (NO upper bound). A
+    // call completed on `date` but delivered/invoiced later has a later
+    // updated_at, so an upper bound would wrongly drop it. The real filter is the
+    // engineer-completion date below (same rule as the Reports "Closed Date"
+    // filter), so the two always agree.
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&select=call_type,problem,status,timeline&limit=2000').catch(()=>[]);
     // A ticket's updated_at bumps on ANY edit (e.g. WC adding an invoice number
     // to an old call weeks later) — that must not make it count as "closed
     // today". Only count if the engineer's own most recent Closed/Repaired
@@ -13445,10 +13472,12 @@ async function drAutoFillCalls(){
     (tickets||[]).forEach(function(t){
       var ct=t.call_type||'';
       var prob=(t.problem||'').toLowerCase();
-      var status=(t.status||'').toLowerCase();
-      if(status.includes('cancel'))return; // skip cancelled
-      if(!status.includes('close')&&!status.includes('pending for delivery')&&!status.includes('repaired')&&!status.includes('resolved by phone'))return; // only completed calls
-      if(!closedRepairedToday(t))return; // only count if actually closed/repaired today, not just edited today
+      if(isTicketCancelled(t))return; // skip cancelled
+      // Count only calls the ENGINEER completed on this exact date — read from the
+      // timeline (Closed / Pending for Delivery / Repaired / Resolved By Phone),
+      // never from Delivered / Invoice. Identical rule to the Reports "Closed
+      // Date" filter, so the daily report and that report always match.
+      if(_engCompletionDate(t)!==date)return;
       // Resolved By Phone — closed without a visit, tracked separately from
       // the usual Install/Breakdown/Repeat buckets but still a real Warranty/
       // Non-Warranty closed call (feeds into the same section totals & grand total).
