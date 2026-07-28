@@ -1961,11 +1961,11 @@ function applyReportFilters(tickets){
   const calltype=document.getElementById('rpt-calltype')?.value||'';
   const engineer=document.getElementById('rpt-engineer')?.value||'';
   const city=(document.getElementById('rpt-city')?.value||'').toLowerCase().trim();
-  const closedStatuses=['Closed','Delivered','Call Cancel','Customer Reject'];
   return tickets.filter(t=>{
     if(dateType==='closed'){
-      // Filter by closed date — only show closed tickets, use updated_at as proxy
-      if(!closedStatuses.includes(t.status))return false;
+      // Filter by closed date — only closed tickets (every done status via the
+      // central helper, incl. Resolved By Phone / Repaired / Pending for Delivery).
+      if(!isTicketClosed(t))return false;
       const d=t.updated_at?new Date(t.updated_at):null;
       if(d&&(d<from||d>to))return false;
     }else{
@@ -5449,9 +5449,11 @@ async function checkReRepair(serial){
 
   try{
     // ── OPEN CALL BLOCK: check if any active call exists for this serial ──
-    const closedStatuses=['Closed','Customer Reject','Call Cancel','Delivered'];
+    // Use the central isTicketActive so every closed status (incl. Resolved By
+    // Phone / Repaired / Pending for Delivery / Customer Reject) is treated as
+    // done and does NOT block a new call.
     const allSame=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(serial)}&order=created_at.desc&limit=10`);
-    const openCalls=(allSame||[]).filter(t=>!closedStatuses.includes(t.status));
+    const openCalls=(allSame||[]).filter(isTicketActive);
     if(openCalls.length>0){
       const oc=openCalls[0];
       alertDiv.innerHTML=`<div style="background:#fee2e2;border:2px solid #ef4444;border-radius:8px;padding:12px;margin-top:4px;">
@@ -5636,9 +5638,11 @@ async function saveCall(){
   // Hard block: re-check open calls for this serial at save time (in case user bypassed the blur check)
   if(!editingCallId&&!data.serial.startsWith('NO-SN-')){
     try{
-      const closedSt=['Closed','Customer Reject','Call Cancel','Delivered'];
       const dupCheck=await sb('tickets','GET',null,`?serial=eq.${encodeURIComponent(data.serial)}&order=created_at.desc&limit=10`);
-      const openDup=(dupCheck||[]).filter(t=>!closedSt.includes(t.status));
+      // Only a genuinely ACTIVE call blocks a new one — every closed status
+      // (Resolved By Phone, Repaired, Pending for Delivery, Customer Reject, etc.)
+      // counts as done via isTicketActive.
+      const openDup=(dupCheck||[]).filter(isTicketActive);
       if(openDup.length>0){
         const od=openDup[0];
         alert(`🚫 Open Call Already Exists!\n\nSerial: ${data.serial}\nTicket: ${od.id} — ${od.status}\nCustomer: ${od.cname||'-'}\n\nPehla ae call close karo pachhi j navi call log kari shako.`);
@@ -8738,7 +8742,9 @@ function _tlEntryDate(e){
   }
   return e&&e.at?new Date(e.at).toLocaleDateString('en-CA'):null;
 }
-function _engCompletionDate(t){
+// The timeline entry that represents the engineer's completion (Closed / Repaired
+// / Pending for Delivery / Resolved By Phone), ignoring Delivered/Invoice.
+function _engCompletionEntry(t){
   var tl=t&&t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
   if(!Array.isArray(tl))return null;
   var COMPLETION=['Closed','Repaired','Pending for Delivery','Resolved By Phone'];
@@ -8751,18 +8757,22 @@ function _engCompletionDate(t){
   });
   // Legacy Non-Warranty closes wrote only a 'Charges Set' entry at close time.
   if(!last){tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Charges Set')!==-1&&e.at)last=e;});}
-  return last?_tlEntryDate(last):null;
+  return last;
 }
-// Date the engineer rejected the customer's estimate (Customer Reject) — that is
-// also a completed call for the engineer. Kept separate from _engCompletionDate
-// so the daily report's dedicated Customer-Reject line doesn't double-count.
-function _engRejectDate(t){
+function _engCompletionDate(t){var e=_engCompletionEntry(t);return e?_tlEntryDate(e):null;}
+// The timeline entry where the engineer rejected the customer's estimate
+// (Customer Reject) — also a completed call for the engineer. Kept separate so
+// the daily report's dedicated Customer-Reject line doesn't double-count.
+function _engRejectEntry(t){
   var tl=t&&t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
   if(!Array.isArray(tl))return null;
   var last=null;
   tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Reject')!==-1&&e.at)last=e;});
-  return last?new Date(last.at).toLocaleDateString('en-CA'):null;
+  return last;
 }
+function _engRejectDate(t){var e=_engRejectEntry(t);return e?_tlEntryDate(e):null;}
+// The completion/reject entry a report uses for the "closed" date (and its time).
+function _engClosedEntry(t){return _engCompletionEntry(t)||_engRejectEntry(t);}
 // The date a call is "closed" from the engineer's side, for reports: repair
 // completion OR estimate rejection.
 function _engClosedDate(t){return _engCompletionDate(t)||_engRejectDate(t);}
@@ -13068,7 +13078,7 @@ async function loadEngDailyReport(){
   if(!from||!to){if(wrap)wrap.innerHTML='';return;}
   if(wrap)wrap.innerHTML='<div class="loading">Loading...</div>';
   try{
-    var q='?select=id,status,call_type,timeline,assigned_to,assigned_name';
+    var q='?select=id,status,call_type,model,timeline,assigned_to,assigned_name';
     q+=engFilter?('&assigned_to=eq.'+encodeURIComponent(engFilter)):'&assigned_to=not.is.null';
     var tickets=await sbAll('tickets',q);
     var byEng={};
@@ -13081,7 +13091,13 @@ async function loadEngDailyReport(){
         // Pending for Delivery / Resolved By Phone / Customer Reject) — never the
         // later Delivered or invoice date. Same rule as the Reports "Closed Date".
         var d=_engClosedDate(t);
-        if(d&&d>=from&&d<=to){var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;row.list.push({id:t.id,date:d,type:isW?'Warranty':'Non-Warranty',status:t.status,call_type:t.call_type||''});}
+        if(d&&d>=from&&d<=to){
+          var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;
+          var _ce=_engClosedEntry(t);
+          var _bd=!!(_ce&&_ce.action&&_ce.action.indexOf('Back-Date')!==-1);
+          var _tm=(_ce&&_ce.at&&!_bd)?new Date(_ce.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
+          row.list.push({id:t.id,date:d,time:_tm,backdated:_bd,model:t.model||'',type:isW?'Warranty':'Non-Warranty',status:t.status,call_type:t.call_type||''});
+        }
       }else if(MYRPT_PENDING_STATUSES.indexOf(t.status)!==-1){
         var d2=myRptStatusEventDate(t);
         if(d2&&d2>=from&&d2<=to)ensure(t.assigned_to,t.assigned_name).pending++;
@@ -13128,9 +13144,12 @@ function showEdrClosedDetail(engId){
   var list=r.list.slice().sort(function(a,b){return (a.date<b.date?-1:a.date>b.date?1:0);});
   var wc=list.filter(function(x){return x.type==='Warranty';}).length;
   var rowsH=list.map(function(x,i){
+    var _dt=new Date(x.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+    var _dtCell=_dt+(x.time?'<div style="font-size:10px;color:#64748b;">🕐 '+escHtml(x.time)+'</div>':(x.backdated?'<div style="font-size:10px;color:#b45309;">back-dated</div>':''));
     return '<tr style="border-bottom:1px solid #eef2f7;"><td style="padding:6px 8px;">'+(i+1)+'</td>'
       +'<td style="padding:6px 8px;"><a href="javascript:void(0)" onclick="closeEdrDetail();viewTicket(\''+x.id+'\')" style="color:#1d4ed8;font-weight:700;">'+escHtml(x.id)+'</a></td>'
-      +'<td style="padding:6px 8px;">'+new Date(x.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'})+'</td>'
+      +'<td style="padding:6px 8px;">'+_dtCell+'</td>'
+      +'<td style="padding:6px 8px;">'+escHtml(x.model||'-')+'</td>'
       +'<td style="padding:6px 8px;">'+escHtml(x.call_type||x.type)+'</td>'
       +'<td style="padding:6px 8px;"><span style="background:#f0fdf4;color:#15803d;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;">'+escHtml(x.status)+'</span></td></tr>';
   }).join('');
@@ -13141,7 +13160,7 @@ function showEdrClosedDetail(engId){
     +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+(rg.from||'')+' → '+(rg.to||'')+' &nbsp;|&nbsp; Total '+r.total+' (Warranty '+wc+', Non-Warranty '+(r.total-wc)+')</div></div>'
     +'<button class="close-btn" onclick="closeEdrDetail()">✕</button></div>'
     +'<div class="modal-body" style="padding:12px 16px;"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-    +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">#</th><th style="padding:6px 8px;">Ticket</th><th style="padding:6px 8px;">Closed Date</th><th style="padding:6px 8px;">Type</th><th style="padding:6px 8px;">Status</th></tr></thead>'
+    +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">#</th><th style="padding:6px 8px;">Ticket</th><th style="padding:6px 8px;">Closed Date</th><th style="padding:6px 8px;">Model</th><th style="padding:6px 8px;">Type</th><th style="padding:6px 8px;">Status</th></tr></thead>'
     +'<tbody>'+rowsH+'</tbody></table></div>'
     +'<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">"Closed Date" = the day the engineer completed the call (Closed / Pending for Delivery / Repaired / Resolved By Phone / Customer Reject) — not the delivery or invoice date.</div>'
     +'</div></div>';
