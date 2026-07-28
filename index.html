@@ -5046,7 +5046,7 @@ async function renderMyCalls(){
   try{
     const engId=currentUser.eng_id||currentUser.user_id;
     const[tickets,tasks]=await Promise.all([
-      sb('tickets','GET',null,`?assigned_to=eq.${engId}&order=created_at.desc`),
+      sb('tickets','GET',null,`?assigned_to=eq.${engId}&select=id,assigned_name,created_at,cname,mobile,alt_mobile,model,serial,problem,status,priority,call_type,service_type,se_call_id,tat_date,address,area,city,state,pin,planned_date,sequence_no&order=created_at.desc`),
       sb('tasks','GET',null,`?assigned_to=eq.${engId}&status=neq.Closed&order=created_at.desc`)
     ]);
     const todayStr=new Date().toLocaleDateString('en-CA');
