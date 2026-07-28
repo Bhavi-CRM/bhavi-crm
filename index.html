@@ -13096,7 +13096,10 @@ async function loadEngDailyReport(){
           var _ce=_engClosedEntry(t);
           var _bd=!!(_ce&&_ce.action&&_ce.action.indexOf('Back-Date')!==-1);
           var _tm=(_ce&&_ce.at&&!_bd)?new Date(_ce.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
-          row.list.push({id:t.id,date:d,time:_tm,backdated:_bd,model:t.model||'',type:isW?'Warranty':'Non-Warranty',status:t.status,call_type:t.call_type||''});
+          // Sort key = closed date + 24h time, so calls list chronologically
+          // (first closed at top → last at bottom). Back-dated: start of that day.
+          var _t24=(_ce&&_ce.at&&!_bd)?new Date(_ce.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'00:00';
+          row.list.push({id:t.id,date:d,time:_tm,sortKey:d+'T'+_t24,backdated:_bd,model:t.model||'',type:isW?'Warranty':'Non-Warranty',status:t.status,call_type:t.call_type||''});
         }
       }else if(MYRPT_PENDING_STATUSES.indexOf(t.status)!==-1){
         var d2=myRptStatusEventDate(t);
@@ -13141,7 +13144,7 @@ function showEdrClosedDetail(engId){
   var rows=window._edrRows||[];var rg=window._edrRange||{};
   var r=rows.find(function(x){return String(x.id)===String(engId);});
   if(!r||!r.list||!r.list.length){alert('No closed calls in this range.');return;}
-  var list=r.list.slice().sort(function(a,b){return (a.date<b.date?-1:a.date>b.date?1:0);});
+  var list=r.list.slice().sort(function(a,b){var ka=a.sortKey||a.date,kb=b.sortKey||b.date;return ka<kb?-1:ka>kb?1:0;});
   var wc=list.filter(function(x){return x.type==='Warranty';}).length;
   var rowsH=list.map(function(x,i){
     var _dt=new Date(x.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
