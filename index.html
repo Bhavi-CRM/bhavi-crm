@@ -8727,6 +8727,17 @@ async function renderReportFilter(c){
 // explicitly ignored — they are not the engineer's completion and happen later,
 // so a call delivered/invoiced today must NOT count as "closed today". Returns
 // en-CA date string or null if the call was never completed.
+// Effective date of a timeline entry. A Back-Date close carries the real close
+// date in its note ("Back-date close for YYYY-MM-DD") — count it on THAT date,
+// not the day the admin/manager performed the back-date action (which can be a
+// week later). Everything else uses the entry's own timestamp.
+function _tlEntryDate(e){
+  if(e&&e.action&&e.action.indexOf('Back-Date')!==-1&&e.note){
+    var m=String(e.note).match(/for\s+(\d{4}-\d{2}-\d{2})/);
+    if(m)return m[1];
+  }
+  return e&&e.at?new Date(e.at).toLocaleDateString('en-CA'):null;
+}
 function _engCompletionDate(t){
   var tl=t&&t.timeline;if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
   if(!Array.isArray(tl))return null;
@@ -8740,7 +8751,7 @@ function _engCompletionDate(t){
   });
   // Legacy Non-Warranty closes wrote only a 'Charges Set' entry at close time.
   if(!last){tl.forEach(function(e){if(e&&e.action&&e.action.indexOf('Charges Set')!==-1&&e.at)last=e;});}
-  return last?new Date(last.at).toLocaleDateString('en-CA'):null;
+  return last?_tlEntryDate(last):null;
 }
 // Date the engineer rejected the customer's estimate (Customer Reject) — that is
 // also a completed call for the engineer. Kept separate from _engCompletionDate
