@@ -19141,7 +19141,38 @@ function swRenderList(){
     +cards+'</div>';
 }
 async function swNewSurvey(){
-  var name=prompt('Client / Survey nu naam:');if(name===null)return;name=(name||'').trim();if(!name){alert('Naam nakho');return;}
+  var sites=[];try{sites=await sb('auto_sites','GET',null,'?select=id,site_name&order=created_at.desc');}catch(e){}
+  var opts='<option value="">— New survey (site vagar) —</option>'+(sites||[]).map(function(s){var nm=s.site_name||('Site '+s.id);return '<option value="'+s.id+'|'+escHtml(nm)+'">'+escHtml(nm)+'</option>';}).join('');
+  var ex=document.getElementById('sw-new-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='sw-new-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:430px;">'
+    +'<div class="modal-header"><h2>➕ New Switchboard Survey</h2><button class="close-btn" onclick="document.getElementById(\'sw-new-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 16px;">'
+    +'<div class="form-group"><label>🏗️ Existing Auto Site mathi</label>'
+    +'<select id="sw-new-site" onchange="var v=this.value;var n=document.getElementById(\'sw-new-name\');if(n){if(v){n.value=(v.split(\'|\')[1]||\'\');n.disabled=true;n.style.background=\'#f1f5f9\';}else{n.disabled=false;n.value=\'\';n.style.background=\'\';}}">'+opts+'</select>'
+    +'<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Site pasand karo to teni sathe survey link thay (already survey hoy to aej khulshe).</div></div>'
+    +'<div style="text-align:center;font-size:12px;color:var(--text-muted);margin:8px 0;">— athva —</div>'
+    +'<div class="form-group"><label>🆕 Navu survey — Client / naam</label><input id="sw-new-name" placeholder="Client nu naam"></div>'
+    +'</div>'
+    +'<div class="modal-footer"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'sw-new-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="swNewSurveyConfirm()">✅ Create / Open</button></div>'
+    +'</div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+async function swNewSurveyConfirm(){
+  var siteSel=document.getElementById('sw-new-site');
+  var nameEl=document.getElementById('sw-new-name');
+  var sv=siteSel?siteSel.value:'';
+  if(sv){
+    var parts=sv.split('|');var siteId=parts[0];var siteName=parts.slice(1).join('|');
+    var m=document.getElementById('sw-new-modal');if(m)m.remove();
+    swOpenSiteSurvey(siteId,siteName);
+    return;
+  }
+  var name=(nameEl&&nameEl.value||'').trim();
+  if(!name){alert('Site pasand karo athva navu naam nakho.');return;}
+  var m2=document.getElementById('sw-new-modal');if(m2)m2.remove();
   var s=await swCreateSurvey({client_name:name,site_name:'',site_id:null});
   if(s){window._swSurveys.unshift(s);swOpenEditor(s.id);}
 }
