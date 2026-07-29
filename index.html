@@ -352,6 +352,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-section-title">Automation</div>
     <div class="nav-item hidden" onclick="navigate('auto-inventory')" id="nav-auto-inventory"><span class="icon">📦</span><span>Auto Inventory</span></div>
     <div class="nav-item hidden" onclick="navigate('auto-sites')" id="nav-auto-sites"><span class="icon">🏗️</span><span>Auto Sites</span></div>
+    <div class="nav-item hidden" onclick="navigate('sw-survey')" id="nav-sw-survey"><span class="icon">🔌</span><span>SW Survey</span></div>
     <div class="nav-item hidden" onclick="navigate('auto-visits-report')" id="nav-auto-visits-report"><span class="icon">📋</span><span>Visit Report</span></div>
   </div>
   <div class="nav-section" id="nav-ai-section">
@@ -2783,7 +2784,7 @@ function doLogout(){
   ['nav-tickets','nav-my-calls','nav-my-report','nav-work-log','nav-walk-in','nav-courier',
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
-   'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report',
+   'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report',
    'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-profit','nav-weekly','nav-pending-list'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
@@ -2961,7 +2962,7 @@ function setupNav(){
       ['nav-tickets','nav-my-calls','nav-my-report','nav-eng-daily-report','nav-work-log','nav-walk-in','nav-courier','btn-new-call',
        'nav-inventory','nav-customers','nav-reports','nav-work-log-report','nav-walk-in-report',
        'nav-courier-report','nav-master','nav-settings','nav-tasks','nav-sales','nav-route-planning',
-       'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-auto-visits-report','nav-inquiries',
+       'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report','nav-inquiries',
        'nav-live-map','nav-ai-agent','nav-ai-analysis','nav-attendance','nav-targets','nav-amc',
        'nav-feedback','nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
        'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr'
@@ -2980,7 +2981,7 @@ function setupNav(){
       sv('btn-daily-report',false);sv('btn-weekly-report',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);
+      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
       // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
       var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
@@ -3012,7 +3013,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
-      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
+      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
@@ -3116,9 +3117,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -19086,6 +19087,245 @@ async function saveBulkStockModal(type){
 
 // ===== AUTOMATION SITE VISIT MODULE =====
 
+// ===== SWITCHBOARD SURVEY (SW Counting) — Automation module =====
+// Fully self-contained. Data lives in the sw_surveys table (one row per survey).
+// A survey can be standalone or linked to an Auto Site (site_id).
+var SW_ITEM_DEFS=[
+  {key:'normalSwitch',label:'Normal Switch (Off)'},
+  {key:'switch15A',label:'15A Switch (Off)'},
+  {key:'sceneController',label:'Scene Controller'},
+  {key:'regulator',label:'Regulator'},
+  {key:'fanSwitch',label:'Fan Switch'},
+  {key:'socket',label:'Socket (6A)'},
+  {key:'socket15A',label:'15A Socket'},
+  {key:'bell',label:'Bell / Buzzer'}
+];
+var SW_MODULE_SIZES=['','2','3','4','6','8','12','16','18','24','32'];
+var SW_SURVEY_SQL='CREATE TABLE IF NOT EXISTS public.sw_surveys (\n  id BIGSERIAL PRIMARY KEY,\n  site_id BIGINT,\n  client_name TEXT,\n  site_name TEXT,\n  survey_date DATE DEFAULT CURRENT_DATE,\n  data JSONB DEFAULT \'{"rooms":[]}\'::jsonb,\n  created_by TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);';
+function swUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function swEmptyItems(){var o={};SW_ITEM_DEFS.forEach(function(d){o[d.key]=0;});return o;}
+function swNewBoard(n){return {id:swUid(),name:n||'SW1',location:'',moduleCount:'',items:swEmptyItems(),custom:[]};}
+function swNewRoom(n){return {id:swUid(),name:n||'Room',boards:[swNewBoard('SW1')]};}
+function swBoardTotal(b){var t=0;SW_ITEM_DEFS.forEach(function(d){t+=(b.items&&b.items[d.key]||0);});(b.custom||[]).forEach(function(c){t+=(c.qty||0);});return t;}
+function swRoomTotal(r){var t=0;(r.boards||[]).forEach(function(b){t+=swBoardTotal(b);});return t;}
+function swSurveyTotal(s){var t=0;((s.data&&s.data.rooms)||[]).forEach(function(r){t+=swRoomTotal(r);});return t;}
+window._swSurveys=[];window._swCur=null;window._swSaveTimer=null;
+
+// ---------- Standalone page ----------
+async function renderSwSurvey(){
+  var pc=document.getElementById('page-content');if(!pc)return;
+  pc.innerHTML='<div class="loading">Loading surveys...</div>';
+  try{
+    var rows=await sb('sw_surveys','GET',null,'?order=updated_at.desc');
+    window._swSurveys=rows||[];
+    swRenderList();
+  }catch(e){
+    pc.innerHTML='<div style="max-width:820px;margin:0 auto;"><div class="alert alert-warning">Error: '+escHtml(e.message)+'<br><br>Jo <b>sw_surveys</b> table missing hoy to Supabase SQL Editor ma aa ek var run karo:<br><pre style="white-space:pre-wrap;font-size:11px;background:#f8fafc;padding:8px;border-radius:6px;">'+escHtml(SW_SURVEY_SQL)+'</pre></div></div>';
+  }
+}
+function swRenderList(){
+  var pc=document.getElementById('page-content');if(!pc)return;
+  var rows=window._swSurveys||[];
+  var cards=rows.map(function(s){
+    var tot=swSurveyTotal(s);var rooms=((s.data&&s.data.rooms)||[]).length;
+    return '<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;" onclick="swOpenEditor('+s.id+')">'
+      +'<div><div style="font-weight:800;font-size:15px;">'+escHtml(s.client_name||'Survey')+'</div>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+(s.site_name?'🏗️ '+escHtml(s.site_name)+' &nbsp;·&nbsp; ':'')+(s.survey_date||'')+' &nbsp;·&nbsp; '+rooms+' rooms &nbsp;·&nbsp; '+tot+' items</div></div>'
+      +'<button class="btn-icon" style="color:var(--danger);" onclick="event.stopPropagation();swDeleteSurvey('+s.id+')" title="Delete survey">🗑️</button>'
+      +'</div>';
+  }).join('')||'<div style="text-align:center;padding:34px;color:var(--text-muted);">Koi survey nathi. "New Survey" thi shuru karo.</div>';
+  pc.innerHTML='<div style="max-width:820px;margin:0 auto;">'
+    +'<div class="section-header" style="margin-bottom:10px;"><h2>🔌 Switchboard Survey</h2>'
+    +'<button class="btn btn-primary btn-sm" onclick="swNewSurvey()">➕ New Survey</button></div>'
+    +'<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Har client / site mate survey banavo — room-wise switchboard nu counting bharo, ane Excel export karo. Auto Site ma thi pan kholi shakay.</p>'
+    +cards+'</div>';
+}
+async function swNewSurvey(){
+  var name=prompt('Client / Survey nu naam:');if(name===null)return;name=(name||'').trim();if(!name){alert('Naam nakho');return;}
+  var s=await swCreateSurvey({client_name:name,site_name:'',site_id:null});
+  if(s){window._swSurveys.unshift(s);swOpenEditor(s.id);}
+}
+async function swCreateSurvey(fields){
+  var row={client_name:fields.client_name||'Survey',site_name:fields.site_name||'',site_id:fields.site_id||null,survey_date:new Date().toISOString().slice(0,10),data:{rooms:[]},created_by:currentUser.name||''};
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/sw_surveys',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(row)});
+    if(!res.ok)throw new Error(await res.text());
+    var created=await res.json();return Array.isArray(created)?created[0]:created;
+  }catch(e){alert('Survey create error: '+e.message+'\n\nJo sw_surveys table missing hoy to aa SQL run karo:\n\n'+SW_SURVEY_SQL);return null;}
+}
+async function swDeleteSurvey(id){
+  if(!confirm('Aa survey delete karvi chhe?'))return;
+  try{await sb('sw_surveys','DELETE',null,'?id=eq.'+id);window._swSurveys=(window._swSurveys||[]).filter(function(s){return s.id!=id;});swRenderList();}catch(e){alert('Error: '+e.message);}
+}
+
+// ---------- Open from an Auto Site ----------
+async function swOpenSiteSurvey(siteId,siteName){
+  try{
+    var rows=await sb('sw_surveys','GET',null,'?site_id=eq.'+encodeURIComponent(siteId)+'&order=updated_at.desc&limit=1');
+    var s=rows&&rows[0];
+    if(!s){s=await swCreateSurvey({client_name:siteName||'Site',site_name:siteName||'',site_id:siteId});if(!s)return;}
+    // keep in cache so the editor can find it
+    var idx=(window._swSurveys||[]).findIndex(function(x){return x.id==s.id;});
+    if(idx<0)window._swSurveys.unshift(s);else window._swSurveys[idx]=s;
+    swOpenEditor(s.id);
+  }catch(e){alert('Error: '+e.message+'\n\nJo sw_surveys table missing hoy to aa SQL run karo:\n\n'+SW_SURVEY_SQL);}
+}
+
+// ---------- Editor overlay ----------
+function swOpenEditor(id){
+  var s=(window._swSurveys||[]).find(function(x){return x.id==id;});
+  if(!s){alert('Survey not found');return;}
+  if(!s.data||typeof s.data!=='object')s.data={rooms:[]};
+  if(!Array.isArray(s.data.rooms))s.data.rooms=[];
+  window._swCur=s;
+  var ex=document.getElementById('sw-editor-ov');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='sw-editor-ov';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:860px;">'
+    +'<div class="modal-header"><div><h2>🔌 Switchboard Survey</h2><div id="sw-save-ind" style="font-size:11px;color:#16a34a;margin-top:2px;">✓ Saved</div></div>'
+    +'<button class="close-btn" onclick="swCloseEditor()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 16px;"><div id="sw-editor-body"></div></div>'
+    +'<div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">'
+    +'<button class="btn btn-primary btn-sm" onclick="swExport()">📊 Export Excel</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="swCloseEditor()">Close</button>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)swCloseEditor();};
+  document.body.appendChild(ov);
+  swRenderEditor();
+}
+function swCloseEditor(){var o=document.getElementById('sw-editor-ov');if(o)o.remove();window._swCur=null;if(currentPage==='sw-survey')swRenderList();}
+function swRenderEditor(){
+  var s=window._swCur;if(!s)return;
+  var body=document.getElementById('sw-editor-body');if(!body)return;
+  var rooms=s.data.rooms||[];
+  var head='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Client</label><input value="'+escHtml(s.client_name||'')+'" onchange="swField(\'client_name\',this.value)"></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Site</label><input value="'+escHtml(s.site_name||'')+'" onchange="swField(\'site_name\',this.value)"'+(s.site_id?' readonly style="background:#f1f5f9;"':'')+'></div>'
+    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Date</label><input type="date" value="'+(s.survey_date||'')+'" onchange="swField(\'survey_date\',this.value)"></div>'
+    +'<div style="display:flex;align-items:flex-end;font-size:12px;color:var(--text-muted);padding-bottom:6px;">Rooms: <b style="color:var(--text);margin:0 4px;">'+rooms.length+'</b> &nbsp;·&nbsp; Total items: <b style="color:var(--text);margin-left:4px;">'+swSurveyTotal(s)+'</b></div>'
+    +'</div>';
+  var roomsHtml=rooms.map(function(r,ri){
+    var boardsHtml=(r.boards||[]).map(function(b,bi){return swBoardHtml(ri,bi,r,b);}).join('');
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;background:var(--bg);">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+      +'<span style="font-size:16px;">🏠</span>'
+      +'<input value="'+escHtml(r.name||'')+'" placeholder="Room name" onchange="swRoomName('+ri+',this.value)" style="flex:1;font-weight:700;">'
+      +'<span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">'+swRoomTotal(r)+' items</span>'
+      +'<button class="btn-icon" style="color:var(--danger);" onclick="swDelRoom('+ri+')" title="Delete room">🗑️</button>'
+      +'</div>'
+      +boardsHtml
+      +'<button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:12px;" onclick="swAddBoard('+ri+')">➕ Add switchboard</button>'
+      +'</div>';
+  }).join('');
+  body.innerHTML=head+roomsHtml+'<button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="swAddRoom()">➕ Add Room</button>';
+}
+function swBoardHtml(ri,bi,r,b){
+  var total=swBoardTotal(b);
+  var sizeSel='<select onchange="swBoardSize('+ri+','+bi+',this.value)" style="height:28px;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:6px;">'
+    +SW_MODULE_SIZES.map(function(v){return '<option value="'+v+'"'+(String(b.moduleCount||'')===v?' selected':'')+'>'+(v===''?'size':v+'M')+'</option>';}).join('')+'</select>';
+  var used=b.moduleCount?('used '+total+' / '+b.moduleCount):('used '+total);
+  var usedColor=(b.moduleCount&&total>Number(b.moduleCount))?'#dc2626':'var(--text-muted)';
+  var counters=SW_ITEM_DEFS.map(function(d){
+    var q=b.items&&b.items[d.key]||0;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);">'
+      +'<span style="font-size:13px;">'+escHtml(d.label)+'</span>'
+      +'<span style="display:flex;align-items:center;gap:6px;">'
+      +'<button class="btn-icon" style="background:#f1f5f9;width:26px;height:26px;" onclick="swItemDelta('+ri+','+bi+',\''+d.key+'\',-1)">−</button>'
+      +'<span style="min-width:26px;text-align:center;font-weight:700;">'+q+'</span>'
+      +'<button class="btn-icon" style="background:#eff6ff;color:#1d4ed8;width:26px;height:26px;" onclick="swItemDelta('+ri+','+bi+',\''+d.key+'\',1)">+</button>'
+      +'</span></div>';
+  }).join('');
+  var customs=(b.custom||[]).map(function(c,ci){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);">'
+      +'<span style="font-size:13px;color:#7c3aed;">'+escHtml(c.name)+'</span>'
+      +'<span style="display:flex;align-items:center;gap:6px;">'
+      +'<button class="btn-icon" style="background:#f1f5f9;width:26px;height:26px;" onclick="swCustDelta('+ri+','+bi+','+ci+',-1)">−</button>'
+      +'<span style="min-width:26px;text-align:center;font-weight:700;">'+(c.qty||0)+'</span>'
+      +'<button class="btn-icon" style="background:#eff6ff;color:#1d4ed8;width:26px;height:26px;" onclick="swCustDelta('+ri+','+bi+','+ci+',1)">+</button>'
+      +'<button class="btn-icon" style="color:var(--danger);width:24px;height:24px;" onclick="swDelCust('+ri+','+bi+','+ci+')">✕</button>'
+      +'</span></div>';
+  }).join('');
+  return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--card);">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+    +'<span style="font-size:14px;">🔌</span>'
+    +'<input value="'+escHtml(b.name||'')+'" placeholder="SW1" onchange="swBoardName('+ri+','+bi+',this.value)" style="flex:1;font-weight:600;font-size:13px;">'
+    +'<span style="font-size:12px;color:var(--text-muted);">'+total+'</span>'
+    +'<button class="btn-icon" style="color:var(--danger);width:24px;height:24px;" onclick="swDelBoard('+ri+','+bi+')" title="Delete board">🗑️</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+    +'<input value="'+escHtml(b.location||'')+'" placeholder="Board ni jagya (e.g. door pase)" onchange="swBoardLoc('+ri+','+bi+',this.value)" style="flex:1;font-size:12px;height:28px;color:var(--text-muted);">'
+    +sizeSel+'<span style="font-size:11px;color:'+usedColor+';white-space:nowrap;">'+used+'</span>'
+    +'</div>'
+    +counters+customs
+    +'<div style="display:flex;gap:6px;margin-top:6px;">'
+    +'<input id="sw-cust-'+ri+'-'+bi+'" placeholder="Other item name" style="flex:1;font-size:12px;height:30px;">'
+    +'<button class="btn btn-outline btn-sm" style="font-size:12px;height:30px;" onclick="swAddCust('+ri+','+bi+')">Add</button>'
+    +'</div>'
+    +'</div>';
+}
+
+// ---------- Mutators (update model + save) ----------
+function swCurRooms(){return window._swCur&&window._swCur.data&&window._swCur.data.rooms;}
+function swField(k,v){if(!window._swCur)return;window._swCur[k]=v;swSave();}
+function swAddRoom(){var rs=swCurRooms();if(!rs)return;rs.push(swNewRoom('Room '+(rs.length+1)));swSave();swRenderEditor();}
+function swDelRoom(ri){var rs=swCurRooms();if(!rs)return;if(!confirm('Room delete karvo?'))return;rs.splice(ri,1);swSave();swRenderEditor();}
+function swRoomName(ri,v){var rs=swCurRooms();if(rs&&rs[ri]){rs[ri].name=v;swSave();}}
+function swAddBoard(ri){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards=rs[ri].boards||[];rs[ri].boards.push(swNewBoard('SW'+(rs[ri].boards.length+1)));swSave();swRenderEditor();}
+function swDelBoard(ri,bi){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards.splice(bi,1);swSave();swRenderEditor();}
+function swBoardName(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].name=v;swSave();}}
+function swBoardLoc(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].location=v;swSave();}}
+function swBoardSize(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].moduleCount=v;swSave();swRenderEditor();}}
+function swItemDelta(ri,bi,key,d){var rs=swCurRooms();if(!rs||!rs[ri]||!rs[ri].boards[bi])return;var b=rs[ri].boards[bi];if(!b.items)b.items=swEmptyItems();b.items[key]=Math.max(0,(b.items[key]||0)+d);swSave();swRenderEditor();}
+function swAddCust(ri,bi){var rs=swCurRooms();if(!rs||!rs[ri]||!rs[ri].boards[bi])return;var el=document.getElementById('sw-cust-'+ri+'-'+bi);var nm=(el&&el.value||'').trim();if(!nm)return;var b=rs[ri].boards[bi];b.custom=b.custom||[];b.custom.push({name:nm,qty:1});swSave();swRenderEditor();}
+function swCustDelta(ri,bi,ci,d){var rs=swCurRooms();if(!rs||!rs[ri]||!rs[ri].boards[bi])return;var c=rs[ri].boards[bi].custom[ci];if(!c)return;c.qty=Math.max(0,(c.qty||0)+d);swSave();swRenderEditor();}
+function swDelCust(ri,bi,ci){var rs=swCurRooms();if(!rs||!rs[ri]||!rs[ri].boards[bi])return;rs[ri].boards[bi].custom.splice(ci,1);swSave();swRenderEditor();}
+
+// ---------- Save (debounced) ----------
+function swSave(){
+  var ind=document.getElementById('sw-save-ind');if(ind){ind.textContent='… saving';ind.style.color='#d97706';}
+  if(window._swSaveTimer)clearTimeout(window._swSaveTimer);
+  window._swSaveTimer=setTimeout(swSaveNow,700);
+}
+async function swSaveNow(){
+  var s=window._swCur;if(!s)return;
+  try{
+    await sb('sw_surveys','PATCH',{client_name:s.client_name||'',site_name:s.site_name||'',survey_date:s.survey_date||null,data:s.data,updated_at:new Date().toISOString()},'?id=eq.'+s.id);
+    var ind=document.getElementById('sw-save-ind');if(ind){ind.textContent='✓ Saved';ind.style.color='#16a34a';}
+  }catch(e){var ind2=document.getElementById('sw-save-ind');if(ind2){ind2.textContent='⚠️ Save failed';ind2.style.color='#dc2626';}console.log('sw save error',e);}
+}
+
+// ---------- Excel export ----------
+function swExport(){
+  var s=window._swCur;if(!s){alert('No survey open');return;}
+  if(typeof XLSX==='undefined'){alert('Excel library not loaded.');return;}
+  var rooms=(s.data&&s.data.rooms)||[];
+  var header=['Room','Switchboard','Location','Board size (M)'].concat(SW_ITEM_DEFS.map(function(d){return d.label;})).concat(['Other items','Total items']);
+  var detail=[header];
+  rooms.forEach(function(r){
+    (r.boards||[]).forEach(function(b){
+      var row=[r.name||'',b.name||'',b.location||'',b.moduleCount||''];
+      SW_ITEM_DEFS.forEach(function(d){row.push(b.items&&b.items[d.key]||0);});
+      var cust=(b.custom||[]).map(function(c){return c.name+' x'+c.qty;}).join(', ');
+      row.push(cust);row.push(swBoardTotal(b));
+      detail.push(row);
+    });
+  });
+  var totalRow=['TOTAL','','',''];
+  SW_ITEM_DEFS.forEach(function(d){var sum=0;rooms.forEach(function(r){(r.boards||[]).forEach(function(b){sum+=(b.items&&b.items[d.key]||0);});});totalRow.push(sum);});
+  totalRow.push('');totalRow.push(swSurveyTotal(s));
+  detail.push(totalRow);
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet(detail);
+  ws['!cols']=[{wch:16},{wch:14},{wch:20},{wch:12}].concat(SW_ITEM_DEFS.map(function(){return {wch:16};})).concat([{wch:24},{wch:12}]);
+  XLSX.utils.book_append_sheet(wb,ws,'Board details');
+  var summary=[['Room','Switchboards','Items']];
+  rooms.forEach(function(r){summary.push([r.name||'',(r.boards||[]).length,swRoomTotal(r)]);});
+  summary.push(['Grand total','',swSurveyTotal(s)]);
+  var ws2=XLSX.utils.aoa_to_sheet(summary);ws2['!cols']=[{wch:20},{wch:16},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
+  var fname=('SW-Survey-'+(s.client_name||'survey')).replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')+'.xlsx';
+  XLSX.writeFile(wb,fname);
+}
+
 async function renderAutoSites(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
@@ -19343,6 +19583,7 @@ async function viewSiteItems(siteId,siteName){
       +'<div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">'
       +'<button class="btn btn-primary btn-sm" onclick="openAddSiteItem(\''+siteId+'\',\''+escQ(siteName)+'\')">➕ Add Item</button>'
       +'<button class="btn btn-sm" style="background:#7c3aed;color:#fff;" onclick="openDispatchModal(\''+siteId+'\',\''+escQ(siteName)+'\')">📤 Dispatch Material</button>'
+      +'<button class="btn btn-sm" style="background:#0891b2;color:#fff;" onclick="this.closest(\'.modal-overlay\').remove();swOpenSiteSurvey(\''+siteId+'\',\''+escQ(siteName)+'\')">🔌 Switchboard Survey</button>'
       +'<button class="btn btn-outline btn-sm" onclick="openTCSelector(window._currentSiteItems,window._currentSiteInfo,{paid:'+totalPaid+'})">📄 Quotation</button>'
       +'<button class="btn btn-success btn-sm" onclick="openSitePaymentModal(\''+siteId+'\',\''+escQ(siteName)+'\','+grandSell+','+totalPaid+')">💰 Add Payment</button>'
       +'<button class="btn btn-outline btn-sm" style="color:#dc2626;" onclick="openTrash()" title="View deleted items this session">🗑️ Trash</button>'
