@@ -19104,7 +19104,7 @@ var SW_MODULE_SIZES=['','2','3','4','6','8','12','16','18','24','32'];
 var SW_SURVEY_SQL='CREATE TABLE IF NOT EXISTS public.sw_surveys (\n  id BIGSERIAL PRIMARY KEY,\n  site_id BIGINT,\n  client_name TEXT,\n  site_name TEXT,\n  survey_date DATE DEFAULT CURRENT_DATE,\n  data JSONB DEFAULT \'{"rooms":[]}\'::jsonb,\n  created_by TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);';
 function swUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function swEmptyItems(){var o={};SW_ITEM_DEFS.forEach(function(d){o[d.key]=0;});return o;}
-function swNewBoard(n){return {id:swUid(),name:n||'SW1',location:'',moduleCount:'',items:swEmptyItems(),custom:[]};}
+function swNewBoard(n){return {id:swUid(),name:n||'SW1',type:'Automation',location:'',moduleCount:'',items:swEmptyItems(),custom:[]};}
 function swNewRoom(n){return {id:swUid(),name:n||'Room',boards:[swNewBoard('SW1')]};}
 function swBoardTotal(b){var t=0;SW_ITEM_DEFS.forEach(function(d){t+=(b.items&&b.items[d.key]||0);});(b.custom||[]).forEach(function(c){t+=(c.qty||0);});return t;}
 function swRoomTotal(r){var t=0;(r.boards||[]).forEach(function(b){t+=swBoardTotal(b);});return t;}
@@ -19276,9 +19276,13 @@ function swBoardHtml(ri,bi,r,b){
       +'</span></div>';
   }).join('');
   return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--card);">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">'
     +'<span style="font-size:14px;">🔌</span>'
-    +'<input value="'+escHtml(b.name||'')+'" placeholder="SW1" onchange="swBoardName('+ri+','+bi+',this.value)" style="flex:1;font-weight:600;font-size:13px;">'
+    +'<input value="'+escHtml(b.name||'')+'" placeholder="SW1" onchange="swBoardName('+ri+','+bi+',this.value)" style="flex:1;min-width:80px;font-weight:600;font-size:13px;">'
+    +'<select onchange="swBoardType('+ri+','+bi+',this.value)" title="Automation / Non-Automation" style="height:28px;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:6px;font-weight:600;color:'+((b.type||'Automation')==='Automation'?'#0891b2':'#92400e')+';">'
+    +'<option value="Automation"'+((b.type||'Automation')==='Automation'?' selected':'')+'>⚙️ Automation</option>'
+    +'<option value="Non-Automation"'+(b.type==='Non-Automation'?' selected':'')+'>🔧 Non-Auto</option>'
+    +'</select>'
     +'<span style="font-size:12px;color:var(--text-muted);">'+total+'</span>'
     +'<button class="btn-icon" style="color:var(--danger);width:24px;height:24px;" onclick="swDelBoard('+ri+','+bi+')" title="Delete board">🗑️</button>'
     +'</div>'
@@ -19303,6 +19307,7 @@ function swRoomName(ri,v){var rs=swCurRooms();if(rs&&rs[ri]){rs[ri].name=v;swSav
 function swAddBoard(ri){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards=rs[ri].boards||[];rs[ri].boards.push(swNewBoard('SW'+(rs[ri].boards.length+1)));swSave();swRenderEditor();}
 function swDelBoard(ri,bi){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards.splice(bi,1);swSave();swRenderEditor();}
 function swBoardName(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].name=v;swSave();}}
+function swBoardType(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].type=v;swSave();swRenderEditor();}}
 function swBoardLoc(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].location=v;swSave();}}
 function swBoardSize(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].moduleCount=v;swSave();swRenderEditor();}}
 function swItemDelta(ri,bi,key,d){var rs=swCurRooms();if(!rs||!rs[ri]||!rs[ri].boards[bi])return;var b=rs[ri].boards[bi];if(!b.items)b.items=swEmptyItems();b.items[key]=Math.max(0,(b.items[key]||0)+d);swSave();swRenderEditor();}
@@ -19329,24 +19334,24 @@ function swExport(){
   var s=window._swCur;if(!s){alert('No survey open');return;}
   if(typeof XLSX==='undefined'){alert('Excel library not loaded.');return;}
   var rooms=(s.data&&s.data.rooms)||[];
-  var header=['Room','Switchboard','Location','Board size (M)'].concat(SW_ITEM_DEFS.map(function(d){return d.label;})).concat(['Other items','Total items']);
+  var header=['Room','Switchboard','Type','Location','Board size (M)'].concat(SW_ITEM_DEFS.map(function(d){return d.label;})).concat(['Other items','Total items']);
   var detail=[header];
   rooms.forEach(function(r){
     (r.boards||[]).forEach(function(b){
-      var row=[r.name||'',b.name||'',b.location||'',b.moduleCount||''];
+      var row=[r.name||'',b.name||'',b.type||'Automation',b.location||'',b.moduleCount||''];
       SW_ITEM_DEFS.forEach(function(d){row.push(b.items&&b.items[d.key]||0);});
       var cust=(b.custom||[]).map(function(c){return c.name+' x'+c.qty;}).join(', ');
       row.push(cust);row.push(swBoardTotal(b));
       detail.push(row);
     });
   });
-  var totalRow=['TOTAL','','',''];
+  var totalRow=['TOTAL','','','',''];
   SW_ITEM_DEFS.forEach(function(d){var sum=0;rooms.forEach(function(r){(r.boards||[]).forEach(function(b){sum+=(b.items&&b.items[d.key]||0);});});totalRow.push(sum);});
   totalRow.push('');totalRow.push(swSurveyTotal(s));
   detail.push(totalRow);
   var wb=XLSX.utils.book_new();
   var ws=XLSX.utils.aoa_to_sheet(detail);
-  ws['!cols']=[{wch:16},{wch:14},{wch:20},{wch:12}].concat(SW_ITEM_DEFS.map(function(){return {wch:16};})).concat([{wch:24},{wch:12}]);
+  ws['!cols']=[{wch:16},{wch:14},{wch:15},{wch:20},{wch:12}].concat(SW_ITEM_DEFS.map(function(){return {wch:16};})).concat([{wch:24},{wch:12}]);
   XLSX.utils.book_append_sheet(wb,ws,'Board details');
   var summary=[['Room','Switchboards','Items']];
   rooms.forEach(function(r){summary.push([r.name||'',(r.boards||[]).length,swRoomTotal(r)]);});
