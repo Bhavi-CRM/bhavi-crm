@@ -19217,7 +19217,8 @@ function swOpenEditor(id){
     +'<button class="close-btn" onclick="swCloseEditor()">✕</button></div>'
     +'<div class="modal-body" style="padding:14px 16px;"><div id="sw-editor-body"></div></div>'
     +'<div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px;">'
-    +'<button class="btn btn-primary btn-sm" onclick="swExport()">📊 Export Excel</button>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="swExport()">📊 Excel</button>'
+    +'<button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="swExportPDF()">🧾 PDF</button></div>'
     +'<button class="btn btn-outline btn-sm" onclick="swCloseEditor()">Close</button>'
     +'</div></div>';
   ov.onclick=function(e){if(e.target===ov)swCloseEditor();};
@@ -19373,6 +19374,56 @@ function swExport(){
   XLSX.utils.book_append_sheet(wb,ws2,'Summary');
   var fname=('SW-Survey-'+(s.client_name||'survey')).replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')+'.xlsx';
   XLSX.writeFile(wb,fname);
+}
+// Branded PDF (print window) — summary brief + full board table, ready to forward.
+function swExportPDF(){
+  var s=window._swCur;if(!s){alert('No survey open');return;}
+  var rooms=(s.data&&s.data.rooms)||[];
+  var itemTotals={};SW_ITEM_DEFS.forEach(function(d){itemTotals[d.key]=0;});
+  var boards=0,autoB=0,nonB=0,customTotal=0;
+  rooms.forEach(function(r){(r.boards||[]).forEach(function(b){boards++;if((b.type||'Automation')==='Automation')autoB++;else nonB++;SW_ITEM_DEFS.forEach(function(d){itemTotals[d.key]+=(b.items&&b.items[d.key]||0);});(b.custom||[]).forEach(function(c){customTotal+=(c.qty||0);});});});
+  var grand=swSurveyTotal(s);
+  var e=function(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+  var trs='';
+  rooms.forEach(function(r){(r.boards||[]).forEach(function(b){
+    var cells='<td>'+e(r.name)+'</td><td>'+e(b.name)+'</td><td>'+e(b.type||'Automation')+'</td><td>'+e(b.location)+'</td><td class="c">'+e(b.moduleCount)+'</td>';
+    SW_ITEM_DEFS.forEach(function(d){var q=b.items&&b.items[d.key]||0;cells+='<td class="c">'+(q||'')+'</td>';});
+    var cust=(b.custom||[]).map(function(c){return e(c.name)+' x'+c.qty;}).join(', ');
+    cells+='<td>'+cust+'</td><td class="c b">'+swBoardTotal(b)+'</td>';
+    trs+='<tr>'+cells+'</tr>';
+  });});
+  var totCells='<td class="b">TOTAL</td><td></td><td></td><td></td><td></td>';
+  SW_ITEM_DEFS.forEach(function(d){totCells+='<td class="c b">'+(itemTotals[d.key]||'')+'</td>';});
+  totCells+='<td></td><td class="c b">'+grand+'</td>';
+  var itemHead=SW_ITEM_DEFS.map(function(d){return '<th class="c">'+e(d.label)+'</th>';}).join('');
+  var chip=function(lbl,val,col){return '<div class="chip"><div class="cv" style="color:'+col+'">'+val+'</div><div class="cl">'+lbl+'</div></div>';};
+  var itemBrief=SW_ITEM_DEFS.filter(function(d){return itemTotals[d.key]>0;}).map(function(d){return '<span class="pill">'+e(d.label)+': <b>'+itemTotals[d.key]+'</b></span>';}).join('');
+  var dstr=s.survey_date?new Date(s.survey_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
+  var logo=(typeof _DEFAULT_LOGO!=='undefined')?(localStorage.getItem('bhaviLogo')||_DEFAULT_LOGO):'';
+  var win=window.open('','_blank');
+  if(!win){alert('Popup blocked — PDF mate popup allow karo.');return;}
+  win.document.write('<html><head><title>SW Survey - '+e(s.client_name||'')+'</title><style>'
+    +'*{box-sizing:border-box;} body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0;padding:18px 22px;font-size:12px;}'
+    +'.hd{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0891b2;padding-bottom:10px;margin-bottom:12px;}'
+    +'.hd img{max-height:56px;max-width:180px;object-fit:contain;}'
+    +'.co{font-size:19px;font-weight:800;color:#0f172a;letter-spacing:0.3px;} .sub{font-size:12px;color:#0891b2;font-weight:700;margin-top:3px;}'
+    +'.meta{display:flex;gap:26px;flex-wrap:wrap;font-size:12px;margin-bottom:12px;} .meta b{color:#0f172a;}'
+    +'.chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;} .chip{border:1px solid #e2e8f0;border-radius:8px;padding:6px 14px;text-align:center;min-width:84px;} .cv{font-size:21px;font-weight:800;} .cl{font-size:10px;color:#64748b;font-weight:700;margin-top:2px;}'
+    +'.pills{margin-bottom:12px;line-height:2;} .pill{display:inline-block;background:#f0f9ff;border:1px solid #e0f2fe;border-radius:20px;padding:3px 10px;font-size:11px;margin:0 4px 4px 0;color:#0369a1;}'
+    +'table{width:100%;border-collapse:collapse;font-size:10px;} th,td{border:1px solid #cbd5e1;padding:3px 5px;text-align:left;} th{background:#f1f5f9;font-size:9.5px;} td.c,th.c{text-align:center;} .b{font-weight:800;} tr:nth-child(even) td{background:#fafbfc;} .totr td{background:#ecfeff !important;font-weight:800;}'
+    +'.ft{margin-top:14px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:8px;}'
+    +'@media print{body{padding:4px;}}'
+    +'</style></head><body>'
+    +'<div class="hd">'+(logo?'<img src="'+logo+'">':'')+'<div><div class="co">BHAVI ELECTRONICS &amp; AUTOMATION</div><div class="sub">Switchboard Survey Report</div></div></div>'
+    +'<div class="meta"><div>Client: <b>'+e(s.client_name||'-')+'</b></div>'+(s.site_name?'<div>Site: <b>'+e(s.site_name)+'</b></div>':'')+'<div>Date: <b>'+e(dstr)+'</b></div></div>'
+    +'<div class="chips">'+chip('Rooms',rooms.length,'#0f172a')+chip('Switchboards',boards,'#0f172a')+chip('Automation',autoB,'#0891b2')+chip('Non-Auto',nonB,'#d97706')+chip('Total Items',grand,'#16a34a')+'</div>'
+    +(itemBrief?'<div class="pills"><b style="font-size:11px;color:#334155;">Item summary:</b> '+itemBrief+(customTotal?' <span class="pill">Other: <b>'+customTotal+'</b></span>':'')+'</div>':'')
+    +'<table><thead><tr><th>Room</th><th>SW</th><th>Type</th><th>Location</th><th class="c">Size</th>'+itemHead+'<th>Other</th><th class="c">Total</th></tr></thead>'
+    +'<tbody>'+trs+'<tr class="totr">'+totCells+'</tr></tbody></table>'
+    +'<div class="ft">Generated on '+new Date().toLocaleString('en-IN')+' &nbsp;·&nbsp; Bhavi Electronics &amp; Automation</div>'
+    +'</body></html>');
+  win.document.close();
+  setTimeout(function(){try{win.print();}catch(e2){}},500);
 }
 
 async function renderAutoSites(){
