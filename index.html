@@ -19188,8 +19188,23 @@ async function swCreateSurvey(fields){
     var created=await res.json();return Array.isArray(created)?created[0]:created;
   }catch(e){alert('Survey create error: '+e.message+'\n\nJo sw_surveys table missing hoy to aa SQL run karo:\n\n'+SW_SURVEY_SQL);return null;}
 }
-async function swDeleteSurvey(id){
-  if(!confirm('Aa survey delete karvi chhe?'))return;
+function swDeleteSurvey(id){
+  var s=(window._swSurveys||[]).find(function(x){return x.id==id;});
+  var nm=s?(s.client_name||'Survey'):'Survey';
+  var ex=document.getElementById('sw-del-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='sw-del-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:390px;">'
+    +'<div class="modal-header"><h2>🗑️ Delete Survey</h2><button class="close-btn" onclick="document.getElementById(\'sw-del-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:18px 16px;"><div style="font-size:14px;">Survey <b>"'+escHtml(nm)+'"</b> delete karvi chhe?</div>'
+    +'<div style="font-size:12px;color:#dc2626;margin-top:8px;font-weight:600;">⚠️ Aa permanent chhe — badho data jato rahe, pachhu nahi male.</div></div>'
+    +'<div class="modal-footer"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'sw-del-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="swDeleteSurveyConfirmed('+id+')">🗑️ Yes, Delete</button></div>'
+    +'</div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+async function swDeleteSurveyConfirmed(id){
+  var m=document.getElementById('sw-del-modal');if(m)m.remove();
   try{await sb('sw_surveys','DELETE',null,'?id=eq.'+id);window._swSurveys=(window._swSurveys||[]).filter(function(s){return s.id!=id;});swRenderList();}catch(e){alert('Error: '+e.message);}
 }
 
@@ -19322,7 +19337,7 @@ function swAddRoom(){var rs=swCurRooms();if(!rs)return;rs.push(swNewRoom('Room '
 function swDelRoom(ri){var rs=swCurRooms();if(!rs)return;if(!confirm('Room delete karvo?'))return;rs.splice(ri,1);swSave();swRenderEditor();}
 function swRoomName(ri,v){var rs=swCurRooms();if(rs&&rs[ri]){rs[ri].name=v;swSave();}}
 function swAddBoard(ri){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards=rs[ri].boards||[];rs[ri].boards.push(swNewBoard('SW'+(rs[ri].boards.length+1)));swSave();swRenderEditor();}
-function swDelBoard(ri,bi){var rs=swCurRooms();if(!rs||!rs[ri])return;rs[ri].boards.splice(bi,1);swSave();swRenderEditor();}
+function swDelBoard(ri,bi){var rs=swCurRooms();if(!rs||!rs[ri])return;if(!confirm('Aa switchboard delete karvo? Data jato rahe.'))return;rs[ri].boards.splice(bi,1);swSave();swRenderEditor();}
 function swBoardName(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].name=v;swSave();}}
 function swBoardType(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].type=v;swSave();swRenderEditor();}}
 function swBoardLoc(ri,bi,v){var rs=swCurRooms();if(rs&&rs[ri]&&rs[ri].boards[bi]){rs[ri].boards[bi].location=v;swSave();}}
