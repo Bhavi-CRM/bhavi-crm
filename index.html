@@ -19101,9 +19101,9 @@ var SW_ITEM_DEFS=[
   {key:'bell',label:'Bell / Buzzer'}
 ];
 var SW_MODULE_SIZES=['','2','3','4','6','8','12','16','18','24','32'];
-// Bhavi Automation Solutions logo — inline SVG recreation (house + wifi). To use
-// the EXACT brand PNG later, set localStorage 'bhaviAutoLogo' to its data URI.
-var SW_AUTO_LOGO='<svg width="150" height="52" viewBox="0 0 300 104" xmlns="http://www.w3.org/2000/svg"><g fill="#2b2b9e"><path d="M14,54 L52,20 a4,4 0 0 1 6,0 L96,54" fill="none" stroke="#2b2b9e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M24,50 V88 a3,3 0 0 0 3,3 H83 a3,3 0 0 0 3,-3 V50" fill="none" stroke="#2b2b9e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><rect x="60" y="40" width="9" height="9" rx="2"/><rect x="73" y="40" width="9" height="9" rx="2"/><rect x="60" y="53" width="9" height="9" rx="2"/><rect x="73" y="53" width="9" height="9" rx="2"/><path d="M30,74 a16,16 0 0 1 26,0" fill="none" stroke="#2b2b9e" stroke-width="5" stroke-linecap="round"/><path d="M36,80 a9,9 0 0 1 14,0" fill="none" stroke="#2b2b9e" stroke-width="5" stroke-linecap="round"/><circle cx="43" cy="86" r="3.5"/><text x="112" y="52" font-family="Arial,Helvetica,sans-serif" font-size="42" font-weight="800" letter-spacing="1">BHAVI</text><text x="113" y="74" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" letter-spacing="4">AUTOMATION SOLUTIONS</text></g></svg>';
+// Bhavi Automation Solutions logo — loaded from the repo file
+// 'bhavi-automation-logo.png' (upload it next to index.html). Falls back to
+// hidden if the file isn't there yet.
 var SW_ROOM_LIST=['Entry','Entry Passage','Vestibule','Foyer','Porch','Lobby','Lift Lobby','Living Room','Drawing Room','Family Lounge','Dining Room','Kitchen','Utility','Pantry','Store Room','Pooja Room','Study','Home Office','Master Bedroom','Bedroom 1','Bedroom 2','Bedroom 3','Bedroom 4','Kids Room','Guest Bedroom','Dressing Room','Walk-in Closet','Master Bathroom','Common Bathroom','Powder Room','Passage / Corridor','Staircase','Balcony','Terrace','Servant Room','Servant Bathroom','Garage','Home Theatre','Gym','Bar','Games Room','Library','Garden / Lawn','Basement','Reception','Cabin','Conference Room','Office','Common Area'];
 var SW_SURVEY_SQL='CREATE TABLE IF NOT EXISTS public.sw_surveys (\n  id BIGSERIAL PRIMARY KEY,\n  site_id BIGINT,\n  client_name TEXT,\n  site_name TEXT,\n  survey_date DATE DEFAULT CURRENT_DATE,\n  data JSONB DEFAULT \'{"rooms":[]}\'::jsonb,\n  created_by TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);';
 function swUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
@@ -19403,6 +19403,8 @@ function swExportPDF(){
   var itemBrief=SW_ITEM_DEFS.filter(function(d){return itemTotals[d.key]>0;}).map(function(d){return '<span class="pill">'+e(d.label)+': <b>'+itemTotals[d.key]+'</b></span>';}).join('');
   var dstr=s.survey_date?new Date(s.survey_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'';
   var logo=(typeof _DEFAULT_LOGO!=='undefined')?(localStorage.getItem('bhaviLogo')||_DEFAULT_LOGO):'';
+  // Automation logo: uploaded repo file next to index.html (or a data URI in localStorage).
+  var autoLogo=localStorage.getItem('bhaviAutoLogo')||(location.href.replace(/[^\/]*(\?.*)?$/,'')+'bhavi-automation-logo.png');
   var win=window.open('','_blank');
   if(!win){alert('Popup blocked — PDF mate popup allow karo.');return;}
   win.document.write('<html><head><title>SW Survey - '+e(s.client_name||'')+'</title><style>'
@@ -19417,7 +19419,7 @@ function swExportPDF(){
     +'.ft{margin-top:14px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:8px;}'
     +'@media print{body{padding:4px;}}'
     +'</style></head><body>'
-    +'<div class="hd">'+(logo?'<img src="'+logo+'">':'')+'<div style="flex:1;"><div class="co">BHAVI ELECTRONICS &amp; AUTOMATION</div><div class="sub">Switchboard Survey Report</div></div>'+(localStorage.getItem('bhaviAutoLogo')?'<img src="'+localStorage.getItem('bhaviAutoLogo')+'">':SW_AUTO_LOGO)+'</div>'
+    +'<div class="hd">'+(logo?'<img src="'+logo+'">':'')+'<div style="flex:1;"><div class="co">BHAVI ELECTRONICS &amp; AUTOMATION</div><div class="sub">Switchboard Survey Report</div></div>'+'<img src="'+autoLogo+'" onerror="this.remove()">'+'</div>'
     +'<div class="meta"><div>Client: <b>'+e(s.client_name||'-')+'</b></div>'+(s.site_name?'<div>Site: <b>'+e(s.site_name)+'</b></div>':'')+'<div>Date: <b>'+e(dstr)+'</b></div></div>'
     +'<div class="chips">'+chip('Rooms',rooms.length,'#0f172a')+chip('Switchboards',boards,'#0f172a')+chip('Automation',autoB,'#0891b2')+chip('Non-Auto',nonB,'#d97706')+chip('Total Items',grand,'#16a34a')+'</div>'
     +(itemBrief?'<div class="pills"><b style="font-size:11px;color:#334155;">Item summary:</b> '+itemBrief+(customTotal?' <span class="pill">Other: <b>'+customTotal+'</b></span>':'')+'</div>':'')
