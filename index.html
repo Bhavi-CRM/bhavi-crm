@@ -19101,6 +19101,7 @@ var SW_ITEM_DEFS=[
   {key:'bell',label:'Bell / Buzzer'}
 ];
 var SW_MODULE_SIZES=['','2','3','4','6','8','12','16','18','24','32'];
+var SW_ROOM_LIST=['Entry','Entry Passage','Vestibule','Foyer','Porch','Lobby','Lift Lobby','Living Room','Drawing Room','Family Lounge','Dining Room','Kitchen','Utility','Pantry','Store Room','Pooja Room','Study','Home Office','Master Bedroom','Bedroom 1','Bedroom 2','Bedroom 3','Bedroom 4','Kids Room','Guest Bedroom','Dressing Room','Walk-in Closet','Master Bathroom','Common Bathroom','Powder Room','Passage / Corridor','Staircase','Balcony','Terrace','Servant Room','Servant Bathroom','Garage','Home Theatre','Gym','Bar','Games Room','Library','Garden / Lawn','Basement','Reception','Cabin','Conference Room','Office','Common Area'];
 var SW_SURVEY_SQL='CREATE TABLE IF NOT EXISTS public.sw_surveys (\n  id BIGSERIAL PRIMARY KEY,\n  site_id BIGINT,\n  client_name TEXT,\n  site_name TEXT,\n  survey_date DATE DEFAULT CURRENT_DATE,\n  data JSONB DEFAULT \'{"rooms":[]}\'::jsonb,\n  created_by TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);';
 function swUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function swEmptyItems(){var o={};SW_ITEM_DEFS.forEach(function(d){o[d.key]=0;});return o;}
@@ -19228,72 +19229,84 @@ function swRenderEditor(){
   var s=window._swCur;if(!s)return;
   var body=document.getElementById('sw-editor-body');if(!body)return;
   var rooms=s.data.rooms||[];
-  var head='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'
-    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Client</label><input value="'+escHtml(s.client_name||'')+'" onchange="swField(\'client_name\',this.value)"></div>'
-    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Site</label><input value="'+escHtml(s.site_name||'')+'" onchange="swField(\'site_name\',this.value)"'+(s.site_id?' readonly style="background:#f1f5f9;"':'')+'></div>'
-    +'<div class="form-group" style="margin:0;"><label style="font-size:11px;">Date</label><input type="date" value="'+(s.survey_date||'')+'" onchange="swField(\'survey_date\',this.value)"></div>'
-    +'<div style="display:flex;align-items:flex-end;font-size:12px;color:var(--text-muted);padding-bottom:6px;">Rooms: <b style="color:var(--text);margin:0 4px;">'+rooms.length+'</b> &nbsp;·&nbsp; Total items: <b style="color:var(--text);margin-left:4px;">'+swSurveyTotal(s)+'</b></div>'
-    +'</div>';
+  var inp='width:100%;border:1px solid #e2e8f0;border-radius:8px;height:36px;padding:0 10px;font-size:13px;box-sizing:border-box;background:#fff;';
+  var lbl='font-size:10.5px;font-weight:700;color:#64748b;display:block;margin-bottom:3px;letter-spacing:0.3px;';
+  var head='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:12px;">'
+    +'<div><label style="'+lbl+'">CLIENT</label><input value="'+escHtml(s.client_name||'')+'" onchange="swField(\'client_name\',this.value)" style="'+inp+'font-weight:600;"></div>'
+    +'<div><label style="'+lbl+'">SITE</label><input value="'+escHtml(s.site_name||'')+'" onchange="swField(\'site_name\',this.value)"'+(s.site_id?' readonly':'')+' style="'+inp+(s.site_id?'background:#f1f5f9;color:#64748b;':'')+'"></div>'
+    +'<div><label style="'+lbl+'">DATE</label><input type="date" value="'+(s.survey_date||'')+'" onchange="swField(\'survey_date\',this.value)" style="'+inp+'"></div>'
+    +'<div style="display:flex;align-items:flex-end;gap:18px;padding-bottom:2px;">'
+      +'<div><div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1;">'+rooms.length+'</div><div style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px;">ROOMS</div></div>'
+      +'<div><div style="font-size:22px;font-weight:800;color:#0891b2;line-height:1;">'+swSurveyTotal(s)+'</div><div style="font-size:10px;color:#94a3b8;font-weight:700;margin-top:2px;">TOTAL ITEMS</div></div>'
+    +'</div></div>';
+  var datalist='<datalist id="sw-room-list">'+SW_ROOM_LIST.map(function(x){return '<option value="'+escHtml(x)+'">';}).join('')+'</datalist>';
   var roomsHtml=rooms.map(function(r,ri){
     var boardsHtml=(r.boards||[]).map(function(b,bi){return swBoardHtml(ri,bi,r,b);}).join('');
-    return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;background:var(--bg);">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+    return '<div style="border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.05);">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#eff6ff;border-bottom:1px solid #dbeafe;">'
       +'<span style="font-size:16px;">🏠</span>'
-      +'<input value="'+escHtml(r.name||'')+'" placeholder="Room name" onchange="swRoomName('+ri+',this.value)" style="flex:1;font-weight:700;">'
-      +'<span style="font-size:12px;color:var(--text-muted);white-space:nowrap;">'+swRoomTotal(r)+' items</span>'
-      +'<button class="btn-icon" style="color:var(--danger);" onclick="swDelRoom('+ri+')" title="Delete room">🗑️</button>'
+      +'<input list="sw-room-list" value="'+escHtml(r.name||'')+'" placeholder="Room pasand karo ke lakho…" onchange="swRoomName('+ri+',this.value)" style="flex:1;border:1px solid #cbd5e1;border-radius:8px;height:34px;padding:0 10px;font-weight:700;font-size:14px;background:#fff;">'
+      +'<span style="font-size:11px;font-weight:700;color:#1d4ed8;background:#dbeafe;border-radius:20px;padding:3px 10px;white-space:nowrap;">'+swRoomTotal(r)+' items</span>'
+      +'<button class="btn-icon" style="color:#dc2626;" onclick="swDelRoom('+ri+')" title="Delete room">🗑️</button>'
       +'</div>'
-      +boardsHtml
-      +'<button class="btn btn-outline btn-sm" style="margin-top:6px;font-size:12px;" onclick="swAddBoard('+ri+')">➕ Add switchboard</button>'
-      +'</div>';
+      +'<div style="padding:10px 12px;">'+boardsHtml
+      +'<button class="btn btn-outline btn-sm" style="margin-top:2px;font-size:12px;" onclick="swAddBoard('+ri+')">➕ Add switchboard</button>'
+      +'</div></div>';
   }).join('');
-  body.innerHTML=head+roomsHtml+'<button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="swAddRoom()">➕ Add Room</button>';
+  body.innerHTML=datalist+head+roomsHtml
+    +'<button class="btn btn-primary btn-sm" style="margin-top:2px;" onclick="swAddRoom()">🏠 ➕ Add Room</button>';
 }
 function swBoardHtml(ri,bi,r,b){
   var total=swBoardTotal(b);
-  var sizeSel='<select onchange="swBoardSize('+ri+','+bi+',this.value)" style="height:28px;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:6px;">'
-    +SW_MODULE_SIZES.map(function(v){return '<option value="'+v+'"'+(String(b.moduleCount||'')===v?' selected':'')+'>'+(v===''?'size':v+'M')+'</option>';}).join('')+'</select>';
+  var isAuto=(b.type||'Automation')==='Automation';
+  var accent=isAuto?'#0891b2':'#d97706';
+  var sizeSel='<select onchange="swBoardSize('+ri+','+bi+',this.value)" style="min-width:138px;height:32px;font-size:13px;padding:0 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-weight:600;color:#334155;">'
+    +SW_MODULE_SIZES.map(function(v){return '<option value="'+v+'"'+(String(b.moduleCount||'')===v?' selected':'')+'>'+(v===''?'Board size':v+' Module')+'</option>';}).join('')+'</select>';
   var used=b.moduleCount?('used '+total+' / '+b.moduleCount):('used '+total);
-  var usedColor=(b.moduleCount&&total>Number(b.moduleCount))?'#dc2626':'var(--text-muted)';
+  var usedColor=(b.moduleCount&&total>Number(b.moduleCount))?'#dc2626':'#64748b';
+  function stepper(qty,minus,plus){
+    var on=qty>0;
+    return '<span style="display:flex;align-items:center;gap:8px;">'
+      +'<button onclick="'+minus+'" style="width:28px;height:28px;border:1px solid #e2e8f0;background:#fff;border-radius:8px;font-size:17px;line-height:1;color:#64748b;cursor:pointer;">−</button>'
+      +'<span style="min-width:22px;text-align:center;font-weight:800;font-size:14px;color:'+(on?'#0f172a':'#cbd5e1')+';">'+qty+'</span>'
+      +'<button onclick="'+plus+'" style="width:28px;height:28px;border:none;background:'+accent+';color:#fff;border-radius:8px;font-size:17px;line-height:1;cursor:pointer;">+</button>'
+      +'</span>';
+  }
   var counters=SW_ITEM_DEFS.map(function(d){
     var q=b.items&&b.items[d.key]||0;
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);">'
-      +'<span style="font-size:13px;">'+escHtml(d.label)+'</span>'
-      +'<span style="display:flex;align-items:center;gap:6px;">'
-      +'<button class="btn-icon" style="background:#f1f5f9;width:26px;height:26px;" onclick="swItemDelta('+ri+','+bi+',\''+d.key+'\',-1)">−</button>'
-      +'<span style="min-width:26px;text-align:center;font-weight:700;">'+q+'</span>'
-      +'<button class="btn-icon" style="background:#eff6ff;color:#1d4ed8;width:26px;height:26px;" onclick="swItemDelta('+ri+','+bi+',\''+d.key+'\',1)">+</button>'
-      +'</span></div>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;'+(q>0?'background:#f0f9ff;':'')+'margin-bottom:2px;">'
+      +'<span style="font-size:13px;color:#334155;">'+escHtml(d.label)+'</span>'
+      +stepper(q,'swItemDelta('+ri+','+bi+',\''+d.key+'\',-1)','swItemDelta('+ri+','+bi+',\''+d.key+'\',1)')
+      +'</div>';
   }).join('');
   var customs=(b.custom||[]).map(function(c,ci){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border);">'
-      +'<span style="font-size:13px;color:#7c3aed;">'+escHtml(c.name)+'</span>'
-      +'<span style="display:flex;align-items:center;gap:6px;">'
-      +'<button class="btn-icon" style="background:#f1f5f9;width:26px;height:26px;" onclick="swCustDelta('+ri+','+bi+','+ci+',-1)">−</button>'
-      +'<span style="min-width:26px;text-align:center;font-weight:700;">'+(c.qty||0)+'</span>'
-      +'<button class="btn-icon" style="background:#eff6ff;color:#1d4ed8;width:26px;height:26px;" onclick="swCustDelta('+ri+','+bi+','+ci+',1)">+</button>'
-      +'<button class="btn-icon" style="color:var(--danger);width:24px;height:24px;" onclick="swDelCust('+ri+','+bi+','+ci+')">✕</button>'
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:#faf5ff;margin-bottom:2px;">'
+      +'<span style="font-size:13px;color:#7c3aed;font-weight:600;">'+escHtml(c.name)+'</span>'
+      +'<span style="display:flex;align-items:center;gap:8px;">'
+      +stepper(c.qty||0,'swCustDelta('+ri+','+bi+','+ci+',-1)','swCustDelta('+ri+','+bi+','+ci+',1)')
+      +'<button class="btn-icon" style="color:#dc2626;width:24px;height:24px;" onclick="swDelCust('+ri+','+bi+','+ci+')">✕</button>'
       +'</span></div>';
   }).join('');
-  return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--card);">'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">'
-    +'<span style="font-size:14px;">🔌</span>'
-    +'<input value="'+escHtml(b.name||'')+'" placeholder="SW1" onchange="swBoardName('+ri+','+bi+',this.value)" style="flex:1;min-width:80px;font-weight:600;font-size:13px;">'
-    +'<select onchange="swBoardType('+ri+','+bi+',this.value)" title="Automation / Non-Automation" style="height:28px;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:6px;font-weight:600;color:'+((b.type||'Automation')==='Automation'?'#0891b2':'#92400e')+';">'
-    +'<option value="Automation"'+((b.type||'Automation')==='Automation'?' selected':'')+'>⚙️ Automation</option>'
-    +'<option value="Non-Automation"'+(b.type==='Non-Automation'?' selected':'')+'>🔧 Non-Auto</option>'
+  return '<div style="border:1px solid #e2e8f0;border-left:3px solid '+accent+';border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff;">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+    +'<span style="font-size:15px;">🔌</span>'
+    +'<input value="'+escHtml(b.name||'')+'" placeholder="SW1" onchange="swBoardName('+ri+','+bi+',this.value)" style="flex:1;min-width:70px;border:1px solid #e2e8f0;border-radius:8px;height:32px;padding:0 8px;font-weight:700;font-size:13px;">'
+    +'<select onchange="swBoardType('+ri+','+bi+',this.value)" title="Automation / Non-Automation" style="height:32px;font-size:12.5px;padding:0 8px;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;background:#fff;color:'+accent+';">'
+    +'<option value="Automation"'+(isAuto?' selected':'')+'>⚙️ Automation</option>'
+    +'<option value="Non-Automation"'+(!isAuto?' selected':'')+'>🔧 Non-Auto</option>'
     +'</select>'
-    +'<span style="font-size:12px;color:var(--text-muted);">'+total+'</span>'
-    +'<button class="btn-icon" style="color:var(--danger);width:24px;height:24px;" onclick="swDelBoard('+ri+','+bi+')" title="Delete board">🗑️</button>'
+    +'<span style="font-size:12px;font-weight:800;color:'+accent+';background:'+(isAuto?'#ecfeff':'#fffbeb')+';border-radius:20px;padding:3px 11px;">'+total+'</span>'
+    +'<button class="btn-icon" style="color:#dc2626;width:26px;height:26px;" onclick="swDelBoard('+ri+','+bi+')" title="Delete board">🗑️</button>'
     +'</div>'
-    +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
-    +'<input value="'+escHtml(b.location||'')+'" placeholder="Board ni jagya (e.g. door pase)" onchange="swBoardLoc('+ri+','+bi+',this.value)" style="flex:1;font-size:12px;height:28px;color:var(--text-muted);">'
-    +sizeSel+'<span style="font-size:11px;color:'+usedColor+';white-space:nowrap;">'+used+'</span>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+    +'<input value="'+escHtml(b.location||'')+'" placeholder="📍 Board ni jagya" onchange="swBoardLoc('+ri+','+bi+',this.value)" style="flex:1;min-width:110px;font-size:12.5px;height:32px;border:1px solid #e2e8f0;border-radius:8px;padding:0 8px;color:#475569;">'
+    +sizeSel
+    +'<span style="font-size:11px;font-weight:600;color:'+usedColor+';white-space:nowrap;">'+used+'</span>'
     +'</div>'
     +counters+customs
-    +'<div style="display:flex;gap:6px;margin-top:6px;">'
-    +'<input id="sw-cust-'+ri+'-'+bi+'" placeholder="Other item name" style="flex:1;font-size:12px;height:30px;">'
-    +'<button class="btn btn-outline btn-sm" style="font-size:12px;height:30px;" onclick="swAddCust('+ri+','+bi+')">Add</button>'
+    +'<div style="display:flex;gap:6px;margin-top:8px;">'
+    +'<input id="sw-cust-'+ri+'-'+bi+'" placeholder="Other item name…" style="flex:1;font-size:12.5px;height:32px;border:1px solid #e2e8f0;border-radius:8px;padding:0 8px;">'
+    +'<button class="btn btn-outline btn-sm" style="font-size:12px;height:32px;" onclick="swAddCust('+ri+','+bi+')">Add</button>'
     +'</div>'
     +'</div>';
 }
