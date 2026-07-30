@@ -19419,7 +19419,7 @@ function swExportPDF(){
     +'.ft{margin-top:14px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:8px;}'
     +'@media print{body{padding:4px;}}'
     +'</style></head><body>'
-    +'<div class="hd">'+(logo?'<img src="'+logo+'">':'')+'<div style="flex:1;"><div class="co">BHAVI ELECTRONICS &amp; AUTOMATION</div><div class="sub">Switchboard Survey Report</div></div>'+'<img src="'+autoLogo+'" onerror="this.remove()">'+'</div>'
+    +'<div class="hd">'+(logo?'<img src="'+logo+'">':'')+'<div style="flex:1;text-align:center;padding:0 8px;"><div class="co">BHAVI ELECTRONICS &amp; AUTOMATION</div><div class="sub">Switchboard Survey Report</div></div>'+'<img src="'+autoLogo+'" onerror="this.remove()">'+'</div>'
     +'<div class="meta"><div>Client: <b>'+e(s.client_name||'-')+'</b></div>'+(s.site_name?'<div>Site: <b>'+e(s.site_name)+'</b></div>':'')+'<div>Date: <b>'+e(dstr)+'</b></div></div>'
     +'<div class="chips">'+chip('Rooms',rooms.length,'#0f172a')+chip('Switchboards',boards,'#0f172a')+chip('Automation',autoB,'#0891b2')+chip('Non-Auto',nonB,'#d97706')+chip('Total Items',grand,'#16a34a')+'</div>'
     +(itemBrief?'<div class="pills"><b style="font-size:11px;color:#334155;">Item summary:</b> '+itemBrief+(customTotal?' <span class="pill">Other: <b>'+customTotal+'</b></span>':'')+'</div>':'')
