@@ -7363,12 +7363,18 @@ async function saveEngUpdate(){
         // Work Log makes clear there was no Work Start (hence the shorter time).
         const _clModel=t?.model?(' | '+t.model):'';
         const _clLabel=(status==='Resolved By Phone')?'📞 Resolved By Phone (no visit) — ':'✅ Call Closed — ';
-        await sb('work_logs','POST',{
-          eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
-          log_date:closeDate,from_time:closeTime,to_time:closeTime,
-          task_description:_clLabel+ticketLabel+_clModel,
-          ticket_id:id,log_type:'work',created_at:closeNow.toISOString()
-        }).catch(()=>{});
+        // Dedupe: exactly ONE close log per ticket per day. Double-taps and the
+        // signature-skip path were creating duplicate "Call Closed" work-log rows.
+        const _existCl=await sb('work_logs','GET',null,'?ticket_id=eq.'+encodeURIComponent(id)+'&log_date=eq.'+closeDate+'&select=task_description').catch(function(){return[];});
+        const _hasCl=(_existCl||[]).some(function(x){var d=x.task_description||'';return d.indexOf('Call Closed')!==-1||d.indexOf('Resolved By Phone')!==-1;});
+        if(!_hasCl){
+          await sb('work_logs','POST',{
+            eng_id:memberId,eng_name:currentUser.name,member_role:memberRole,
+            log_date:closeDate,from_time:closeTime,to_time:closeTime,
+            task_description:_clLabel+ticketLabel+_clModel,
+            ticket_id:id,log_type:'work',created_at:closeNow.toISOString()
+          }).catch(()=>{});
+        }
       }catch(ex){console.log('WorkLog auto error:',ex);}
     }
     if(status==='Closed'||status==='Resolved By Phone'){
@@ -11587,7 +11593,7 @@ function initSig(){sigCanvas=document.getElementById('sig-canvas');sigCtx=sigCan
 function clearSig(){if(sigCtx){sigCtx.clearRect(0,0,sigCanvas.width,sigCanvas.height);sigCtx.fillStyle='#fafafa';sigCtx.fillRect(0,0,sigCanvas.width,sigCanvas.height);}}
 async function saveSig(){if(!sigCanvas)return;const img=sigCanvas.toDataURL('image/png');try{const t=(await sb('tickets','GET',null,`?id=eq.${sigPendingId}`))[0];const tl=[...(t?.timeline||[]),{action:'Customer Signed',by:currentUser.name,at:new Date().toISOString()}];await sb('tickets','PATCH',{customer_signature:img,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${sigPendingId}`);closeModal('modal-signature');
 alert('Signature saved! ✅');}catch(e){alert(e.message);}}
-async function skipSig(){closeModal('modal-signature');if(!sigPendingId)return;try{const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(sigPendingId)))[0];const skipNow=new Date();const skipTime=skipNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const skipDate=skipNow.toLocaleDateString('en-CA');const skipEngId=currentUser.eng_id||currentUser.user_id;const skipLabel=(t?.ticket_no||sigPendingId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(skipEngId)+'&log_date=eq.'+skipDate+'&to_time=eq.OPEN');for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:skipTime},'?id=eq.'+ol.id).catch(()=>{});}if(t&&t.status==='Closed'){await sb('work_logs','POST',{eng_id:skipEngId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',log_date:skipDate,from_time:skipTime,to_time:skipTime,task_description:'✅ Call Closed — '+skipLabel,ticket_id:sigPendingId,log_type:'work',created_at:skipNow.toISOString()}).catch(()=>{});}}catch(ex){console.log('skipSig worklog err:',ex);}}
+async function skipSig(){closeModal('modal-signature');if(!sigPendingId)return;try{const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(sigPendingId)))[0];const skipNow=new Date();const skipTime=skipNow.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const skipDate=skipNow.toLocaleDateString('en-CA');const skipEngId=currentUser.eng_id||currentUser.user_id;const skipLabel=(t?.ticket_no||sigPendingId)+(t?.cname?' — '+t.cname:'')+(t?.model?' | '+t.model:'');const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(skipEngId)+'&log_date=eq.'+skipDate+'&to_time=eq.OPEN');for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:skipTime},'?id=eq.'+ol.id).catch(()=>{});}if(t&&t.status==='Closed'){var _exCl=await sb('work_logs','GET',null,'?ticket_id=eq.'+encodeURIComponent(sigPendingId)+'&log_date=eq.'+skipDate+'&select=task_description').catch(function(){return[];});var _hasCl2=(_exCl||[]).some(function(x){var d=x.task_description||'';return d.indexOf('Call Closed')!==-1||d.indexOf('Resolved By Phone')!==-1;});if(!_hasCl2){await sb('work_logs','POST',{eng_id:skipEngId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',log_date:skipDate,from_time:skipTime,to_time:skipTime,task_description:'✅ Call Closed — '+skipLabel,ticket_id:sigPendingId,log_type:'work',created_at:skipNow.toISOString()}).catch(()=>{});}}}catch(ex){console.log('skipSig worklog err:',ex);}}
 
 // JOB SHEET PRINT - Point 12: no meter photos, has signature
 async function printJobSheet(){
