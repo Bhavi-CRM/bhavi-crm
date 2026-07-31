@@ -22094,6 +22094,31 @@ async function showInqReport(){
   document.body.appendChild(modal);
 }
 
+function _inqCard(inq,isAdm,today){
+  var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
+  var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
+  var statusColor={'Open':'#2563eb','In Progress':'#d97706','Pending - Customer Call':'#7c3aed','Pending - Quotation':'#0369a1','Pending - Customer Side':'#b45309','Site Visit Scheduled':'#0891b2','Demo Scheduled':'#9333ea','Converted':'#059669','Lost':'#6b7280'}[inq.status]||'#6b7280';
+  return '<div class="card" style="margin-bottom:10px;border-left:4px solid '+statusColor+';'+(isFollowup?'background:#fffbeb;':'')+(isPast?'background:#fff1f2;':'')+'"'
+    +' data-name="'+(inq.customer_name||'').toLowerCase()+'" data-mobile="'+(inq.mobile||'').toLowerCase()+'" data-status="'+(inq.status||'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+    +'<div>'
+    +'<div style="font-size:15px;font-weight:700;cursor:pointer;color:var(--primary);" onclick="openInquiryDetail('+inq.id+')">'+inq.customer_name+(inq.mobile?' &nbsp;📱 '+inq.mobile:'')+'</div>'
+    +(inq.inquiry_type?'<div style="font-size:12px;color:var(--text-muted);">🔖 '+inq.inquiry_type+'</div>':'')
+    +(inq.description?'<div style="font-size:13px;margin-top:4px;">'+inq.description+'</div>':'')
+    +(inq.followup_date?'<div style="font-size:12px;margin-top:4px;color:'+(isFollowup?'#92400e':isPast?'#dc2626':'#059669')+';">📅 Followup: '+new Date(inq.followup_date+'T00:00:00').toLocaleDateString('en-IN')+(isFollowup?' 🔔 TODAY!':isPast?' ⚠️ OVERDUE':'')+'</div>':'')
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+    +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
+    +(inq.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(inq.assigned_name)+'</span>':(inq.created_by_name?'<span style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 9px;border-radius:99px;font-weight:600;">👤 '+escHtml(inq.created_by_name)+'</span>':''))
+    +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
+    +(isAdm?'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>':'')
+    +(isAdm?'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>':'')
+    +'</div>'
+    +'</div>'
+    +(inq.notes?(function(){var lines=(inq.notes||'').split('\n');var last=lines[lines.length-1];return'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">💬 '+escQ(last)+(lines.length>1?' <span style="color:#94a3b8;">(+'+( lines.length-1)+' more)</span>':'')+'</div>';}())  :'')
+    +'</div>';
+}
+
 async function renderInquiries(){
   var pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
@@ -22130,32 +22155,28 @@ async function renderInquiries(){
     if(!inqs.length){
       html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🔍 No inquiries found. Click "New Inquiry" to add one!</div>';
     }else{
-      html+='<div id="inq-list">';
-      inqs.forEach(function(inq){
-        var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
-        var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
-        var statusColor={'Open':'#2563eb','In Progress':'#d97706','Pending - Customer Call':'#7c3aed','Pending - Quotation':'#0369a1','Pending - Customer Side':'#b45309','Site Visit Scheduled':'#0891b2','Demo Scheduled':'#9333ea','Converted':'#059669','Lost':'#6b7280'}[inq.status]||'#6b7280';
-        html+='<div class="card" style="margin-bottom:10px;border-left:4px solid '+statusColor+';'+(isFollowup?'background:#fffbeb;':'')+(isPast?'background:#fff1f2;':'')+'"'
-          +' data-name="'+(inq.customer_name||'').toLowerCase()+'" data-mobile="'+(inq.mobile||'').toLowerCase()+'" data-status="'+(inq.status||'')+'">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
-          +'<div>'
-          +'<div style="font-size:15px;font-weight:700;cursor:pointer;color:var(--primary);" onclick="openInquiryDetail('+inq.id+')">'+inq.customer_name+(inq.mobile?' &nbsp;📱 '+inq.mobile:'')+'</div>'
-          +(inq.inquiry_type?'<div style="font-size:12px;color:var(--text-muted);">🔖 '+inq.inquiry_type+'</div>':'')
-          +(inq.description?'<div style="font-size:13px;margin-top:4px;">'+inq.description+'</div>':'')
-          +(inq.followup_date?'<div style="font-size:12px;margin-top:4px;color:'+(isFollowup?'#92400e':isPast?'#dc2626':'#059669')+';">📅 Followup: '+new Date(inq.followup_date+'T00:00:00').toLocaleDateString('en-IN')+(isFollowup?' 🔔 TODAY!':isPast?' ⚠️ OVERDUE':'')+'</div>':'')
+      // Split by status so each group is clearly separated.
+      var gConverted=inqs.filter(function(i){return i.status==='Converted';});
+      var gLost=inqs.filter(function(i){return i.status==='Lost';});
+      var gActive=inqs.filter(function(i){return i.status!=='Converted'&&i.status!=='Lost';});
+      var gFollowup=gActive.filter(function(i){return !!i.followup_date;}).sort(function(a,b){return (a.followup_date||'').localeCompare(b.followup_date||'');});
+      var gPending=gActive.filter(function(i){return !i.followup_date;});
+      function inqSection(title,emoji,color,arr){
+        if(!arr.length)return '';
+        return '<div class="inq-group" style="margin-bottom:18px;">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+          +'<div style="border-left:4px solid '+color+';padding-left:10px;font-size:15px;font-weight:800;color:#1e293b;">'+emoji+' '+title+'</div>'
+          +'<span style="background:'+color+'22;color:'+color+';padding:2px 11px;border-radius:20px;font-size:12px;font-weight:800;">'+arr.length+'</span>'
           +'</div>'
-          +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-          +'<span style="font-size:11px;background:'+statusColor+'22;color:'+statusColor+';padding:3px 10px;border-radius:99px;font-weight:600;">'+inq.status+'</span>'
-          +(inq.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(inq.assigned_name)+'</span>':(inq.created_by_name?'<span style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:3px 9px;border-radius:99px;font-weight:600;">👤 '+escHtml(inq.created_by_name)+'</span>':''))
-          +'<button class="btn btn-primary btn-sm" onclick="openUpdateInquiryModal('+inq.id+')">📝 Update</button>'
-          +(isAdm?'<button class="btn btn-outline btn-sm" onclick="openEditInquiryModal('+inq.id+')">✏️ Edit</button>':'')
-          +(isAdm?'<button class="btn btn-danger btn-sm" onclick="deleteInquiry('+inq.id+')">🗑️</button>':'')
-          +'</div>'
-          +'</div>'
-          +(inq.notes?(function(){var lines=(inq.notes||'').split('\n');var last=lines[lines.length-1];return'<div style="margin-top:6px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">💬 '+escQ(last)+(lines.length>1?' <span style="color:#94a3b8;">(+'+( lines.length-1)+' more)</span>':'')+'</div>';}())  :'')
+          +arr.map(function(inq){return _inqCard(inq,isAdm,today);}).join('')
           +'</div>';
-      });
-      html+='</div>';
+      }
+      html+='<div id="inq-list">'
+        +inqSection('Follow-up','📞','#f59e0b',gFollowup)
+        +inqSection('Pending / Open','🕐','#2563eb',gPending)
+        +inqSection('Converted (Won)','✅','#059669',gConverted)
+        +inqSection('Lost','❌','#6b7280',gLost)
+        +'</div>';
     }
     pc.innerHTML=html;
     window._allInquiries=inqs;
@@ -22165,11 +22186,14 @@ async function renderInquiries(){
 function filterInquiryList(){
   var q=(document.getElementById('inq-search')?.value||'').toLowerCase();
   var sf=(document.getElementById('inq-status-filter')?.value||'');
-  var cards=document.querySelectorAll('#inq-list .card');
-  cards.forEach(function(c){
-    var matchQ=!q||(c.dataset.name||'').includes(q)||(c.dataset.mobile||'').includes(q);
-    var matchS=!sf||(c.dataset.status||'')===sf;
-    c.style.display=(matchQ&&matchS)?'':'none';
+  document.querySelectorAll('#inq-list .inq-group').forEach(function(g){
+    var anyVisible=false;
+    g.querySelectorAll('.card').forEach(function(c){
+      var matchQ=!q||(c.dataset.name||'').includes(q)||(c.dataset.mobile||'').includes(q);
+      var matchS=!sf||(c.dataset.status||'')===sf;
+      var show=matchQ&&matchS;c.style.display=show?'':'none';if(show)anyVisible=true;
+    });
+    g.style.display=anyVisible?'':'none';
   });
 }
 
