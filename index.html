@@ -314,6 +314,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="showPaymentQR()" id="nav-payment-qr"><span class="icon">💳</span><span>Payment QR</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
+    <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
     <div class="nav-item hidden" onclick="navigate('eng-daily-report')" id="nav-eng-daily-report"><span class="icon">📅</span><span>Engineer Daily Report</span></div>
     <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
     <div class="nav-item hidden" onclick="navigate('walk-in')" id="nav-walk-in"><span class="icon">🚶</span><span>Walk-in</span></div>
@@ -346,7 +347,6 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
     <div class="nav-item" onclick="showPortalQR()" id="nav-customer-portal"><span class="icon">📱</span><span>Customer Portal</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
-    <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
     <div class="nav-item hidden" onclick="navigate('peon-activity')" id="nav-peon-activity"><span class="icon">🧹</span><span>Peon Activity</span></div>
   </div>
   <div class="nav-section" id="nav-automation-section">
@@ -5103,7 +5103,7 @@ async function renderMyCalls(){
           </div>`;
         } else {
           rtoHtml=`<div id="rto-bar" style="background:#f0fdf4;border:1.5px solid #86efac;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;flex-wrap:wrap;">
-            <div style="color:#166534;font-size:13px;font-weight:600;">🏠 Din puro thai gyo? Ghar ke office ja?</div>
+            <div style="color:#166534;font-size:13px;font-weight:600;">🏁 End of day — mark your return trip</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button onclick="startReturnToOffice()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏢 Return to Office</button>
             <button onclick="startReturnToHome()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏡 Return to Home</button>
