@@ -346,6 +346,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
     <div class="nav-item" onclick="showPortalQR()" id="nav-customer-portal"><span class="icon">📱</span><span>Customer Portal</span></div>
     <div class="nav-item hidden" onclick="navigate('inquiries')" id="nav-inquiries"><span class="icon">🔍</span><span>Inquiries</span></div>
+    <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
     <div class="nav-item hidden" onclick="navigate('peon-activity')" id="nav-peon-activity"><span class="icon">🧹</span><span>Peon Activity</span></div>
   </div>
   <div class="nav-section" id="nav-automation-section">
@@ -2785,7 +2786,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report',
-   'nav-inquiries','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-profit','nav-weekly','nav-pending-list'].forEach(function(id){
+   'nav-inquiries','nav-field-tasks','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-profit','nav-weekly','nav-pending-list'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2962,7 +2963,7 @@ function setupNav(){
       ['nav-tickets','nav-my-calls','nav-my-report','nav-eng-daily-report','nav-work-log','nav-walk-in','nav-courier','btn-new-call',
        'nav-inventory','nav-customers','nav-reports','nav-work-log-report','nav-walk-in-report',
        'nav-courier-report','nav-master','nav-settings','nav-tasks','nav-sales','nav-route-planning',
-       'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report','nav-inquiries',
+       'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report','nav-inquiries','nav-field-tasks',
        'nav-live-map','nav-ai-agent','nav-ai-analysis','nav-attendance','nav-targets','nav-amc',
        'nav-feedback','nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
        'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr'
@@ -2981,7 +2982,7 @@ function setupNav(){
       sv('btn-daily-report',false);sv('btn-weekly-report',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);
+      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
       // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
       var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
@@ -2997,7 +2998,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
-      sv('nav-pending-list',true);sv('nav-route-planning',true);
+      sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
@@ -3013,7 +3014,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
-      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);
+      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
@@ -3117,9 +3118,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -5089,15 +5090,24 @@ async function renderMyCalls(){
       try{
         const todayLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+todayStr+'&order=from_time.desc&limit=50');
         const rtoOpen=(todayLogs||[]).find(l=>l.to_time==='OPEN'&&(l.task_description||'').includes('Return to Office'));
+        const rthOpen=(todayLogs||[]).find(l=>l.to_time==='OPEN'&&(l.task_description||'').includes('Return to Home'));
         if(rtoOpen){
           rtoHtml=`<div id="rto-bar" style="background:#1e3a5f;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
             <div style="color:#93c5fd;font-size:13px;font-weight:600;">🚗 Traveling to Office... (since ${rtoOpen.from_time})</div>
             <button onclick="reachedOffice('${rtoOpen.id}')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Reached Office</button>
           </div>`;
+        } else if(rthOpen){
+          rtoHtml=`<div id="rto-bar" style="background:#3f2d5c;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
+            <div style="color:#d8b4fe;font-size:13px;font-weight:600;">🚗 Traveling to Home... (since ${rthOpen.from_time})</div>
+            <button onclick="reachedHome('${rthOpen.id}')" style="background:#10b981;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Reached Home</button>
+          </div>`;
         } else {
-          rtoHtml=`<div id="rto-bar" style="background:#f0fdf4;border:1.5px solid #86efac;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;">
-            <div style="color:#166534;font-size:13px;font-weight:600;">🏠 Heading back to office?</div>
-            <button onclick="startReturnToOffice()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏠 Return to Office</button>
+          rtoHtml=`<div id="rto-bar" style="background:#f0fdf4;border:1.5px solid #86efac;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;border-radius:10px;flex-wrap:wrap;">
+            <div style="color:#166534;font-size:13px;font-weight:600;">🏠 Din puro thai gyo? Ghar ke office ja?</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="startReturnToOffice()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏢 Return to Office</button>
+            <button onclick="startReturnToHome()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">🏡 Return to Home</button>
+            </div>
           </div>`;
         }
       }catch(e2){}
@@ -10778,6 +10788,7 @@ var _NAV_ALL_ITEMS=[
   {id:'nav-work-log',      label:'Work Log',           engDef:true,  wcDef:true},
   {id:'nav-tasks',         label:'Tasks',              engDef:true,  wcDef:true},
   {id:'nav-inquiries',     label:'Inquiries',          engDef:true,  wcDef:true},
+  {id:'nav-field-tasks',   label:'Other Work',         engDef:true,  wcDef:true},
   {id:'nav-attendance',    label:'Attendance',         engDef:true,  wcDef:true},
   {id:'nav-tickets',       label:'All Tickets',        engDef:false, wcDef:true},
   {id:'nav-walk-in',       label:'Walk-in Entry',      engDef:false, wcDef:true},
@@ -13089,7 +13100,7 @@ async function loadEngDailyReport(){
     q+=engFilter?('&assigned_to=eq.'+encodeURIComponent(engFilter)):'&assigned_to=not.is.null';
     var tickets=await sbAll('tickets',q);
     var byEng={};
-    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0,list:[]};return byEng[id];}
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0,otherWork:0,list:[]};return byEng[id];}
     (tickets||[]).forEach(function(t){
       if(!t.assigned_to)return;
       var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
@@ -13114,6 +13125,14 @@ async function loadEngDailyReport(){
       }
       myRptInvoiceDates(t).forEach(function(d3){if(d3>=from&&d3<=to)ensure(t.assigned_to,t.assigned_name).invoice++;});
     });
+    // Other Work (field_tasks) — count Done tasks by done_date in the range,
+    // per engineer. Additive; if the table is missing it silently stays 0.
+    try{
+      var _ftq='?status=eq.Done&done_date=gte.'+from+'&done_date=lte.'+to;
+      if(engFilter)_ftq+='&assigned_to=eq.'+encodeURIComponent(engFilter);
+      var _fts=await sb('field_tasks','GET',null,_ftq);
+      (_fts||[]).forEach(function(ft){if(ft.assigned_to)ensure(ft.assigned_to,ft.assigned_name).otherWork++;});
+    }catch(_fe){}
     // Ensure every matching engineer shows even with zero activity in range.
     (allEngineers||[]).forEach(function(e){
       if(engFilter&&e.eng_id!==engFilter)return;
@@ -13122,25 +13141,27 @@ async function loadEngDailyReport(){
     var rows=Object.keys(byEng).map(function(id){var r=byEng[id];r.id=id;r.total=r.w+r.ow;return r;});
     rows.sort(function(a,b){return b.total-a.total;});
     window._edrRows=rows;window._edrRange={from:from,to:to};
-    var totW=0,totOW=0,totPending=0,totInvoice=0;
-    rows.forEach(function(r){totW+=r.w;totOW+=r.ow;totPending+=r.pending;totInvoice+=r.invoice;});
+    var totW=0,totOW=0,totPending=0,totInvoice=0,totOtherWork=0;
+    rows.forEach(function(r){totW+=r.w;totOW+=r.ow;totPending+=r.pending;totInvoice+=r.invoice;totOtherWork+=(r.otherWork||0);});
     if(summaryEl)summaryEl.innerHTML=
       '<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">🛡️ Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+totW+'</div></div>'
       +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">💳 Non-Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+totOW+'</div></div>'
       +'<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Total Closed</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+(totW+totOW)+'</div></div>'
       +'<div style="background:#fefce8;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#a16207;font-weight:700;">⏳ Total Pending</div><div style="font-size:20px;font-weight:800;color:#a16207;">'+totPending+'</div></div>'
-      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">🧾 Payment/Invoice Done</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+totInvoice+'</div></div>';
+      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">🧾 Payment/Invoice Done</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+totInvoice+'</div></div>'
+      +'<div style="background:#eef7f4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#0d9488;font-weight:700;">🚚 Other Work</div><div style="font-size:20px;font-weight:800;color:#0d9488;">'+totOtherWork+'</div></div>';
     var rowsHtml=rows.map(function(r){
       var clk=r.total>0?' style="cursor:pointer;" onclick="showEdrClosedDetail(\''+String(r.id).replace(/'/g,"\\'")+'\')" title="Click to see which '+r.total+' calls are counted"':'';
       return '<tr'+clk+'><td style="font-weight:600;">'+escHtml(r.name)+(r.total>0?' <span style="color:#1d4ed8;font-size:11px;">🔍</span>':'')+'</td><td style="text-align:center;">'+r.w+'</td><td style="text-align:center;">'+r.ow+'</td>'
         +'<td style="text-align:center;font-weight:700;color:#15803d;">'+r.total+'</td>'
         +'<td style="text-align:center;">'+r.pending+'</td>'
-        +'<td style="text-align:center;">'+r.invoice+'</td></tr>';
+        +'<td style="text-align:center;">'+r.invoice+'</td>'
+        +'<td style="text-align:center;color:#0d9488;font-weight:700;">'+(r.otherWork||0)+'</td></tr>';
     }).join('');
     if(wrap)wrap.innerHTML='<div class="table-wrap"><table><thead><tr>'
       +'<th style="text-align:left;padding:8px;">Engineer</th><th style="padding:8px;">Warranty Closed</th><th style="padding:8px;">Non-Warranty Closed</th>'
-      +'<th style="padding:8px;">Total Closed</th><th style="padding:8px;">Pending</th><th style="padding:8px;">Payment/Invoice Done</th>'
-      +'</tr></thead><tbody>'+(rowsHtml||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>')+'</tbody></table></div>';
+      +'<th style="padding:8px;">Total Closed</th><th style="padding:8px;">Pending</th><th style="padding:8px;">Payment/Invoice Done</th><th style="padding:8px;">🚚 Other Work</th>'
+      +'</tr></thead><tbody>'+(rowsHtml||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>')+'</tbody></table></div>';
   }catch(e){if(wrap)wrap.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
 }
 
@@ -13181,7 +13202,7 @@ function downloadEngDailyReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
   var rows=window._edrRows||[];
   if(!rows.length){alert('No data to download — run Search first.');return;}
-  var data=rows.map(function(r){return {'Engineer':r.name,'Warranty Closed':r.w,'Non-Warranty Closed':r.ow,'Total Closed':r.total,'Pending':r.pending,'Payment/Invoice Done':r.invoice};});
+  var data=rows.map(function(r){return {'Engineer':r.name,'Warranty Closed':r.w,'Non-Warranty Closed':r.ow,'Total Closed':r.total,'Pending':r.pending,'Payment/Invoice Done':r.invoice,'Other Work':r.otherWork||0};});
   var ws=XLSX.utils.json_to_sheet(data);
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Engineer Report');
@@ -18160,6 +18181,56 @@ async function reachedOffice(logId){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// Return to Home — same as Return to Office but for when the engineer heads
+// straight home from a call. Closing KM odometer is still captured so the
+// day-end KM total is complete.
+async function startReturnToHome(){
+  const engId=currentUser.eng_id||currentUser.user_id;
+  const now=new Date();
+  const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const nowDate=now.toLocaleDateString('en-CA');
+  // Close any other open travel/work log first
+  try{
+    const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+nowDate+'&to_time=eq.OPEN');
+    for(const ol of (openLogs||[])){await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+ol.id).catch(()=>{});}
+  }catch(e){}
+  try{
+    await sb('work_logs','POST',{
+      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+      log_date:nowDate,from_time:nowTime,to_time:'OPEN',
+      task_description:'🏡 Return to Home',log_type:'travel',created_at:now.toISOString()
+    });
+    renderMyCalls();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function reachedHome(logId){
+  const now=new Date();
+  const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const nowDate=now.toLocaleDateString('en-CA');
+  const engId=currentUser.eng_id||currentUser.user_id;
+  // KM TRACKING — Closing KM odometer photo when reaching home (day-end).
+  if(currentUser.role==='engineer'){
+    try{
+      var _kmL=await kmTodayLogs(); // order=captured_at.asc → last item is most recent
+      if(_kmL!==null&&_kmL.length&&_kmL[_kmL.length-1].entry_type!=='closing'){
+        openKmCapture({type:'closing',ticketId:null,onDone:function(){reachedHome(logId);}});
+        return;
+      }
+    }catch(_ke){}
+  }
+  try{
+    await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
+    // Write "Reached Home" status entry
+    await sb('work_logs','POST',{
+      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+      log_date:nowDate,from_time:nowTime,to_time:nowTime,
+      task_description:'🏡 Reached Home',log_type:'work',created_at:now.toISOString()
+    }).catch(()=>{});
+    renderMyCalls();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 async function saveWorkLog(){
   var from=document.getElementById('wl-from').value;
   var to=document.getElementById('wl-to').value;
@@ -22094,6 +22165,398 @@ async function showInqReport(){
   document.body.appendChild(modal);
 }
 
+// ============================================================================
+// OTHER WORK / FIELD TASKS MODULE
+// Standalone — no service-call fields. For office errands an engineer does on
+// the road: Cart Delivery, Payment Collection, Cheque Collection, etc.
+// Lifecycle: Assigned → Travel Start → Reached → Done (NO Work Start).
+// Travel Start + Reached capture KM (via km_logs, ticket_id='FT<id>') so the
+// engineer's daily KM total includes this travel automatically. Fully isolated
+// from the ticket/call flow — nothing here touches tickets or call work logs.
+// ============================================================================
+var FT_TYPES=['Cart Delivery','Payment Collection','Cheque Collection','Document Pickup','Bank Work','Other'];
+var FT_TYPE_META={
+  'Cart Delivery':{e:'🚚',c:'#2563eb'},
+  'Payment Collection':{e:'💵',c:'#059669'},
+  'Cheque Collection':{e:'🧾',c:'#7c3aed'},
+  'Document Pickup':{e:'📄',c:'#0891b2'},
+  'Bank Work':{e:'🏦',c:'#b45309'},
+  'Other':{e:'🔧',c:'#64748b'}
+};
+var FT_STATUS_META={
+  'Assigned':{e:'📋',c:'#d97706',t:'Assigned'},
+  'Traveling':{e:'🚗',c:'#f59e0b',t:'Traveling'},
+  'Reached':{e:'📍',c:'#0d9488',t:'Reached'},
+  'Done':{e:'✅',c:'#059669',t:'Done'},
+  'Cancelled':{e:'🚫',c:'#6b7280',t:'Cancelled'}
+};
+function _ftMeta(type){return FT_TYPE_META[type]||FT_TYPE_META['Other'];}
+function _ftSMeta(st){return FT_STATUS_META[st]||FT_STATUS_META['Assigned'];}
+async function _ftLoadEngs(){
+  if(window._ftEngs&&window._ftEngs.length)return window._ftEngs;
+  if(allEngineers&&allEngineers.length){window._ftEngs=allEngineers;return allEngineers;}
+  try{window._ftEngs=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){window._ftEngs=[];}
+  return window._ftEngs;
+}
+
+async function renderFieldTasks(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var isAdm=currentUser&&currentUser.role==='admin';
+    var isWC=currentUser&&currentUser.role_type==='work_controller';
+    var isEng=currentUser&&currentUser.role==='engineer';
+    var myId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+    var today=new Date().toLocaleDateString('en-CA');
+    await _ftLoadEngs();
+    // Engineers (non-CSP-manager) see only their own / self-created tasks.
+    var q;
+    if(isEng&&!window._isCspMgr){q='?or=(assigned_to.eq.'+encodeURIComponent(myId)+',created_by.eq.'+encodeURIComponent(myId)+')&order=created_at.desc';}
+    else{q='?order=created_at.desc';}
+    var tasks=await sb('field_tasks','GET',null,q);
+    window._ftCache=tasks;
+    var canAdminList=isAdm||isWC||window._isCspMgr;
+    var engOpts='<option value="">All Engineers</option>'+(window._ftEngs||[]).map(function(e){return '<option value="'+e.eng_id+'">'+escHtml(e.name)+'</option>';}).join('');
+
+    var active=tasks.filter(function(t){return t.status!=='Done'&&t.status!=='Cancelled';});
+    var done=tasks.filter(function(t){return t.status==='Done';});
+    var doneToday=done.filter(function(t){return t.done_date===today;}).length;
+
+    var html='<div class="section-header">'
+      +'<h2>🚚 Other Work ('+tasks.length+')</h2>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +(canAdminList?'<button class="btn btn-outline btn-sm" onclick="openFtReport()">📊 Report</button>':'')
+      +'<button class="btn btn-primary" onclick="openFtCreateModal()">+ New Task</button>'
+      +'</div></div>';
+    // Stat strip
+    html+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+      +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">📋 Active</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+active.length+'</div></div>'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Done Today</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+doneToday+'</div></div>'
+      +'<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">🗂️ Total Done</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+done.length+'</div></div>'
+      +'</div>';
+    // Filter bar
+    html+='<div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">'
+      +'<input type="text" id="ft-search" placeholder="Search name / mobile..." style="flex:1;min-width:160px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;" oninput="filterFieldTasks()">'
+      +'<select id="ft-type-filter" onchange="filterFieldTasks()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"><option value="">All Types</option>'+FT_TYPES.map(function(t){return '<option value="'+t+'">'+_ftMeta(t).e+' '+t+'</option>';}).join('')+'</select>'
+      +'<select id="ft-status-filter" onchange="filterFieldTasks()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"><option value="">All Status</option><option value="Assigned">Assigned</option><option value="Traveling">Traveling</option><option value="Reached">Reached</option><option value="Done">Done</option><option value="Cancelled">Cancelled</option></select>'
+      +(canAdminList?'<select id="ft-eng-filter" onchange="filterFieldTasks()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">'+engOpts+'</select>':'')
+      +'</div>';
+
+    if(!tasks.length){
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--text-muted);">🚚 No tasks yet. Click "New Task" to add one!</div>';
+    }else{
+      function ftSection(title,emoji,color,arr){
+        if(!arr.length)return '';
+        return '<div class="ft-group" style="margin-bottom:18px;">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+          +'<div style="border-left:4px solid '+color+';padding-left:10px;font-size:15px;font-weight:800;color:#1e293b;">'+emoji+' '+title+'</div>'
+          +'<span style="background:'+color+'22;color:'+color+';padding:2px 11px;border-radius:20px;font-size:12px;font-weight:800;">'+arr.length+'</span>'
+          +'</div>'
+          +arr.map(function(t){return _ftCard(t,{isAdm:isAdm,isWC:isWC,isEng:isEng,myId:myId,today:today});}).join('')
+          +'</div>';
+      }
+      var doneSorted=done.slice().sort(function(a,b){return (b.done_at||b.updated_at||'').localeCompare(a.done_at||a.updated_at||'');});
+      var cancelled=tasks.filter(function(t){return t.status==='Cancelled';});
+      html+='<div id="ft-list">'
+        +ftSection('Active','📋','#d97706',active.sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');}))
+        +ftSection('Done','✅','#059669',doneSorted)
+        +ftSection('Cancelled','🚫','#6b7280',cancelled)
+        +'</div>';
+    }
+    pc.innerHTML=html;
+  }catch(e){
+    pc.innerHTML='<div class="alert alert-warning">Error: '+escHtml(e.message)+'<br><br>If the <b>field_tasks</b> table is missing, run <b>FIELD_TASKS_TABLE.sql</b> in Supabase (SQL Editor) once.</div>';
+  }
+}
+
+function _ftCard(t,ctx){
+  var meta=_ftMeta(t.task_type);
+  var sm=_ftSMeta(t.status);
+  var mine=(String(t.assigned_to)===String(ctx.myId));
+  var canAct=ctx.isAdm||(ctx.isEng&&mine)||window._isCspMgr;
+  var canManage=ctx.isAdm||ctx.isWC||window._isCspMgr||(String(t.created_by)===String(ctx.myId));
+  var amt=(t.amount!==null&&t.amount!==undefined&&t.amount!=='')?parseFloat(t.amount):null;
+  var fmtT=function(iso){return iso?new Date(iso).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';};
+  var fmtD=function(iso){return iso?new Date(iso).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'';};
+  // Lifecycle buttons
+  var acts='';
+  if(canAct&&t.status==='Assigned'){
+    acts+='<button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;" onclick="doFtTravelStart('+t.id+')">🚗 Travel Start</button>';
+  }else if(canAct&&t.status==='Traveling'){
+    acts+='<button class="btn btn-sm" style="background:#0d9488;color:#fff;border:none;" onclick="doFtReached('+t.id+')">📍 Reached</button>';
+  }else if(canAct&&t.status==='Reached'){
+    acts+='<button class="btn btn-sm" style="background:#059669;color:#fff;border:none;" onclick="doFtDone('+t.id+')">✅ Done</button>';
+  }
+  var manage='';
+  if(canManage){
+    manage+='<button class="btn btn-outline btn-sm" onclick="openFtEditModal('+t.id+')">✏️</button>';
+    if(t.status!=='Done'&&t.status!=='Cancelled')manage+='<button class="btn btn-outline btn-sm" style="color:#b45309;border-color:#fde68a;" onclick="ftCancelConfirm('+t.id+')">🚫</button>';
+    manage+='<button class="btn btn-danger btn-sm" onclick="ftDeleteConfirm('+t.id+')">🗑️</button>';
+  }
+  // Progress trail
+  var trail='';
+  if(t.travel_start_at||t.reached_at||t.done_at){
+    trail='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#64748b;border-top:1px dashed var(--border);padding-top:6px;">'
+      +(t.travel_start_at?'<span>🚗 '+fmtD(t.travel_start_at)+' '+fmtT(t.travel_start_at)+'</span>':'')
+      +(t.reached_at?'<span>📍 '+fmtT(t.reached_at)+'</span>':'')
+      +(t.done_at?'<span style="color:#059669;font-weight:700;">✅ '+fmtD(t.done_at)+' '+fmtT(t.done_at)+'</span>':'')
+      +'</div>';
+  }
+  return '<div class="card ft-card" style="margin-bottom:10px;border-left:4px solid '+sm.c+';"'
+    +' data-name="'+escHtml((t.customer_name||'').toLowerCase())+'" data-mobile="'+escHtml((t.mobile||'').toLowerCase())+'" data-status="'+escHtml(t.status||'')+'" data-type="'+escHtml(t.task_type||'')+'" data-eng="'+escHtml(t.assigned_to||'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+    +'<div style="min-width:0;">'
+    +'<div style="font-size:15px;font-weight:700;">'+meta.e+' '+escHtml(t.customer_name||'(no name)')+(t.mobile?' &nbsp;<a href="tel:'+escHtml(t.mobile)+'" style="font-size:12px;color:#2563eb;text-decoration:none;">📱 '+escHtml(t.mobile)+'</a>':'')+'</div>'
+    +'<div style="font-size:12px;color:'+meta.c+';font-weight:700;margin-top:2px;">'+escHtml(t.task_type||'Other')+(amt!==null&&!isNaN(amt)?' • ₹'+amt.toLocaleString('en-IN'):'')+'</div>'
+    +(t.address?'<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">📍 '+escHtml(t.address)+(t.location?' &nbsp;<a href="https://maps.google.com/?q='+encodeURIComponent(t.location)+'" target="_blank" style="color:#2563eb;">Map</a>':'')+'</div>':(t.location?'<div style="font-size:12px;margin-top:3px;"><a href="https://maps.google.com/?q='+encodeURIComponent(t.location)+'" target="_blank" style="color:#2563eb;">📍 Open in Maps</a></div>':''))
+    +(t.notes?'<div style="font-size:12px;margin-top:4px;color:var(--text-muted);">💬 '+escQ(t.notes)+'</div>':'')
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">'
+    +'<span style="font-size:11px;background:'+sm.c+'22;color:'+sm.c+';padding:3px 10px;border-radius:99px;font-weight:700;">'+sm.e+' '+sm.t+'</span>'
+    +(t.assigned_name?'<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:3px 9px;border-radius:99px;font-weight:600;">👷 '+escHtml(t.assigned_name)+'</span>':'')
+    +'</div>'
+    +'</div>'
+    +((acts||manage)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;justify-content:flex-end;">'+acts+manage+'</div>':'')
+    +trail
+    +'</div>';
+}
+
+function filterFieldTasks(){
+  var q=(document.getElementById('ft-search')?.value||'').toLowerCase();
+  var tf=(document.getElementById('ft-type-filter')?.value||'');
+  var sf=(document.getElementById('ft-status-filter')?.value||'');
+  var ef=(document.getElementById('ft-eng-filter')?.value||'');
+  document.querySelectorAll('#ft-list .ft-group').forEach(function(g){
+    var anyVisible=false;
+    g.querySelectorAll('.ft-card').forEach(function(c){
+      var mQ=!q||(c.dataset.name||'').includes(q)||(c.dataset.mobile||'').includes(q);
+      var mT=!tf||(c.dataset.type||'')===tf;
+      var mS=!sf||(c.dataset.status||'')===sf;
+      var mE=!ef||(c.dataset.eng||'')===ef;
+      var show=mQ&&mT&&mS&&mE;c.style.display=show?'':'none';if(show)anyVisible=true;
+    });
+    g.style.display=anyVisible?'':'none';
+  });
+}
+
+// ---- Create / Edit modal ----
+async function openFtCreateModal(){openFtEditModal(null);}
+async function openFtEditModal(id){
+  await _ftLoadEngs();
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var myId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  var t=id?((window._ftCache||[]).find(function(x){return String(x.id)===String(id);})||{}):{};
+  var ex=document.getElementById('modal-ft-edit');if(ex)ex.remove();
+  var defEng=t.assigned_to||(isEng?myId:'');
+  var engOpts='<option value="">— Select Engineer —</option>'+(window._ftEngs||[]).map(function(e){return '<option value="'+e.eng_id+'"'+(String(defEng)===String(e.eng_id)?' selected':'')+'>'+escHtml(e.name)+'</option>';}).join('');
+  var typeOpts=FT_TYPES.map(function(x){return '<option value="'+x+'"'+((t.task_type||'Cart Delivery')===x?' selected':'')+'>'+_ftMeta(x).e+' '+x+'</option>';}).join('');
+  var m=document.createElement('div');
+  m.id='modal-ft-edit';m.className='modal-overlay';
+  var f=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escHtml(v==null?'':String(v))+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">';};
+  m.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()" style="max-width:460px;">'
+    +'<div class="modal-header"><h2>'+(id?'✏️ Edit Task':'🚚 New Other Work')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-ft-edit\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Task Type *</label><select id="ft-type" onchange="_ftToggleAmt()" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+typeOpts+'</select></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Customer / Party Name *</label>'+f('ft-name','e.g. Sharma Traders',t.customer_name)+'</div>'
+    +'<div style="display:flex;gap:10px;"><div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Mobile</label>'+f('ft-mobile','10-digit',t.mobile,'tel')+'</div>'
+    +'<div id="ft-amt-wrap" style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Amount (₹)</label>'+f('ft-amount','e.g. 5000',t.amount,'number')+'</div></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Address</label>'+f('ft-address','Delivery / pickup address',t.address)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Location (Maps link / coords)</label>'+f('ft-location','optional',t.location)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Assign to Engineer</label><select id="ft-eng" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+engOpts+'</select></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Notes</label><textarea id="ft-notes" rows="2" placeholder="Any instructions..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;">'+escHtml(t.notes||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-ft-edit\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveFtTask('+(id||'null')+')">💾 Save</button></div>'
+    +'</div>';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  document.body.appendChild(m);
+  _ftToggleAmt();
+}
+function _ftToggleAmt(){
+  var tp=document.getElementById('ft-type')?.value||'';
+  var w=document.getElementById('ft-amt-wrap');
+  if(w)w.style.opacity=(tp==='Payment Collection'||tp==='Cheque Collection')?'1':'0.55';
+}
+async function saveFtTask(id){
+  var type=document.getElementById('ft-type')?.value||'Other';
+  var name=(document.getElementById('ft-name')?.value||'').trim();
+  if(!name){alert('Customer / Party name is required.');return;}
+  var mobile=(document.getElementById('ft-mobile')?.value||'').trim();
+  var amountRaw=(document.getElementById('ft-amount')?.value||'').trim();
+  var amount=amountRaw===''?null:parseFloat(amountRaw);
+  var address=(document.getElementById('ft-address')?.value||'').trim();
+  var location=(document.getElementById('ft-location')?.value||'').trim();
+  var engSel=document.getElementById('ft-eng');
+  var engId=engSel?engSel.value:'';
+  var engName=engId&&engSel?(engSel.options[engSel.selectedIndex]?.text||'').trim():'';
+  var notes=(document.getElementById('ft-notes')?.value||'').trim();
+  var now=new Date();
+  var payload={task_type:type,customer_name:name,mobile:mobile,amount:amount,address:address,location:location,
+    assigned_to:engId||null,assigned_name:engName||null,notes:notes,updated_at:now.toISOString()};
+  try{
+    if(id){
+      await sb('field_tasks','PATCH',payload,'?id=eq.'+id);
+    }else{
+      payload.status='Assigned';
+      payload.created_by=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+      payload.created_by_name=(currentUser&&currentUser.name)||'';
+      payload.task_date=now.toLocaleDateString('en-CA');
+      payload.created_at=now.toISOString();
+      await sb('field_tasks','POST',payload);
+    }
+    var mm=document.getElementById('modal-ft-edit');if(mm)mm.remove();
+    renderFieldTasks();
+  }catch(e){alert('Error saving: '+e.message);}
+}
+
+// ---- Lifecycle ----
+async function doFtTravelStart(id){
+  var t=(window._ftCache||[]).find(function(x){return String(x.id)===String(id);});
+  if(!t){try{t=(await sb('field_tasks','GET',null,'?id=eq.'+id))[0];}catch(e){}}
+  if(!t)return;
+  var now=new Date();
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  // KM — mirror the call flow so the day's KM chain stays intact:
+  if(isEng){
+    var dateNow=now.toLocaleDateString('en-CA');
+    var skipKey='kmSkip_'+engId+'_'+dateNow;
+    var skipRef=localStorage.getItem(skipKey);
+    if(skipRef){openKmCapture({type:'arrival',ticketId:(skipRef==='1'?null:skipRef),onDone:function(){localStorage.removeItem(skipKey);doFtTravelStart(id);}});return;}
+    try{var kmL=await kmTodayLogs();if(kmL!==null&&!kmL.some(function(l){return l.entry_type==='opening';})){openKmCapture({type:'opening',ticketId:null,onDone:function(){doFtTravelStart(id);}});return;}}catch(e){}
+  }
+  try{
+    await sb('field_tasks','PATCH',{status:'Traveling',travel_start_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);
+    alert('🚗 Travel Start — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    renderFieldTasks();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function doFtReached(id){
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  var _finish=async function(skipped){
+    var now=new Date();
+    try{
+      await sb('field_tasks','PATCH',{status:'Reached',reached_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);
+      alert('📍 Reached — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+(skipped?'\n\n⏭️ KM skip karyu — next travel start par levase.':''));
+      renderFieldTasks();
+    }catch(e){alert('Error: '+e.message);}
+  };
+  if(isEng){
+    var _kmL=await kmTodayLogs();
+    if(_kmL&&_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id==='FT'+id;})){return _finish(false);}
+    openKmCapture({type:'arrival',ticketId:'FT'+id,allowSkip:true,onDone:function(skipped){_finish(!!skipped);}});
+  }else{_finish(false);}
+}
+async function doFtDone(id){
+  var now=new Date();
+  try{
+    await sb('field_tasks','PATCH',{status:'Done',done_at:now.toISOString(),done_date:now.toLocaleDateString('en-CA'),updated_at:now.toISOString()},'?id=eq.'+id);
+    alert('✅ Task Done — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    renderFieldTasks();
+  }catch(e){alert('Error: '+e.message);}
+}
+function ftCancelConfirm(id){_ftConfirm(id,'cancel');}
+function ftDeleteConfirm(id){_ftConfirm(id,'delete');}
+function _ftConfirm(id,mode){
+  var t=(window._ftCache||[]).find(function(x){return String(x.id)===String(id);})||{};
+  var ex=document.getElementById('ft-confirm-modal');if(ex)ex.remove();
+  var isDel=mode==='delete';
+  var ov=document.createElement('div');ov.id='ft-confirm-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()" style="max-width:360px;">'
+    +'<div class="modal-body" style="text-align:center;padding:22px;">'
+    +'<div style="font-size:34px;margin-bottom:8px;">'+(isDel?'🗑️':'🚫')+'</div>'
+    +'<div style="font-size:16px;font-weight:800;color:'+(isDel?'#dc2626':'#b45309')+';margin-bottom:6px;">'+(isDel?'Delete this task?':'Cancel this task?')+'</div>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">'+escHtml(t.customer_name||'')+(t.task_type?' — '+escHtml(t.task_type):'')+'<br>'+(isDel?'This cannot be undone.':'Task will be marked Cancelled.')+'</div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<button class="btn btn-outline" style="flex:1;" onclick="document.getElementById(\'ft-confirm-modal\').remove()">No, keep it</button>'
+    +'<button class="btn '+(isDel?'btn-danger':'btn-primary')+'" style="flex:1;" onclick="'+(isDel?'ftDoDelete':'ftDoCancel')+'('+id+')">'+(isDel?'Yes, delete':'Yes, cancel')+'</button>'
+    +'</div></div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+async function ftDoDelete(id){
+  try{await sb('field_tasks','DELETE',null,'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  var m=document.getElementById('ft-confirm-modal');if(m)m.remove();
+  renderFieldTasks();
+}
+async function ftDoCancel(id){
+  try{await sb('field_tasks','PATCH',{status:'Cancelled',updated_at:new Date().toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  var m=document.getElementById('ft-confirm-modal');if(m)m.remove();
+  renderFieldTasks();
+}
+
+// ---- Report (date range → per-engineer / per-type counts + Excel) ----
+async function openFtReport(){
+  await _ftLoadEngs();
+  var today=new Date();
+  var monthStart=today.toLocaleDateString('en-CA').substring(0,8)+'01';
+  var todayStr=today.toLocaleDateString('en-CA');
+  var ex=document.getElementById('modal-ft-report');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='modal-ft-report';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;">'
+    +'<div class="modal-header"><h2>📊 Other Work Report</h2><button class="close-btn" onclick="document.getElementById(\'modal-ft-report\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">'
+    +'<div><label style="font-size:12px;font-weight:700;">From</label><br><input type="date" id="ftr-from" value="'+monthStart+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<div><label style="font-size:12px;font-weight:700;">To</label><br><input type="date" id="ftr-to" value="'+todayStr+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="loadFtReport()" style="height:34px;">🔍 Load</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadFtReport()" style="height:34px;">⬇️ Excel</button>'
+    +'</div>'
+    +'<div id="ftr-body"><div class="loading">Loading...</div></div>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+  loadFtReport();
+}
+window._ftrRows=[];window._ftrRange={};
+async function loadFtReport(){
+  var body=document.getElementById('ftr-body');if(!body)return;
+  var from=document.getElementById('ftr-from')?.value||'';
+  var to=document.getElementById('ftr-to')?.value||'';
+  if(!from||!to){body.innerHTML='';return;}
+  body.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    // Count Done tasks by done_date within the range.
+    var tasks=await sb('field_tasks','GET',null,'?status=eq.Done&done_date=gte.'+from+'&done_date=lte.'+to+'&order=done_date.desc');
+    var byEng={};
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id||'Unassigned',total:0,amount:0,types:{}};return byEng[id];}
+    (tasks||[]).forEach(function(t){
+      var r=ensure(t.assigned_to||'—',t.assigned_name);
+      r.total++;
+      r.types[t.task_type||'Other']=(r.types[t.task_type||'Other']||0)+1;
+      var a=parseFloat(t.amount);if(!isNaN(a))r.amount+=a;
+    });
+    var rows=Object.keys(byEng).map(function(k){var r=byEng[k];r.id=k;return r;}).sort(function(a,b){return b.total-a.total;});
+    window._ftrRows=rows;window._ftrRange={from:from,to:to};
+    if(!rows.length){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-muted);">No completed tasks in this period.</div>';return;}
+    var grand=0,grandAmt=0;rows.forEach(function(r){grand+=r.total;grandAmt+=r.amount;});
+    var th='<th style="text-align:left;padding:7px 9px;">Engineer</th>'+FT_TYPES.map(function(t){return '<th style="padding:7px 9px;">'+_ftMeta(t).e+'</th>';}).join('')+'<th style="padding:7px 9px;">Total</th><th style="padding:7px 9px;">Amount ₹</th>';
+    var tr=rows.map(function(r){
+      return '<tr style="border-bottom:1px solid #eef2f7;"><td style="padding:6px 9px;font-weight:600;">'+escHtml(r.name)+'</td>'
+        +FT_TYPES.map(function(t){return '<td style="padding:6px 9px;text-align:center;">'+(r.types[t]||0||'')+'</td>';}).join('')
+        +'<td style="padding:6px 9px;text-align:center;font-weight:800;color:#059669;">'+r.total+'</td>'
+        +'<td style="padding:6px 9px;text-align:right;">'+(r.amount?r.amount.toLocaleString('en-IN'):'')+'</td></tr>';
+    }).join('');
+    body.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:8px 14px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Total Done</div><div style="font-size:18px;font-weight:800;color:#15803d;">'+grand+'</div></div>'
+      +'<div style="background:#eff6ff;border-radius:10px;padding:8px 14px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">💰 Total Collected</div><div style="font-size:18px;font-weight:800;color:#1d4ed8;">₹'+grandAmt.toLocaleString('en-IN')+'</div></div>'
+      +'</div>'
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;text-align:center;">'+th+'</tr></thead><tbody>'+tr+'</tbody></table></div>'
+      +'<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Legend: '+FT_TYPES.map(function(t){return _ftMeta(t).e+' '+t;}).join(' &nbsp; ')+'</div>';
+  }catch(e){body.innerHTML='<div class="alert alert-warning">Error: '+escHtml(e.message)+'</div>';}
+}
+function downloadFtReport(){
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
+  var rows=window._ftrRows||[];
+  if(!rows.length){alert('No data — click Load first.');return;}
+  var data=rows.map(function(r){var o={'Engineer':r.name};FT_TYPES.forEach(function(t){o[t]=r.types[t]||0;});o['Total Done']=r.total;o['Amount (₹)']=r.amount;return o;});
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Other Work');
+  var rg=window._ftrRange||{};
+  XLSX.writeFile(wb,'Other_Work_Report_'+(rg.from||'')+'_to_'+(rg.to||'')+'.xlsx');
+}
+
 function _inqCard(inq,isAdm,today){
   var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
   var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
@@ -24238,7 +24701,7 @@ async function loadKmReport(){
     // the engineer travelled to.
     var _kmAreaMap={};
     try{
-      var _ktids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
+      var _ktids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(function(x){return x&&String(x).indexOf('FT')!==0;})));
       if(_ktids.length){
         var _ktk=await sbAll('tickets','?id=in.('+_ktids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city,cname');
         (_ktk||[]).forEach(function(t){_kmAreaMap[t.id]={area:t.area||t.city||'',cname:t.cname||''};});
@@ -24265,7 +24728,8 @@ async function loadKmReport(){
         var tm=l.captured_at?new Date(l.captured_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-';
         var _kInfo=l.ticket_id&&_kmAreaMap[l.ticket_id]||null;
         var _kArea=_kInfo&&_kInfo.area?_kInfo.area:'';
-        var ticketCell=l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—';
+        var _isFt=l.ticket_id&&String(l.ticket_id).indexOf('FT')===0;
+        var ticketCell=_isFt?'<span style="color:#7c3aed;font-weight:700;">🚚 Other Work</span>':(l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—');
         var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
         var gpsCell=(l.lat&&l.lng)?'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>':'—';
         var _kmEdited=l.edit_remark?' <span title="Edited: '+escHtml(l.edit_remark)+(l.corrected_by?' — '+escHtml(l.corrected_by):'')+'" style="color:#d97706;cursor:help;">✎</span>':'';
