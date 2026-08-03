@@ -16964,6 +16964,8 @@ async function renderCourier(){
           <input type="text" id="cr-in-from" placeholder="City/Location" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>Weight (kg)</label>
           <input type="number" id="cr-in-weight" placeholder="e.g. 1.5" step="0.1" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+        <div class="form-group"><label>Entry Date <span style="font-size:11px;color:var(--text-muted);">(kal aavelu aaje entry karo to date badlo)</span></label>
+          <input type="date" id="cr-in-date" value="${today}" max="${today}" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
       </div>
       <hr class="divider">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -16992,6 +16994,8 @@ async function renderCourier(){
         </div>
         <div class="form-group"><label>Weight (kg)</label>
           <input type="number" id="cr-out-weight" placeholder="e.g. 1.5" step="0.1" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
+        <div class="form-group"><label>Entry Date <span style="font-size:11px;color:var(--text-muted);">(bija divas ni entry karvi hoy to date badlo)</span></label>
+          <input type="date" id="cr-out-date" value="${today}" max="${today}" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
       </div>
       <hr class="divider">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -17265,10 +17269,11 @@ async function saveCourierEntry(dir){
   if(!isIn&&!products.length){alert('Please add at least one product for Outward entries');return;}
 
   var today=new Date().toLocaleDateString('en-CA');
+  var entryDate=(document.getElementById('cr-'+dir+'-date')?.value||'').trim()||today;
   try{
     await sb('courier_log','POST',{
       direction:isIn?'Inward':'Outward',
-      entry_date:today,
+      entry_date:entryDate,
       awb_no:awb,
       agency:agency,
       person_name:person||null,
@@ -17505,6 +17510,7 @@ async function openCourierEdit(id){
       +'<div class="form-group"><label>'+(isIn?'Sender':'Receiver')+'</label><input id="ced-person" value="'+(e.person_name||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'<div class="form-group"><label>'+(isIn?'From':'To')+' Place</label><input id="ced-place" value="'+(e.place||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'<div class="form-group"><label>⚖️ Weight (kg)</label><input type="number" id="ced-weight" value="'+(e.weight||'')+'" step="0.1" placeholder="e.g. 1.5" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+      +'<div class="form-group"><label>📅 Entry Date</label><input type="date" id="ced-date" value="'+(e.entry_date||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
       +'</div>'
       +'<hr style="margin:0 0 12px;border:none;border-top:1px solid #e2e8f0;">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
@@ -17546,9 +17552,10 @@ async function saveCourierEdit(id,isOut){
   var person=document.getElementById('ced-person').value.trim();
   var place=document.getElementById('ced-place').value.trim();
   var weight=document.getElementById('ced-weight').value;
+  var entryDate=(document.getElementById('ced-date')?.value||'').trim();
   var products=getCEDProducts(isOut);
   try{
-    await sb('courier_log','PATCH',{
+    var _patch={
       awb_no:awb,agency:agency,
       person_name:person||null,
       place:place,
@@ -17556,7 +17563,9 @@ async function saveCourierEdit(id,isOut){
       products:products,
       product_count:products.length,
       updated_at:new Date().toISOString()
-    },'?id=eq.'+id);
+    };
+    if(entryDate)_patch.entry_date=entryDate;
+    await sb('courier_log','PATCH',_patch,'?id=eq.'+id);
     document.getElementById('cr-edit-modal').remove();
     showToastWI('✅ Entry updated!');
     renderCourier();
