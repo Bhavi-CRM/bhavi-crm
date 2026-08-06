@@ -7234,7 +7234,11 @@ async function saveEngUpdate(){
   const needsPaymentConfirm=(status==='Closed'||status==='Resolved By Phone')&&(t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other'))&&t.service_type==='On Site';
   if(needsPaymentConfirm){
     return new Promise(async function(resolve){
-      showPaymentConfirmation(t,async function(paymentData){
+      // data.service_charges was just auto-calculated above (line ~7193) from
+      // the ticket's saved charge or the live "Service/Labour" field on the
+      // update form — pass that in, not the stale t.service_charges, so the
+      // popup opens pre-filled instead of blank/0.
+      showPaymentConfirmation(Object.assign({},t,{service_charges:data.service_charges}),async function(paymentData){
         if(paymentData.cname)data.cname=paymentData.cname;
         data.payment_mode=paymentData.payment_mode;
         data.service_charges=paymentData.service_charges;
@@ -7257,14 +7261,16 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
     try{
       await sb('tickets','PATCH',data,`?id=eq.${id}`);
     }catch(pe){
-      // jobsheet_photo / attachments column not added yet (setup SQL not run) —
-      // don't brick call closing: retry without the missing field(s).
+      // jobsheet_photo / attachments / payment_mode column not added yet
+      // (setup SQL not run) — don't brick call closing: retry without the
+      // missing field(s).
       var _msg=String(pe&&pe.message);
-      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)){
+      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)){
         if(_msg.indexOf('jobsheet_photo')!==-1)delete data.jobsheet_photo;
         if(_msg.indexOf('attachments')!==-1)delete data.attachments;
+        if(_msg.indexOf('payment_mode')!==-1)delete data.payment_mode;
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
-        console.log('photo column(s) missing — run the attachments SQL in Supabase');
+        console.log('column(s) missing — run the relevant setup SQL in Supabase');
       }else throw pe;
     }
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
