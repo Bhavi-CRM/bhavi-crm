@@ -13101,7 +13101,8 @@ async function renderEngDailyReport(){
   if(!allEngineers||!allEngineers.length){try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}}
   var engOpts='<option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+e.name+'</option>';}).join('');
   pc.innerHTML='<div class="card">'
-    +'<div class="section-header"><h2>📅 Engineer Daily Report</h2></div>'
+    +'<div class="section-header"><h2>📅 Engineer Daily Report</h2><button class="btn btn-primary btn-sm" id="edr-send-now-btn" onclick="sendDigestNow()">📤 Send Today\'s Report Now</button></div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;">Sends a Telegram + Email summary of today\'s work so far (as of right now) — same as the 8PM auto-digest, triggered on demand.</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
     +'<div class="form-group" style="margin-bottom:0;"><label>Engineer</label><select id="edr-eng" onchange="loadEngDailyReport()" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;min-width:170px;">'+engOpts+'</select></div>'
     +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="edr-from" value="'+monthStart+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
@@ -13117,6 +13118,33 @@ async function renderEngDailyReport(){
     +'<div id="edr-table-wrap" style="overflow-x:auto;"></div>'
     +'</div>';
   loadEngDailyReport();
+}
+
+// Admin-triggered on-demand digest — same Telegram+Email combined report the
+// 8PM cron sends, fired manually so admin can get "today so far" whenever
+// needed, without waiting for the scheduled time or for engineers to punch out.
+async function sendDigestNow(){
+  var btn=document.getElementById('edr-send-now-btn');
+  if(!btn)return;
+  var origText=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳ Sending...';
+  try{
+    var r=await fetch(SB_URL+'/functions/v1/daily-digest',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({})
+    });
+    var j=await r.json().catch(function(){return null;});
+    if(r.ok&&j&&j.ok){
+      var tgOk=Array.isArray(j.results&&j.results.telegram)?j.results.telegram.some(function(s){return String(s).indexOf('sent')!==-1;}):false;
+      var emOk=j.results&&String(j.results.email).indexOf('sent')!==-1;
+      alert('✅ Report sent!\n\n📱 Telegram: '+(tgOk?'Sent':'Check — '+JSON.stringify(j.results.telegram))+'\n✉️ Email: '+(emOk?'Sent':'Check — '+j.results.email)+'\n\n👷 Engineers with data today: '+(j.engineers||0));
+    }else{
+      alert('❌ Send failed.\n\n'+(j?JSON.stringify(j):('HTTP '+r.status))+'\n\nCheck that the daily-digest function is deployed.');
+    }
+  }catch(e){
+    alert('❌ Error: '+e.message+'\n\nCheck that the daily-digest function is deployed in Supabase.');
+  }
+  btn.disabled=false;btn.textContent=origText;
 }
 
 function edrQuick(type){
