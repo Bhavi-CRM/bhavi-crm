@@ -315,6 +315,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
+    <div class="nav-item hidden" onclick="navigate('site-visits')" id="nav-site-visits"><span class="icon">🏗️</span><span>Site Visits</span></div>
     <div class="nav-item hidden" onclick="navigate('eng-daily-report')" id="nav-eng-daily-report"><span class="icon">📅</span><span>Engineer Daily Report</span></div>
     <div class="nav-item hidden" onclick="navigate('work-log')" id="nav-work-log"><span class="icon">🕐</span><span>Work Log</span></div>
     <div class="nav-item hidden" onclick="navigate('walk-in')" id="nav-walk-in"><span class="icon">🚶</span><span>Walk-in</span></div>
@@ -2786,7 +2787,7 @@ function doLogout(){
    'nav-inventory','nav-customers','nav-reports','nav-work-log-report',
    'nav-walk-in-report','nav-courier-report','nav-master','nav-settings',
    'nav-tasks','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report',
-   'nav-inquiries','nav-field-tasks','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-profit','nav-weekly','nav-pending-list'].forEach(function(id){
+   'nav-inquiries','nav-field-tasks','nav-site-visits','nav-ai-agent','nav-btn-new-call','nav-live-map','nav-attendance','nav-targets','nav-amc','nav-feedback','nav-profit','nav-weekly','nav-pending-list'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.classList.add('hidden');
   });
   var as=document.getElementById('nav-admin-section');if(as)as.style.display='none';
@@ -2982,7 +2983,7 @@ function setupNav(){
       sv('btn-daily-report',false);sv('btn-weekly-report',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);
+      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
       // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
       var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
@@ -2998,7 +2999,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-tasks',true);sv('nav-sales',true);
-      sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);
+      sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
@@ -3014,7 +3015,7 @@ function setupNav(){
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);sv('nav-tasks',true);
-      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);
+      sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       sv('nav-live-map',true);sv('nav-ai-agent',true);sv('nav-ai-analysis',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
       sv('nav-feedback',true);sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
@@ -3118,9 +3119,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',tasks:'Tasks',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','ai-agent':'🤖 Virtual AI Agent','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','feedback':'⭐ Customer Feedback','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','ai-analysis':'🤖 AI Analysis','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,tasks:renderTasks,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'ai-agent':renderVirtualAgent,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'feedback':renderFeedback,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'ai-analysis':renderAIAnalysis,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -4417,9 +4418,21 @@ function doPunchOut(){
   const key=`punch_${currentUser.user_id}`;
   const ps=JSON.parse(localStorage.getItem(key)||'null');
   if(!ps||!ps.punched_in){alert('Please Punch In first');return;}
-  // KM TRACKING — engineer returning home directly: capture Closing KM before punch out
-  // (skipped automatically if Reached Office already captured it, or no travel happened today)
   if(currentUser.role==='engineer'){
+    const engId=currentUser.eng_id||currentUser.user_id;
+    const nowDate=new Date().toLocaleDateString('en-CA');
+    // KM CATCH-UP — final safety net: if an arrival KM was skipped at some
+    // call's "Reached Location" and never picked up (no next call, no Return
+    // to Office/Home either), it becomes MANDATORY now — no skip option.
+    const _skipKey='kmSkip_'+engId+'_'+nowDate;
+    const _skipTicket=localStorage.getItem(_skipKey);
+    if(_skipTicket){
+      openKmCapture({type:'arrival',ticketId:(_skipTicket==='1'?null:_skipTicket),onDone:function(){localStorage.removeItem(_skipKey);doPunchOut();}});
+      return;
+    }
+    // KM TRACKING — engineer returning home directly: capture Closing KM before punch out
+    // (skipped automatically if Reached Office/Home already captured it, or no travel happened today)
+    // Also catches a Reached Office/Home closing photo that was itself skipped — mandatory here.
     kmTodayLogs().then(function(logs){
       // Need a closing if the day has an opening AND the latest KM entry is not
       // already a closing (covers direct-home after an afternoon trip too).
@@ -7217,6 +7230,29 @@ async function saveEngUpdate(){
   data.attachments=_extras;
   window._jsPhotos=[null,null,null];
 
+  // Payment Confirmation Popup — Non-Warranty Onsite calls only
+  const needsPaymentConfirm=(status==='Closed'||status==='Resolved By Phone')&&(t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other'))&&t.service_type==='On Site';
+  if(needsPaymentConfirm){
+    return new Promise(async function(resolve){
+      showPaymentConfirmation(t,async function(paymentData){
+        if(paymentData.cname)data.cname=paymentData.cname;
+        data.payment_mode=paymentData.payment_mode;
+        data.service_charges=paymentData.service_charges;
+        if(paymentData.payment_notes){
+          data.charges_note=(data.charges_note||'')+(paymentData.payment_notes?'\nPayment notes: '+paymentData.payment_notes:'');
+        }
+        data.final_charges=paymentData.parts_cost+paymentData.service_charges;
+        await _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime,status,t);
+        resolve();
+      });
+    });
+  }
+
+  // Normal save path (no payment popup needed)
+  await _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime,status,t);
+}
+
+async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime,status,t){
   try{
     try{
       await sb('tickets','PATCH',data,`?id=eq.${id}`);
@@ -13712,7 +13748,7 @@ async function saveDailyReport(){
       remarks:remarks
     });
     closeModal('modal-daily-report');
-    showDailyReportShare({
+    autoSendDailyReport({
       eng_name:currentUser.name,
       report_date:date,
       call_summary:callSummary,
@@ -13843,6 +13879,54 @@ function formatDailyReportWA(d){
   lines.push(DIV);
   lines.push('_Bhavi Electronics — CRM_');
   return lines.join('\n');
+}
+
+// Auto-send Daily Report — no manual share options
+// Auto-send the Punch-Out "Eng Daily Report" — Telegram + Email, no manual
+// share/copy step. Telegram goes straight from the client using the same bot
+// infra already used for other CRM notifications (tgNotify). Email goes via
+// the "report-email" Edge Function (Resend) — see
+// supabase/functions/report-email/index.ts.
+async function autoSendDailyReport(d){
+  var old=document.getElementById('dr-send-panel');if(old)old.remove();
+  var text=formatDailyReportWA(d);
+  var sentTelegram=false,sentEmail=false;
+  // 1) Telegram — direct send to Admin + Office chat (plain text, no
+  // parse_mode, since the WhatsApp-style *bold* markers aren't valid HTML
+  // and customer/company names may contain & or < which would break HTML parsing).
+  try{
+    if(TG_TOKEN&&TG_ADMIN_CHAT){
+      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_ADMIN_CHAT)+'&text='+encodeURIComponent(text),{mode:'no-cors'});
+      sentTelegram=true;
+    }
+    if(TG_TOKEN&&TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT){
+      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_OWNER_CHAT)+'&text='+encodeURIComponent(text),{mode:'no-cors'});
+    }
+  }catch(e){console.log('Daily report Telegram send error:',e);}
+  // 2) Email — via Edge Function (server-side, keeps email provider key off the client)
+  try{
+    var r=await fetch(SB_URL+'/functions/v1/report-email',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify({eng_name:d.eng_name,report_date:d.report_date,text:text})
+    });
+    sentEmail=r&&r.ok;
+  }catch(e){console.log('Daily report Email send error:',e);}
+  // Success panel — no manual share/copy step, just confirmation.
+  var panel=document.createElement('div');
+  panel.id='dr-send-panel';
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  var sentWhat=[sentTelegram?'Telegram':null,'Email'].filter(Boolean).join(' & ');
+  panel.innerHTML=
+    '<div style="background:#fff;border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
+    +'<div style="padding:20px 18px;text-align:center;background:#f0fdf4;border-bottom:1px solid #dcfce7;">'
+    +'<div style="font-size:40px;margin-bottom:8px;">✅</div>'
+    +'<div style="font-size:16px;font-weight:700;color:#15803d;margin-bottom:4px;">Report Submitted!</div>'
+    +'<div style="font-size:13px;color:#65a30d;">Auto-sent to '+sentWhat+' — no further action needed</div>'
+    +'</div>'
+    +'<div style="padding:16px 18px;text-align:center;">'
+    +'<button onclick="document.getElementById(\'dr-send-panel\').remove();_proceedPunchOutSelfie();" style="background:#059669;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;">✅ Done</button>'
+    +'</div></div>';
+  document.body.appendChild(panel);
 }
 
 function showDailyReportShare(d){
@@ -15489,6 +15573,58 @@ document.addEventListener('mouseup',function(e){
     e.stopImmediatePropagation();
   }
 },true);
+
+// Payment Confirmation Popup (Non-Warranty Onsite calls only)
+async function showPaymentConfirmation(ticketData,onConfirm){
+  var ex=document.getElementById('modal-payment-confirm');if(ex)ex.remove();
+  var partsCost=(currentSpares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+  var serviceCost=parseFloat(ticketData.service_charges)||0;
+  var totalCost=partsCost+serviceCost;
+  var ov=document.createElement('div');ov.id='modal-payment-confirm';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div class="modal-header"><h2>💳 Payment Confirmation</h2><button class="close-btn" onclick="document.getElementById(\'modal-payment-confirm\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:16px;display:flex;flex-direction:column;gap:12px;">'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Customer Name</label><input type="text" id="pconf-cname" value="'+escHtml(ticketData.cname||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Service Charges (₹)</label><input type="number" id="pconf-service" value="'+serviceCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Parts Cost (₹)</label><input type="number" id="pconf-parts" value="'+partsCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>'
+    +'<div style="background:#f0fdf4;border-radius:8px;padding:12px;border-left:4px solid #15803d;"><div style="font-size:12px;color:#15803d;font-weight:700;">Total Amount (₹)</div><div style="font-size:24px;font-weight:800;color:#15803d;" id="pconf-total">'+totalCost.toFixed(0)+'</div></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Payment Mode</label><select id="pconf-mode" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"><option value="">— Select —</option><option value="Cash">💵 Cash</option><option value="Online">💻 Online</option><option value="Check">📋 Cheque</option><option value="Card">💳 Card</option></select></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Additional Notes</label><textarea id="pconf-notes" rows="2" placeholder="Optional notes..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;"></textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer" style="display:flex;gap:8px;">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-payment-confirm\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="confirmPayment()">✅ Confirm & Close</button>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+  window._paymentConfirmCallback=onConfirm;
+  window._paymentConfirmTicket=ticketData;
+}
+function updatePconfTotal(){
+  var service=parseFloat(document.getElementById('pconf-service')?.value||0);
+  var parts=parseFloat(document.getElementById('pconf-parts')?.value||0);
+  var total=(isNaN(service)?0:service)+(isNaN(parts)?0:parts);
+  var totalEl=document.getElementById('pconf-total');
+  if(totalEl)totalEl.textContent=total.toFixed(0);
+}
+async function confirmPayment(){
+  var mode=(document.getElementById('pconf-mode')?.value||'').trim();
+  if(!mode){alert('Please select a payment mode.');return;}
+  var mEl=document.getElementById('modal-payment-confirm');if(mEl)mEl.remove();
+  var data={
+    cname:(document.getElementById('pconf-cname')?.value||'').trim(),
+    payment_mode:mode,
+    service_charges:parseFloat(document.getElementById('pconf-service')?.value||0)||0,
+    parts_cost:parseFloat(document.getElementById('pconf-parts')?.value||0)||0,
+    payment_notes:(document.getElementById('pconf-notes')?.value||'').trim()
+  };
+  if(window._paymentConfirmCallback){
+    window._paymentConfirmCallback(data);
+    delete window._paymentConfirmCallback;
+    delete window._paymentConfirmTicket;
+  }
+}
+
 function closeModal(id){
   var el=document.getElementById(id);
   if(el)el.classList.add('hidden');
@@ -18150,6 +18286,17 @@ async function startReturnToOffice(){
   const now=new Date();
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
+  // KM CATCH-UP — same as a call's next Visit Start: if an arrival KM was
+  // skipped at some earlier call's "Reached Location" and no later call
+  // picked it up, it becomes mandatory now, before Return to Office starts.
+  if(currentUser.role==='engineer'){
+    const _skipKey='kmSkip_'+engId+'_'+nowDate;
+    const _skipTicket=localStorage.getItem(_skipKey);
+    if(_skipTicket){
+      openKmCapture({type:'arrival',ticketId:(_skipTicket==='1'?null:_skipTicket),onDone:function(){localStorage.removeItem(_skipKey);startReturnToOffice();}});
+      return;
+    }
+  }
   // Close any other open travel/work log first
   try{
     const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+nowDate+'&to_time=eq.OPEN');
@@ -18170,29 +18317,34 @@ async function reachedOffice(logId){
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
   const engId=currentUser.eng_id||currentUser.user_id;
+  async function _finishReachedOffice(){
+    try{
+      await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
+      // Write "Reached Office" status entry
+      await sb('work_logs','POST',{
+        eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+        log_date:nowDate,from_time:nowTime,to_time:nowTime,
+        task_description:'🏢 Reached Office',log_type:'work',created_at:now.toISOString()
+      }).catch(()=>{});
+      renderMyCalls();
+    }catch(e){alert('Error: '+e.message);}
+  }
   // KM TRACKING — Closing KM odometer photo when reaching office.
   // Captured every time the engineer returns to office with un-closed travel
   // since the last closing (so morning trip AND afternoon trip each get a
   // closing). Skipped if the most recent KM entry is already a closing.
+  // Skip option allowed here — but if skipped, the "not closed" state stays,
+  // so Punch Out (which never allows skip) will force it mandatorily.
   if(currentUser.role==='engineer'){
     try{
       var _kmL=await kmTodayLogs(); // order=captured_at.asc → last item is most recent
       if(_kmL!==null&&_kmL.length&&_kmL[_kmL.length-1].entry_type!=='closing'){
-        openKmCapture({type:'closing',ticketId:null,onDone:function(){reachedOffice(logId);}});
+        openKmCapture({type:'closing',ticketId:null,allowSkip:true,onDone:function(){_finishReachedOffice();}});
         return;
       }
     }catch(_ke){}
   }
-  try{
-    await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
-    // Write "Reached Office" status entry
-    await sb('work_logs','POST',{
-      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
-      log_date:nowDate,from_time:nowTime,to_time:nowTime,
-      task_description:'🏢 Reached Office',log_type:'work',created_at:now.toISOString()
-    }).catch(()=>{});
-    renderMyCalls();
-  }catch(e){alert('Error: '+e.message);}
+  _finishReachedOffice();
 }
 
 // Return to Home — same as Return to Office but for when the engineer heads
@@ -18203,6 +18355,16 @@ async function startReturnToHome(){
   const now=new Date();
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
+  // KM CATCH-UP — same as Return to Office: pick up any skipped arrival KM
+  // before this travel starts.
+  if(currentUser.role==='engineer'){
+    const _skipKey='kmSkip_'+engId+'_'+nowDate;
+    const _skipTicket=localStorage.getItem(_skipKey);
+    if(_skipTicket){
+      openKmCapture({type:'arrival',ticketId:(_skipTicket==='1'?null:_skipTicket),onDone:function(){localStorage.removeItem(_skipKey);startReturnToHome();}});
+      return;
+    }
+  }
   // Close any other open travel/work log first
   try{
     const openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+nowDate+'&to_time=eq.OPEN');
@@ -18223,26 +18385,31 @@ async function reachedHome(logId){
   const nowTime=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const nowDate=now.toLocaleDateString('en-CA');
   const engId=currentUser.eng_id||currentUser.user_id;
+  async function _finishReachedHome(){
+    try{
+      await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
+      // Write "Reached Home" status entry
+      await sb('work_logs','POST',{
+        eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
+        log_date:nowDate,from_time:nowTime,to_time:nowTime,
+        task_description:'🏡 Reached Home',log_type:'work',created_at:now.toISOString()
+      }).catch(()=>{});
+      renderMyCalls();
+    }catch(e){alert('Error: '+e.message);}
+  }
   // KM TRACKING — Closing KM odometer photo when reaching home (day-end).
+  // Skip option allowed here too — falls through to a mandatory prompt at
+  // Punch Out (same as Reached Office) if left un-closed.
   if(currentUser.role==='engineer'){
     try{
       var _kmL=await kmTodayLogs(); // order=captured_at.asc → last item is most recent
       if(_kmL!==null&&_kmL.length&&_kmL[_kmL.length-1].entry_type!=='closing'){
-        openKmCapture({type:'closing',ticketId:null,onDone:function(){reachedHome(logId);}});
+        openKmCapture({type:'closing',ticketId:null,allowSkip:true,onDone:function(){_finishReachedHome();}});
         return;
       }
     }catch(_ke){}
   }
-  try{
-    await sb('work_logs','PATCH',{to_time:nowTime},'?id=eq.'+logId);
-    // Write "Reached Home" status entry
-    await sb('work_logs','POST',{
-      eng_id:engId,eng_name:currentUser.name,member_role:currentUser.role_type==='work_controller'?'WC':'Engineer',
-      log_date:nowDate,from_time:nowTime,to_time:nowTime,
-      task_description:'🏡 Reached Home',log_type:'work',created_at:now.toISOString()
-    }).catch(()=>{});
-    renderMyCalls();
-  }catch(e){alert('Error: '+e.message);}
+  _finishReachedHome();
 }
 
 async function saveWorkLog(){
@@ -22571,6 +22738,353 @@ function downloadFtReport(){
   XLSX.writeFile(wb,'Other_Work_Report_'+(rg.from||'')+'_to_'+(rg.to||'')+'.xlsx');
 }
 
+// ============================================================================
+// SITE VISITS MODULE (Manual entry for site visits, surveys, demos, etc.)
+// Mirrors field_tasks lifecycle with travel/work/KM tracking.
+// Completely self-contained; nothing here touches tickets or call work logs.
+// ============================================================================
+var SV_TYPES=['Site Visit','Survey','Maintenance','Demo','Installation','Other'];
+var SV_TYPE_META={
+  'Site Visit':{e:'🏗️',c:'#0891b2'},
+  'Survey':{e:'📋',c:'#7c3aed'},
+  'Maintenance':{e:'🔧',c:'#ea580c'},
+  'Demo':{e:'🎯',c:'#059669'},
+  'Installation':{e:'⚡',c:'#2563eb'},
+  'Other':{e:'📌',c:'#64748b'}
+};
+function _svMeta(t){return SV_TYPE_META[t]||{e:'📌',c:'#64748b'};}
+
+window._svCache=[];
+window._svEngs=null;
+async function _svLoadEngs(){
+  if(window._svEngs)return;
+  try{window._svEngs=await sbAll('engineers','?select=eng_id,name&order=name.asc');}catch(e){window._svEngs=[];}
+}
+
+async function renderSiteVisits(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var today=new Date().toLocaleDateString('en-CA');
+    var q='?order=status.asc,visit_date.desc,created_at.desc';
+    var isEng=currentUser&&currentUser.role==='engineer';
+    var isWc=currentUser&&currentUser.role==='work_coordinator';
+    var isAdm=currentUser&&currentUser.role==='admin';
+    if(isEng)q='?assigned_to=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+q;
+    else if(!isWc&&!isAdm)q='?assigned_to=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+q;
+    var tasks=await sbAll('site_visits',q);
+    window._svCache=tasks||[];
+    await _svLoadEngs();
+    var canAdminList=isAdm||isWc;
+    var html='<div class="section-header">'
+      +'<h2>🏗️ Site Visits ('+tasks.length+')</h2>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +(canAdminList?'<button class="btn btn-outline btn-sm" onclick="openSvReport()">📊 Report</button>':'')
+      +'<button class="btn btn-primary" onclick="openSvCreateModal()">+ New Visit</button>'
+      +'</div></div>';
+    // Status stats
+    var stats={Assigned:0,Traveling:0,Reached:0,Working:0,Done:0};
+    (window._svCache||[]).forEach(function(t){if(stats.hasOwnProperty(t.status))stats[t.status]++;});
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;font-size:13px;">'
+      +'<div style="background:#eff6ff;border-radius:8px;padding:6px 12px;"><span style="color:#1d4ed8;font-weight:700;">📌 Assigned:</span> '+stats.Assigned+'</div>'
+      +'<div style="background:#fff7ed;border-radius:8px;padding:6px 12px;"><span style="color:#ea580c;font-weight:700;">🚗 Traveling:</span> '+stats.Traveling+'</div>'
+      +'<div style="background:#eef7f4;border-radius:8px;padding:6px 12px;"><span style="color:#0d9488;font-weight:700;">📍 Reached:</span> '+stats.Reached+'</div>'
+      +'<div style="background:#fef3c7;border-radius:8px;padding:6px 12px;"><span style="color:#b45309;font-weight:700;">⚙️ Working:</span> '+stats.Working+'</div>'
+      +'<div style="background:#f0fdf4;border-radius:8px;padding:6px 12px;"><span style="color:#15803d;font-weight:700;">✅ Done:</span> '+stats.Done+'</div>'
+      +'</div>';
+    var searchVal=(document.getElementById('sv-search')?.value||'').toLowerCase();
+    var filtered=window._svCache.filter(function(t){
+      var match=searchVal===''||!searchVal||(t.client_name||'').toLowerCase().includes(searchVal)||(t.site_name||'').toLowerCase().includes(searchVal)||(t.address||'').toLowerCase().includes(searchVal);
+      return match;
+    });
+    var grouped={Assigned:[],Traveling:[],Reached:[],Working:[],Done:[],Cancelled:[]};
+    (filtered||[]).forEach(function(t){
+      if(grouped.hasOwnProperty(t.status))grouped[t.status].push(t);
+      else grouped.Cancelled.push(t);
+    });
+    var statusOrder=['Assigned','Traveling','Reached','Working','Done','Cancelled'];
+    statusOrder.forEach(function(st){
+      var grp=grouped[st]||[];
+      if(grp.length===0)return;
+      var stColor={'Assigned':'#1d4ed8','Traveling':'#ea580c','Reached':'#0d9488','Working':'#b45309','Done':'#15803d','Cancelled':'#6b7280'}[st]||'#6b7280';
+      html+='<div class="group-header" style="margin-top:16px;padding:8px 12px;background:'+stColor+'15;border-left:3px solid '+stColor+';border-radius:6px;"><h3 style="margin:0;font-size:14px;color:'+stColor+';font-weight:700;">'+st+' ('+grp.length+')</h3></div>';
+      grp.forEach(function(t){html+=_svCard(t,isAdm,today);});
+    });
+    html+='<div style="display:flex;gap:8px;margin-top:16px;"><input type="text" id="sv-search" placeholder="🔍 Search by client/site/address..." onkeyup="filterSiteVisits()" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;"/></div>';
+    pc.innerHTML=html;
+  }catch(e){pc.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
+}
+
+function _svCard(t,isAdm,today){
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var canAct=isAdm||isEng||(currentUser&&currentUser.user_id===t.created_by);
+  var canManage=isAdm;
+  var stColor={'Assigned':'#1d4ed8','Traveling':'#ea580c','Reached':'#0d9488','Working':'#b45309','Done':'#15803d','Cancelled':'#6b7280'}[t.status]||'#6b7280';
+  var tMeta=_svMeta(t.visit_type);
+  var acts='';
+  if(canAct&&t.status==='Assigned'){
+    acts+='<button class="btn btn-sm" style="background:#ea580c;color:#fff;border:none;" onclick="doSvTravelStart('+t.id+')">🚗 Travel Start</button>';
+  }else if(canAct&&t.status==='Traveling'){
+    acts+='<button class="btn btn-sm" style="background:#0d9488;color:#fff;border:none;" onclick="doSvReached('+t.id+')">📍 Reached</button>';
+    acts+='<button class="btn btn-sm btn-outline" style="color:#b45309;" onclick="doSvStopTravel('+t.id+')">🛑 Stop Travel</button>';
+  }else if(canAct&&t.status==='Reached'){
+    acts+='<button class="btn btn-sm" style="background:#b45309;color:#fff;border:none;" onclick="doSvWorkStart('+t.id+')">⚙️ Work Start</button>';
+  }else if(canAct&&t.status==='Working'){
+    acts+='<button class="btn btn-sm" style="background:#15803d;color:#fff;border:none;" onclick="doSvWorkEnd('+t.id+')">⏹️ Work End</button>';
+    acts+='<button class="btn btn-sm btn-outline" style="color:#b45309;" onclick="doSvStopWork('+t.id+')">⏸️ Stop Work</button>';
+  }
+  if((canAct&&t.status==='Working')||(canAct&&t.status==='Reached')){
+    acts+='<button class="btn btn-sm" style="background:#15803d;color:#fff;border:none;" onclick="doSvDone('+t.id+')">✅ Done</button>';
+  }
+  if(canManage){
+    acts+='<button class="btn btn-sm btn-outline" onclick="openSvEditModal('+t.id+')">✏️ Edit</button>';
+    acts+='<button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="svDeleteConfirm('+t.id+')">🗑️ Delete</button>';
+  }else if(canAct&&t.status!=='Done'&&t.status!=='Cancelled'){
+    acts+='<button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="svCancelConfirm('+t.id+')">❌ Cancel</button>';
+  }
+  return '<div class="card" style="margin-bottom:10px;border-left:4px solid '+stColor+';"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;"><div><div style="font-size:15px;font-weight:700;">'+tMeta.e+' '+escHtml(t.client_name)+(t.site_name?' — '+escHtml(t.site_name):'')+' <span style="font-size:12px;background:'+stColor+'20;color:'+stColor+';padding:2px 8px;border-radius:12px;font-weight:600;">'+t.status+'</span></div>'
+    +(t.address?'<div style="font-size:12px;color:var(--text-muted);">📍 '+escHtml(t.address)+(t.location?' <a href="'+escHtml(t.location)+'" target="_blank" style="color:#1d4ed8;">🔗</a>':'')+'</div>':'')
+    +(t.purpose?'<div style="font-size:13px;margin-top:4px;">'+escHtml(t.purpose)+'</div>':'')
+    +(t.rooms?'<div style="font-size:12px;color:#64748b;">📊 '+t.rooms+' rooms</div>':'')
+    +(t.travel_start_at?'<div style="font-size:11px;color:#64748b;">🚗 '+new Date(t.travel_start_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div>':'')
+    +(t.work_start_at?'<div style="font-size:11px;color:#64748b;">⚙️ '+new Date(t.work_start_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div>':'')
+    +'</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+acts+'</div></div></div>';
+}
+function filterSiteVisits(){renderSiteVisits();}
+
+function _svConfirm(id,action){
+  var ex=document.getElementById('sv-confirm-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='sv-confirm-modal';ov.className='modal-overlay';
+  var msg=action==='delete'?'Permanently delete this visit?':'Cancel this visit?';var btnTxt=action==='delete'?'🗑️ Delete':'❌ Cancel';var btnClr=action==='delete'?'#dc2626':'#ea580c';
+  ov.innerHTML='<div class="modal" style="max-width:320px;" onclick="event.stopPropagation()"><div class="modal-header"><h2>⚠️ '+msg+'</h2><button class="close-btn" onclick="document.getElementById(\'sv-confirm-modal\').remove()">✕</button></div><div class="modal-body" style="padding:12px 16px;"><p>This action cannot be undone.</p></div><div class="modal-footer" style="display:flex;gap:8px;"><button class="btn btn-outline" onclick="document.getElementById(\'sv-confirm-modal\').remove()">Cancel</button><button class="btn" style="background:'+btnClr+';color:#fff;border:none;" onclick="'+(action==='delete'?'svDoDelete':'svDoCancel')+'('+id+')">'+btnTxt+'</button></div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+function svDeleteConfirm(id){_svConfirm(id,'delete');}
+function svCancelConfirm(id){_svConfirm(id,'cancel');}
+async function svDoDelete(id){
+  try{await sb('site_visits','DELETE',null,'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  var m=document.getElementById('sv-confirm-modal');if(m)m.remove();
+  renderSiteVisits();
+}
+async function svDoCancel(id){
+  try{await sb('site_visits','PATCH',{status:'Cancelled',updated_at:new Date().toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  var m=document.getElementById('sv-confirm-modal');if(m)m.remove();
+  renderSiteVisits();
+}
+
+async function openSvCreateModal(){openSvEditModal(null);}
+async function openSvEditModal(id){
+  await _svLoadEngs();
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var myId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  var t=id?((window._svCache||[]).find(function(x){return String(x.id)===String(id);})||{}):{};
+  var ex=document.getElementById('modal-sv-edit');if(ex)ex.remove();
+  var defEng=t.assigned_to||(isEng?myId:'');
+  var engOpts='<option value="">— Select Engineer —</option>'+(window._svEngs||[]).map(function(e){return '<option value="'+e.eng_id+'"'+(String(defEng)===String(e.eng_id)?' selected':'')+'>'+escHtml(e.name)+'</option>';}).join('');
+  var typeOpts=SV_TYPES.map(function(x){return '<option value="'+x+'"'+((t.visit_type||'Site Visit')===x?' selected':'')+'>'+_svMeta(x).e+' '+x+'</option>';}).join('');
+  var m=document.createElement('div');
+  m.id='modal-sv-edit';m.className='modal-overlay';
+  var f=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escHtml(v==null?'':String(v))+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">';};
+  m.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()" style="max-width:480px;">'
+    +'<div class="modal-header"><h2>'+(id?'✏️ Edit Visit':'🏗️ New Site Visit')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-sv-edit\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Visit Type *</label><select id="sv-type" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+typeOpts+'</select></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Client / Company Name *</label>'+f('sv-client','e.g. ABC Ltd.',t.client_name)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Site Name</label>'+f('sv-site','e.g. Main Office, Branch 1',t.site_name)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Address</label>'+f('sv-address','Full address',t.address)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Location (Maps link / coords)</label>'+f('sv-location','optional',t.location)+'</div>'
+    +'<div style="display:flex;gap:10px;"><div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Rooms / Items</label>'+f('sv-rooms','e.g. 5',t.rooms,'number')+'</div>'
+    +'<div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Visit Date</label>'+f('sv-date','',t.visit_date||new Date().toLocaleDateString('en-CA'),'date')+'</div></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Purpose / Description</label><textarea id="sv-purpose" rows="2" placeholder="Visit purpose & details..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;">'+escHtml(t.purpose||'')+'</textarea></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Assign to Engineer</label><select id="sv-eng" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+engOpts+'</select></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Notes</label><textarea id="sv-notes" rows="2" placeholder="Any special instructions..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;">'+escHtml(t.notes||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-sv-edit\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveSvTask('+(id||'null')+')">💾 Save</button></div>'
+    +'</div>';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  document.body.appendChild(m);
+}
+async function saveSvTask(id){
+  var type=document.getElementById('sv-type')?.value||'Site Visit';
+  var client=(document.getElementById('sv-client')?.value||'').trim();
+  if(!client){alert('Client / Company name is required.');return;}
+  var site=(document.getElementById('sv-site')?.value||'').trim();
+  var address=(document.getElementById('sv-address')?.value||'').trim();
+  var location=(document.getElementById('sv-location')?.value||'').trim();
+  var rooms=(document.getElementById('sv-rooms')?.value||'').trim();
+  var purpose=(document.getElementById('sv-purpose')?.value||'').trim();
+  var engSel=document.getElementById('sv-eng');
+  var engId=engSel?engSel.value:'';
+  var engName=engId&&engSel?(engSel.options[engSel.selectedIndex]?.text||'').trim():'';
+  var notes=(document.getElementById('sv-notes')?.value||'').trim();
+  var date=(document.getElementById('sv-date')?.value||'').trim()||new Date().toLocaleDateString('en-CA');
+  var now=new Date();
+  var payload={visit_type:type,client_name:client,site_name:site,address:address,location:location,rooms:rooms||null,purpose:purpose,assigned_to:engId||null,assigned_name:engName||null,notes:notes,visit_date:date,updated_at:now.toISOString()};
+  try{
+    if(id){
+      await sb('site_visits','PATCH',payload,'?id=eq.'+id);
+    }else{
+      payload.status='Assigned';
+      payload.created_by=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+      payload.created_by_name=(currentUser&&currentUser.name)||'';
+      payload.created_at=now.toISOString();
+      await sb('site_visits','POST',payload);
+    }
+    var mm=document.getElementById('modal-sv-edit');if(mm)mm.remove();
+    renderSiteVisits();
+  }catch(e){alert('Error saving: '+e.message);}
+}
+
+async function doSvTravelStart(id){
+  var t=(window._svCache||[]).find(function(x){return String(x.id)===String(id);});
+  if(!t){try{t=(await sb('site_visits','GET',null,'?id=eq.'+id))[0];}catch(e){}}
+  if(!t)return;
+  var now=new Date();
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  if(isEng){
+    var dateNow=now.toLocaleDateString('en-CA');
+    var skipKey='kmSkip_'+engId+'_'+dateNow;
+    openKmCapture({type:'opening',ticketId:'SV'+id,allowSkip:true,onDone:function(skipped){
+      var _finish=function(){
+        try{sb('site_visits','PATCH',{status:'Traveling',travel_start_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){}
+        alert('🚗 Travel Start — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+        renderSiteVisits();
+      };
+      _finish();
+    }});
+  }else{
+    try{await sb('site_visits','PATCH',{status:'Traveling',travel_start_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){}
+    alert('🚗 Travel Start — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    renderSiteVisits();
+  }
+}
+async function doSvReached(id){
+  var t=(window._svCache||[]).find(function(x){return String(x.id)===String(id);});
+  if(!t){try{t=(await sb('site_visits','GET',null,'?id=eq.'+id))[0];}catch(e){}}
+  if(!t)return;
+  var now=new Date();
+  var isEng=currentUser&&currentUser.role==='engineer';
+  var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  if(isEng){
+    openKmCapture({type:'arrival',ticketId:'SV'+id,allowSkip:true,onDone:function(skipped){
+      var _finish=function(){
+        try{sb('site_visits','PATCH',{status:'Reached',reached_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){}
+        alert('📍 Reached — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+(skipped?'\n\n⏭️ KM skip karyu — next travel start par levase.':''));
+        renderSiteVisits();
+      };
+      _finish();
+    }});
+  }else{
+    try{await sb('site_visits','PATCH',{status:'Reached',reached_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){}
+    alert('📍 Reached — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    renderSiteVisits();
+  }
+}
+async function doSvWorkStart(id){
+  var now=new Date();
+  try{await sb('site_visits','PATCH',{status:'Working',work_start_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  alert('⚙️ Work Start — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+  renderSiteVisits();
+}
+async function doSvWorkEnd(id){
+  var now=new Date();
+  try{await sb('site_visits','PATCH',{work_end_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  alert('⏹️ Work End — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+  renderSiteVisits();
+}
+// Stop Travel — mirrors call's "Visit Stop": travel didn't reach the site,
+// so revert to Assigned (travel can be started again later, e.g. for a
+// multi-visit day where the engineer got called away mid-route).
+async function doSvStopTravel(id){
+  if(!confirm('🛑 Stop travel?\n\nThis visit will go back to "Assigned" — you can start travel again later.'))return;
+  var now=new Date();
+  try{await sb('site_visits','PATCH',{status:'Assigned',travel_start_at:null,updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  alert('🛑 Travel stopped — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+  renderSiteVisits();
+}
+// Stop Work — mirrors call's "Work Hold": pause the work session and go back
+// to Reached, so it can be resumed later without losing the arrival KM.
+async function doSvStopWork(id){
+  if(!confirm('⏸️ Stop work?\n\nThis visit will go back to "Reached" — you can resume work later.'))return;
+  var now=new Date();
+  try{await sb('site_visits','PATCH',{status:'Reached',work_start_at:null,updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  alert('⏸️ Work stopped — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+  renderSiteVisits();
+}
+async function doSvDone(id){
+  var now=new Date();
+  try{await sb('site_visits','PATCH',{status:'Done',done_at:now.toISOString(),done_date:now.toLocaleDateString('en-CA'),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){alert('Error: '+e.message);return;}
+  alert('✅ Visit Done — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+  renderSiteVisits();
+}
+
+async function openSvReport(){
+  await _svLoadEngs();
+  var today=new Date();
+  var monthStart=today.toLocaleDateString('en-CA').substring(0,8)+'01';
+  var todayStr=today.toLocaleDateString('en-CA');
+  var ex=document.getElementById('modal-sv-report');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='modal-sv-report';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;max-height:90vh;overflow-y:auto;"><div class="modal-header"><h2>📊 Site Visits Report</h2><button class="close-btn" onclick="document.getElementById(\'modal-sv-report\').remove()">✕</button></div><div class="modal-body" style="padding:16px;">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">'
+    +'<div><label style="font-size:12px;font-weight:700;">From</label><br><input type="date" id="svr-from" value="'+monthStart+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<div><label style="font-size:12px;font-weight:700;">To</label><br><input type="date" id="svr-to" value="'+todayStr+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;"></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="loadSvReport()" style="height:34px;">🔍 Load</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadSvReport()" style="height:34px;">⬇️ Excel</button>'
+    +'</div>'
+    +'<div id="svr-body"><div class="loading">Loading...</div></div>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+  loadSvReport();
+}
+window._svrRows=[];window._svrRange={};
+async function loadSvReport(){
+  var body=document.getElementById('svr-body');if(!body)return;
+  var from=document.getElementById('svr-from')?.value||'';
+  var to=document.getElementById('svr-to')?.value||'';
+  if(!from||!to){body.innerHTML='';return;}
+  body.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var visits=await sb('site_visits','GET',null,'?status=eq.Done&done_date=gte.'+from+'&done_date=lte.'+to+'&order=done_date.desc');
+    var byEng={};
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id||'Unassigned',total:0,types:{}};return byEng[id];}
+    (visits||[]).forEach(function(v){
+      var r=ensure(v.assigned_to||'—',v.assigned_name);
+      r.total++;
+      r.types[v.visit_type||'Other']=(r.types[v.visit_type||'Other']||0)+1;
+    });
+    var rows=Object.keys(byEng).map(function(k){var r=byEng[k];r.id=k;return r;}).sort(function(a,b){return b.total-a.total;});
+    window._svrRows=rows;window._svrRange={from:from,to:to};
+    if(!rows.length){body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-muted);">No completed visits in this period.</div>';return;}
+    var grand=0;rows.forEach(function(r){grand+=r.total;});
+    var th='<th style="text-align:left;padding:7px 9px;">Engineer</th>'+SV_TYPES.map(function(t){return '<th style="padding:7px 9px;">'+_svMeta(t).e+'</th>';}).join('')+'<th style="padding:7px 9px;">Total</th>';
+    var tr=rows.map(function(r){
+      return '<tr style="border-bottom:1px solid #eef2f7;"><td style="padding:6px 9px;font-weight:600;">'+escHtml(r.name)+'</td>'
+        +SV_TYPES.map(function(t){return '<td style="padding:6px 9px;text-align:center;">'+(r.types[t]||0||'')+'</td>';}).join('')
+        +'<td style="padding:6px 9px;text-align:center;font-weight:800;color:#059669;">'+r.total+'</td></tr>';
+    }).join('');
+    body.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<div style="background:#f0fdf4;border-radius:10px;padding:8px 14px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Total Completed</div><div style="font-size:18px;font-weight:800;color:#15803d;">'+grand+'</div></div>'
+      +'</div>'
+      +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#f8fafc;text-align:center;">'+th+'</tr></thead><tbody>'+tr+'</tbody></table></div>'
+      +'<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Legend: '+SV_TYPES.map(function(t){return _svMeta(t).e+' '+t;}).join(' &nbsp; ')+'</div>';
+  }catch(e){body.innerHTML='<div class="alert alert-warning">Error: '+escHtml(e.message)+'</div>';}
+}
+function downloadSvReport(){
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
+  var rows=window._svrRows||[];
+  if(!rows.length){alert('No data — click Load first.');return;}
+  var data=rows.map(function(r){var o={'Engineer':r.name};SV_TYPES.forEach(function(t){o[t]=r.types[t]||0;});o['Total Done']=r.total;return o;});
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Site Visits');
+  var rg=window._svrRange||{};
+  XLSX.writeFile(wb,'Site_Visits_Report_'+(rg.from||'')+'_to_'+(rg.to||'')+'.xlsx');
+}
+
 function _inqCard(inq,isAdm,today){
   var isFollowup=inq.followup_date===today&&inq.status!=='Converted'&&inq.status!=='Lost';
   var isPast=inq.followup_date&&inq.followup_date<today&&inq.status!=='Converted'&&inq.status!=='Lost';
@@ -24540,7 +25054,7 @@ function openKmCapture(opts){
     +'</div>'
     +'<div style="font-size:12px;color:#64748b;margin-bottom:10px;">📍 GPS: <span id="km-gps-status">Getting location...</span> &nbsp;|&nbsp; 🕐 <span id="km-time-now"></span></div>'
     +'<button id="km-save-btn" class="btn btn-success" style="width:100%;" onclick="saveKmEntry()">💾 Save KM Entry</button>'
-    +((_kmCapOpts&&_kmCapOpts.allowSkip)?'<button class="btn btn-outline" style="width:100%;margin-top:8px;color:#b45309;border-color:#fde68a;" onclick="skipKmEntry()">⏭️ Skip — next call na Visit Start ma karish</button>':'')
+    +((_kmCapOpts&&_kmCapOpts.allowSkip)?'<button class="btn btn-outline" style="width:100%;margin-top:8px;color:#b45309;border-color:#fde68a;" onclick="skipKmEntry()">⏭️ '+(opts.type==='closing'?'Skip — Punch Out vakhte farjiyat thashe':'Skip — next call na Visit Start ma karish')+'</button>':'')
     +'</div></div>';
   document.body.appendChild(m);
   var tEl=document.getElementById('km-time-now');
