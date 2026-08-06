@@ -13887,35 +13887,33 @@ function formatDailyReportWA(d){
 // infra already used for other CRM notifications (tgNotify). Email goes via
 // the "report-email" Edge Function (Resend) — see
 // supabase/functions/report-email/index.ts.
+// Per-engineer send — TELEGRAM ONLY (immediate, one per punch-out). Email is
+// deliberately NOT sent here: admin gets ONE combined email per day from the
+// 8PM digest (supabase/functions/daily-digest) instead of one email per
+// engineer per punch-out. Telegram still gets both: this individual ping
+// AND the 8PM combined summary.
 async function autoSendDailyReport(d){
   var old=document.getElementById('dr-send-panel');if(old)old.remove();
   var text=formatDailyReportWA(d);
-  var sentTelegram=false,sentEmail=false;
-  // 1) Telegram — direct send to Admin + Office chat (plain text, no
-  // parse_mode, since the WhatsApp-style *bold* markers aren't valid HTML
-  // and customer/company names may contain & or < which would break HTML parsing).
+  // Telegram is sent as plain text (no parse_mode) — customer/company names
+  // may contain & or < which would break HTML parsing — so strip the
+  // WhatsApp-style *bold* markers instead of sending them literally.
+  var tgText=text.replace(/[*_]/g,'');
+  var sentTelegram=false;
   try{
     if(TG_TOKEN&&TG_ADMIN_CHAT){
-      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_ADMIN_CHAT)+'&text='+encodeURIComponent(text),{mode:'no-cors'});
+      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_ADMIN_CHAT)+'&text='+encodeURIComponent(tgText),{mode:'no-cors'});
       sentTelegram=true;
     }
     if(TG_TOKEN&&TG_OWNER_CHAT&&TG_OWNER_CHAT!==TG_ADMIN_CHAT){
-      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_OWNER_CHAT)+'&text='+encodeURIComponent(text),{mode:'no-cors'});
+      await fetch('https://api.telegram.org/bot'+TG_TOKEN+'/sendMessage?chat_id='+encodeURIComponent(TG_OWNER_CHAT)+'&text='+encodeURIComponent(tgText),{mode:'no-cors'});
     }
   }catch(e){console.log('Daily report Telegram send error:',e);}
-  // 2) Email — via Edge Function (server-side, keeps email provider key off the client)
-  try{
-    var r=await fetch(SB_URL+'/functions/v1/report-email',{method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
-      body:JSON.stringify({eng_name:d.eng_name,report_date:d.report_date,text:text})
-    });
-    sentEmail=r&&r.ok;
-  }catch(e){console.log('Daily report Email send error:',e);}
   // Success panel — no manual share/copy step, just confirmation.
   var panel=document.createElement('div');
   panel.id='dr-send-panel';
   panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-  var sentWhat=[sentTelegram?'Telegram':null,'Email'].filter(Boolean).join(' & ');
+  var sentWhat=sentTelegram?'Telegram':'nowhere (Telegram not configured — check Settings)';
   panel.innerHTML=
     '<div style="background:#fff;border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">'
     +'<div style="padding:20px 18px;text-align:center;background:#f0fdf4;border-bottom:1px solid #dcfce7;">'
