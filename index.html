@@ -20942,8 +20942,8 @@ async function loadWorkLogReport(){
     // the engineer travelled to. Fetched once from the referenced tickets.
     var _wlrAreaMap={};
     var _wlrSvcMap={};
+    var _wtids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
     try{
-      var _wtids=Array.from(new Set(logs.map(function(l){return l.ticket_id;}).filter(Boolean)));
       if(_wtids.length){
         var _wtk=await sbAll('tickets','?id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=id,area,city,service_type');
         (_wtk||[]).forEach(function(t){_wlrAreaMap[t.id]=t.area||t.city||'';_wlrSvcMap[t.id]=t.service_type||'';});
@@ -20951,6 +20951,18 @@ async function loadWorkLogReport(){
     }catch(e){}
     window._wlrAreaMap=_wlrAreaMap;
     window._wlrSvcMap=_wlrSvcMap;
+    // GPS lookup for "Call Closed" entries — the exact spot the engineer was
+    // standing when they closed each on-site call (captured via
+    // saveLocationEvent('ticket_close', id) at close time), so the Work Log
+    // can link straight to it on the map instead of just the customer's area name.
+    var _wlrGpsMap={};
+    try{
+      if(_wtids.length){
+        var _wloc=await sbAll('engineer_locations','?event_type=eq.ticket_close&ticket_id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=ticket_id,lat,lng,accuracy,recorded_at&order=recorded_at.desc');
+        (_wloc||[]).forEach(function(r){if(r.ticket_id&&!_wlrGpsMap[r.ticket_id]&&r.lat&&r.lng)_wlrGpsMap[r.ticket_id]={lat:r.lat,lng:r.lng,accuracy:r.accuracy};});
+      }
+    }catch(e){}
+    window._wlrGpsMap=_wlrGpsMap;
     var byEng={};
     logs.forEach(function(l){
       var k=l.eng_name||l.eng_id;
@@ -21003,9 +21015,15 @@ async function loadWorkLogReport(){
           var _wArea=(_wSvc==='Carry In')
             ?' <span style="background:#ede9fe;color:#6d28d9;font-weight:800;border-radius:6px;padding:1px 7px;font-size:11px;white-space:nowrap;">📦 Carry In</span>'
             :((l.ticket_id&&window._wlrAreaMap&&window._wlrAreaMap[l.ticket_id])?' <span style="color:#0d9488;font-weight:700;white-space:nowrap;">📍 '+escHtml(window._wlrAreaMap[l.ticket_id])+'</span>':'');
+          // Call Closed / Resolved By Phone — link straight to the exact GPS
+          // spot captured when the engineer closed the call (not just the
+          // customer's area name), so it can be opened and verified on the map.
+          var _isCloseEntry=l.task_description&&(l.task_description.indexOf('Call Closed')!==-1||l.task_description.indexOf('Resolved By Phone')!==-1);
+          var _wGps=(_isCloseEntry&&l.ticket_id&&window._wlrGpsMap&&window._wlrGpsMap[l.ticket_id])||null;
+          var _wGpsLink=_wGps?' <a href="https://maps.google.com/?q='+_wGps.lat+','+_wGps.lng+'" target="_blank" title="Open closing location in Google Maps'+(_wGps.accuracy?' (±'+Math.round(_wGps.accuracy)+'m)':'')+'" style="color:#dc2626;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Location</a>':'';
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
-            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+_wGpsLink+'</div>'
             +'</div>';
         });
         html+='</div>';
