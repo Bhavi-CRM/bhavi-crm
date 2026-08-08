@@ -21036,7 +21036,7 @@ async function loadWorkLogReport(){
           // Traveling entry that has ended = the engineer reached — link to the
           // arrival-KM location captured at "📍 Reached Location" for that call.
           var _wArrival=(isTravel&&!isOpen&&l.ticket_id&&window._wlrArrivalMap&&window._wlrArrivalMap[l.ticket_id])||null;
-          var _wArrivalLink=_wArrival?' <a href="https://maps.google.com/?q='+_wArrival.lat+','+_wArrival.lng+'" target="_blank" title="Open reached location in Google Maps'+(_wArrival.accuracy?' (±'+Math.round(_wArrival.accuracy)+'m)':'')+'" style="color:#0d9488;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Reached</a>':'';
+          var _wArrivalLink=_wArrival?' <a href="https://maps.google.com/?q='+_wArrival.lat+','+_wArrival.lng+'" target="_blank" title="Open reached location in Google Maps'+(_wArrival.accuracy?' (±'+Math.round(_wArrival.accuracy)+'m)':'')+'" style="color:#2563eb;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Reached</a>':'';
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
             +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+_wGpsLink+_wArrivalLink+'</div>'
@@ -25366,11 +25366,14 @@ async function loadKmReport(){
       var g=groups[k];dayCount++;
       var opening=null,closing=null,prev=null,dayKm=0,maxRead=null,rowsHtml='';
       var excelDayRows=[];
-      var openingLoc=null;
+      var openingLoc=null,closingLoc=null;
       g.entries.forEach(function(l){
         var kmN=parseFloat(l.odometer_km);
         if(l.entry_type==='opening'&&opening===null&&!isNaN(kmN))opening=kmN;
         if(l.entry_type==='opening'&&openingLoc===null&&l.lat&&l.lng)openingLoc={lat:parseFloat(l.lat),lng:parseFloat(l.lng)};
+        // Last closing wins (a day can have a morning-trip closing AND an
+        // afternoon-trip closing — the final one is the real day-end spot).
+        if(l.entry_type==='closing'&&l.lat&&l.lng)closingLoc={lat:parseFloat(l.lat),lng:parseFloat(l.lng)};
         if(l.entry_type==='closing'&&!isNaN(kmN))closing=kmN;
         if(!isNaN(kmN)&&(maxRead===null||kmN>maxRead))maxRead=kmN;
         var seg='';
@@ -25410,7 +25413,17 @@ async function loadKmReport(){
       }else if(openingLoc){
         startLabel='📍 View Location';
       }
-      excelGroups.push({eng_id:g.eng_id,eng_name:g.eng_name,date:g.date,dateLabel:dLabel,totalKm:totalKm,startLabel:startLabel.replace(/^[^\s]+\s/,''),rows:excelDayRows});
+      // Same Office/Away check for the day's LAST closing KM — where the
+      // engineer actually was when they wrapped up for the day.
+      var endMapsUrl=closingLoc?('https://maps.google.com/?q='+closingLoc.lat+','+closingLoc.lng):'';
+      var endLabel='—',endDistKm=null;
+      if(closingLoc&&officeLoc){
+        endDistKm=Math.round(_kmHaversine(closingLoc.lat,closingLoc.lng,officeLoc.lat,officeLoc.lng)*10)/10;
+        endLabel=endDistKm<=0.3?'🏢 Office':'📍 Away (~'+endDistKm+' km)';
+      }else if(closingLoc){
+        endLabel='📍 View Location';
+      }
+      excelGroups.push({eng_id:g.eng_id,eng_name:g.eng_name,date:g.date,dateLabel:dLabel,totalKm:totalKm,startLabel:startLabel.replace(/^[^\s]+\s/,''),endLabel:endLabel.replace(/^[^\s]+\s/,''),rows:excelDayRows});
       html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">'
         +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">'
         +'<div style="font-weight:800;font-size:14px;">👷 '+escHtml(g.eng_name)+' <span style="color:var(--text-muted);font-weight:600;font-size:12px;">— '+dLabel+'</span></div>'
@@ -25418,7 +25431,8 @@ async function loadKmReport(){
         +'<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:4px 10px;">Opening: '+(opening!==null?opening:'—')+'</span>'
         +'<span style="background:#fef3c7;color:#92400e;border-radius:8px;padding:4px 10px;">Closing: '+(closing!==null?closing:'—')+'</span>'
         +'<span style="background:#f0fdf4;color:#15803d;border-radius:8px;padding:4px 10px;">Total: '+totalKm+' km</span>'
-        +(openingLoc?'<a href="'+startMapsUrl+'" target="_blank" style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s Opening KM was captured">'+startLabel+'</a>':'')
+        +(openingLoc?'<a href="'+startMapsUrl+'" target="_blank" style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s Opening KM was captured">Start: '+startLabel+'</a>':'')
+        +(closingLoc?'<a href="'+endMapsUrl+'" target="_blank" style="background:#fdf2f8;color:#be185d;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s last Closing KM was captured">End: '+endLabel+'</a>':'')
         +'</div></div>'
         +'<div class="table-wrap"><table><thead><tr><th>Time</th><th>Point</th><th>Call</th><th style="text-align:right;">Odometer</th><th style="text-align:right;">Travel</th><th style="text-align:center;">Photo</th><th style="text-align:center;">GPS</th></tr></thead>'
         +'<tbody>'+rowsHtml+'</tbody></table></div>'
@@ -25474,14 +25488,14 @@ async function editKmReading(id,curKm){
 // Builds one sheet: Engineer/Date/Total-KM merged down each day's rows
 // (matching the CRM's own day-card layout), plus a FINAL TOTAL row at the end.
 function _buildKmSheet(groups){
-  var header=['Engineer','Date','Time','Type','Ticket','Area','Odometer','Segment KM','Total KM','Start Location'];
+  var header=['Engineer','Date','Time','Type','Ticket','Area','Odometer','Segment KM','Total KM','Start Location','End Location'];
   var aoa=[header];
   var merges=[];
   var grand=0;
   groups.forEach(function(g){
     var startRow=aoa.length;
     (g.rows.length?g.rows:[['-','-','','','','']]).forEach(function(r,idx){
-      aoa.push([idx===0?g.eng_name:'',idx===0?g.dateLabel:'',r[0],r[1],r[2],r[3],r[4],r[5],idx===0?g.totalKm:'',idx===0?(g.startLabel||''):'']);
+      aoa.push([idx===0?g.eng_name:'',idx===0?g.dateLabel:'',r[0],r[1],r[2],r[3],r[4],r[5],idx===0?g.totalKm:'',idx===0?(g.startLabel||''):'',idx===0?(g.endLabel||''):'']);
     });
     var endRow=aoa.length-1;
     if(endRow>startRow){
@@ -25489,15 +25503,16 @@ function _buildKmSheet(groups){
       merges.push({s:{r:startRow,c:1},e:{r:endRow,c:1}});
       merges.push({s:{r:startRow,c:8},e:{r:endRow,c:8}});
       merges.push({s:{r:startRow,c:9},e:{r:endRow,c:9}});
+      merges.push({s:{r:startRow,c:10},e:{r:endRow,c:10}});
     }
     grand+=g.totalKm||0;
   });
   var finalRow=aoa.length;
-  aoa.push(['FINAL TOTAL','','','','','','','',grand,'']);
+  aoa.push(['FINAL TOTAL','','','','','','','',grand,'','']);
   merges.push({s:{r:finalRow,c:0},e:{r:finalRow,c:7}});
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!merges']=merges;
-  ws['!cols']=[{wch:16},{wch:12},{wch:10},{wch:16},{wch:16},{wch:16},{wch:10},{wch:11},{wch:10},{wch:14}];
+  ws['!cols']=[{wch:16},{wch:12},{wch:10},{wch:16},{wch:16},{wch:16},{wch:10},{wch:11},{wch:10},{wch:14},{wch:14}];
   return ws;
 }
 function downloadKmReport(){
