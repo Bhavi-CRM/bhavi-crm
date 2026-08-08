@@ -5962,7 +5962,15 @@ async function viewTicket(id,autoPrint=false){
     return;
   }
   const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
-  const spares=t.spares||[];const total=spares.reduce((a,s)=>a+s.qty*(s.price||0),0);
+  const isCustReject=t.status==='Customer Reject';
+  const spares=t.spares||[];
+  // Customer Reject: the part(s) were only requested/estimated — customer
+  // never approved them, so nothing was actually fitted. Only the final
+  // inspection/visit charge (set when rejecting) applies; parts must not
+  // count toward the bill even though they're still listed below for record.
+  // Also excludes any still-"requested" (not yet approved/fitted) spare on
+  // any other status, matching the same convention used across all reports.
+  const total=isCustReject?0:spares.filter(s=>!s.requested).reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const svcCharge=labCharge;
@@ -6083,13 +6091,13 @@ async function viewTicket(id,autoPrint=false){
     ${t.work_done?`<div style="font-size:13px;margin-bottom:10px;"><b>Action:</b> ${t.work_done}</div>`:''}
     ${t.remarks?`<div style="font-size:13px;margin-bottom:10px;background:var(--bg);padding:8px;border-radius:8px;"><b>Remarks:</b> ${t.remarks}</div>`:''}
     ${t.serial_photo?`<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">📷 SERIAL NUMBER PHOTO</b><br><img src="${t.serial_photo}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'120px':'none'" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border);margin-top:6px;cursor:zoom-in;display:block;" title="Click to expand"><span style="font-size:10px;color:var(--text-muted);">Click image to expand</span></div>`:''}
-    ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES</h3>
+    ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>{const sp=isWarranty?0:(s.price||0);const sa=isWarranty?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      <tbody>${spares.map(s=>{const sp=(isWarranty||isCustReject)?0:(s.price||0);const sa=(isWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
     </table>
-    <div style="font-size:13px;background:#f0fdf4;padding:10px;border-radius:8px;">
-    ${isWarranty?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
+    <div style="font-size:13px;background:${isCustReject?'#fef2f2':'#f0fdf4'};padding:10px;border-radius:8px;">
+    ${isWarranty?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`:isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
     </div>`:''}
     ${svcCharge>0&&!spares.length&&!isWarranty?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
@@ -6120,32 +6128,39 @@ async function generateInvoice(id){
   const coTerms=(ci.terms||'• Warranty on repaired parts: 90 days\n• No warranty on physical/liquid damage\n• Uncollected products after 30 days attract storage charges').split('\n').join('<br>');
   const spares=t.spares||[];
   const isWarranty=t.call_type&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type);
+  // Customer Reject: part(s) were only requested/estimated — customer never
+  // approved them, so nothing was actually fitted. They must NOT be billed;
+  // only the final inspection/visit charge (already in t.labor) applies.
+  const isCustReject=t.status==='Customer Reject';
   // service_charges is GST-inclusive — back-calculate base and GST from it
   const laborInclGst=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const other=parseFloat(t.other_charge)||0;
   // Part prices are MRP (GST-inclusive)
   const defaultPartsGst=parseFloat(ci.gst_pct)||18;
   const laborGstPct=parseFloat(ci.labor_gst_pct)||18;
-  const partsMrpTotal=spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
+  const partsMrpTotal=isCustReject?0:spares.reduce(function(a,s){return a+((s.qty||1)*(s.price||0));},0);
   // Back-calculate parts base (excl. GST) from MRP
-  const partsBase=isWarranty?partsMrpTotal:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;const mrp=(s.qty||1)*(s.price||0);return a+Math.round(mrp/(1+r/100)*100)/100;},0);
-  const partsGstAmt=isWarranty?0:Math.round((partsMrpTotal-partsBase)*100)/100;
+  const partsBase=isCustReject?0:(isWarranty?partsMrpTotal:spares.reduce(function(a,s){const r=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;const mrp=(s.qty||1)*(s.price||0);return a+Math.round(mrp/(1+r/100)*100)/100;},0));
+  const partsGstAmt=(isCustReject||isWarranty)?0:Math.round((partsMrpTotal-partsBase)*100)/100;
   const partsTotal=partsBase;// excl. GST, for display in sub-total row
   // labor is incl. GST → base = labor/(1+gst%), gstAmt = labor - base
   const labor=isWarranty?laborInclGst:Math.round(laborInclGst/(1+laborGstPct/100)*100)/100;
   const laborGstAmt=isWarranty?0:Math.round((laborInclGst-labor)*100)/100;
   const totalGst=partsGstAmt+laborGstAmt;
   const subTotal=partsBase+labor+other;
-  const grandTotal=partsMrpTotal+laborInclGst+other;// all MRP totals already incl. GST
+  const grandTotal=partsMrpTotal+laborInclGst+other;// all MRP totals already incl. GST (partsMrpTotal is 0 for Customer Reject)
   const invoiceNo=t.invoice_no||('INV-'+t.id);
   const invoiceDate=t.visit_date||new Date().toLocaleDateString('en-CA');
 
-  // Part prices are MRP (GST-inclusive) — back-calculate base and GST
+  // Part prices are MRP (GST-inclusive) — back-calculate base and GST.
+  // Customer Reject: still LIST what was quoted (for record), but at ₹0 —
+  // it was never actually fitted/sold.
   const partsRows=spares.length?spares.map(function(s,i){
     const partGstR=s.gst_pct!=null?parseFloat(s.gst_pct):defaultPartsGst;
-    const mrpAmt=(s.qty||1)*(s.price||0);// MRP total (incl. GST)
-    const baseAmt=isWarranty?mrpAmt:Math.round(mrpAmt/(1+partGstR/100)*100)/100;
-    const partGstAmt=isWarranty?0:Math.round((mrpAmt-baseAmt)*100)/100;
+    const mrpAmt=isCustReject?0:(s.qty||1)*(s.price||0);// MRP total (incl. GST) — 0 if rejected, never fitted
+    const baseAmt=(isWarranty||isCustReject)?mrpAmt:Math.round(mrpAmt/(1+partGstR/100)*100)/100;
+    const partGstAmt=(isWarranty||isCustReject)?0:Math.round((mrpAmt-baseAmt)*100)/100;
+    if(isCustReject)return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'} <span style="color:#991b1b;font-size:10px;">(Estimate Rejected — Not Fitted)</span></td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">—</td><td style="text-align:center;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">₹0.00</td></tr>`;
     return `<tr><td>${i+1}</td><td>${s.name||s.code||'-'}</td><td>${s.code||'-'}</td><td style="text-align:center;">${s.qty||1}</td><td style="text-align:right;">₹${(s.price||0).toFixed(2)}</td><td style="text-align:center;">${isWarranty?'—':partGstR+'%'}</td><td style="text-align:right;">${isWarranty?'—':'₹'+partGstAmt.toFixed(2)}</td><td style="text-align:right;">₹${mrpAmt.toFixed(2)}</td></tr>`;
   }).join(''):'<tr><td colspan="8" style="text-align:center;color:#888;padding:12px;">No parts used</td></tr>';
 
@@ -6246,6 +6261,7 @@ tbody td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;}
       ${other>0?`<tr><td>Other Charges</td><td style="text-align:right;">₹${other.toFixed(2)}</td></tr>`:''}
       ${totalGst>0&&!isWarranty?`<tr style="background:#f5f3ff;"><td style="font-weight:700;">Total GST</td><td style="text-align:right;font-weight:700;">₹${totalGst.toFixed(2)}</td></tr>`:''}
       ${isWarranty?`<tr><td colspan="2" style="color:#065f46;font-weight:600;text-align:center;">✅ Under Warranty — No Charge</td></tr>`:''}
+      ${isCustReject?`<tr><td colspan="2" style="color:#991b1b;font-weight:600;text-align:center;">❌ Estimate Rejected — Inspection/Visit Charges Only</td></tr>`:''}
       <tr class="grand"><td>GRAND TOTAL${totalGst>0&&!isWarranty?' (incl. GST)':''}</td><td style="text-align:right;">₹${grandTotal.toFixed(2)}</td></tr>
     </tbody>
   </table>
@@ -11657,7 +11673,12 @@ async function printJobSheet(){
   const id=viewingTicketId;if(!id)return;
   let t;try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
   if(!t)return;
-  const sp=t.spares||[];const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
+  const sp=t.spares||[];
+  // Parts still marked "requested" (pending/never-approved — e.g. a
+  // Customer Reject) were never actually fitted, so they must not count
+  // toward the total — matches the itemized rows below, which already
+  // filter them out (sp.filter(s=>!s.requested)).
+  const partsTotal=sp.filter(s=>!s.requested).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
   const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
   const other=parseFloat(t.other_charge)||0;
   const grand=partsTotal+svc+other;
@@ -11792,7 +11813,10 @@ async function openJobSheets(id){
   try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
   if(!t)return;
   const sp=t.spares||[];
-  const partsTotal=sp.reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
+  // Parts still marked "requested" (pending/never-approved — e.g. a
+  // Customer Reject) were never actually fitted, so they must not count
+  // toward the total — matches the itemized rows below.
+  const partsTotal=sp.filter(s=>!s.requested).reduce((a,s)=>a+(s.qty||0)*(s.price||0),0);
   const svc=parseFloat(t.service_charges)||parseFloat(t.labor)||0;
   const other=parseFloat(t.other_charge)||0;
   const grand=partsTotal+svc+other;
@@ -25274,10 +25298,11 @@ async function loadKmReport(){
       if(!groups[k])groups[k]={eng_id:l.eng_id,eng_name:l.eng_name||l.eng_id,date:l.log_date,entries:[]};
       groups[k].entries.push(l);
     });
-    var grandKm=0,dayCount=0,html='',excelRows=[];
+    var grandKm=0,dayCount=0,html='',excelRows=[],excelGroups=[];
     Object.keys(groups).sort().forEach(function(k){
       var g=groups[k];dayCount++;
       var opening=null,closing=null,prev=null,dayKm=0,maxRead=null,rowsHtml='';
+      var excelDayRows=[];
       g.entries.forEach(function(l){
         var kmN=parseFloat(l.odometer_km);
         if(l.entry_type==='opening'&&opening===null&&!isNaN(kmN))opening=kmN;
@@ -25299,6 +25324,7 @@ async function loadKmReport(){
           +'<td style="text-align:right;font-weight:700;color:#0d9488;">'+(seg===''?'—':('+'+seg+' km'))+'</td>'
           +'<td style="text-align:center;">'+photoCell+'</td><td style="text-align:center;">'+gpsCell+'</td></tr>';
         excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
+        excelDayRows.push([tm,(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),_isFt?'Other Work':(l.ticket_id||''),_kArea,isNaN(kmN)?'':kmN,seg===''?'':seg]);
         if(!isNaN(kmN))prev=kmN;
       });
       // Live-aware day total: highest reading so far minus opening. This counts
@@ -25307,6 +25333,7 @@ async function loadKmReport(){
       var totalKm=(opening!==null&&maxRead!==null&&maxRead>=opening)?(maxRead-opening):dayKm;
       grandKm+=totalKm;
       var dLabel=new Date(g.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
+      excelGroups.push({eng_id:g.eng_id,eng_name:g.eng_name,date:g.date,dateLabel:dLabel,totalKm:totalKm,rows:excelDayRows});
       html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">'
         +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">'
         +'<div style="font-weight:800;font-size:14px;">👷 '+escHtml(g.eng_name)+' <span style="color:var(--text-muted);font-weight:600;font-size:12px;">— '+dLabel+'</span></div>'
@@ -25327,6 +25354,11 @@ async function loadKmReport(){
       +'<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">📅 Days</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+dayCount+'</div></div>'
       +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">📸 Entries</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+logs.length+'</div></div>';
     window._kmrRows=excelRows;
+    window._kmrGroups=excelGroups;
+    // Multi-sheet (per engineer) export only for admin/manager/WC — anyone who
+    // can see the "All Engineers" dropdown. A plain engineer only ever sees
+    // their own restricted data anyway, so their download stays single-sheet.
+    window._kmrIsMultiView=!isEng;
     body.innerHTML=html;
   }catch(e){
     body.innerHTML='<div class="alert alert-danger">Error: '+e.message+'<br><br>If the km_logs table is missing, run this SQL in Supabase:<br><pre style="white-space:pre-wrap;font-size:11px;background:#f8fafc;padding:8px;border-radius:6px;">'+KM_SETUP_SQL+'</pre></div>';
@@ -25361,13 +25393,62 @@ async function editKmReading(id,curKm){
     }else alert('Error: '+e.message);
   }
 }
+// Builds one sheet: Engineer/Date/Total-KM merged down each day's rows
+// (matching the CRM's own day-card layout), plus a FINAL TOTAL row at the end.
+function _buildKmSheet(groups){
+  var header=['Engineer','Date','Time','Type','Ticket','Area','Odometer','Segment KM','Total KM'];
+  var aoa=[header];
+  var merges=[];
+  var grand=0;
+  groups.forEach(function(g){
+    var startRow=aoa.length;
+    (g.rows.length?g.rows:[['-','-','','','','']]).forEach(function(r,idx){
+      aoa.push([idx===0?g.eng_name:'',idx===0?g.dateLabel:'',r[0],r[1],r[2],r[3],r[4],r[5],idx===0?g.totalKm:'']);
+    });
+    var endRow=aoa.length-1;
+    if(endRow>startRow){
+      merges.push({s:{r:startRow,c:0},e:{r:endRow,c:0}});
+      merges.push({s:{r:startRow,c:1},e:{r:endRow,c:1}});
+      merges.push({s:{r:startRow,c:8},e:{r:endRow,c:8}});
+    }
+    grand+=g.totalKm||0;
+  });
+  var finalRow=aoa.length;
+  aoa.push(['FINAL TOTAL','','','','','','','',grand]);
+  merges.push({s:{r:finalRow,c:0},e:{r:finalRow,c:7}});
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:16},{wch:12},{wch:10},{wch:16},{wch:16},{wch:16},{wch:10},{wch:11},{wch:10}];
+  return ws;
+}
 function downloadKmReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
-  var rows=window._kmrRows||[];
-  if(!rows.length){alert('No data to download — load the report first.');return;}
-  var ws=XLSX.utils.json_to_sheet(rows);
+  var groups=window._kmrGroups||[];
+  if(!groups.length){alert('No data to download — load the report first.');return;}
   var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'KM Report');
+  if(window._kmrIsMultiView){
+    // Admin/Manager/WC: one sheet per engineer.
+    var byEng={},order=[];
+    groups.forEach(function(g){
+      var key=g.eng_id||g.eng_name;
+      if(!byEng[key]){byEng[key]={name:g.eng_name,groups:[]};order.push(key);}
+      byEng[key].groups.push(g);
+    });
+    var usedNames={};
+    order.forEach(function(key){
+      var eg=byEng[key];
+      var ws=_buildKmSheet(eg.groups);
+      var base=(eg.name||'Engineer').replace(/[\[\]\*\?\/\\:]/g,'').substring(0,28)||'Engineer';
+      var sheetName=base,n=2;
+      while(usedNames[sheetName]){sheetName=base+' ('+n+')';n++;}
+      usedNames[sheetName]=true;
+      XLSX.utils.book_append_sheet(wb,ws,sheetName);
+    });
+  }else{
+    // Engineer viewing their own report: single sheet, own data only.
+    var ws=_buildKmSheet(groups);
+    XLSX.utils.book_append_sheet(wb,ws,'KM Report');
+  }
   XLSX.writeFile(wb,'KM_Report_'+(document.getElementById('kmr-from')?.value||'')+'_to_'+(document.getElementById('kmr-to')?.value||'')+'.xlsx');
 }
 
