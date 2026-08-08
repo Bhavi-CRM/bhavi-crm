@@ -20963,6 +20963,18 @@ async function loadWorkLogReport(){
       }
     }catch(e){}
     window._wlrGpsMap=_wlrGpsMap;
+    // GPS lookup for "Reached" — the arrival-KM location captured at
+    // "📍 Reached Location" (doReachedLocation → openKmCapture type:'arrival'),
+    // which is also exactly where each ticket's Traveling entry ends. Shown on
+    // the Traveling entry itself since there's no separate "Reached" work_log row.
+    var _wlrArrivalMap={};
+    try{
+      if(_wtids.length){
+        var _wkm=await sbAll('km_logs','?entry_type=eq.arrival&ticket_id=in.('+_wtids.map(function(x){return '"'+x+'"';}).join(',')+')&select=ticket_id,lat,lng,gps_accuracy,captured_at&order=captured_at.desc');
+        (_wkm||[]).forEach(function(r){if(r.ticket_id&&!_wlrArrivalMap[r.ticket_id]&&r.lat&&r.lng)_wlrArrivalMap[r.ticket_id]={lat:r.lat,lng:r.lng,accuracy:r.gps_accuracy};});
+      }
+    }catch(e){}
+    window._wlrArrivalMap=_wlrArrivalMap;
     var byEng={};
     logs.forEach(function(l){
       var k=l.eng_name||l.eng_id;
@@ -21021,9 +21033,13 @@ async function loadWorkLogReport(){
           var _isCloseEntry=l.task_description&&(l.task_description.indexOf('Call Closed')!==-1||l.task_description.indexOf('Resolved By Phone')!==-1);
           var _wGps=(_isCloseEntry&&l.ticket_id&&window._wlrGpsMap&&window._wlrGpsMap[l.ticket_id])||null;
           var _wGpsLink=_wGps?' <a href="https://maps.google.com/?q='+_wGps.lat+','+_wGps.lng+'" target="_blank" title="Open closing location in Google Maps'+(_wGps.accuracy?' (±'+Math.round(_wGps.accuracy)+'m)':'')+'" style="color:#dc2626;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Location</a>':'';
+          // Traveling entry that has ended = the engineer reached — link to the
+          // arrival-KM location captured at "📍 Reached Location" for that call.
+          var _wArrival=(isTravel&&!isOpen&&l.ticket_id&&window._wlrArrivalMap&&window._wlrArrivalMap[l.ticket_id])||null;
+          var _wArrivalLink=_wArrival?' <a href="https://maps.google.com/?q='+_wArrival.lat+','+_wArrival.lng+'" target="_blank" title="Open reached location in Google Maps'+(_wArrival.accuracy?' (±'+Math.round(_wArrival.accuracy)+'m)':'')+'" style="color:#0d9488;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Reached</a>':'';
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
-            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+_wGpsLink+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+_wGpsLink+_wArrivalLink+'</div>'
             +'</div>';
         });
         html+='</div>';
@@ -25261,11 +25277,30 @@ async function renderKmReport(){
     +'<button class="btn btn-outline btn-sm" onclick="kmrQuick(\'week\')" style="height:36px;">This Week</button>'
     +'<button class="btn btn-outline btn-sm" onclick="kmrQuick(\'month\')" style="height:36px;">This Month</button>'
     +'<button class="btn btn-outline btn-sm" onclick="downloadKmReport()" style="height:36px;">⬇️ Excel</button>'
+    +(currentUser.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="setOfficeLocation()" style="height:36px;" title="Stand at the office and tap this once — used to mark each day\'s Opening KM as Office/Away">🏢 Set Office Location</button>':'')
     +'</div>'
     +'<div id="kmr-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>'
     +'<div id="kmr-body"></div>'
     +'</div>';
   loadKmReport();
+}
+// Admin: capture current GPS once (while standing at the office) and save it
+// as the reference "Office" location — used only to label each day's Opening
+// KM as 🏢 Office vs 📍 Away in the KM Tracking report. Self-contained: reuses
+// the existing company_info singleton row (id=1), same pattern as the UPI QR
+// URL — no other module reads or depends on these two columns.
+async function setOfficeLocation(){
+  if(!confirm('🏢 Tame atyare office ma standing chho?\n\nAa current GPS location "Office" tarike save thashe — pachi KM Tracking ma dareek din nu Opening KM Office/Away batavse.'))return;
+  var loc=await getLocation();
+  if(!loc){alert('❌ Location capture nathi thayu. GPS/location permission check karo ane fari try karo.');return;}
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/company_info',{method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:1,office_lat:loc.lat,office_lng:loc.lng,updated_at:new Date().toISOString()})});
+    if(!r.ok){var et=await r.text();throw new Error(et);}
+    alert('✅ Office location saved! (±'+loc.accuracy+'m accuracy)');
+    loadKmReport();
+  }catch(e){alert('❌ Office location save na thayu.\n\nJo office_lat/office_lng columns missing hoy, Supabase SQL Editor ma aa run karo:\n\nALTER TABLE public.company_info ADD COLUMN IF NOT EXISTS office_lat DOUBLE PRECISION;\nALTER TABLE public.company_info ADD COLUMN IF NOT EXISTS office_lng DOUBLE PRECISION;\n\nError: '+e.message);}
 }
 function kmrQuick(type){
   var today=new Date();
@@ -25289,6 +25324,16 @@ async function loadKmReport(){
   var isEng=currentUser.role==='engineer'&&!window._isCspMgr;
   var _kmIsAdmin=currentUser.role==='admin'||window._isCspMgr;
   var engFilter=isEng?(currentUser.eng_id||currentUser.user_id):(document.getElementById('kmr-eng')?.value||'');
+  // Office location (admin-configured once via setOfficeLocation()) — used to
+  // label each day's Opening KM as "at Office" or "Away", so it's clear
+  // whether the day started from the office or somewhere else (e.g. home).
+  var officeLoc=null;
+  try{
+    var _ci=await sb('company_info','GET',null,'?id=eq.1&select=office_lat,office_lng');
+    if(_ci&&_ci[0]&&_ci[0].office_lat!=null&&_ci[0].office_lng!=null)officeLoc={lat:parseFloat(_ci[0].office_lat),lng:parseFloat(_ci[0].office_lng)};
+  }catch(e){}
+  window._kmrOfficeLoc=officeLoc;
+  function _kmHaversine(la1,ln1,la2,ln2){var R=6371;var dL=(la2-la1)*Math.PI/180;var dN=(ln2-ln1)*Math.PI/180;var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)*Math.sin(dN/2);return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
   try{
     var q='?log_date=gte.'+from+'&log_date=lte.'+to+(engFilter?'&eng_id=eq.'+encodeURIComponent(engFilter):'')+'&order=eng_id.asc,captured_at.asc';
     var logs=await sbAll('km_logs',q);
@@ -25321,9 +25366,11 @@ async function loadKmReport(){
       var g=groups[k];dayCount++;
       var opening=null,closing=null,prev=null,dayKm=0,maxRead=null,rowsHtml='';
       var excelDayRows=[];
+      var openingLoc=null;
       g.entries.forEach(function(l){
         var kmN=parseFloat(l.odometer_km);
         if(l.entry_type==='opening'&&opening===null&&!isNaN(kmN))opening=kmN;
+        if(l.entry_type==='opening'&&openingLoc===null&&l.lat&&l.lng)openingLoc={lat:parseFloat(l.lat),lng:parseFloat(l.lng)};
         if(l.entry_type==='closing'&&!isNaN(kmN))closing=kmN;
         if(!isNaN(kmN)&&(maxRead===null||kmN>maxRead))maxRead=kmN;
         var seg='';
@@ -25351,7 +25398,19 @@ async function loadKmReport(){
       var totalKm=(opening!==null&&maxRead!==null&&maxRead>=opening)?(maxRead-opening):dayKm;
       grandKm+=totalKm;
       var dLabel=new Date(g.date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
-      excelGroups.push({eng_id:g.eng_id,eng_name:g.eng_name,date:g.date,dateLabel:dLabel,totalKm:totalKm,rows:excelDayRows});
+      // Start location — Office vs Away, based on distance from the
+      // admin-configured office coordinate (if set). Not claimed as "Home"
+      // specifically (we can't be sure) — just "Away", with the exact spot
+      // linked so it can be visually checked.
+      var startMapsUrl=openingLoc?('https://maps.google.com/?q='+openingLoc.lat+','+openingLoc.lng):'';
+      var startLabel='—',startDistKm=null;
+      if(openingLoc&&officeLoc){
+        startDistKm=Math.round(_kmHaversine(openingLoc.lat,openingLoc.lng,officeLoc.lat,officeLoc.lng)*10)/10;
+        startLabel=startDistKm<=0.3?'🏢 Office':'📍 Away (~'+startDistKm+' km)';
+      }else if(openingLoc){
+        startLabel='📍 View Location';
+      }
+      excelGroups.push({eng_id:g.eng_id,eng_name:g.eng_name,date:g.date,dateLabel:dLabel,totalKm:totalKm,startLabel:startLabel.replace(/^[^\s]+\s/,''),rows:excelDayRows});
       html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;">'
         +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">'
         +'<div style="font-weight:800;font-size:14px;">👷 '+escHtml(g.eng_name)+' <span style="color:var(--text-muted);font-weight:600;font-size:12px;">— '+dLabel+'</span></div>'
@@ -25359,6 +25418,7 @@ async function loadKmReport(){
         +'<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:4px 10px;">Opening: '+(opening!==null?opening:'—')+'</span>'
         +'<span style="background:#fef3c7;color:#92400e;border-radius:8px;padding:4px 10px;">Closing: '+(closing!==null?closing:'—')+'</span>'
         +'<span style="background:#f0fdf4;color:#15803d;border-radius:8px;padding:4px 10px;">Total: '+totalKm+' km</span>'
+        +(openingLoc?'<a href="'+startMapsUrl+'" target="_blank" style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s Opening KM was captured">'+startLabel+'</a>':'')
         +'</div></div>'
         +'<div class="table-wrap"><table><thead><tr><th>Time</th><th>Point</th><th>Call</th><th style="text-align:right;">Odometer</th><th style="text-align:right;">Travel</th><th style="text-align:center;">Photo</th><th style="text-align:center;">GPS</th></tr></thead>'
         +'<tbody>'+rowsHtml+'</tbody></table></div>'
@@ -25414,29 +25474,30 @@ async function editKmReading(id,curKm){
 // Builds one sheet: Engineer/Date/Total-KM merged down each day's rows
 // (matching the CRM's own day-card layout), plus a FINAL TOTAL row at the end.
 function _buildKmSheet(groups){
-  var header=['Engineer','Date','Time','Type','Ticket','Area','Odometer','Segment KM','Total KM'];
+  var header=['Engineer','Date','Time','Type','Ticket','Area','Odometer','Segment KM','Total KM','Start Location'];
   var aoa=[header];
   var merges=[];
   var grand=0;
   groups.forEach(function(g){
     var startRow=aoa.length;
     (g.rows.length?g.rows:[['-','-','','','','']]).forEach(function(r,idx){
-      aoa.push([idx===0?g.eng_name:'',idx===0?g.dateLabel:'',r[0],r[1],r[2],r[3],r[4],r[5],idx===0?g.totalKm:'']);
+      aoa.push([idx===0?g.eng_name:'',idx===0?g.dateLabel:'',r[0],r[1],r[2],r[3],r[4],r[5],idx===0?g.totalKm:'',idx===0?(g.startLabel||''):'']);
     });
     var endRow=aoa.length-1;
     if(endRow>startRow){
       merges.push({s:{r:startRow,c:0},e:{r:endRow,c:0}});
       merges.push({s:{r:startRow,c:1},e:{r:endRow,c:1}});
       merges.push({s:{r:startRow,c:8},e:{r:endRow,c:8}});
+      merges.push({s:{r:startRow,c:9},e:{r:endRow,c:9}});
     }
     grand+=g.totalKm||0;
   });
   var finalRow=aoa.length;
-  aoa.push(['FINAL TOTAL','','','','','','','',grand]);
+  aoa.push(['FINAL TOTAL','','','','','','','',grand,'']);
   merges.push({s:{r:finalRow,c:0},e:{r:finalRow,c:7}});
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!merges']=merges;
-  ws['!cols']=[{wch:16},{wch:12},{wch:10},{wch:16},{wch:16},{wch:16},{wch:10},{wch:11},{wch:10}];
+  ws['!cols']=[{wch:16},{wch:12},{wch:10},{wch:16},{wch:16},{wch:16},{wch:10},{wch:11},{wch:10},{wch:14}];
   return ws;
 }
 function downloadKmReport(){
