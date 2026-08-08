@@ -20336,6 +20336,29 @@ async function svCheckOpenLogBlock(){
   return false;
 }
 
+// Same KM catch-up + Opening-of-day check the ticket call flow runs before
+// Visit Start — so Site Visits share the same day's KM chain
+// (opening/arrival/closing) as calls, instead of being invisible to it.
+// Engineers only; WC/admin don't carry KM, so this is a no-op for them and
+// can never affect their flow.
+function _svKmGate(onProceed){
+  if(!(currentUser&&currentUser.role==='engineer')){onProceed();return;}
+  var engId=currentUser.eng_id||currentUser.user_id;
+  var dateNow=new Date().toLocaleDateString('en-CA');
+  var skipKey='kmSkip_'+engId+'_'+dateNow;
+  var skipTicket=localStorage.getItem(skipKey);
+  if(skipTicket){
+    openKmCapture({type:'arrival',ticketId:(skipTicket==='1'?null:skipTicket),onDone:function(){localStorage.removeItem(skipKey);onProceed();}});
+    return;
+  }
+  kmTodayLogs().then(function(logs){
+    if(logs!==null&&!(logs||[]).some(function(l){return l.entry_type==='opening';})){
+      openKmCapture({type:'opening',ticketId:null,onDone:function(){onProceed();}});
+    }else{
+      onProceed();
+    }
+  }).catch(function(){onProceed();});
+}
 async function svStartNew(kind){
   var isAdhoc=document.getElementById('qv-adhoc')?.checked;
   var siteId=document.getElementById('qv-site')?.value;
@@ -20350,29 +20373,37 @@ async function svStartNew(kind){
   }else{if(!siteId){alert('Please select a site!');return;}}
   if(!date){alert('Date required!');return;}
   if(await svCheckOpenLogBlock())return;
-  try{
-    var now=new Date();
-    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    var action=kind==='visit'?'Visit Start':'Work Started';
-    var note=kind==='visit'?'Travel started: '+timeNow:'Session 1: Time In: '+timeNow;
-    var vData={
-      site_id:isAdhoc?null:parseInt(siteId),
-      adhoc_label:isAdhoc?adhocLabel:null,
-      adhoc_client_name:isAdhoc?adhocClient:null,
-      adhoc_address:isAdhoc?(adhocAddress||null):null,
-      adhoc_area:isAdhoc?(adhocArea||null):null,
-      visit_date:date,visit_status:'active',
-      timeline:[{action:action,by:currentUser.name,at:now.toISOString(),note:note}],
-      created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||''
-    };
-    var r=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(vData)});
-    if(!r.ok)throw new Error(await r.text());
-    var created=(await r.json())[0];
-    var label=await svLabel(vData);
-    await svOpenWorkLog(created.id,label,kind,timeNow,date);
-    svRemoveModal();
-    openSiteVisitTracker(created.id);
-  }catch(e){alert('Error: '+e.message);}
+  function _svStartNewProceed(){
+    (async function(){
+      try{
+        var now=new Date();
+        var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        var action=kind==='visit'?'Visit Start':'Work Started';
+        var note=kind==='visit'?'Travel started: '+timeNow:'Session 1: Time In: '+timeNow;
+        var vData={
+          site_id:isAdhoc?null:parseInt(siteId),
+          adhoc_label:isAdhoc?adhocLabel:null,
+          adhoc_client_name:isAdhoc?adhocClient:null,
+          adhoc_address:isAdhoc?(adhocAddress||null):null,
+          adhoc_area:isAdhoc?(adhocArea||null):null,
+          visit_date:date,visit_status:'active',
+          timeline:[{action:action,by:currentUser.name,at:now.toISOString(),note:note}],
+          created_by:currentUser?.user_id||'',created_by_name:currentUser?.name||currentUser?.user_id||''
+        };
+        var r=await fetch(SB_URL+'/rest/v1/auto_site_visits',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(vData)});
+        if(!r.ok)throw new Error(await r.text());
+        var created=(await r.json())[0];
+        var label=await svLabel(vData);
+        await svOpenWorkLog(created.id,label,kind,timeNow,date);
+        svRemoveModal();
+        openSiteVisitTracker(created.id);
+      }catch(e){alert('Error: '+e.message);}
+    })();
+  }
+  // Visit Start = travel begins → same KM gate as a call's Visit Start.
+  // Work Start (skip-travel shortcut, e.g. already on-site) needs no KM.
+  if(kind==='visit')_svKmGate(_svStartNewProceed);
+  else _svStartNewProceed();
 }
 
 // Live tracker panel — re-rendered after every action, exactly like the
@@ -20428,21 +20459,40 @@ async function svAction(visitId,kind){
   try{
     var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
     if(!v)return;
-    var now=new Date();
-    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    var dateNow=now.toLocaleDateString('en-CA');
     var st=svDeriveState(v);
-    var action=kind==='visit'?'Visit Start':kind==='work'?'Work Started':'Visit Stop';
-    var note=kind==='visit'?'Travel started: '+timeNow:kind==='work'?('Session '+(st.wsCount+1)+': Time In: '+timeNow):'Travel stopped: '+timeNow;
-    var tl=svParseTL(v).concat([{action:action,by:currentUser.name,at:now.toISOString(),note:note}]);
-    await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
-    // Work Log: close whatever leg was open, then open the new one (skip on 'stop')
-    await svCloseOpenWorkLog(visitId,timeNow);
-    if(kind==='visit'||kind==='work'){
-      var label=await svLabel(v);
-      await svOpenWorkLog(visitId,label,kind,timeNow,dateNow);
+    function _svActionProceed(){
+      (async function(){
+        try{
+          var now=new Date();
+          var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+          var dateNow=now.toLocaleDateString('en-CA');
+          var action=kind==='visit'?'Visit Start':kind==='work'?'Work Started':'Visit Stop';
+          var note=kind==='visit'?'Travel started: '+timeNow:kind==='work'?('Session '+(st.wsCount+1)+': Time In: '+timeNow):'Travel stopped: '+timeNow;
+          var tl=svParseTL(v).concat([{action:action,by:currentUser.name,at:now.toISOString(),note:note}]);
+          await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+          // Work Log: close whatever leg was open, then open the new one (skip on 'stop')
+          await svCloseOpenWorkLog(visitId,timeNow);
+          if(kind==='visit'||kind==='work'){
+            var label=await svLabel(v);
+            await svOpenWorkLog(visitId,label,kind,timeNow,dateNow);
+          }
+          openSiteVisitTracker(visitId);
+        }catch(e){alert('Error: '+e.message);}
+      })();
     }
-    openSiteVisitTracker(visitId);
+    var isEng=currentUser&&currentUser.role==='engineer';
+    if(kind==='visit'){
+      // Restarting travel (from a stopped/on-hold visit) — same KM gate as
+      // the very first Visit Start.
+      _svKmGate(_svActionProceed);
+    }else if(kind==='work'&&st.lastKind==='visitstart'&&isEng){
+      // Was travelling, now reached — capture arrival KM (same as a call's
+      // "Reached Location"), tagged SV+id so it shows up in KM Tracking
+      // alongside call arrivals without being mistaken for one.
+      openKmCapture({type:'arrival',ticketId:'SV'+visitId,allowSkip:true,onDone:function(){_svActionProceed();}});
+    }else{
+      _svActionProceed();
+    }
   }catch(e){alert('Error: '+e.message);}
 }
 
