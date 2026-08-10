@@ -20423,11 +20423,19 @@ async function openSiteVisitTracker(visitId){
         +'<button onclick="svOpenFinishForm(\''+visitId+'\')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:800;cursor:pointer;">✅ Finish Visit</button>'
         +'</div></div>';
     }else if(st.lastKind==='visitstart'){
+      // Same as the call panel: a dedicated "Reached Location" button
+      // (captures arrival KM, skippable) separate from Work Start, which
+      // never pops up KM itself — matches doWorkStart's "never blocks" rule.
+      var todayStr=new Date().toLocaleDateString('en-CA');
+      var reachedToday=st.tl.some(function(e){return e&&e.action==='Reached Location'&&e.at&&new Date(e.at).toLocaleDateString('en-CA')===todayStr;});
       panelHtml='<div style="background:#f59e0b;color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
-        +'<div style="font-size:14px;font-weight:700;text-align:center;margin-bottom:8px;">🚗 Visiting — '+svFmtTime(st.lastAt)+'</div>'
-        +'<div style="display:flex;gap:8px;">'
-        +'<button onclick="svAction(\''+visitId+'\',\'stop\')" style="flex:1;background:#fff;color:#b45309;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;">🛑 Stop</button>'
-        +'<button onclick="svAction(\''+visitId+'\',\'work\')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+        +'<span style="font-size:14px;font-weight:700;">🚗 Visiting — '+svFmtTime(st.lastAt)+'</span>'
+        +'<button onclick="svAction(\''+visitId+'\',\'stop\')" style="background:#fff;color:#b45309;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;">🛑 Stop</button>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button onclick="svDoReached(\''+visitId+'\')" style="flex:1;background:'+(reachedToday?'rgba(255,255,255,0.25)':'#fff')+';color:'+(reachedToday?'#fff':'#0d9488')+';border:'+(reachedToday?'1.5px solid rgba(255,255,255,0.6)':'none')+';border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">'+(reachedToday?'✅ Reached':'📍 Reached Location')+'</button>'
+        +'<button onclick="svAction(\''+visitId+'\',\'work\')" style="flex:1;background:#fff;color:#059669;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">🔧 Work Start</button>'
         +'</div></div>';
     }else{ // visitstop or hold — paused, ready to resume
       var label2=st.lastKind==='hold'?'⏸️ Work on Hold — Ready to resume':'🛑 Travel Stopped — Ready to restart';
@@ -20485,15 +20493,58 @@ async function svAction(visitId,kind){
       // Restarting travel (from a stopped/on-hold visit) — same KM gate as
       // the very first Visit Start.
       _svKmGate(_svActionProceed);
-    }else if(kind==='work'&&st.lastKind==='visitstart'&&isEng){
-      // Was travelling, now reached — capture arrival KM (same as a call's
-      // "Reached Location"), tagged SV+id so it shows up in KM Tracking
-      // alongside call arrivals without being mistaken for one.
-      openKmCapture({type:'arrival',ticketId:'SV'+visitId,allowSkip:true,onDone:function(){_svActionProceed();}});
+    }else if(kind==='work'&&isEng){
+      // Work Start NEVER pops up a KM prompt (same rule as doWorkStart for
+      // calls) — arrival KM is only ever captured via the dedicated
+      // "📍 Reached Location" button. If the engineer jumped straight to
+      // Work Start without tapping Reached — and hasn't already skipped —
+      // defer it to the next travel start by setting the same skip flag,
+      // so it's never lost, but Work Start is never blocked either.
+      (async function(){
+        try{
+          var _skipKey='kmSkip_'+(currentUser.eng_id||currentUser.user_id)+'_'+new Date().toLocaleDateString('en-CA');
+          if(!localStorage.getItem(_skipKey)){
+            var _kmL=await kmTodayLogs();
+            if(_kmL!==null&&!_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id==='SV'+visitId;})){
+              localStorage.setItem(_skipKey,'SV'+visitId);
+            }
+          }
+        }catch(_ke){}
+        _svActionProceed();
+      })();
     }else{
       _svActionProceed();
     }
   }catch(e){alert('Error: '+e.message);}
+}
+// Dedicated "Reached Location" action — mirrors doReachedLocation() for
+// calls exactly: captures arrival KM (skippable), closes the open
+// Traveling work_log (travel ends at arrival, not at Work Start), and
+// stamps the visit's timeline. Work Start stays a separate, later tap.
+async function svDoReached(visitId){
+  var v=(await sb('auto_site_visits','GET',null,'?id=eq.'+visitId))[0];
+  if(!v)return;
+  var _kmL=await kmTodayLogs();
+  if(_kmL&&_kmL.some(function(l){return l.entry_type==='arrival'&&l.ticket_id==='SV'+visitId;})){
+    alert('✅ Arrival KM is already recorded for this visit today.');
+    return;
+  }
+  openKmCapture({type:'arrival',ticketId:'SV'+visitId,allowSkip:true,onDone:async function(skipped){
+    var now=new Date();
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var dateNow=now.toLocaleDateString('en-CA');
+    var engId=currentUser.eng_id||currentUser.user_id;
+    try{
+      var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN&log_type=eq.travel');
+      for(var i=0;i<(openLogs||[]).length;i++){await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+openLogs[i].id).catch(function(){});}
+    }catch(e){}
+    try{
+      var tl=svParseTL(v).concat([{action:'Reached Location',by:currentUser.name,at:now.toISOString(),note:skipped?('Reached at '+timeNow+' — KM skipped (next travel start ma karse)'):('Arrival KM recorded at '+timeNow)}]);
+      await sb('auto_site_visits','PATCH',{timeline:tl},'?id=eq.'+visitId);
+    }catch(e){}
+    alert('📍 Reached Location saved — '+timeNow+(skipped?'\n\n⏭️ KM skip karyu — next call na Visit Start (travel start) par farjiyat KM levase.':'')+'\n\nNow go inside and tap 🔧 Work Start when you begin work.');
+    openSiteVisitTracker(visitId);
+  }});
 }
 
 function svShowHoldModal(visitId){
