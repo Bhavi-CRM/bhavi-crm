@@ -19519,8 +19519,14 @@ async function svFinishVisit(visitId){
     var now=new Date();
     var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     var photos=await _readPhotosBase64('qv-photos');
-    var tl=svParseTL(v).concat([{action:'Visit Finished',by:currentUser.name,at:now.toISOString(),note:'Completed: '+timeNow}]);
-    var patch={timeline:tl,visit_status:'completed',work_done:work,material_delivered:material};
+    var origTl=svParseTL(v);
+    // Visit Report's Time column reads the flat visit_time field, which the
+    // Start/Stop tracker never set (only the older one-shot "Log Visit" form
+    // did) — backfill it here from when the visit actually started.
+    var startAt=origTl.length?origTl[0].at:null;
+    var visitTime=v.visit_time||(startAt?new Date(startAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):timeNow);
+    var tl=origTl.concat([{action:'Visit Finished',by:currentUser.name,at:now.toISOString(),note:'Completed: '+timeNow}]);
+    var patch={timeline:tl,visit_status:'completed',work_done:work,material_delivered:material,visit_time:visitTime};
     if(photos.length)patch.photos=photos;
     await sb('auto_site_visits','PATCH',patch,'?id=eq.'+visitId);
     await svCloseOpenWorkLog(visitId,timeNow);
@@ -22937,7 +22943,8 @@ async function renderPunchApprovalSection(){
   try{
     pending=await sb('punch_logs','GET',null,'?status=eq.late_pending&order=punch_in_date.desc')||[];
   }catch(e){box.innerHTML='';return;}
-  if(!pending.length){box.innerHTML='';return;}
+  if(!pending.length){box.innerHTML='';window._pendingPunchApprovals=[];return;}
+  window._pendingPunchApprovals=pending;
   function row(l){
     var isNextDay=l.is_next_day;
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fff7ed;">'
@@ -22947,14 +22954,27 @@ async function renderPunchApprovalSection(){
       +'</div>'
       +'<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Punch In: '+(l.punch_in_time||'-')+' → Punch Out: '+((l.punch_out_date&&l.punch_out_date!==l.punch_in_date?l.punch_out_date+' ':'')+(l.punch_out_time||'-'))+'</div>'
       +(l.late_remark?'<div style="font-size:12px;color:var(--danger);margin-top:2px;">📝 '+escHtml(l.late_remark)+'</div>':'')
-      +'<div style="display:flex;gap:8px;margin-top:8px;">'
+      +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'
       +'<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="verifyPunchLog(\''+l.id+'\')">✅ Approve</button>'
+      +'<button class="btn btn-sm" style="background:#1d4ed8;color:#fff;border:none;" onclick="openAttEditModal(\''+l.id+'\')">✏️ Correction</button>'
+      +'<button class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;" onclick="rejectPunchLog(\''+l.id+'\')">❌ Reject</button>'
       +'</div></div>';
   }
   box.innerHTML='<div class="card">'
     +'<div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">⏳ Pending Punch Approvals ('+pending.length+')</div>'
     +pending.map(row).join('')
     +'</div>';
+}
+
+async function rejectPunchLog(id){
+  var reason=prompt('Reason for rejecting this punch-out? (required)');
+  if(reason===null)return;
+  if(!reason.trim()){alert('A reason is required to reject.');return;}
+  try{
+    await sb('punch_logs','PATCH',{status:'rejected',admin_remark:reason.trim(),verified_by:currentUser.name,updated_at:new Date().toISOString()},'?id=eq.'+id);
+    alert('❌ Punch-out rejected.');
+    renderPunchApprovalSection();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ===== LEAVE APPLICATION / APPROVAL =====
@@ -24041,7 +24061,7 @@ async function saveAttAdd(){
 
 // ---- Attendance Edit (Admin direct) ----
 function openAttEditModal(logId){
-  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;})||(window._pendingPunchApprovals||[]).find(function(x){return x.id===logId;});
   if(!l){alert('Record not found');return;}
   var ex=document.getElementById('att-edit-modal');if(ex)ex.remove();
   var ol=document.createElement('div');
@@ -24068,7 +24088,7 @@ async function saveAttEdit(logId){
   var inT=document.getElementById('att-edit-in')?.value||'';
   var outT=document.getElementById('att-edit-out')?.value||'';
   var remark=document.getElementById('att-edit-remark')?.value||'Admin correction';
-  var l=(window._attLogs||[]).find(function(x){return x.id===logId;});
+  var l=(window._attLogs||[]).find(function(x){return x.id===logId;})||(window._pendingPunchApprovals||[]).find(function(x){return x.id===logId;});
   if(!l){alert('Record not found');return;}
   var wMins=0;var otMins=0;
   if(inT&&outT){
@@ -24091,6 +24111,7 @@ async function saveAttEdit(logId){
     if(idx>=0){Object.assign(window._attLogs[idx],{punch_in_time:inT?fmt12(inT):l.punch_in_time,punch_out_time:outT?fmt12(outT):l.punch_out_time,working_minutes:wMins,overtime_minutes:otMins,status:'verified',is_late:false,pending_edit:null});}
     document.getElementById('att-edit-modal').remove();
     loadAttendanceReport();
+    if(typeof renderPunchApprovalSection==='function')renderPunchApprovalSection();
   }catch(e){alert('Error: '+e.message);}
 }
 
