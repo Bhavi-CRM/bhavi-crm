@@ -13126,7 +13126,7 @@ async function renderEngDailyReport(){
   var engOpts='<option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+e.name+'</option>';}).join('');
   pc.innerHTML='<div class="card">'
     +'<div class="section-header"><h2>📅 Engineer Daily Report</h2><button class="btn btn-primary btn-sm" id="edr-send-now-btn" onclick="sendDigestNow()">📤 Send Today\'s Report Now</button></div>'
-    +'<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;">Sends a Telegram + Email summary of today\'s work so far (as of right now) — same as the 8PM auto-digest, triggered on demand.</div>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 12px;">Sends a Telegram + Email summary of today\'s work so far (as of right now) — same as the 8PM auto-send, triggered on demand.</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">'
     +'<div class="form-group" style="margin-bottom:0;"><label>Engineer</label><select id="edr-eng" onchange="loadEngDailyReport()" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;min-width:170px;">'+engOpts+'</select></div>'
     +'<div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" id="edr-from" value="'+monthStart+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;"></div>'
@@ -13613,7 +13613,7 @@ async function drAutoFillCalls(){
     // updated_at, so an upper bound would wrongly drop it. The real filter is the
     // engineer-completion date below (same rule as the Reports "Closed Date"
     // filter), so the two always agree.
-    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&select=call_type,problem,status,timeline&limit=2000').catch(()=>[]);
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&select=call_type,problem,status,timeline,cname,final_charges,payment_mode&limit=2000').catch(()=>[]);
     // A ticket's updated_at bumps on ANY edit (e.g. WC adding an invoice number
     // to an old call weeks later) — that must not make it count as "closed
     // today". Only count if the engineer's own most recent Closed/Repaired
@@ -13704,6 +13704,39 @@ async function drAutoFillCalls(){
     setVal('dr-pending-parts',pendingParts);setVal('dr-pending-approval',pendingApproval);setVal('dr-pending-other',pendingOther);
     setVal('dr-cust-reject',custRejectCount);
     updateCallTotals();
+    // Auto-fill Payment Details from the SAME tickets set — any call the
+    // engineer completed today (per _engCompletionDate, exact rule as above)
+    // with a charge actually set (final_charges>0, written when the call was
+    // closed — see the "Charges Set" timeline entry / Payment Confirmation
+    // Popup) becomes a payment row automatically. Customer Reject calls are
+    // naturally excluded since their final_charges is forced to 0.
+    try{
+      var payTickets=(tickets||[]).filter(function(t){
+        if(isTicketCancelled(t))return false;
+        if(_engCompletionDate(t)!==date)return false;
+        return (parseFloat(t.final_charges)||0)>0;
+      });
+      var pr2=document.getElementById('payment-rows');
+      if(pr2&&payTickets.length){
+        pr2.innerHTML='';
+        payTickets.slice(0,5).forEach(function(t){
+          addPaymentRow();
+          var rowsNow=pr2.querySelectorAll('.payment-row');
+          var row=rowsNow[rowsNow.length-1];
+          if(!row)return;
+          var nameInp=row.querySelector('input[type=text]');
+          var amtInp=row.querySelector('.pay-amount');
+          var modeSel=row.querySelector('.pay-mode');
+          if(nameInp)nameInp.value=t.cname||'';
+          if(amtInp)amtInp.value=parseFloat(t.final_charges)||0;
+          if(modeSel&&t.payment_mode){
+            var okMode=Array.prototype.some.call(modeSel.options,function(o){return o.value===t.payment_mode;});
+            if(okMode)modeSel.value=t.payment_mode;
+          }
+        });
+        updatePaymentTotal();
+      }
+    }catch(_pe){console.log('payment autofill error:',_pe);}
   }catch(e){console.log('drAutoFillCalls error:',e);}
 }
 
@@ -13869,6 +13902,15 @@ function formatDailyReportWA(d){
     if(cs.pending_approval>0)lines.push('     • Approval: '+cs.pending_approval);
     if(cs.pending_other>0)lines.push('     • Other: '+cs.pending_other);
     if(!cs.pending_parts&&!cs.pending_approval&&!cs.pending_other&&cs.pending_calls)lines.push('     • '+cs.pending_calls);
+    lines.push('');
+  }
+
+  // Final Total — Closed + Pending together, so it's unambiguous how many
+  // calls the engineer actually attended today, even when Closed and Pending
+  // are both small numbers and easy to misread as the whole day (e.g. 2
+  // Closed + 3 Pending looks like only 2 happened unless this line is here).
+  if(grandTotal>0||pendingTotal>0){
+    lines.push('📌 *FINAL TOTAL (Closed + Pending): '+(grandTotal+pendingTotal)+'*');
     lines.push('');
   }
 
