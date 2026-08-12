@@ -12979,7 +12979,7 @@ async function drAutoFillCalls(){
     // updated_at, so an upper bound would wrongly drop it. The real filter is the
     // engineer-completion date below (same rule as the Reports "Closed Date"
     // filter), so the two always agree.
-    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&select=call_type,problem,status,timeline,cname,final_charges,payment_mode&limit=2000').catch(()=>[]);
+    var tickets=await sb('tickets','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&updated_at=gte.'+date+'T00:00:00&select=call_type,problem,status,timeline,cname,final_charges,service_charges,labor,other_charge,spares,payment_mode&limit=2000').catch(()=>[]);
     // A ticket's updated_at bumps on ANY edit (e.g. WC adding an invoice number
     // to an old call weeks later) — that must not make it count as "closed
     // today". Only count if the engineer's own most recent Closed/Repaired
@@ -13072,15 +13072,19 @@ async function drAutoFillCalls(){
     updateCallTotals();
     // Auto-fill Payment Details from the SAME tickets set — any call the
     // engineer completed today (per _engCompletionDate, exact rule as above)
-    // with a charge actually set (final_charges>0, written when the call was
-    // closed — see the "Charges Set" timeline entry / Payment Confirmation
-    // Popup) becomes a payment row automatically. Customer Reject calls are
-    // naturally excluded since their final_charges is forced to 0.
+    // with a charge actually set becomes a payment row automatically.
+    // Customer Reject calls are naturally excluded since their final_charges
+    // is forced to 0. Amount uses _pcAmount()'s same fallback chain Payment
+    // Collection/Revenue use (final_charges, else parts-from-spares +
+    // labor-or-service_charges + other) — final_charges-only was silently
+    // skipping/undercounting every call whose charge only ever made it into
+    // "Labor" on the update form, which is most of them, hence rows not
+    // showing up here at all.
     try{
       var payTickets=(tickets||[]).filter(function(t){
         if(isTicketCancelled(t))return false;
         if(_engCompletionDate(t)!==date)return false;
-        return (parseFloat(t.final_charges)||0)>0;
+        return _pcAmount(t)>0;
       });
       var pr2=document.getElementById('payment-rows');
       if(pr2&&payTickets.length){
@@ -13094,7 +13098,7 @@ async function drAutoFillCalls(){
           var amtInp=row.querySelector('.pay-amount');
           var modeSel=row.querySelector('.pay-mode');
           if(nameInp)nameInp.value=t.cname||'';
-          if(amtInp)amtInp.value=parseFloat(t.final_charges)||0;
+          if(amtInp)amtInp.value=_pcAmount(t);
           if(modeSel&&t.payment_mode){
             var okMode=Array.prototype.some.call(modeSel.options,function(o){return o.value===t.payment_mode;});
             if(okMode)modeSel.value=t.payment_mode;
