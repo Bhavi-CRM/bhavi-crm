@@ -16416,7 +16416,15 @@ async function renderCourier(){
           <input type="text" id="cr-out-awb" placeholder="Paste AWB number (if applicable)" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
         <div class="form-group"><label>Courier Agency <span class="req">*</span></label>
           <input type="text" id="cr-out-agency" placeholder="e.g. BlueDart, DTDC, FedEx" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>
-        <div class="form-group" style="grid-column:1/-1;"><label>Receiver <span class="req">*</span> <span style="font-size:11px;color:var(--text-muted);">(Select from Master)</span></label>
+        <div class="form-group" style="grid-column:1/-1;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;">
+          <label style="font-weight:700;color:#1D4ED8;">🔍 Fetch Receiver from CRM (by Mobile)</label>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <input type="tel" id="cr-out-crm-mobile" placeholder="Customer's mobile number" maxlength="15" onkeydown="if(event.key==='Enter'){event.preventDefault();searchCrmForCourier();}" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="searchCrmForCourier()">Search</button>
+          </div>
+          <div id="cr-out-crm-results" style="margin-top:6px;"></div>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;"><label>Receiver <span class="req">*</span> <span style="font-size:11px;color:var(--text-muted);">(Select from Master, or fetch from CRM above)</span></label>
           <div style="position:relative;">
             <input type="text" id="cr-out-recv-search" placeholder="Type receiver name to search..." autocomplete="off" oninput="searchReceiverDD()" onfocus="searchReceiverDD()" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;">
             <div id="cr-recv-dd" style="display:none;position:absolute;z-index:300;background:#fff;border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12);width:100%;top:100%;left:0;"></div>
@@ -16687,7 +16695,9 @@ async function saveCourierEntry(dir){
   } else {
     recvId=document.getElementById('cr-out-recv-id')?.value||'';
     var recvData=window._selectedReceiver||null;
-    if(!recvData||!recvId){alert('Please select a Receiver (from Master)');return;}
+    // Either a Receiver Master pick (recvId set) or a CRM fetch-by-mobile
+    // (window._selectedCrmTicketId set) counts as a valid receiver.
+    if(!recvData||(!recvId&&!window._selectedCrmTicketId)){alert('Please select a Receiver (from Master, or fetch from CRM by mobile)');return;}
     person=recvData.name;
     place=recvData.city||'';
   }
@@ -16702,25 +16712,37 @@ async function saveCourierEntry(dir){
 
   var today=new Date().toLocaleDateString('en-CA');
   var entryDate=(document.getElementById('cr-'+dir+'-date')?.value||'').trim()||today;
+  var payload={
+    direction:isIn?'Inward':'Outward',
+    entry_date:entryDate,
+    awb_no:awb,
+    agency:agency,
+    person_name:person||null,
+    sender_mobile:senderMobile||null,
+    place:place,
+    receiver_id:recvId||null,
+    receiver_data:isIn?null:(window._selectedReceiver||null),
+    ticket_id:isIn?null:(window._selectedCrmTicketId||null),
+    weight:weight?parseFloat(weight):null,
+    products:products,
+    product_count:products.length,
+    wc_id:currentUser.user_id,
+    wc_name:currentUser.name,
+    created_at:new Date().toISOString()
+  };
   try{
-    await sb('courier_log','POST',{
-      direction:isIn?'Inward':'Outward',
-      entry_date:entryDate,
-      awb_no:awb,
-      agency:agency,
-      person_name:person||null,
-      sender_mobile:senderMobile||null,
-      place:place,
-      receiver_id:recvId||null,
-      receiver_data:isIn?null:(window._selectedReceiver||null),
-      weight:weight?parseFloat(weight):null,
-      products:products,
-      product_count:products.length,
-      wc_id:currentUser.user_id,
-      wc_name:currentUser.name,
-      created_at:new Date().toISOString()
-    });
+    try{
+      await sb('courier_log','POST',payload);
+    }catch(pe){
+      // ticket_id column not added yet (setup SQL not run) — don't block
+      // saving the courier entry over a purely-optional traceability field.
+      if(payload.ticket_id&&String(pe.message||'').indexOf('ticket_id')!==-1){
+        delete payload.ticket_id;
+        await sb('courier_log','POST',payload);
+      }else throw pe;
+    }
     window._selectedReceiver=null;
+    window._selectedCrmTicketId=null;
     showToastWI('✅ '+(isIn?'Inward':'Outward')+' entry saved!');
     renderCourier();
   }catch(e){alert('Error: '+e.message);}
@@ -17276,12 +17298,57 @@ function selectReceiver(id){
   var r=_allReceivers.find(function(x){return x.id===id;});
   if(!r)return;
   window._selectedReceiver=r;
+  window._selectedCrmTicketId=null; // picking from Master supersedes any earlier CRM fetch
   document.getElementById('cr-out-recv-id').value=r.id;
   document.getElementById('cr-out-recv-search').value=r.name;
   document.getElementById('cr-recv-dd').style.display='none';
   var prev=document.getElementById('cr-out-recv-preview');
   prev.style.display='block';
   prev.innerHTML='<b>'+r.name+'</b><br>'+(r.address?r.address+'<br>':'')+r.city+(r.pin?', '+r.pin:'')+(r.state?', '+r.state:'')+(r.phone?'<br>📞 '+r.phone:'');
+}
+
+// Fetch Receiver from CRM (by Mobile) — lets a WC courier accessories/ink to
+// a customer straight from an existing call's already-verified address,
+// instead of retyping name/address/pincode by hand. Deliberately separate
+// from the Receiver Master picker above (which is for repeat vendors/repair
+// centers, not one-off end customers) — the two paths just both end up
+// filling the same window._selectedReceiver + preview box.
+async function searchCrmForCourier(){
+  var mobile=(document.getElementById('cr-out-crm-mobile')?.value||'').trim();
+  var box=document.getElementById('cr-out-crm-results');
+  if(!box)return;
+  if(!mobile){box.innerHTML='<div style="font-size:12px;color:var(--danger);">Enter a mobile number to search.</div>';return;}
+  box.innerHTML='<div style="font-size:12px;color:var(--text-muted);">Searching...</div>';
+  try{
+    var rows=await sb('tickets','GET',null,'?mobile=eq.'+encodeURIComponent(mobile)+'&select=id,cname,mobile,address,area,city,state,pin,model,problem,call_type,status,created_at&order=created_at.desc&limit=10');
+    if(!rows||!rows.length){
+      box.innerHTML='<div style="font-size:12px;color:var(--text-muted);">No calls found for this mobile — search Receiver Master below, or add the address manually.</div>';
+      return;
+    }
+    window._crmCourierResults=rows;
+    box.innerHTML='<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Found '+rows.length+' call(s) — pick the right one:</div>'
+      +rows.map(function(t){
+        return '<div onclick="selectCrmReceiver(\''+t.id+'\')" style="cursor:pointer;background:#fff;border:1px solid #BFDBFE;border-radius:8px;padding:8px 10px;margin-bottom:5px;">'
+          +'<div style="font-weight:700;font-size:13px;color:#1D4ED8;">'+escHtml(t.id)+' — '+escHtml(t.cname||'')+'</div>'
+          +'<div style="font-size:11px;color:#64748B;">'+escHtml(t.model||'')+(t.problem?' · '+escHtml(t.problem):'')+' · '+escHtml(t.city||'')+' · '+escHtml(t.status||'')+'</div>'
+          +'</div>';
+      }).join('');
+  }catch(e){box.innerHTML='<div style="font-size:12px;color:var(--danger);">Error: '+e.message+'</div>';}
+}
+function selectCrmReceiver(ticketId){
+  var t=(window._crmCourierResults||[]).find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  var r={name:t.cname||'',address:t.address||'',city:t.city||'',area:t.area||'',state:t.state||'',pin:t.pin||'',phone:t.mobile||''};
+  window._selectedReceiver=r;
+  window._selectedCrmTicketId=t.id;
+  document.getElementById('cr-out-recv-id').value=''; // no Receiver Master row — CRM ticket link stands in for it
+  document.getElementById('cr-out-recv-search').value=r.name;
+  document.getElementById('cr-out-crm-results').innerHTML='<div style="font-size:12px;color:#15803d;font-weight:600;">✅ Fetched from '+escHtml(ticketId)+' — verify address below before saving.</div>';
+  var prev=document.getElementById('cr-out-recv-preview');
+  prev.style.display='block';
+  prev.innerHTML='<b>'+escHtml(r.name)+'</b> <span style="color:#64748B;font-weight:400;">(from '+escHtml(ticketId)+')</span><br>'
+    +(r.address?escHtml(r.address)+'<br>':'')+(r.area?escHtml(r.area)+', ':'')+escHtml(r.city)+(r.pin?', '+escHtml(r.pin):'')+(r.state?', '+escHtml(r.state):'')
+    +(r.phone?'<br>📞 '+escHtml(r.phone):'');
 }
 
 document.addEventListener('click',function(e){
