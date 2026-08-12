@@ -2849,6 +2849,9 @@ function setupNav(){
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-peon-activity',false);
+      // ACCT001 (Chaula Trivedi, the Accountant) is a WC-role account but needs
+      // the manager-level Payment Collection view — other plain WCs don't.
+      sv('nav-payment-collection',window._isAcct);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
@@ -8720,7 +8723,7 @@ async function downloadRevenueExcel(){
 // don't exist yet, the page still shows data (mark-Received just fails
 // with a clear alert instead of the page breaking).
 // ════════════════════════════════════════════════════════════
-function _pcCanManage(){return currentUser&&(currentUser.role==='admin'||window._isCspMgr);}
+function _pcCanManage(){return currentUser&&(currentUser.role==='admin'||window._isCspMgr||window._isAcct);}
 function _pcBreakdown(t){
   // Same fallback chain as the Revenue tab (final_charges wins when set;
   // otherwise rebuild from parts + labor/service_charges + other) — many
