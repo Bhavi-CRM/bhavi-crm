@@ -398,6 +398,7 @@ tr:hover td{background:#f8fafc;}
           <input type="file" id="js-scan-input" accept="image/*" multiple style="display:none;" onchange="scanJobsheetFiles(this)">
           <button class="btn btn-primary btn-sm" type="button" onclick="document.getElementById('js-scan-input').click()" style="white-space:nowrap;">📷 Scan Jobsheet</button>
         </div>
+        <div id="js-paste-zone" tabindex="0" style="margin-top:8px;border:1.5px dashed #a5b4fc;border-radius:8px;padding:8px 10px;font-size:11px;color:#4f46e5;background:#fff;cursor:text;text-align:center;">📋 Screenshot lidha pachi ahi click kari ne <b>Ctrl+V</b> dabo — file save/upload karvani jarur nathi</div>
         <div id="js-scan-status" style="font-size:12px;margin-top:8px;"></div>
       </div>
       <!-- Customer Search - Point 9 -->
@@ -3094,25 +3095,29 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // mandatory reason (enforced via the required Action Taken field).
         // Resolved By Phone: On-Site only — the visit turned out unnecessary because the
         // fix was talked through on a phone call, so it closes without ever going out.
-        return isCarryIn?['In Progress','Repaired','Sent to MSC','Call Cancel']:['In Progress','Closed','Resolved By Phone','Call Cancel'];
+        // Customer Reject: customer had agreed earlier but backs out later (won't approve
+        // charges / doesn't want the repair anymore) — engineer sets it directly with
+        // amount + remark, no admin approval hop needed.
+        return isCarryIn?['In Progress','Repaired','Sent to MSC','Customer Reject','Call Cancel']:['In Progress','Closed','Resolved By Phone','Customer Reject','Call Cancel'];
       }
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
-        if(isRepeat) return isCarryIn?['Closed','Call Cancel']:['Closed','Resolved By Phone','Call Cancel'];
+        if(isRepeat) return isCarryIn?['Closed','Customer Reject','Call Cancel']:['Closed','Resolved By Phone','Customer Reject','Call Cancel'];
         // Carry In: Repaired + Sent to MSC. On-Site: only Closed (engineer repairs on location).
-        return isCarryIn?['Repaired','Sent to MSC','Call Cancel']:['Closed','Resolved By Phone','Call Cancel'];
+        return isCarryIn?['Repaired','Sent to MSC','Customer Reject','Call Cancel']:['Closed','Resolved By Phone','Customer Reject','Call Cancel'];
       }
 
       case 'Pending Parts':
       case 'Pending Engineer Stock':
-        // Waiting for parts/issue — engineer cannot change status manually
-        return[];
+        // Waiting for parts/issue — engineer cannot change status manually,
+        // except Customer Reject (customer can still back out while parts are pending).
+        return['Customer Reject'];
 
       case 'Pending Repair Carry In':
-        return['Repaired','Sent to MSC','Call Cancel'];
+        return['Repaired','Sent to MSC','Customer Reject','Call Cancel'];
       case 'Pending Repair On Site':
-        return['Closed','Sent to MSC','Call Cancel'];
+        return['Closed','Sent to MSC','Customer Reject','Call Cancel'];
 
       case 'Customer Approved':
         // OW approved — check parts
@@ -3120,8 +3125,9 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // Handled by system after approval
 
       case 'Pending Customer Approval':
-        // Waiting for admin/WC approval — engineer waits
-        return[];
+        // Engineer handles their own call's approval/rejection directly —
+        // no need to wait on admin/WC (matches what admin/WC could already do here).
+        return['Customer Approved','Customer Reject'];
 
       default: return[];
     }
@@ -4763,11 +4769,13 @@ function renderTicketTable(filtered){
     </div>`;
 }
 function ticketRow(t){
-  return `<tr><td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
+  const isCarryIn=t.service_type==='Carry In';
+  const rowStyle=isCarryIn?'background:#fff7ed;':'background:#eff6ff;';
+  return `<tr style="${rowStyle}"><td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
     <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
     <td>${t.model||'-'}</td><td>${t.serial||'-'}</td>
     <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
-    <td><span class="badge badge-warranty">${t.call_type||'-'}</span></td>
+    <td><span class="badge badge-warranty">${t.call_type||'-'}</span> <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;${isCarryIn?'background:#fed7aa;color:#9a3412;':'background:#bfdbfe;color:#1e40af;'}">${isCarryIn?'🏠 CARRY IN':'📍 ON SITE'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
     <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
@@ -6013,6 +6021,12 @@ async function viewTicket(id,autoPrint=false){
             <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
           </div>
         </div>`:''}
+    </div>`;
+  } else if(currentUser.role==='engineer' && t.status==='Pending Customer Approval' && t.assigned_to===(currentUser.eng_id||currentUser.user_id)){
+    // Engineer handles approval/rejection on their own assigned call directly —
+    // no need to wait for admin/WC (same Approve/Reject Estimate modal admin uses).
+    adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>
     </div>`;
   }
 
@@ -8781,7 +8795,7 @@ async function downloadFilteredReport(format){
         'Model':t.model,'Serial':t.serial,'Brand':t.brand_name||'',
         'Call Type':t.call_type,'Service Type':t.service_type,'Coverage':t.warranty_coverage||'',
         'Problem':t.problem,'Action Taken':t.work_done||'','Cause':t.cause||'',
-        'Engineer':t.assigned_name||'','Status':t.status,
+        'Engineer':t.assigned_name||'','Status':t.status,'SE Call ID':t.se_call_id||'',
         'Visit Date':t.visit_date||'',
         'Visit Start':_fmtT(vsISO),
         'Time In':t.visit_in||'',
@@ -25129,7 +25143,7 @@ async function renderPendingList(){
   try{
     var tickets=await sb('tickets','GET',null,
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired&status=neq.Resolved+By+Phone&status=neq.Pending+for+Delivery'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
     if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
@@ -25272,7 +25286,7 @@ function pendingListRender(){
   // ── Main pending table ─────────────────────────────────────────
   var rows='';
   if(!filtered.length){
-    rows='<tr><td colspan="'+(window._routeMode?10:8)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
+    rows='<tr><td colspan="'+(window._routeMode?11:9)+'" style="padding:30px;text-align:center;color:#9ca3af;">No pending calls found</td></tr>';
   }else{
     filtered.forEach(function(t){
       var createdDate=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
@@ -25306,6 +25320,7 @@ function pendingListRender(){
         +'<td style="padding:10px 12px;font-size:12px;color:#374151;">'+areaDisplay+'</td>'
         +'<td style="padding:10px 12px;"><div style="font-size:12px;font-weight:600;color:#1f2937;">'+escHtml(t.model||'—')+'</div>'
         +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
+        +'<td style="padding:10px 12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#374151;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)+_plHoldBadge
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
         +'<td style="padding:10px 12px;">'+tatBadge(t.tat_date)+'</td>'
@@ -25364,6 +25379,7 @@ function pendingListRender(){
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Customer</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">📍 Area / Pincode</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Model / Serial</th>'
+    +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Problem</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
     +'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">⏱ TAT</th>'
     +(window._routeMode?'<th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">🧑‍🔧 Assign Eng</th><th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">Seq</th><th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;color:#7c3aed;background:#faf5ff;">Move</th>':'')
@@ -25397,7 +25413,7 @@ function pendingListRenderResults(){
   var now=new Date();
   var rows='';
   if(!filtered.length){
-    rows='<tr><td colspan="8" style="padding:24px;text-align:center;color:#6b7280;">No matching calls</td></tr>';
+    rows='<tr><td colspan="9" style="padding:24px;text-align:center;color:#6b7280;">No matching calls</td></tr>';
   }else{
     filtered.forEach(function(t){
       var tatB=tatBadge(t.tat_date);
@@ -25407,6 +25423,7 @@ function pendingListRenderResults(){
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.cname||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div>'+escHtml(t.area||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.pin||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.model||'-')+'</div><div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'MISSING')+'</div></td>'
+        +'<td style="padding:10px 12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#374151;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</td>'
         +'<td style="padding:10px 12px;"><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">'+escHtml(t.status||'')+'</span><br><span style="font-size:11px;color:#6b7280;">'+escHtml(t.assigned_name||'UNASSIGNED')+'</span></td>'
         +'<td style="padding:10px 12px;">'+tatB+'</td>'
         +'<td style="padding:10px 12px;text-align:center;"><button onclick="viewTicket(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button></td>'
@@ -25467,6 +25484,7 @@ async function exportPendingListExcel(){
         'WC Type':t.wc_type||'',
         'Brand':t.brand_name||'',
         'Call Type':t.call_type||'',
+        'Problem':t.problem||'',
         'Status':t.status||'',
         'Assigned To':t.assigned_name||'',
         'Created Date':t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):''
@@ -26311,13 +26329,19 @@ function _jsScanReadFile(file){
   });
 }
 async function scanJobsheetFiles(input){
-  var files=input.files;
+  var files=input.files?Array.prototype.slice.call(input.files):[];
+  await _jsScanProcess(files);
+  input.value=''; // allow re-selecting the same file
+}
+// Shared by both the file-picker (Scan Jobsheet button) and the clipboard
+// paste zone below — either way we end up with an array of image Blobs/Files.
+async function _jsScanProcess(fileArr){
   var st=document.getElementById('js-scan-status');
-  if(!files||!files.length)return;
+  if(!fileArr||!fileArr.length)return;
   if(st)st.innerHTML='<span style="color:#4338ca;font-weight:700;">🤖 Screenshot vanchai rahyu chhe... (thodi var lagse)</span>';
   try{
     var imgs=[];
-    for(var i=0;i<files.length&&i<4;i++){imgs.push(await _jsScanReadFile(files[i]));}
+    for(var i=0;i<fileArr.length&&i<4;i++){imgs.push(await _jsScanReadFile(fileArr[i]));}
     var resp=await fetch(JOBSHEET_SCAN_URL,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
@@ -26330,10 +26354,31 @@ async function scanJobsheetFiles(input){
     if(st)st.innerHTML='<span style="color:#15803d;font-weight:700;">✅ '+filled+' field bharai gaya</span> <span style="color:#64748b;">— niche badhu review kari ne, Model/Problem check kari ne Save karo.</span>';
   }catch(e){
     if(st)st.innerHTML='<span style="color:#dc2626;font-weight:700;">⚠️ Vanchi na shakayu:</span> <span style="color:#64748b;">'+(e.message||e)+'</span><br><span style="font-size:11px;color:#94a3b8;">Jo "jobsheet-scan" function deploy na thayu hoy to niche na steps juo, athva fields jate bharo.</span>';
-  }finally{
-    input.value=''; // allow re-selecting the same file
   }
 }
+// Paste-to-scan: Ctrl+V a screenshot straight from the clipboard while the New
+// Call modal is open — no save-to-disk-then-upload round trip needed. Only
+// intercepts when the clipboard actually carries image data, so normal text
+// pasting into form fields is untouched.
+document.addEventListener('paste',function(e){
+  var mc=document.getElementById('modal-call');
+  if(!mc||mc.classList.contains('hidden'))return;
+  var items=(e.clipboardData||window.clipboardData)&&(e.clipboardData||window.clipboardData).items;
+  if(!items)return;
+  var blobs=[];
+  for(var i=0;i<items.length;i++){
+    if(items[i].type&&items[i].type.indexOf('image')!==-1){
+      var b=items[i].getAsFile();
+      if(b)blobs.push(b);
+    }
+  }
+  if(blobs.length){
+    e.preventDefault();
+    var st=document.getElementById('js-scan-status');
+    if(st)st.innerHTML='<span style="color:#4338ca;font-weight:700;">📋 Clipboard thi screenshot madyu...</span>';
+    _jsScanProcess(blobs);
+  }
+});
 // Fill the New Call form from the extracted fields; returns how many were set.
 function applyJobsheetFields(f){
   var count=0;
