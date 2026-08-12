@@ -335,6 +335,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('attendance')" id="nav-attendance"><span class="icon">🗓️</span><span>Attendance</span></div>
     <div class="nav-item hidden" onclick="navigate('targets')" id="nav-targets"><span class="icon">🎯</span><span>Targets</span></div>
     <div class="nav-item hidden" onclick="navigate('amc')" id="nav-amc"><span class="icon">🔄</span><span>AMC</span></div>
+    <div class="nav-item hidden" onclick="navigate('payment-collection')" id="nav-payment-collection"><span class="icon">💰</span><span>Payment Collection</span></div>
     <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit" style="display:none!important;"><span class="icon">💰</span><span>Profit</span></div>
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
@@ -2814,7 +2815,7 @@ function setupNav(){
        'nav-inventory','nav-customers','nav-reports','nav-work-log-report','nav-walk-in-report',
        'nav-courier-report','nav-master','nav-settings','nav-sales','nav-route-planning',
        'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report','nav-inquiries','nav-field-tasks',
-       'nav-live-map','nav-attendance','nav-targets','nav-amc',
+       'nav-live-map','nav-attendance','nav-targets','nav-amc','nav-payment-collection',
        'nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
        'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr'
       ].forEach(function(id){sv(id,false);});
@@ -2835,7 +2836,7 @@ function setupNav(){
       // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
       var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
       window._isCspMgr=isCspMgr;
-      sv('nav-attendance',true);
+      sv('nav-attendance',true);sv('nav-payment-collection',true);
       if(isCspMgr){sv('nav-tickets',true);sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-customers',true);sv('nav-inventory',true);sv('nav-eng-parts',true);sv('nav-reports',true);sv('nav-work-log-report',true);sv('nav-amc',true);}
       // Apply per-employee nav permissions
       var _uid=currentUser.eng_id||currentUser.user_id;
@@ -2863,7 +2864,7 @@ function setupNav(){
       sv('nav-inventory',true);sv('nav-customers',true);sv('nav-reports',true);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',true);sv('nav-courier-report',true);sv('nav-master',true);sv('nav-settings',true);
       sv('nav-auto-inventory',true);sv('nav-auto-sites',true);sv('nav-sw-survey',true);sv('nav-auto-visits-report',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
-      sv('nav-live-map',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);
+      sv('nav-live-map',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);sv('nav-payment-collection',true);
       sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);
@@ -2959,9 +2960,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','payment-collection':'💰 Payment Collection','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'payment-collection':renderPaymentCollection,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
   if(renderFn)await renderFn();
 }
 
@@ -5597,7 +5598,7 @@ async function checkTATReminder(){
     var engFilter=isEng?'&assigned_to=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id):'';
     // Exclude EVERY done status (incl. Resolved By Phone, Repaired, Pending for
     // Delivery) plus cancelled — a closed call must never appear in TAT reminders.
-    var rows=await sb('tickets','GET',null,'?tat_date=not.is.null&status=not.in.(Closed,Delivered,Repaired,Pending for Delivery,Resolved By Phone,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to&limit=20'+engFilter);
+    var rows=await sbAll('tickets','?tat_date=not.is.null&status=not.in.(Closed,Delivered,Repaired,Pending for Delivery,Resolved By Phone,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to'+engFilter);
     if(!rows||!rows.length)return;
     function tatDL(t){var d=new Date(t.tat_date);return /T00:00:00/.test(t.tat_date)?new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),23,59,59):d;}
     var overdue=rows.filter(function(t){return tatDL(t)<now;});
@@ -8693,6 +8694,143 @@ async function downloadRevenueExcel(){
 }
 
 // ════════════════════════════════════════════════════════════
+// PAYMENT COLLECTION — tracks the payment_mode/amount every engineer
+// records via the Payment Confirmation Popup on Non-Warranty On-Site
+// closes, and lets admin/CSP-managers/ACCT001 mark each one "Received"
+// (handed over / reconciled) once the cash or online payment has actually
+// reached the office — independent of payment_mode: Cash needs the same
+// hand-over confirmation as Online/Cheque/Card. Engineers see the same
+// data for their own tickets, read-only, so they know what's still owed.
+// Needs 3 new columns on tickets (payment_received boolean,
+// payment_received_at timestamptz, payment_received_by text) — if they
+// don't exist yet, the page still shows data (mark-Received just fails
+// with a clear alert instead of the page breaking).
+// ════════════════════════════════════════════════════════════
+function _pcCanManage(){return currentUser&&(currentUser.role==='admin'||window._isCspMgr);}
+function _pcAmount(t){
+  const fin=parseFloat(t.final_charges)||0;
+  if(fin>0)return fin;
+  return (parseFloat(t.service_charges)||0);
+}
+async function renderPaymentCollection(){
+  const pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    const canManage=_pcCanManage();
+    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by&order=updated_at.desc';
+    if(!canManage){
+      const myId=currentUser.eng_id||currentUser.user_id;
+      q+='&assigned_to=eq.'+encodeURIComponent(myId);
+    }
+    let tickets;
+    try{
+      tickets=await sb('tickets','GET',null,q);
+    }catch(qe){
+      if(String(qe.message||'').indexOf('payment_received')!==-1){
+        pc.innerHTML='<div class="alert alert-warning">⚠️ Setup needed: the payment_received columns don\'t exist on the tickets table yet. Run the Payment Collection setup SQL in Supabase, then reload this page.</div>';
+        return;
+      }
+      throw qe;
+    }
+    window._pcTickets=tickets;
+    if(!tickets.length){
+      pc.innerHTML='<div class="alert alert-info">No payment-confirmed calls found'+(canManage?'.':' for you yet.')+'</div>';
+      return;
+    }
+    const byEng={};
+    tickets.forEach(function(t){
+      const k=t.assigned_to||'unassigned';
+      if(!byEng[k])byEng[k]={name:t.assigned_name||'Unassigned',rows:[],pending:0,received:0};
+      const amt=_pcAmount(t);
+      byEng[k].rows.push(t);
+      if(t.payment_received)byEng[k].received+=amt;else byEng[k].pending+=amt;
+    });
+    const totalPending=Object.values(byEng).reduce(function(a,e){return a+e.pending;},0);
+    const totalReceived=Object.values(byEng).reduce(function(a,e){return a+e.received;},0);
+
+    let html='<div class="kpi-grid" style="grid-template-columns:repeat('+(canManage?3:2)+',1fr);margin-bottom:14px;">'
+      +(canManage?'<div class="kpi-card"><div class="kpi-label">Total Calls</div><div class="kpi-value">'+tickets.length+'</div></div>':'')
+      +'<div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Pending to Collect</div><div class="kpi-value" style="color:#d97706;font-size:20px;">₹'+totalPending.toFixed(0)+'</div></div>'
+      +'<div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Received</div><div class="kpi-value" style="color:#0e9f6e;font-size:20px;">₹'+totalReceived.toFixed(0)+'</div></div>'
+      +'</div>';
+    if(canManage){
+      html+='<div style="text-align:right;margin-bottom:12px;"><button class="btn btn-success btn-sm" onclick="downloadPaymentCollectionExcel()">📊 Excel Download</button></div>';
+    }
+
+    const groups=Object.entries(byEng).sort(function(a,b){return b[1].pending-a[1].pending;});
+    groups.forEach(function([engId,g]){
+      html+='<div class="card" style="margin-bottom:14px;">'
+        +'<div class="section-header" style="margin-bottom:10px;"><h2>👷 '+escHtml(g.name)+'</h2>'
+        +'<span style="font-size:13px;font-weight:700;color:'+(g.pending>0?'#d97706':'#0e9f6e')+';">⏳ Pending: ₹'+g.pending.toFixed(0)+'</span></div>'
+        +'<div class="table-wrap"><table><thead><tr>'
+        +'<th>Date</th><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Amount</th><th>Mode</th><th>Received</th>'
+        +'</tr></thead><tbody>'
+        +g.rows.map(function(t){
+          const amt=_pcAmount(t);
+          const received=!!t.payment_received;
+          let recvCell;
+          if(received){
+            const when=t.payment_received_at?new Date(t.payment_received_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
+            recvCell='<div style="color:#0e9f6e;font-weight:700;font-size:12px;">✅ '+escHtml(t.payment_received_by||'')+'</div><div style="font-size:10px;color:var(--text-muted);">'+when+'</div>'
+              +(canManage?'<button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="pcToggleReceived(\''+t.id+'\',false)">Undo</button>':'');
+          }else if(canManage){
+            recvCell='<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="pcToggleReceived(\''+t.id+'\',true)">☐ Mark Received</button>';
+          }else{
+            recvCell='<span style="color:#d97706;font-weight:700;font-size:12px;">☐ Pending</span>';
+          }
+          return '<tr>'
+            +'<td>'+(t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN'):'-')+'</td>'
+            +'<td>'+(canManage?'<a href="javascript:void(0)" onclick="viewTicket(\''+t.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(t.id)+'</a>':'<b>'+escHtml(t.id)+'</b>')+'</td>'
+            +'<td>'+escHtml(t.cname||'-')+'</td>'
+            +'<td>'+escHtml(t.mobile||'-')+'</td>'
+            +'<td>'+escHtml(t.area||'-')+'</td>'
+            +'<td>'+escHtml(t.model||'-')+'</td>'
+            +'<td style="font-weight:700;">₹'+amt.toFixed(0)+'</td>'
+            +'<td>'+escHtml(t.payment_mode||'-')+'</td>'
+            +'<td style="white-space:nowrap;">'+recvCell+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div></div>';
+    });
+    pc.innerHTML=html;
+  }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+async function pcToggleReceived(ticketId,received){
+  if(!_pcCanManage())return;
+  try{
+    const patch=received
+      ?{payment_received:true,payment_received_at:new Date().toISOString(),payment_received_by:currentUser.name}
+      :{payment_received:false,payment_received_at:null,payment_received_by:null};
+    await sb('tickets','PATCH',patch,'?id=eq.'+ticketId);
+    renderPaymentCollection();
+  }catch(e){
+    if(String(e.message||'').indexOf('payment_received')!==-1){
+      alert('⚠️ Setup needed: the payment_received columns don\'t exist on the tickets table yet. Run the Payment Collection setup SQL in Supabase first.');
+    }else{
+      alert('Error: '+e.message);
+    }
+  }
+}
+function downloadPaymentCollectionExcel(){
+  const tickets=window._pcTickets||[];
+  if(!tickets.length){alert('Nothing to download');return;}
+  const data=tickets.map(function(t){
+    return {
+      'Engineer':t.assigned_name||'-','Date':t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN'):'-',
+      'Ticket':t.id,'Customer':t.cname||'-','Mobile':t.mobile||'-','Area':t.area||'-','Model':t.model||'-',
+      'Amount ₹':_pcAmount(t).toFixed(2),'Mode':t.payment_mode||'-',
+      'Received':t.payment_received?'Yes':'No',
+      'Received By':t.payment_received_by||'',
+      'Received At':t.payment_received_at?new Date(t.payment_received_at).toLocaleString('en-IN'):''
+    };
+  });
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Payment Collection');
+  XLSX.writeFile(wb,'payment_collection_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
+}
+
+// ════════════════════════════════════════════════════════════
 // ENGINEER PARTS TRACKING  (uses existing inventory table)
 // ════════════════════════════════════════════════════════════
 let allEngStock=[];
@@ -10345,6 +10483,7 @@ var _NAV_ALL_ITEMS=[
   {id:'nav-fault-finder',  label:'Fault Finder',       engDef:false, wcDef:false},
   {id:'nav-eng-parts',     label:'Eng Parts Stock',    engDef:false, wcDef:false},
   {id:'nav-amc',           label:'AMC',                engDef:false, wcDef:false},
+  {id:'nav-payment-collection',label:'Payment Collection',engDef:true, wcDef:false},
   {id:'nav-targets',       label:'Targets',            engDef:false, wcDef:false},
   {id:'nav-reports',       label:'Reports',            engDef:false, wcDef:false},
   {id:'nav-work-log-report',label:'Work Log Report',   engDef:false, wcDef:false},
