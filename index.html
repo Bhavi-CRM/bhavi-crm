@@ -1359,12 +1359,15 @@ async function renderDailyReports(c){
       +'<th style="background:#eff6ff;color:#1d4ed8;">W-Break</th>'
       +'<th style="background:#fff7ed;color:#d97706;">OW-Break</th>'
       +'<th style="background:#fff7ed;color:#d97706;">OW-Other</th>'
+      +'<th style="background:#f5f3ff;color:#5b21b6;">Office Work</th>'
       +'<th>Total</th><th>KM</th>'
       +'<th style="color:#065f46;">Collection</th>'
       +'<th>Action</th>'
       +'</tr></thead>'
       +'<tbody id="daily-report-tbody">'
       +reports.map(function(r,idx){
+        var owList=r.office_work;if(typeof owList==='string'){try{owList=JSON.parse(owList);}catch(e){owList=[];}}
+        var owCount=(Array.isArray(owList)&&owList.length)||r.total_office_work||0;
         return '<tr>'
           +'<td><b>'+r.report_date+'</b></td>'
           +'<td>'+r.eng_name+'</td>'
@@ -1372,6 +1375,7 @@ async function renderDailyReports(c){
           +'<td style="text-align:center;font-weight:700;color:#1d4ed8;">'+(r.warranty_breakdown||(r.call_summary&&((r.call_summary.w_breakdown||0)+(r.call_summary.w_repeat||0)))||0)+'</td>'
           +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_breakdown||(r.call_summary&&((r.call_summary.nw_breakdown||0)+(r.call_summary.nw_repeat||0)))||0)+'</td>'
           +'<td style="text-align:center;font-weight:700;color:#d97706;">'+(r.outwarranty_other||(r.call_summary&&((r.call_summary.nw_other||0)+(r.call_summary.nw_delivery||0)))||0)+'</td>'
+          +'<td style="text-align:center;font-weight:700;color:'+(owCount?'#5b21b6':'#cbd5e1')+';">'+owCount+'</td>'
           +'<td style="text-align:center;font-weight:700;">'+(r.total_calls||(r.call_summary&&r.call_summary.grand_total)||0)+'</td>'
           +'<td style="text-align:center;">'+(r.petrol_km||0)+' km</td>'
           +'<td style="font-weight:700;color:#065f46;">₹'+(r.total_amount||0)+'</td>'
@@ -1746,6 +1750,8 @@ function viewDailyReport(idx){
   var r=(window._dailyReports||[])[idx];
   if(!r)return;
   var pays=r.payment_details||[];
+  var owItems=r.office_work;if(typeof owItems==='string'){try{owItems=JSON.parse(owItems);}catch(e){owItems=[];}}
+  if(!Array.isArray(owItems))owItems=[];
   var panel=document.getElementById('daily-detail-panel');
   if(!panel)return;
   panel.innerHTML='<div class="card" style="margin-top:14px;border-left:4px solid var(--primary);">'
@@ -1765,6 +1771,12 @@ function viewDailyReport(idx){
     +'<span>🚗 KM: <b>'+(r.petrol_km||0)+'</b></span>'
     +'<span>💰 Total Collection: <b style="color:#065f46;font-size:15px;">₹'+(r.total_amount||0)+'</b></span>'
     +'</div>'
+    +(owItems.length?'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;">💼 Office / Remote Work ('+owItems.length+')</h4>'
+      +'<div style="margin-bottom:14px;">'+owItems.map(function(o){
+        return '<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:13px;">'
+          +'<b style="color:#5b21b6;">'+(o.work_type||'Work')+'</b>'+(o.remark?' — '+o.remark:'')
+          +'</div>';
+      }).join('')+'</div>':'')
     +(pays.length?'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;">💳 Payment Details</h4>'
       +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
       +'<thead><tr style="background:#f8fafc;"><th style="padding:8px;border-bottom:1px solid var(--border);text-align:left;">Customer</th><th style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">Amount</th><th style="padding:8px;border-bottom:1px solid var(--border);">Mode</th></tr></thead>'
@@ -1786,7 +1798,12 @@ function filterDailyReports(){
 
 async function downloadDailyExcel(){
   var reports=window._dailyReports||[];
-  var data=reports.map(function(r){return{'Engineer':r.eng_name,'Date':r.report_date,'W-Installation':r.warranty_installation,'W-Breakdown':r.warranty_breakdown,'OW-Breakdown':r.outwarranty_breakdown,'OW-Other':r.outwarranty_other,'Total Calls':r.total_calls,'Petrol KM':r.petrol_km,'Total Collection':r.total_amount,'Remarks':r.remarks||''};});
+  var data=reports.map(function(r){
+    var owList=r.office_work;if(typeof owList==='string'){try{owList=JSON.parse(owList);}catch(e){owList=[];}}
+    if(!Array.isArray(owList))owList=[];
+    var owSummary=owList.map(function(o){return(o.work_type||'Work')+(o.remark?' - '+o.remark:'');}).join('; ');
+    return{'Engineer':r.eng_name,'Date':r.report_date,'W-Installation':r.warranty_installation,'W-Breakdown':r.warranty_breakdown,'OW-Breakdown':r.outwarranty_breakdown,'OW-Other':r.outwarranty_other,'Office Work Count':owList.length||r.total_office_work||0,'Office Work Details':owSummary,'Total Calls':r.total_calls,'Petrol KM':r.petrol_km,'Total Collection':r.total_amount,'Remarks':r.remarks||''};
+  });
   var ws=XLSX.utils.json_to_sheet(data);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Daily Reports');XLSX.writeFile(wb,'daily_reports.xlsx');
 }
 
