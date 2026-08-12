@@ -328,6 +328,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item" onclick="navigate('eng-parts')" id="nav-eng-parts"><span class="icon">🧰</span><span>Eng. Parts</span></div>
     <div class="nav-item" onclick="navigate('customers')" id="nav-customers"><span class="icon">👥</span><span>Customers</span></div>
     <div class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="icon">📈</span><span>Reports</span></div>
+    <div class="nav-item" onclick="navigate('tat-report')" id="nav-tat-report" style="display:none;"><span class="icon">⏱️</span><span>TAT Compliance</span></div>
     <div class="nav-item" onclick="openWCDailyReport()" id="nav-wc-report" style="display:none;"><span class="icon">📋</span><span>WC Report</span></div>
     <div class="nav-item" onclick="navigate('work-log-report')" id="nav-work-log-report"><span class="icon">📋</span><span>Work Log Report</span></div>
     <div class="nav-item" onclick="navigate('walk-in-report')" id="nav-walk-in-report"><span class="icon">🚶</span><span>Walk-in Report</span></div>
@@ -2836,7 +2837,7 @@ function setupNav(){
        'nav-pending-list','nav-auto-inventory','nav-auto-sites','nav-sw-survey','nav-auto-visits-report','nav-inquiries','nav-field-tasks',
        'nav-live-map','nav-attendance','nav-targets','nav-amc','nav-payment-collection',
        'nav-weekly','nav-parts-catalog','nav-fault-finder','nav-peon-activity',
-       'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr'
+       'btn-daily-report','btn-weekly-report','nav-eng-parts','nav-km-report','nav-payment-qr','nav-tat-report'
       ].forEach(function(id){sv(id,false);});
       if(as)as.style.display='none';
       var autoSec2=document.getElementById('nav-automation-section');
@@ -2847,7 +2848,7 @@ function setupNav(){
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);
       sv('nav-sales',false);sv('nav-route-planning',false);sv('nav-pending-list',false);
-      sv('btn-daily-report',false);sv('btn-weekly-report',false);sv('nav-peon-activity',false);
+      sv('btn-daily-report',false);sv('btn-weekly-report',false);sv('nav-peon-activity',false);sv('nav-tat-report',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
       sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',false);
@@ -2871,6 +2872,7 @@ function setupNav(){
       // ACCT001 (Chaula Trivedi, the Accountant) is a WC-role account but needs
       // the manager-level Payment Collection view — other plain WCs don't.
       sv('nav-payment-collection',window._isAcct);
+      sv('nav-tat-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
@@ -2889,7 +2891,7 @@ function setupNav(){
       sv('nav-live-map',true);sv('nav-attendance',true);sv('nav-targets',true);sv('nav-amc',true);sv('nav-payment-collection',true);
       sv('nav-weekly',true);sv('nav-sales',true);sv('nav-pending-list',true);sv('nav-route-planning',true);
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
-      sv('btn-daily-report',true);sv('btn-weekly-report',true);
+      sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-tat-report',false);
     }
     // Position KM Tracking + Payment QR per role:
     // Admin → below Engineer Daily Report (Dashboard, All Tickets, Eng Daily Report first)
@@ -2984,9 +2986,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','payment-collection':'💰 Payment Collection','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','payment-collection':'💰 Payment Collection','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder','tat-report':'⏱️ TAT Compliance Report'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'payment-collection':renderPaymentCollection,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'payment-collection':renderPaymentCollection,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder,'tat-report':renderTatReportPage}[page];
   if(renderFn)await renderFn();
 }
 
@@ -8357,6 +8359,11 @@ async function switchReportTab(tab, el){
 // after close, etc.), which would otherwise make an on-time call look
 // like it closed whenever it was last touched.
 // ════════════════════════════════════════════════════════════
+async function renderTatReportPage(){
+  var pc=document.getElementById('page-content');
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  await renderTatComplianceReport(pc);
+}
 async function renderTatComplianceReport(c){
   if(!allEngineers||!allEngineers.length) await loadMasterData();
   var today=new Date().toLocaleDateString('en-CA');
@@ -8367,6 +8374,7 @@ async function renderTatComplianceReport(c){
     +'<div class="form-group"><label>Closed From</label><input type="date" id="tat-from" value="'+monthStart.toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
     +'<div class="form-group"><label>Closed To</label><input type="date" id="tat-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
     +'<div class="form-group"><label>Engineer</label><select id="tat-eng" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+escHtml(e.name)+'</option>';}).join('')+'</select></div>'
+    +'<div class="form-group"><label>TAT Status</label><select id="tat-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="">All</option><option value="within">✅ Within TAT</option><option value="outside">⚠️ Outside TAT</option></select></div>'
     +'</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
     +'<button class="btn btn-primary" onclick="loadTatComplianceReport()">🔍 Search</button>'
@@ -8383,6 +8391,7 @@ async function loadTatComplianceReport(){
   var from=document.getElementById('tat-from')?.value||'';
   var to=document.getElementById('tat-to')?.value||'';
   var engFilter=document.getElementById('tat-eng')?.value||'';
+  var statusFilter=document.getElementById('tat-status')?.value||'';
   var res=document.getElementById('tat-results');
   if(!res)return;
   res.innerHTML='<div class="loading">Loading...</div>';
@@ -8392,7 +8401,7 @@ async function loadTatComplianceReport(){
     // entry earlier in the timeline — _engCompletionEntry finds that, not
     // the later Delivered/Invoice entries — but the ticket itself must still
     // be included in this fetch for that to have a chance to run).
-    var q='?tat_date=not.is.null&status=in.(Closed,Repaired,Pending for Delivery,Resolved By Phone,Delivered)&select=id,cname,model,assigned_name,assigned_to,tat_date,timeline';
+    var q='?tat_date=not.is.null&status=in.(Closed,Repaired,Pending for Delivery,Resolved By Phone,Delivered)&select=id,cname,mobile,model,assigned_name,assigned_to,tat_date,timeline';
     if(engFilter)q+='&assigned_to=eq.'+encodeURIComponent(engFilter);
     var tickets=await sbAll('tickets',q);
     var rows=[];
@@ -8405,7 +8414,9 @@ async function loadTatComplianceReport(){
       if(to&&closedDateStr>to)return;
       var deadline=_tatDeadline(t.tat_date);
       var withinTAT=closedAt<=deadline;
-      rows.push({id:t.id,cname:t.cname,model:t.model,eng:t.assigned_name,closedAt:closedAt,deadline:deadline,withinTAT:withinTAT,diffHrs:(closedAt-deadline)/3600000});
+      if(statusFilter==='within'&&!withinTAT)return;
+      if(statusFilter==='outside'&&withinTAT)return;
+      rows.push({id:t.id,cname:t.cname,mobile:t.mobile,model:t.model,eng:t.assigned_name,closedAt:closedAt,deadline:deadline,withinTAT:withinTAT,diffHrs:(closedAt-deadline)/3600000});
     });
     window._tatRows=rows;
     if(!rows.length){res.innerHTML='<div class="alert alert-info">No closed calls with a TAT found for this filter.</div>';return;}
@@ -8432,11 +8443,12 @@ async function loadTatComplianceReport(){
       }).join('')
       +'</tbody></table></div></div>';
     html+='<div class="card"><h3 style="font-weight:700;font-size:14px;margin-bottom:12px;">📋 Call Details</h3>'
-      +'<div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>TAT Deadline</th><th>Closed At</th><th>Status</th></tr></thead><tbody>'
+      +'<div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Engineer</th><th>TAT Deadline</th><th>Closed At</th><th>Status</th></tr></thead><tbody>'
       +rows.slice().sort(function(a,b){return b.closedAt-a.closedAt;}).map(function(r){
         return '<tr>'
           +'<td><a href="javascript:void(0)" onclick="viewTicket(\''+r.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(r.id)+'</a></td>'
           +'<td>'+escHtml(r.cname||'-')+'</td>'
+          +'<td>'+(r.mobile?'<a href="tel:'+r.mobile+'" class="clickable-phone">📞 '+r.mobile+'</a>':'-')+'</td>'
           +'<td>'+escHtml(r.model||'-')+'</td>'
           +'<td>'+escHtml(r.eng||'-')+'</td>'
           +'<td>'+fmtDT(r.deadline)+'</td>'
@@ -8453,7 +8465,7 @@ function downloadTatComplianceExcel(){
   if(!rows.length){alert('Please search first');return;}
   var data=rows.map(function(r){
     return{
-      'Ticket':r.id,'Customer':r.cname||'-','Model':r.model||'-','Engineer':r.eng||'-',
+      'Ticket':r.id,'Customer':r.cname||'-','Mobile':r.mobile||'-','Model':r.model||'-','Engineer':r.eng||'-',
       'TAT Deadline':r.deadline.toLocaleString('en-IN'),'Closed At':r.closedAt.toLocaleString('en-IN'),
       'Status':r.withinTAT?'Within TAT':'Outside TAT',
       'Hours Early/Late':Math.round(r.diffHrs*10)/10
@@ -10823,6 +10835,7 @@ var _NAV_ALL_ITEMS=[
   {id:'nav-targets',       label:'Targets',            engDef:false, wcDef:false},
   {id:'nav-reports',       label:'Reports',            engDef:false, wcDef:false},
   {id:'nav-work-log-report',label:'Work Log Report',   engDef:false, wcDef:false},
+  {id:'nav-tat-report',    label:'TAT Compliance',     engDef:false, wcDef:true},
 ];
 
 window._navPerms={users:{}};
