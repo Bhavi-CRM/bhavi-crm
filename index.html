@@ -8311,6 +8311,7 @@ async function renderReports(){
     <div class="tabs" id="report-tabs">
       <button class="tab active" id="rtab-filter" onclick="switchReportTab('filter',this)">🔍 Filter & Download</button>
       <button class="tab" id="rtab-revenue" onclick="switchReportTab('revenue',this)">💰 Revenue</button>
+      <button class="tab" id="rtab-tat" onclick="switchReportTab('tat',this)">⏱️ TAT Compliance</button>
       <button class="tab" id="rtab-daily" onclick="switchReportTab('daily',this)">📋 Eng Daily Reports</button>
       <button class="tab" id="rtab-wcdaily" onclick="switchReportTab('wcdaily',this)">🎯 WC Daily Reports</button>
       <button class="tab" id="rtab-import" onclick="switchReportTab('import',this)">📥 Import Calls</button>
@@ -8336,6 +8337,7 @@ async function switchReportTab(tab, el){
   try{
     if(tab==='filter') await renderReportFilter(c);
     else if(tab==='revenue') await renderReportRevenue(c);
+    else if(tab==='tat') await renderTatComplianceReport(c);
     else if(tab==='daily') await renderDailyReports(c);
   else if(tab==='wcdaily') await renderWCDailyReports(c);
   else if(tab==='import') await renderImportCalls(c);
@@ -8344,6 +8346,123 @@ async function switchReportTab(tab, el){
   }finally{
     clearTimeout(timeout);
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// TAT COMPLIANCE REPORT — how many completed calls were closed within
+// their promised TAT deadline vs after it. Uses the same precise
+// "engineer completion" timeline lookup (_engCompletionEntry) the Daily
+// Report auto-fill already relies on, instead of updated_at — a ticket's
+// updated_at bumps on any later edit (WC adding an invoice number weeks
+// after close, etc.), which would otherwise make an on-time call look
+// like it closed whenever it was last touched.
+// ════════════════════════════════════════════════════════════
+async function renderTatComplianceReport(c){
+  if(!allEngineers||!allEngineers.length) await loadMasterData();
+  var today=new Date().toLocaleDateString('en-CA');
+  var monthStart=new Date();monthStart.setDate(1);
+  c.innerHTML='<div class="card" style="margin-bottom:14px;">'
+    +'<div class="section-header"><h2>⏱️ TAT Compliance Report</h2></div>'
+    +'<div class="form-grid" style="margin-bottom:12px;">'
+    +'<div class="form-group"><label>Closed From</label><input type="date" id="tat-from" value="'+monthStart.toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Closed To</label><input type="date" id="tat-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Engineer</label><select id="tat-eng" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"><option value="">All Engineers</option>'+(allEngineers||[]).map(function(e){return '<option value="'+e.eng_id+'">'+escHtml(e.name)+'</option>';}).join('')+'</select></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary" onclick="loadTatComplianceReport()">🔍 Search</button>'
+    +'<button class="btn btn-success" onclick="downloadTatComplianceExcel()">📊 Excel Download</button>'
+    +'</div></div>'
+    +'<div id="tat-results"></div>';
+  loadTatComplianceReport();
+}
+function _tatDeadline(tatStr){
+  var d=new Date(tatStr);
+  return /T00:00:00/.test(tatStr)?new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),23,59,59):d;
+}
+async function loadTatComplianceReport(){
+  var from=document.getElementById('tat-from')?.value||'';
+  var to=document.getElementById('tat-to')?.value||'';
+  var engFilter=document.getElementById('tat-eng')?.value||'';
+  var res=document.getElementById('tat-results');
+  if(!res)return;
+  res.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    // Same completion statuses _engCompletionEntry looks for, plus Delivered
+    // (a ticket sitting at Delivered still has its real "Repaired" completion
+    // entry earlier in the timeline — _engCompletionEntry finds that, not
+    // the later Delivered/Invoice entries — but the ticket itself must still
+    // be included in this fetch for that to have a chance to run).
+    var q='?tat_date=not.is.null&status=in.(Closed,Repaired,Pending for Delivery,Resolved By Phone,Delivered)&select=id,cname,model,assigned_name,assigned_to,tat_date,timeline';
+    if(engFilter)q+='&assigned_to=eq.'+encodeURIComponent(engFilter);
+    var tickets=await sbAll('tickets',q);
+    var rows=[];
+    tickets.forEach(function(t){
+      var entry=_engCompletionEntry(t);
+      if(!entry||!entry.at)return; // no real completion timestamp on record — can't judge TAT
+      var closedAt=new Date(entry.at);
+      var closedDateStr=closedAt.toLocaleDateString('en-CA');
+      if(from&&closedDateStr<from)return;
+      if(to&&closedDateStr>to)return;
+      var deadline=_tatDeadline(t.tat_date);
+      var withinTAT=closedAt<=deadline;
+      rows.push({id:t.id,cname:t.cname,model:t.model,eng:t.assigned_name,closedAt:closedAt,deadline:deadline,withinTAT:withinTAT,diffHrs:(closedAt-deadline)/3600000});
+    });
+    window._tatRows=rows;
+    if(!rows.length){res.innerHTML='<div class="alert alert-info">No closed calls with a TAT found for this filter.</div>';return;}
+    var withinCount=rows.filter(function(r){return r.withinTAT;}).length;
+    var outsideCount=rows.length-withinCount;
+    var pct=rows.length?Math.round(withinCount/rows.length*100):0;
+    var byEng={};
+    rows.forEach(function(r){
+      var k=r.eng||'Unassigned';
+      if(!byEng[k])byEng[k]={within:0,outside:0};
+      if(r.withinTAT)byEng[k].within++;else byEng[k].outside++;
+    });
+    var fmtDT=function(d){return d.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});};
+    var html='<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">'
+      +'<div class="kpi-card"><div class="kpi-label">Total Closed (with TAT)</div><div class="kpi-value">'+rows.length+'</div></div>'
+      +'<div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Within TAT</div><div class="kpi-value" style="color:#0e9f6e;">'+withinCount+' <span style="font-size:14px;">('+pct+'%)</span></div></div>'
+      +'<div class="kpi-card" style="border-color:#f05252"><div class="kpi-label">Outside TAT</div><div class="kpi-value" style="color:#f05252;">'+outsideCount+'</div></div>'
+      +'</div>';
+    html+='<div class="card" style="margin-bottom:14px;"><h3 style="font-weight:700;font-size:14px;margin-bottom:12px;">👷 Per Engineer</h3>'
+      +'<div class="table-wrap"><table><thead><tr><th>Engineer</th><th>Within TAT</th><th>Outside TAT</th><th>Total</th><th>Compliance %</th></tr></thead><tbody>'
+      +Object.entries(byEng).sort(function(a,b){return (b[1].within+b[1].outside)-(a[1].within+a[1].outside);}).map(function(e){
+        var name=e[0],d=e[1];var tot=d.within+d.outside;var p=tot?Math.round(d.within/tot*100):0;
+        return '<tr><td><b>'+escHtml(name)+'</b></td><td style="text-align:center;color:#0e9f6e;font-weight:700;">'+d.within+'</td><td style="text-align:center;color:#f05252;font-weight:700;">'+d.outside+'</td><td style="text-align:center;">'+tot+'</td><td style="text-align:center;font-weight:700;">'+p+'%</td></tr>';
+      }).join('')
+      +'</tbody></table></div></div>';
+    html+='<div class="card"><h3 style="font-weight:700;font-size:14px;margin-bottom:12px;">📋 Call Details</h3>'
+      +'<div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Engineer</th><th>TAT Deadline</th><th>Closed At</th><th>Status</th></tr></thead><tbody>'
+      +rows.slice().sort(function(a,b){return b.closedAt-a.closedAt;}).map(function(r){
+        return '<tr>'
+          +'<td><a href="javascript:void(0)" onclick="viewTicket(\''+r.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(r.id)+'</a></td>'
+          +'<td>'+escHtml(r.cname||'-')+'</td>'
+          +'<td>'+escHtml(r.model||'-')+'</td>'
+          +'<td>'+escHtml(r.eng||'-')+'</td>'
+          +'<td>'+fmtDT(r.deadline)+'</td>'
+          +'<td>'+fmtDT(r.closedAt)+'</td>'
+          +'<td>'+(r.withinTAT?'<span style="color:#0e9f6e;font-weight:700;">✅ Within TAT</span>':'<span style="color:#f05252;font-weight:700;">⚠️ '+Math.round(Math.abs(r.diffHrs))+'h Late</span>')+'</td>'
+          +'</tr>';
+      }).join('')
+      +'</tbody></table></div></div>';
+    res.innerHTML=html;
+  }catch(e){res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
+}
+function downloadTatComplianceExcel(){
+  var rows=window._tatRows||[];
+  if(!rows.length){alert('Please search first');return;}
+  var data=rows.map(function(r){
+    return{
+      'Ticket':r.id,'Customer':r.cname||'-','Model':r.model||'-','Engineer':r.eng||'-',
+      'TAT Deadline':r.deadline.toLocaleString('en-IN'),'Closed At':r.closedAt.toLocaleString('en-IN'),
+      'Status':r.withinTAT?'Within TAT':'Outside TAT',
+      'Hours Early/Late':Math.round(r.diffHrs*10)/10
+    };
+  });
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'TAT Compliance');
+  XLSX.writeFile(wb,'tat_compliance_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
 
 async function renderReportFilter(c){
