@@ -4902,11 +4902,90 @@ function mcTatHtml(t){
   return'<span style="color:'+(overdue?'#dc2626':'#166534')+';font-weight:700;">'+tdStr+' · '+ttStr+(overdue?' ⚠️ Overdue':'')+'</span>';
 }
 
+// PREVIOUS LOCATION — for a repeat serial, reuse the GPS already captured at
+// a past visit's "Reached Location" (km_logs, entry_type=arrival) or ticket
+// close (engineer_locations, event_type=ticket_close) instead of having to
+// call the customer again to re-confirm directions. No new table: this is a
+// bulk lookup across the two tables that already capture that GPS today,
+// keyed via serial -> other tickets with the same serial -> their logs.
+async function mcBuildPrevLocMap(tickets){
+  window._myCallsPrevLoc={};
+  try{
+    var serials=[...new Set((tickets||[]).map(function(t){return t.serial;}).filter(function(s){return s&&!s.startsWith('NO-SN-');}))];
+    if(!serials.length)return;
+    var qSerials=serials.map(function(s){return '"'+s.replace(/"/g,'')+'"';}).join(',');
+    var sameSerial=await sbAll('tickets','?serial=in.('+qSerials+')&select=id,serial,created_at');
+    var byId={};var idsBySerial={};
+    sameSerial.forEach(function(t){
+      byId[t.id]=t.serial;
+      if(!idsBySerial[t.serial])idsBySerial[t.serial]=[];
+      idsBySerial[t.serial].push(t.id);
+    });
+    var allIds=Object.keys(byId);
+    if(!allIds.length)return;
+    var qIds=allIds.map(function(id){return '"'+id.replace(/"/g,'')+'"';}).join(',');
+    var[arrivals,closes]=await Promise.all([
+      sbAll('km_logs','?ticket_id=in.('+qIds+')&entry_type=eq.arrival&lat=not.is.null&select=ticket_id,lat,lng,captured_at').catch(function(){return[];}),
+      sbAll('engineer_locations','?ticket_id=in.('+qIds+')&event_type=eq.ticket_close&lat=not.is.null&select=ticket_id,lat,lng,recorded_at').catch(function(){return[];})
+    ]);
+    var points=arrivals.map(function(l){return{ticketId:l.ticket_id,lat:l.lat,lng:l.lng,at:l.captured_at};})
+      .concat(closes.map(function(l){return{ticketId:l.ticket_id,lat:l.lat,lng:l.lng,at:l.recorded_at};}));
+    var bestBySerial={};
+    points.forEach(function(p){
+      var serial=byId[p.ticketId];if(!serial)return;
+      var cur=bestBySerial[serial];
+      if(!cur||new Date(p.at)>new Date(cur.at))bestBySerial[serial]={ticketId:p.ticketId,lat:p.lat,lng:p.lng,at:p.at};
+    });
+    window._myCallsPrevLoc=bestBySerial;
+  }catch(e){console.log('Previous location lookup error:',e);}
+}
+function mcHasPrevLoc(t){
+  var pl=(window._myCallsPrevLoc||{})[t.serial];
+  return pl&&pl.ticketId!==t.id?pl:null;
+}
+function mcConfirmPrevLocation(ticketId){
+  var t=(window._myCallsTickets||[]).find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  var pl=mcHasPrevLoc(t);
+  if(!pl)return;
+  var msg='📍 આ લોકેશન આ ડિવાઇસ (સિરિયલ: '+t.serial+') ની પાછલી વિઝિટ વખતે સેવ થયેલ છે.\n\n'
+    +'નેવિગેટ કરતા પહેલા એક વાર કન્ફર્મ કરો કે તમે એ જ સરનામે/જગ્યાએ જવાના છો — વચ્ચે કસ્ટમરનું લોકેશન બદલાઈ પણ ગયું હોઈ શકે છે.';
+  if(confirm(msg))mcOpenPrevLocationMap(pl,t);
+}
+function mcOpenPrevLocationMap(pl,t){
+  var ex=document.getElementById('modal-prev-location');if(ex)ex.remove();
+  var m=document.createElement('div');
+  m.id='modal-prev-location';m.className='modal-overlay';
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">'
+    +'<div class="modal-header"><h2>📍 Previous Location — '+escHtml(t.cname||t.serial)+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-prev-location\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="padding:0;">'
+    +'<div id="mc-prev-loc-map" style="width:100%;height:320px;"></div>'
+    +'<div style="padding:12px 16px;font-size:12px;color:var(--text-muted);">Recorded '+new Date(pl.at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})+' (Ticket '+escHtml(pl.ticketId)+')</div>'
+    +'</div>'
+    +'<div class="modal-footer" style="display:flex;gap:8px;">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'modal-prev-location\').remove()">⬅ Back to My Calls</button>'
+    +'<a href="https://www.google.com/maps/dir/?api=1&destination='+pl.lat+','+pl.lng+'" target="_blank" class="btn btn-primary" style="flex:1;text-align:center;text-decoration:none;">🧭 Get Directions</a>'
+    +'</div></div>';
+  document.body.appendChild(m);
+  setTimeout(function(){
+    try{
+      var map=L.map('mc-prev-loc-map').setView([pl.lat,pl.lng],16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+      L.marker([pl.lat,pl.lng]).addTo(map).bindPopup(escHtml(t.cname||'Previous visit location')).openPopup();
+    }catch(e){
+      var mp=document.getElementById('mc-prev-loc-map');
+      if(mp)mp.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);">Map failed to load. Use Get Directions below instead.</div>';
+    }
+  },50);
+}
+
 async function renderMyCalls(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     const engId=currentUser.eng_id||currentUser.user_id;
     const tickets=await sb('tickets','GET',null,`?assigned_to=eq.${engId}&select=id,assigned_name,created_at,cname,mobile,alt_mobile,model,serial,problem,status,priority,call_type,service_type,se_call_id,tat_date,address,area,city,state,pin,planned_date,sequence_no&order=created_at.desc`);
+    window._myCallsTickets=tickets;
+    await mcBuildPrevLocMap(tickets);
     const todayStr=new Date().toLocaleDateString('en-CA');
     const todayRoute=tickets.filter(t=>t.planned_date===todayStr&&isTicketActive(t)).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
     // Punch bar
@@ -5077,6 +5156,7 @@ async function renderMyCalls(){
                   <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([t.address,t.area,t.city,t.state].filter(Boolean).join(', '))}" target="_blank" style="display:inline-block;margin-top:4px;color:#1d4ed8;font-weight:600;font-size:11px;">🗺️ Open in Maps</a>
                   <div onclick="event.stopPropagation();document.getElementById('addr-${t.id}').style.display='none';" style="cursor:pointer;margin-top:6px;font-size:11px;color:#64748b;font-weight:700;">✕ Close</div>
                 </div>`:''}
+                ${mcHasPrevLoc(t)?`<div onclick="mcConfirmPrevLocation('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;margin-left:6px;">📍 Previous Location</div>`:''}
                 <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
               </div>`;
             }).join('');
@@ -8756,7 +8836,7 @@ async function renderPaymentCollection(view){
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
     const canManage=_pcCanManage();
-    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by&order=updated_at.desc';
+    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by,invoice_done,invoice_no&order=updated_at.desc';
     if(!canManage){
       const myId=currentUser.eng_id||currentUser.user_id;
       q+='&assigned_to=eq.'+encodeURIComponent(myId);
@@ -8815,7 +8895,7 @@ async function renderPaymentCollection(view){
           :'<span style="font-size:13px;font-weight:700;color:#0e9f6e;">✅ Received: ₹'+g.received.toFixed(0)+'</span>')
         +'</div>'
         +'<div class="table-wrap"><table><thead><tr>'
-        +'<th>Date</th><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Amount</th><th>Mode</th><th>'+(view==='pending'?'Received':'Received Info')+'</th>'
+        +'<th>Date</th><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Amount</th><th>Mode</th><th>Invoice</th><th>'+(view==='pending'?'Received':'Received Info')+'</th>'
         +'</tr></thead><tbody>'
         +g[groupKey].map(function(t){
           const amt=_pcAmount(t);
@@ -8829,6 +8909,15 @@ async function renderPaymentCollection(view){
           }else{
             recvCell='<span style="color:#d97706;font-weight:700;font-size:12px;">☐ Pending</span>';
           }
+          let invCell;
+          if(t.invoice_done){
+            invCell='<div style="color:#0e9f6e;font-weight:700;font-size:12px;">✅ #'+escHtml(t.invoice_no||'')+'</div>'
+              +(canManage?'<button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="pcOpenInvoice(\''+t.id+'\')">✏️ Edit</button>':'');
+          }else if(canManage){
+            invCell='<button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;" onclick="pcOpenInvoice(\''+t.id+'\')">🧾 Add Invoice</button>';
+          }else{
+            invCell='<span style="color:#d97706;font-weight:700;font-size:12px;">☐ Pending</span>';
+          }
           return '<tr>'
             +'<td>'+(t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN'):'-')+'</td>'
             +'<td>'+(canManage?'<a href="javascript:void(0)" onclick="viewTicket(\''+t.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(t.id)+'</a>':'<b>'+escHtml(t.id)+'</b>')+'</td>'
@@ -8838,6 +8927,7 @@ async function renderPaymentCollection(view){
             +'<td>'+escHtml(t.model||'-')+'</td>'
             +'<td><a href="javascript:void(0)" onclick="pcShowBreakdown(\''+t.id+'\')" style="font-weight:700;color:var(--primary);text-decoration:underline dotted;" title="Click for Labor/Parts breakdown">₹'+amt.toFixed(0)+'</a></td>'
             +'<td>'+escHtml(t.payment_mode||'-')+'</td>'
+            +'<td style="white-space:nowrap;">'+invCell+'</td>'
             +'<td style="white-space:nowrap;">'+recvCell+'</td>'
             +'</tr>';
         }).join('')
@@ -8869,6 +8959,53 @@ async function pcToggleReceived(ticketId,received){
     }
   }
 }
+// Self-contained Invoice entry for Payment Collection — deliberately not
+// reusing the ticket-card's openInvoiceModal(), which looks the ticket up
+// in the global allTickets array (not populated on this page) and pokes a
+// #inv-status-<id> element that doesn't exist here. Same invoice_no/
+// invoice_done fields, so both places stay in sync either way.
+function pcOpenInvoice(ticketId){
+  const t=(window._pcTickets||[]).find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  const b=_pcBreakdown(t);
+  const ex=document.getElementById('pc-inv-modal');if(ex)ex.remove();
+  const d=document.createElement('div');
+  d.id='pc-inv-modal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  d.innerHTML='<div style="background:var(--card);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.2);padding:20px;max-width:420px;width:92vw;">'
+    +'<h3 style="margin:0 0 14px;font-size:16px;font-weight:700;">🧾 Invoice Entry — '+escHtml(ticketId)+'</h3>'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">'+escHtml(t.cname||'')+(t.model?' | '+escHtml(t.model):'')+'</div>'
+    +'<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;">'
+    +'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Labor/Service</span><b>₹'+b.labor.toFixed(0)+'</b></div>'
+    +(b.parts>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Parts</span><b>₹'+b.parts.toFixed(0)+'</b></div>':'')
+    +(b.other>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-muted);">Other</span><b>₹'+b.other.toFixed(0)+'</b></div>':'')
+    +'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px;margin-top:4px;"><span style="font-weight:700;">Total</span><b style="color:#0d9488;font-size:15px;">₹'+b.total.toFixed(0)+'</b></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:600;">Invoice Number <span class="req">*</span></label>'
+    +'<input type="text" id="pc-inv-no-inp" value="'+escHtml(t.invoice_no||'')+'" placeholder="e.g. INV-2026-001" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;box-sizing:border-box;" /></div>'
+    +'<div style="display:flex;gap:10px;">'
+    +'<button class="btn btn-primary btn-sm" style="flex:1;" onclick="pcSaveInvoice(\''+ticketId+'\')">💾 Save & Mark Done</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'pc-inv-modal\').remove()">Cancel</button>'
+    +'</div></div>';
+  d.onclick=function(e){if(e.target===d)d.remove();};
+  document.body.appendChild(d);
+  setTimeout(function(){var el=document.getElementById('pc-inv-no-inp');if(el)el.focus();},100);
+}
+async function pcSaveInvoice(ticketId){
+  const invNo=(document.getElementById('pc-inv-no-inp')?.value||'').trim();
+  if(!invNo){alert('⚠️ Invoice Number is required.');return;}
+  try{
+    // Fetch the ticket's full current timeline fresh — window._pcTickets doesn't
+    // carry it (kept out of the list query since it's only needed here) — so
+    // appending to a stale/empty local copy can't ever clobber real history.
+    const fresh=(await sb('tickets','GET',null,'?id=eq.'+ticketId+'&select=timeline'))[0];
+    let tl=(fresh&&fresh.timeline)||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+    tl=tl.concat([{action:'Invoice Done',by:currentUser.name||'',at:new Date().toISOString(),note:'Invoice No: '+invNo}]);
+    await sb('tickets','PATCH',{invoice_done:true,invoice_no:invNo,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+ticketId);
+    document.getElementById('pc-inv-modal')?.remove();
+    renderPaymentCollection(window._pcView||'pending');
+  }catch(e){alert('Error: '+e.message);}
+}
 function downloadPaymentCollectionExcel(){
   const tickets=window._pcTickets||[];
   if(!tickets.length){alert('Nothing to download');return;}
@@ -8879,6 +9016,7 @@ function downloadPaymentCollectionExcel(){
       'Ticket':t.id,'Customer':t.cname||'-','Mobile':t.mobile||'-','Area':t.area||'-','Model':t.model||'-',
       'Labor ₹':b.labor.toFixed(2),'Parts ₹':b.parts.toFixed(2),'Other ₹':b.other.toFixed(2),
       'Total ₹':b.total.toFixed(2),'Mode':t.payment_mode||'-',
+      'Invoice Done':t.invoice_done?'Yes':'No','Invoice No':t.invoice_no||'',
       'Received':t.payment_received?'Yes':'No',
       'Received By':t.payment_received_by||'',
       'Received At':t.payment_received_at?new Date(t.payment_received_at).toLocaleString('en-IN'):''
