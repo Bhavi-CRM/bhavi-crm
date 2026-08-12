@@ -1773,8 +1773,9 @@ function viewDailyReport(idx){
     +'</div>'
     +(owItems.length?'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;">💼 Office / Remote Work ('+owItems.length+')</h4>'
       +'<div style="margin-bottom:14px;">'+owItems.map(function(o){
+        var timeStr=(o.from_time&&o.to_time)?' <span style="color:#7c3aed;font-weight:600;">('+o.from_time+' – '+o.to_time+')</span>':'';
         return '<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:13px;">'
-          +'<b style="color:#5b21b6;">'+(o.work_type||'Work')+'</b>'+(o.remark?' — '+o.remark:'')
+          +'<b style="color:#5b21b6;">'+(o.work_type||'Work')+'</b>'+(o.remark?' — '+o.remark:'')+timeStr
           +'</div>';
       }).join('')+'</div>':'')
     +(pays.length?'<h4 style="font-size:13px;font-weight:700;margin-bottom:8px;">💳 Payment Details</h4>'
@@ -1801,7 +1802,7 @@ async function downloadDailyExcel(){
   var data=reports.map(function(r){
     var owList=r.office_work;if(typeof owList==='string'){try{owList=JSON.parse(owList);}catch(e){owList=[];}}
     if(!Array.isArray(owList))owList=[];
-    var owSummary=owList.map(function(o){return(o.work_type||'Work')+(o.remark?' - '+o.remark:'');}).join('; ');
+    var owSummary=owList.map(function(o){return(o.work_type||'Work')+(o.remark?' - '+o.remark:'')+((o.from_time&&o.to_time)?' ['+o.from_time+'-'+o.to_time+']':'');}).join('; ');
     return{'Engineer':r.eng_name,'Date':r.report_date,'W-Installation':r.warranty_installation,'W-Breakdown':r.warranty_breakdown,'OW-Breakdown':r.outwarranty_breakdown,'OW-Other':r.outwarranty_other,'Office Work Count':owList.length||r.total_office_work||0,'Office Work Details':owSummary,'Total Calls':r.total_calls,'Petrol KM':r.petrol_km,'Total Collection':r.total_amount,'Remarks':r.remarks||''};
   });
   var ws=XLSX.utils.json_to_sheet(data);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Daily Reports');XLSX.writeFile(wb,'daily_reports.xlsx');
@@ -12934,7 +12935,12 @@ function addOfficeWorkRow(){
     +'</div>'
     +'<input type="text" class="ow-remark" placeholder="Party Name / Remark" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%;">'
     +'<button onclick="this.closest(\'.dr-office-row\').remove();updateOfficeCount();" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;">✕</button>'
-    +'</div>';
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'
+    +'<div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">From (optional)</label><input type="time" class="ow-from" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div><label style="font-size:11px;color:var(--text-muted);font-weight:600;">To (optional)</label><input type="time" class="ow-to" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;outline:none;width:100%;"></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Time bharso to aa entry Work Log ma pan automatically aavi jashe.</div>';
   rows.appendChild(div);
   updateOfficeCount();
 }
@@ -13178,7 +13184,9 @@ async function saveDailyReport(){
   document.querySelectorAll('#dr-office-rows .dr-office-row').forEach(function(row){
     var type=row.querySelector('.ow-type')?.value?.trim()||'';
     var remark=row.querySelector('.ow-remark')?.value?.trim()||'';
-    if(type)officeWork.push({work_type:type,remark:remark});
+    var fromT=row.querySelector('.ow-from')?.value||'';
+    var toT=row.querySelector('.ow-to')?.value||'';
+    if(type)officeWork.push({work_type:type,remark:remark,from_time:fromT,to_time:toT});
   });
 
   // Collect payment details
@@ -13225,6 +13233,25 @@ async function saveDailyReport(){
       total_reviews:googleReviews.length,
       remarks:remarks
     });
+    // Office Work entries with a time range also create a matching Work Log
+    // row, so the day's full picture (travel/ticket work/office work) shows
+    // up in one place — same table + rendering Work Log already has, no
+    // special-casing needed there since it just reads task_description/
+    // from_time/to_time generically.
+    var _owMemberRole=(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'WC':'Engineer';
+    for(var _owi=0;_owi<officeWork.length;_owi++){
+      var _ow=officeWork[_owi];
+      if(_ow.from_time&&_ow.to_time){
+        try{
+          await sb('work_logs','POST',{
+            eng_id:currentUser.eng_id||currentUser.user_id,eng_name:currentUser.name,member_role:_owMemberRole,
+            log_date:date,from_time:_ow.from_time,to_time:_ow.to_time,
+            task_description:'🏢 Office Work — '+_ow.work_type+(_ow.remark?' — '+_ow.remark:''),
+            ticket_id:null,log_type:'work',created_at:new Date().toISOString()
+          });
+        }catch(_owe){}
+      }
+    }
     closeModal('modal-daily-report');
     autoSendDailyReport({
       eng_name:currentUser.name,
