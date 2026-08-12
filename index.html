@@ -1001,8 +1001,9 @@ tr:hover td{background:#f8fafc;}
           <h3 style="font-size:14px;font-weight:700;color:#5b21b6;">2. 💼 Office / Remote Work</h3>
           <span style="font-size:12px;color:#5b21b6;font-weight:600;">Total: <span id="dr-office-count">0</span></span>
         </div>
+        <div style="font-size:11px;color:#6d28d9;margin-bottom:8px;">🔄 Aaje "🚚 Other Work" page thi je Office Work log karyu hoy ae automatic uper aavi jashe. Khali kaink chuki gaya hoy to j niche manually add karo.</div>
         <div id="dr-office-rows"></div>
-        <button class="btn btn-outline btn-sm" onclick="addOfficeWorkRow()" style="margin-top:8px;">+ Add Office Work</button>
+        <button class="btn btn-outline btn-sm" onclick="addOfficeWorkRow()" style="margin-top:8px;">+ Add Office Work (manually — if missed)</button>
       </div>
 
       <!-- Section 3: Payment Details -->
@@ -12749,6 +12750,7 @@ function openDailyReport(){
   var or2=document.getElementById('dr-office-rows');
   if(or2)or2.innerHTML='';
   updateOfficeCount();
+  drAutoFillOfficeWork();
   // Init payment rows
   var pr=document.getElementById('payment-rows');
   pr.innerHTML='';
@@ -12946,9 +12948,37 @@ function addOfficeWorkRow(){
 }
 
 function updateOfficeCount(){
-  var count=document.querySelectorAll('#dr-office-rows .dr-office-row').length;
+  var count=document.querySelectorAll('#dr-office-rows .dr-office-row, #dr-office-rows .dr-office-row-auto').length;
   var el=document.getElementById('dr-office-count');
   if(el)el.textContent=count;
+}
+// Today's Office Work already logged live via the Other Work page (real-time,
+// with its own time range) shown here read-only — the engineer doesn't
+// re-type it. Deliberately a DIFFERENT class (.dr-office-row-auto, not
+// .dr-office-row) so saveDailyReport()'s collection loop skips these: they're
+// already counted once via field_tasks directly (daily-digest reads that
+// table independently), so folding them into office_work here too would
+// double-count them in the Mail/Telegram digest.
+async function drAutoFillOfficeWork(){
+  try{
+    var date=document.getElementById('dr-date').value||new Date().toLocaleDateString('en-CA');
+    var engId=currentUser.eng_id||currentUser.user_id;
+    var tasks=await sb('field_tasks','GET',null,'?assigned_to=eq.'+encodeURIComponent(engId)+'&task_type=eq.Office Work&status=eq.Done&done_date=eq.'+date+'&select=id,customer_name,notes,from_time,to_time,done_at&order=done_at.asc').catch(function(){return[];});
+    var rows=document.getElementById('dr-office-rows');
+    if(!rows||!tasks||!tasks.length)return;
+    tasks.forEach(function(t){
+      var div=document.createElement('div');
+      div.className='dr-office-row-auto';
+      div.style.cssText='background:#f5f3ff;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #ddd6fe;';
+      var timeStr=(t.from_time&&t.to_time)?' <span style="color:#7c3aed;">('+t.from_time+' – '+t.to_time+')</span>':'';
+      div.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+        +'<div style="font-size:13px;"><b style="color:#5b21b6;">'+escHtml(t.customer_name||'Work')+'</b>'+(t.notes?' — '+escHtml(t.notes):'')+timeStr+'</div>'
+        +'<span style="font-size:10px;background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:99px;font-weight:700;white-space:nowrap;">🔄 Other Work</span>'
+        +'</div>';
+      rows.appendChild(div);
+    });
+    updateOfficeCount();
+  }catch(e){console.log('Office work autofill error:',e);}
 }
 function addPaymentRow(){
   var pr=document.getElementById('payment-rows');
@@ -21899,15 +21929,19 @@ async function showInqReport(){
 // engineer's daily KM total includes this travel automatically. Fully isolated
 // from the ticket/call flow — nothing here touches tickets or call work logs.
 // ============================================================================
-var FT_TYPES=['Cart Delivery','Payment Collection','Cheque Collection','Document Pickup','Bank Work','Other'];
+var FT_TYPES=['Cart Delivery','Payment Collection','Cheque Collection','Document Pickup','Bank Work','Office Work','Other'];
 var FT_TYPE_META={
   'Cart Delivery':{e:'🚚',c:'#2563eb'},
   'Payment Collection':{e:'💵',c:'#059669'},
   'Cheque Collection':{e:'🧾',c:'#7c3aed'},
   'Document Pickup':{e:'📄',c:'#0891b2'},
   'Bank Work':{e:'🏦',c:'#b45309'},
+  'Office Work':{e:'🏢',c:'#7c3aed'},
   'Other':{e:'🔧',c:'#64748b'}
 };
+// Sub-type suggestions shown only for the "Office Work" type — same list
+// Daily Report's old manual entry used, kept for consistency.
+var FT_OFFICE_WORK_TYPES=['Remote Support','Configuration','Estimation','Documentation','Follow-up Call','Billing / Invoice','Stock / Inventory','Training','Other'];
 var FT_STATUS_META={
   'Assigned':{e:'📋',c:'#d97706',t:'Assigned'},
   'Traveling':{e:'🚗',c:'#f59e0b',t:'Traveling'},
@@ -22020,10 +22054,11 @@ function _ftCard(t,ctx){
   }
   // Progress trail
   var trail='';
-  if(t.travel_start_at||t.reached_at||t.done_at){
+  if(t.travel_start_at||t.reached_at||t.done_at||(t.from_time&&t.to_time)){
     trail='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#64748b;border-top:1px dashed var(--border);padding-top:6px;">'
       +(t.travel_start_at?'<span>🚗 '+fmtD(t.travel_start_at)+' '+fmtT(t.travel_start_at)+'</span>':'')
       +(t.reached_at?'<span>📍 '+fmtT(t.reached_at)+'</span>':'')
+      +((t.from_time&&t.to_time)?'<span style="color:#7c3aed;font-weight:700;">🕐 '+t.from_time+' – '+t.to_time+'</span>':'')
       +(t.done_at?'<span style="color:#059669;font-weight:700;">✅ '+fmtD(t.done_at)+' '+fmtT(t.done_at)+'</span>':'')
       +'</div>';
   }
@@ -22075,59 +22110,129 @@ async function openFtEditModal(id){
   var defEng=t.assigned_to||(isEng?myId:'');
   var engOpts='<option value="">— Select Engineer —</option>'+(window._ftEngs||[]).map(function(e){return '<option value="'+e.eng_id+'"'+(String(defEng)===String(e.eng_id)?' selected':'')+'>'+escHtml(e.name)+'</option>';}).join('');
   var typeOpts=FT_TYPES.map(function(x){return '<option value="'+x+'"'+((t.task_type||'Cart Delivery')===x?' selected':'')+'>'+_ftMeta(x).e+' '+x+'</option>';}).join('');
+  var isOfficeEdit=t.task_type==='Office Work';
   var m=document.createElement('div');
   m.id='modal-ft-edit';m.className='modal-overlay';
   var f=function(id2,ph,v,tp){return'<input type="'+(tp||'text')+'" id="'+id2+'" value="'+escHtml(v==null?'':String(v))+'" placeholder="'+ph+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">';};
+  var owTypeOpts=FT_OFFICE_WORK_TYPES.map(function(x){return '<option value="'+x+'">';}).join('');
   m.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()" style="max-width:460px;">'
     +'<div class="modal-header"><h2>'+(id?'✏️ Edit Task':'🚚 New Other Work')+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-ft-edit\').remove()">✕</button></div>'
     +'<div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Task Type *</label><select id="ft-type" onchange="_ftToggleAmt()" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+typeOpts+'</select></div>'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Customer / Party Name *</label>'+f('ft-name','e.g. Sharma Traders',t.customer_name)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Task Type *</label><select id="ft-type" onchange="_ftToggleType()" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+typeOpts+'</select></div>'
+    // Office Work — a simple real-time log (no travel/customer), submitted
+    // as Done immediately: work sub-type, details, optional From/To time.
+    +'<div id="ft-office-fields" style="display:'+(isOfficeEdit?'flex':'none')+';flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Work Type *</label><input list="ft-ow-type-list" id="ft-ow-type" value="'+escHtml(isOfficeEdit?(t.customer_name||''):'')+'" placeholder="e.g. Remote Support" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"><datalist id="ft-ow-type-list">'+owTypeOpts+'</datalist></div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Details</label><textarea id="ft-ow-notes" rows="2" placeholder="What was done / for whom...">'+escHtml(isOfficeEdit?(t.notes||''):'')+'</textarea></div>'
+    +'<div style="display:flex;gap:10px;"><div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">From (optional)</label><input type="time" id="ft-ow-from" value="'+escHtml(t.from_time||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
+    +'<div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">To (optional)</label><input type="time" id="ft-ow-to" value="'+escHtml(t.to_time||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div></div>'
+    +'</div>'
+    +'<div id="ft-delivery-fields" style="display:'+(isOfficeEdit?'none':'flex')+';flex-direction:column;gap:10px;">'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Customer / Party Name *</label>'+f('ft-name','e.g. Sharma Traders',isOfficeEdit?'':t.customer_name)+'</div>'
     +'<div style="display:flex;gap:10px;"><div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Mobile</label>'+f('ft-mobile','10-digit',t.mobile,'tel')+'</div>'
     +'<div id="ft-amt-wrap" style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;">Amount (₹)</label>'+f('ft-amount','e.g. 5000',t.amount,'number')+'</div></div>'
     +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Address</label>'+f('ft-address','Delivery / pickup address',t.address)+'</div>'
     +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Location (Maps link / coords)</label>'+f('ft-location','optional',t.location)+'</div>'
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Notes</label><textarea id="ft-notes" rows="2" placeholder="Any instructions..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;">'+escHtml(isOfficeEdit?'':(t.notes||''))+'</textarea></div>'
+    +'</div>'
     +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Assign to Engineer</label><select id="ft-eng" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;">'+engOpts+'</select></div>'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Notes</label><textarea id="ft-notes" rows="2" placeholder="Any instructions..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;">'+escHtml(t.notes||'')+'</textarea></div>'
     +'</div>'
     +'<div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-ft-edit\').remove()">Cancel</button>'
     +'<button class="btn btn-primary" onclick="saveFtTask('+(id||'null')+')">💾 Save</button></div>'
     +'</div>';
   m.onclick=function(e){if(e.target===m)m.remove();};
   document.body.appendChild(m);
-  _ftToggleAmt();
+  _ftToggleType();
 }
 function _ftToggleAmt(){
   var tp=document.getElementById('ft-type')?.value||'';
   var w=document.getElementById('ft-amt-wrap');
   if(w)w.style.opacity=(tp==='Payment Collection'||tp==='Cheque Collection')?'1':'0.55';
 }
+function _ftToggleType(){
+  var tp=document.getElementById('ft-type')?.value||'';
+  var isOffice=tp==='Office Work';
+  var of=document.getElementById('ft-office-fields');if(of)of.style.display=isOffice?'flex':'none';
+  var df=document.getElementById('ft-delivery-fields');if(df)df.style.display=isOffice?'none':'flex';
+  _ftToggleAmt();
+}
 async function saveFtTask(id){
   var type=document.getElementById('ft-type')?.value||'Other';
-  var name=(document.getElementById('ft-name')?.value||'').trim();
-  if(!name){alert('Customer / Party name is required.');return;}
-  var mobile=(document.getElementById('ft-mobile')?.value||'').trim();
-  var amountRaw=(document.getElementById('ft-amount')?.value||'').trim();
-  var amount=amountRaw===''?null:parseFloat(amountRaw);
-  var address=(document.getElementById('ft-address')?.value||'').trim();
-  var location=(document.getElementById('ft-location')?.value||'').trim();
+  var isOffice=type==='Office Work';
   var engSel=document.getElementById('ft-eng');
   var engId=engSel?engSel.value:'';
   var engName=engId&&engSel?(engSel.options[engSel.selectedIndex]?.text||'').trim():'';
-  var notes=(document.getElementById('ft-notes')?.value||'').trim();
   var now=new Date();
-  var payload={task_type:type,customer_name:name,mobile:mobile,amount:amount,address:address,location:location,
-    assigned_to:engId||null,assigned_name:engName||null,notes:notes,updated_at:now.toISOString()};
+  var payload;
+  if(isOffice){
+    // Office Work — a simple real-time log, no travel/customer involved.
+    // work type stands in for "customer_name" so the existing card display
+    // (meta.e + customer_name as the title) needs no special-casing.
+    var owType=(document.getElementById('ft-ow-type')?.value||'').trim();
+    if(!owType){alert('Work Type is required.');return;}
+    var owNotes=(document.getElementById('ft-ow-notes')?.value||'').trim();
+    var owFrom=document.getElementById('ft-ow-from')?.value||'';
+    var owTo=document.getElementById('ft-ow-to')?.value||'';
+    var isEngSelf=currentUser&&currentUser.role==='engineer';
+    payload={task_type:type,customer_name:owType,notes:owNotes,from_time:owFrom||null,to_time:owTo||null,
+      assigned_to:engId||(isEngSelf?(currentUser.eng_id||currentUser.user_id):null),
+      assigned_name:engName||(isEngSelf?currentUser.name:null),
+      updated_at:now.toISOString()};
+  }else{
+    var name=(document.getElementById('ft-name')?.value||'').trim();
+    if(!name){alert('Customer / Party name is required.');return;}
+    var mobile=(document.getElementById('ft-mobile')?.value||'').trim();
+    var amountRaw=(document.getElementById('ft-amount')?.value||'').trim();
+    var amount=amountRaw===''?null:parseFloat(amountRaw);
+    var address=(document.getElementById('ft-address')?.value||'').trim();
+    var location=(document.getElementById('ft-location')?.value||'').trim();
+    var notes=(document.getElementById('ft-notes')?.value||'').trim();
+    payload={task_type:type,customer_name:name,mobile:mobile,amount:amount,address:address,location:location,
+      assigned_to:engId||null,assigned_name:engName||null,notes:notes,updated_at:now.toISOString()};
+  }
+  // field_tasks may not have from_time/to_time yet (setup SQL not run) — retry
+  // without them rather than blocking the whole task from saving.
+  async function _ftSave(method,body,qs){
+    try{
+      await sb('field_tasks',method,body,qs);
+    }catch(pe){
+      var msg=String(pe&&pe.message||'');
+      if((body.from_time!==undefined||body.to_time!==undefined)&&(msg.indexOf('from_time')!==-1||msg.indexOf('to_time')!==-1)){
+        var retry=Object.assign({},body);delete retry.from_time;delete retry.to_time;
+        await sb('field_tasks',method,retry,qs);
+      }else throw pe;
+    }
+  }
   try{
     if(id){
-      await sb('field_tasks','PATCH',payload,'?id=eq.'+id);
+      await _ftSave('PATCH',payload,'?id=eq.'+id);
     }else{
-      payload.status='Assigned';
       payload.created_by=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
       payload.created_by_name=(currentUser&&currentUser.name)||'';
       payload.task_date=now.toLocaleDateString('en-CA');
       payload.created_at=now.toISOString();
-      await sb('field_tasks','POST',payload);
+      if(isOffice){
+        // Office Work has no travel lifecycle — submitting IS finishing it.
+        payload.status='Done';
+        payload.done_date=payload.task_date;
+        payload.done_at=now.toISOString();
+      }else{
+        payload.status='Assigned';
+      }
+      await _ftSave('POST',payload);
+      // Time range given -> also drop it straight into Work Log, same as any
+      // other time-tracked entry there (generic rendering, no special-casing).
+      if(isOffice&&payload.from_time&&payload.to_time){
+        try{
+          await sb('work_logs','POST',{
+            eng_id:payload.assigned_to||(currentUser.eng_id||currentUser.user_id),eng_name:payload.assigned_name||currentUser.name,
+            member_role:(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'WC':'Engineer',
+            log_date:payload.task_date,from_time:payload.from_time,to_time:payload.to_time,
+            task_description:'🏢 Office Work — '+payload.customer_name+(payload.notes?' — '+payload.notes:''),
+            ticket_id:null,log_type:'work',created_at:now.toISOString()
+          });
+        }catch(_we){}
+      }
     }
     var mm=document.getElementById('modal-ft-edit');if(mm)mm.remove();
     renderFieldTasks();
