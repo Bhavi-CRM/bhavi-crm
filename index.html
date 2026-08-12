@@ -2828,10 +2828,10 @@ function setupNav(){
       sv('nav-inventory',false);sv('nav-customers',false);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',false);sv('nav-settings',false);
       sv('nav-sales',false);sv('nav-route-planning',false);sv('nav-pending-list',false);
-      sv('btn-daily-report',false);sv('btn-weekly-report',false);
+      sv('btn-daily-report',false);sv('btn-weekly-report',false);sv('nav-peon-activity',false);
       // Automation for ENG002 (Hiren Jansari) and ENG008 (Nachiket Joshi) - full access
       var isAutoEng=(currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002'||currentUser.eng_id==='ENG008'||currentUser.user_id==='ENG008');
-      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
+      sv('nav-auto-inventory',isAutoEng);sv('nav-auto-sites',isAutoEng);sv('nav-sw-survey',isAutoEng);sv('nav-auto-visits-report',isAutoEng);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',false);
       var avb=document.getElementById('auto-visit-btn');if(avb){if(isAutoEng){avb.classList.remove('hidden');}else{avb.classList.add('hidden');}}
       // ENG001 (Yogesh Suthar) & ENG002 (Hiren Jansari) = CSP Managers: extra access
       var isCspMgr=['ENG001','ENG002'].includes(currentUser.user_id)||['ENG001','ENG002'].includes(currentUser.eng_id);
@@ -2848,7 +2848,7 @@ function setupNav(){
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
-      sv('btn-daily-report',true);sv('btn-weekly-report',true);
+      sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-peon-activity',false);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
       if(wb){wb.classList.remove('hidden');wb.style.removeProperty('display');wb.style.display='';}
@@ -5615,25 +5615,13 @@ async function checkTATReminder(){
     if(!overdue.length&&!urgent.length)return;
     var old=document.getElementById('modal-tat-reminder');if(old)old.remove();
     var html='';
-    if(overdue.length){
-      html+='<div style="margin-bottom:12px;">'
-        +'<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ OVERDUE ('+overdue.length+')</div>';
-      overdue.forEach(function(t){
-        var dl=tatDL(t);
-        var overdueHrs=Math.round((now-dl)/3600000);
-        var overdueLabel=overdueHrs<1?'Just now':overdueHrs<24?overdueHrs+'h overdue':Math.floor(overdueHrs/24)+'d overdue';
-        var deadlineStr=/T00:00:00/.test(t.tat_date)?'End of Day':dl.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
-        html+='<div onclick="document.getElementById(\'modal-tat-reminder\').remove();viewTicket(\''+t.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin-bottom:5px;">'
-          +'<div><div style="font-weight:700;color:#dc2626;font-size:13px;">'+escHtml(t.id)+'</div>'
-          +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.cname||'')+(t.model?' · '+escHtml(t.model):'')+'</div>'
-          +'<div style="font-size:10px;color:#9ca3af;">Deadline: '+deadlineStr+'</div></div>'
-          +'<span style="background:#dc2626;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+overdueLabel+'</span>'
-          +'</div>';
-      });
-      html+='</div>';
-    }
+    // Due-soon (not yet breached) goes first — those are still fully
+    // avoidable if acted on now, which makes them the highest-value thing
+    // to see at the very top of the popup. Already-overdue calls follow
+    // below since the deadline's already gone; the section itself still
+    // sorts barely-overdue-first (see the .reverse() above).
     if(urgent.length){
-      html+='<div>'
+      html+='<div style="margin-bottom:12px;">'
         +'<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px;">⏰ DUE WITHIN 4 HOURS ('+urgent.length+')</div>';
       urgent.forEach(function(t){
         var dl=tatDL(t);
@@ -5645,6 +5633,23 @@ async function checkTATReminder(){
           +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.cname||'')+(t.model?' · '+escHtml(t.model):'')+'</div>'
           +'<div style="font-size:10px;color:#9ca3af;">Deadline: '+deadlineStr+'</div></div>'
           +'<span style="background:#d97706;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">⏰ '+leftLabel+'</span>'
+          +'</div>';
+      });
+      html+='</div>';
+    }
+    if(overdue.length){
+      html+='<div>'
+        +'<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px;">⚠️ OVERDUE ('+overdue.length+')</div>';
+      overdue.forEach(function(t){
+        var dl=tatDL(t);
+        var overdueHrs=Math.round((now-dl)/3600000);
+        var overdueLabel=overdueHrs<1?'Just now':overdueHrs<24?overdueHrs+'h overdue':Math.floor(overdueHrs/24)+'d overdue';
+        var deadlineStr=/T00:00:00/.test(t.tat_date)?'End of Day':dl.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+        html+='<div onclick="document.getElementById(\'modal-tat-reminder\').remove();viewTicket(\''+t.id+'\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;margin-bottom:5px;">'
+          +'<div><div style="font-weight:700;color:#dc2626;font-size:13px;">'+escHtml(t.id)+'</div>'
+          +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.cname||'')+(t.model?' · '+escHtml(t.model):'')+'</div>'
+          +'<div style="font-size:10px;color:#9ca3af;">Deadline: '+deadlineStr+'</div></div>'
+          +'<span style="background:#dc2626;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">'+overdueLabel+'</span>'
           +'</div>';
       });
       html+='</div>';
@@ -8716,18 +8721,31 @@ async function downloadRevenueExcel(){
 // with a clear alert instead of the page breaking).
 // ════════════════════════════════════════════════════════════
 function _pcCanManage(){return currentUser&&(currentUser.role==='admin'||window._isCspMgr);}
-function _pcAmount(t){
+function _pcBreakdown(t){
   // Same fallback chain as the Revenue tab (final_charges wins when set;
   // otherwise rebuild from parts + labor/service_charges + other) — many
   // tickets only ever get a value in "Labor" on the main update form, not
   // the auto-calculated service_charges, so service_charges-only was
-  // silently showing ₹0 for those.
-  const fin=parseFloat(t.final_charges)||0;
-  if(fin>0)return fin;
+  // silently showing ₹0 for those. Parts/Labor/Other are always computed
+  // from their own fields regardless, so the bifurcation is available even
+  // when final_charges is the one driving the displayed total.
   const sp=(t.spares||[]).reduce(function(a,s){return a+(s.qty||0)*(s.price||0);},0);
   const lab=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const oth=parseFloat(t.other_charge)||0;
-  return sp+lab+oth;
+  const fin=parseFloat(t.final_charges)||0;
+  return {parts:sp,labor:lab,other:oth,total:fin>0?fin:(sp+lab+oth)};
+}
+function _pcAmount(t){return _pcBreakdown(t).total;}
+function pcShowBreakdown(ticketId){
+  const t=(window._pcTickets||[]).find(function(x){return x.id===ticketId;});
+  if(!t)return;
+  const b=_pcBreakdown(t);
+  alert('💰 Amount Breakdown — '+ticketId
+    +'\n\nLabor/Service: ₹'+b.labor.toFixed(0)
+    +'\nParts: ₹'+b.parts.toFixed(0)
+    +(b.other?'\nOther: ₹'+b.other.toFixed(0):'')
+    +'\n─────────────'
+    +'\nTotal: ₹'+b.total.toFixed(0));
 }
 async function renderPaymentCollection(view){
   view=view==='received'?'received':'pending';
@@ -8815,7 +8833,7 @@ async function renderPaymentCollection(view){
             +'<td>'+escHtml(t.mobile||'-')+'</td>'
             +'<td>'+escHtml(t.area||'-')+'</td>'
             +'<td>'+escHtml(t.model||'-')+'</td>'
-            +'<td style="font-weight:700;">₹'+amt.toFixed(0)+'</td>'
+            +'<td><a href="javascript:void(0)" onclick="pcShowBreakdown(\''+t.id+'\')" style="font-weight:700;color:var(--primary);text-decoration:underline dotted;" title="Click for Labor/Parts breakdown">₹'+amt.toFixed(0)+'</a></td>'
             +'<td>'+escHtml(t.payment_mode||'-')+'</td>'
             +'<td style="white-space:nowrap;">'+recvCell+'</td>'
             +'</tr>';
@@ -8852,10 +8870,12 @@ function downloadPaymentCollectionExcel(){
   const tickets=window._pcTickets||[];
   if(!tickets.length){alert('Nothing to download');return;}
   const data=tickets.map(function(t){
+    const b=_pcBreakdown(t);
     return {
       'Engineer':t.assigned_name||'-','Date':t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN'):'-',
       'Ticket':t.id,'Customer':t.cname||'-','Mobile':t.mobile||'-','Area':t.area||'-','Model':t.model||'-',
-      'Amount ₹':_pcAmount(t).toFixed(2),'Mode':t.payment_mode||'-',
+      'Labor ₹':b.labor.toFixed(2),'Parts ₹':b.parts.toFixed(2),'Other ₹':b.other.toFixed(2),
+      'Total ₹':b.total.toFixed(2),'Mode':t.payment_mode||'-',
       'Received':t.payment_received?'Yes':'No',
       'Received By':t.payment_received_by||'',
       'Received At':t.payment_received_at?new Date(t.payment_received_at).toLocaleString('en-IN'):''
