@@ -312,6 +312,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('my-report')" id="nav-my-report"><span class="icon">📊</span><span>My Report</span></div>
     <div class="nav-item hidden" onclick="navigate('km-report')" id="nav-km-report"><span class="icon">🛣️</span><span>KM Tracking</span></div>
     <div class="nav-item hidden" onclick="showPaymentQR()" id="nav-payment-qr"><span class="icon">💳</span><span>Payment QR</span></div>
+    <div class="nav-item hidden" onclick="navigate('payment-collection')" id="nav-payment-collection"><span class="icon">💰</span><span>Payment Collection</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
@@ -335,7 +336,6 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('attendance')" id="nav-attendance"><span class="icon">🗓️</span><span>Attendance</span></div>
     <div class="nav-item hidden" onclick="navigate('targets')" id="nav-targets"><span class="icon">🎯</span><span>Targets</span></div>
     <div class="nav-item hidden" onclick="navigate('amc')" id="nav-amc"><span class="icon">🔄</span><span>AMC</span></div>
-    <div class="nav-item hidden" onclick="navigate('payment-collection')" id="nav-payment-collection"><span class="icon">💰</span><span>Payment Collection</span></div>
     <div class="nav-item hidden" onclick="navigate('profit')" id="nav-profit" style="display:none!important;"><span class="icon">💰</span><span>Profit</span></div>
     <div class="nav-item hidden" onclick="navigate('weekly')" id="nav-weekly"><span class="icon">📊</span><span>Weekly Report</span></div>
     <div class="nav-item hidden" onclick="navigate('sales')" id="nav-sales"><span class="icon">💼</span><span>Sales</span></div>
@@ -2881,6 +2881,8 @@ function setupNav(){
       if(_navAnchor&&_navAnchor.parentNode){
         _navAnchor.parentNode.insertBefore(_kmNav,_navAnchor.nextSibling);
         _kmNav.parentNode.insertBefore(_pqNav,_kmNav.nextSibling);
+        var _pcNav=document.getElementById('nav-payment-collection');
+        if(_pcNav)_pqNav.parentNode.insertBefore(_pcNav,_pqNav.nextSibling);
       }
     }
     if(isEng){
@@ -5601,7 +5603,14 @@ async function checkTATReminder(){
     var rows=await sbAll('tickets','?tat_date=not.is.null&status=not.in.(Closed,Delivered,Repaired,Pending for Delivery,Resolved By Phone,Call Cancel,Customer Reject)&order=tat_date.asc&select=id,cname,model,status,tat_date,assigned_to'+engFilter);
     if(!rows||!rows.length)return;
     function tatDL(t){var d=new Date(t.tat_date);return /T00:00:00/.test(t.tat_date)?new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),23,59,59):d;}
-    var overdue=rows.filter(function(t){return tatDL(t)<now;});
+    // Overdue by more than 2 days is a lost cause for THIS reminder (TAT's
+    // long gone, nothing to "catch up" on) — those still show in the full
+    // Pending List, just not here. Within the 2-day window, order by how
+    // close each call is to *now*: barely-overdue first (still catchable),
+    // then progressively older — the mirror of "urgent" below, which is
+    // already soonest-deadline-first (rows arrives sorted tat_date ascending,
+    // so reversing the filtered slice gives nearest-to-now-first for free).
+    var overdue=rows.filter(function(t){var dl=tatDL(t);return dl<now&&(now-dl)<=2*24*3600000;}).reverse();
     var urgent=rows.filter(function(t){var dl=tatDL(t);return dl>=now&&dl<=soon;});
     if(!overdue.length&&!urgent.length)return;
     var old=document.getElementById('modal-tat-reminder');if(old)old.remove();
@@ -8708,16 +8717,25 @@ async function downloadRevenueExcel(){
 // ════════════════════════════════════════════════════════════
 function _pcCanManage(){return currentUser&&(currentUser.role==='admin'||window._isCspMgr);}
 function _pcAmount(t){
+  // Same fallback chain as the Revenue tab (final_charges wins when set;
+  // otherwise rebuild from parts + labor/service_charges + other) — many
+  // tickets only ever get a value in "Labor" on the main update form, not
+  // the auto-calculated service_charges, so service_charges-only was
+  // silently showing ₹0 for those.
   const fin=parseFloat(t.final_charges)||0;
   if(fin>0)return fin;
-  return (parseFloat(t.service_charges)||0);
+  const sp=(t.spares||[]).reduce(function(a,s){return a+(s.qty||0)*(s.price||0);},0);
+  const lab=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
+  const oth=parseFloat(t.other_charge)||0;
+  return sp+lab+oth;
 }
-async function renderPaymentCollection(){
+async function renderPaymentCollection(view){
+  view=view==='received'?'received':'pending';
   const pc=document.getElementById('page-content');
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
     const canManage=_pcCanManage();
-    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by&order=updated_at.desc';
+    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by&order=updated_at.desc';
     if(!canManage){
       const myId=currentUser.eng_id||currentUser.user_id;
       q+='&assigned_to=eq.'+encodeURIComponent(myId);
@@ -8740,36 +8758,48 @@ async function renderPaymentCollection(){
     const byEng={};
     tickets.forEach(function(t){
       const k=t.assigned_to||'unassigned';
-      if(!byEng[k])byEng[k]={name:t.assigned_name||'Unassigned',rows:[],pending:0,received:0};
+      if(!byEng[k])byEng[k]={name:t.assigned_name||'Unassigned',pendingRows:[],receivedRows:[],pending:0,received:0};
       const amt=_pcAmount(t);
-      byEng[k].rows.push(t);
-      if(t.payment_received)byEng[k].received+=amt;else byEng[k].pending+=amt;
+      if(t.payment_received){byEng[k].receivedRows.push(t);byEng[k].received+=amt;}
+      else{byEng[k].pendingRows.push(t);byEng[k].pending+=amt;}
     });
     const totalPending=Object.values(byEng).reduce(function(a,e){return a+e.pending;},0);
     const totalReceived=Object.values(byEng).reduce(function(a,e){return a+e.received;},0);
+    const pendingCount=tickets.filter(function(t){return!t.payment_received;}).length;
+    const receivedCount=tickets.length-pendingCount;
 
     let html='<div class="kpi-grid" style="grid-template-columns:repeat('+(canManage?3:2)+',1fr);margin-bottom:14px;">'
       +(canManage?'<div class="kpi-card"><div class="kpi-label">Total Calls</div><div class="kpi-value">'+tickets.length+'</div></div>':'')
       +'<div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Pending to Collect</div><div class="kpi-value" style="color:#d97706;font-size:20px;">₹'+totalPending.toFixed(0)+'</div></div>'
       +'<div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Received</div><div class="kpi-value" style="color:#0e9f6e;font-size:20px;">₹'+totalReceived.toFixed(0)+'</div></div>'
       +'</div>';
-    if(canManage){
-      html+='<div style="text-align:right;margin-bottom:12px;"><button class="btn btn-success btn-sm" onclick="downloadPaymentCollectionExcel()">📊 Excel Download</button></div>';
-    }
+    html+='<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;">'
+      +(view==='pending'
+        ?'<button class="btn btn-outline btn-sm" onclick="renderPaymentCollection(\'received\')">✅ View Received ('+receivedCount+')</button>'
+        :'<button class="btn btn-outline btn-sm" onclick="renderPaymentCollection(\'pending\')">⬅ Back to Pending</button>')
+      +(canManage?'<button class="btn btn-success btn-sm" onclick="downloadPaymentCollectionExcel()">📊 Excel Download</button>':'')
+      +'</div>';
 
-    const groups=Object.entries(byEng).sort(function(a,b){return b[1].pending-a[1].pending;});
+    const groupKey=view==='pending'?'pendingRows':'receivedRows';
+    const groups=Object.entries(byEng).filter(function(e){return e[1][groupKey].length;})
+      .sort(function(a,b){return view==='pending'?b[1].pending-a[1].pending:b[1].received-a[1].received;});
+    if(!groups.length){
+      html+='<div class="alert alert-info">'+(view==='pending'?'🎉 Nothing pending — everything collected!':'No received payments yet.')+'</div>';
+    }
     groups.forEach(function([engId,g]){
       html+='<div class="card" style="margin-bottom:14px;">'
         +'<div class="section-header" style="margin-bottom:10px;"><h2>👷 '+escHtml(g.name)+'</h2>'
-        +'<span style="font-size:13px;font-weight:700;color:'+(g.pending>0?'#d97706':'#0e9f6e')+';">⏳ Pending: ₹'+g.pending.toFixed(0)+'</span></div>'
+        +(view==='pending'
+          ?'<span style="font-size:13px;font-weight:700;color:'+(g.pending>0?'#d97706':'#0e9f6e')+';">⏳ Pending: ₹'+g.pending.toFixed(0)+'</span>'
+          :'<span style="font-size:13px;font-weight:700;color:#0e9f6e;">✅ Received: ₹'+g.received.toFixed(0)+'</span>')
+        +'</div>'
         +'<div class="table-wrap"><table><thead><tr>'
-        +'<th>Date</th><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Amount</th><th>Mode</th><th>Received</th>'
+        +'<th>Date</th><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Amount</th><th>Mode</th><th>'+(view==='pending'?'Received':'Received Info')+'</th>'
         +'</tr></thead><tbody>'
-        +g.rows.map(function(t){
+        +g[groupKey].map(function(t){
           const amt=_pcAmount(t);
-          const received=!!t.payment_received;
           let recvCell;
-          if(received){
+          if(view==='received'){
             const when=t.payment_received_at?new Date(t.payment_received_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}):'';
             recvCell='<div style="color:#0e9f6e;font-weight:700;font-size:12px;">✅ '+escHtml(t.payment_received_by||'')+'</div><div style="font-size:10px;color:var(--text-muted);">'+when+'</div>'
               +(canManage?'<button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="pcToggleReceived(\''+t.id+'\',false)">Undo</button>':'');
@@ -8793,16 +8823,23 @@ async function renderPaymentCollection(){
         +'</tbody></table></div></div>';
     });
     pc.innerHTML=html;
+    window._pcView=view;
   }catch(e){pc.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';}
 }
 async function pcToggleReceived(ticketId,received){
   if(!_pcCanManage())return;
+  if(received){
+    const t=(window._pcTickets||[]).find(function(x){return x.id===ticketId;});
+    const amt=t?_pcAmount(t).toFixed(0):'?';
+    const who=t?(t.cname||''):'';
+    if(!confirm('Confirm payment received?\n\nTicket: '+ticketId+(who?'\nCustomer: '+who:'')+'\nAmount: ₹'+amt+'\n\nThis marks it as collected/handed over to office.'))return;
+  }
   try{
     const patch=received
       ?{payment_received:true,payment_received_at:new Date().toISOString(),payment_received_by:currentUser.name}
       :{payment_received:false,payment_received_at:null,payment_received_by:null};
     await sb('tickets','PATCH',patch,'?id=eq.'+ticketId);
-    renderPaymentCollection();
+    renderPaymentCollection(window._pcView||'pending');
   }catch(e){
     if(String(e.message||'').indexOf('payment_received')!==-1){
       alert('⚠️ Setup needed: the payment_received columns don\'t exist on the tickets table yet. Run the Payment Collection setup SQL in Supabase first.');
