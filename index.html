@@ -5174,7 +5174,7 @@ async function renderMyCalls(){
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;color:var(--text-muted);margin-bottom:10px;">
                   <div>📱 <b style="color:var(--text);">${t.model||'-'}</b></div>
-                  <div>🔢 <b style="color:var(--text);">${t.serial||'-'}</b></div>
+                  <div>🔢 <b style="color:var(--text);">${t.serial||'-'}</b> ${(t.serial||'').startsWith('NO-SN-')?`<button class="btn btn-outline btn-sm" style="padding:0px 6px;font-size:10px;" onclick="event.stopPropagation();openSerialEditModal('${t.id}')">✏️</button>`:''}</div>
                   <div>📞 <a href="tel:${t.mobile}" style="color:#1d4ed8;font-weight:600;">${t.mobile||'-'}</a>${t.mobile?` <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a>`:''}</div>
                   <div>⏱ TAT: ${mcTatHtml(t)}</div>
                   ${t.alt_mobile?`<div style="grid-column:1/-1;">📞 Alt: <a href="tel:${t.alt_mobile}" style="color:#1d4ed8;font-weight:600;">${t.alt_mobile}</a> <a href="https://wa.me/91${(t.alt_mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;margin-left:4px;">💬</a></div>`:''}
@@ -5186,6 +5186,7 @@ async function renderMyCalls(){
                   <div onclick="event.stopPropagation();document.getElementById('addr-${t.id}').style.display='none';" style="cursor:pointer;margin-top:6px;font-size:11px;color:#64748b;font-weight:700;">✕ Close</div>
                 </div>`:''}
                 ${mcHasPrevLoc(t)?`<div onclick="mcConfirmPrevLocation('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;margin-left:6px;">📍 Previous Location</div>`:''}
+                <div onclick="event.stopPropagation();addProductForSameCustomer('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#065f46;margin-bottom:8px;margin-left:6px;">➕ Add Product (Same Customer)</div>
                 <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
               </div>`;
             }).join('');
@@ -5254,7 +5255,9 @@ async function openNewCall(){
   document.getElementById('customer-search-results').innerHTML='';
   document.getElementById('search-customer-q').value='';
   window._fromWalkInId=null;
+  window._callGroupId=null;
   var oldBanner=document.getElementById('wi-source-banner');if(oldBanner)oldBanner.remove();
+  var oldGroupBanner=document.getElementById('call-group-banner');if(oldGroupBanner)oldGroupBanner.remove();
   // WC002 (CSP Work Controller): default Brand = Canon and Sub-Category = CSP
   // so calls land under the CSP report. Fully changeable by the user.
   applyCallDefaultsForWC();
@@ -5592,6 +5595,7 @@ async function saveCall(){
     accessories:document.getElementById('call-accessories').value,
     rerepair:document.getElementById('call-rerepair').value||'No',
     rerepair_foc:(()=>{const el=document.querySelector('input[name="rr-charges"]:checked');return el?el.value==='foc':false;})(),
+    group_id:window._callGroupId||null,
     phys_js:document.getElementById('call-phys-js').value,
     tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v||null;})(),
     assigned_to:engId||null,assigned_name:engName||null,
@@ -5636,6 +5640,8 @@ async function saveCall(){
           var _pm=String(pe&&pe.message||'');
           // email column not added yet — don't block call creation; retry without it.
           if(data.email&&_pm.indexOf('email')!==-1){delete data.email;continue;}
+          // group_id column not added yet — don't block call creation; retry without it (linking just won't apply).
+          if(data.group_id&&_pm.indexOf('group_id')!==-1){delete data.group_id;continue;}
           if(_pm.indexOf('23505')!==-1||_pm.toLowerCase().indexOf('duplicate key')!==-1||_pm.indexOf('tickets_pkey')!==-1){
             id=await generateTicketNo();data.id=id;data.job_sheet=id;_lastErr=pe;continue;
           }
@@ -6040,7 +6046,7 @@ async function viewTicket(id,autoPrint=false){
         📍 ${t.address||''}${t.area?', '+t.area:''}<br>${t.city||''}${t.pin?' — '+t.pin:''}</div>
       </div>
       <div><h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">CALL INFO</h3>
-        <div style="font-size:13px;line-height:1.9;">Model: <b>${t.model}</b><br>Serial: <b>${t.serial}</b><br>
+        <div style="font-size:13px;line-height:1.9;">Model: <b>${t.model}</b><br>Serial: <b>${t.serial}</b> ${(t.serial||'').startsWith('NO-SN-')?`<button class="btn btn-outline btn-sm" style="padding:1px 8px;font-size:11px;" onclick="openSerialEditModal('${t.id}')">✏️ Edit</button>`:''}<br>
         Type: ${t.call_type} | ${t.service_type}<br>
         ${t.se_call_id?'SE Call ID: <b>'+t.se_call_id+'</b><br>':''}
         Engineer: <b>${t.assigned_name||'<span style="color:var(--danger);">Unassigned</span>'}</b><br>
@@ -6052,6 +6058,7 @@ async function viewTicket(id,autoPrint=false){
     ${t.work_done?`<div style="font-size:13px;margin-bottom:10px;"><b>Action:</b> ${t.work_done}</div>`:''}
     ${t.remarks?`<div style="font-size:13px;margin-bottom:10px;background:var(--bg);padding:8px;border-radius:8px;"><b>Remarks:</b> ${t.remarks}</div>`:''}
     ${t.serial_photo?`<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">📷 SERIAL NUMBER PHOTO</b><br><img src="${t.serial_photo}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'120px':'none'" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border);margin-top:6px;cursor:zoom-in;display:block;" title="Click to expand"><span style="font-size:10px;color:var(--text-muted);">Click image to expand</span></div>`:''}
+    ${(()=>{let log=t.serial_edit_log;if(typeof log==='string'){try{log=JSON.parse(log);}catch(e){log=[];}}if(!Array.isArray(log)||!log.length)return'';return `<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">🔢 SERIAL NO EDIT HISTORY</b>`+log.slice().reverse().map(l=>`<div style="font-size:12px;background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:6px;"><b>${escHtml(l.old_serial||'-')}</b> → <b>${escHtml(l.new_serial||'-')}</b><br><span style="color:var(--text-muted);">By: ${escHtml(l.by||'-')}${l.role?' ('+escHtml(l.role)+')':''} | ${l.at?new Date(l.at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}):'-'}</span><br><span>Remark: ${escHtml(l.remark||'-')}</span>${l.photo?`<br><img src="${l.photo}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'100px':'none'" style="max-height:100px;border-radius:6px;margin-top:4px;cursor:zoom-in;">`:''}</div>`).join('')+`</div>`;})()}
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
@@ -6064,11 +6071,75 @@ async function viewTicket(id,autoPrint=false){
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
     ${isClosed&&!t.customer_signature&&currentUser.role==='engineer'?`<hr class="divider"><button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openSignature('${t.id}')">✍️ Get Customer Signature</button>`:''}
     <hr class="divider">
+    <div id="linked-products-box" style="margin-bottom:12px;"></div>
     ${t.pending_edit?`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;">⏳ <b>Report Edit Pending Admin Approval</b> — Requested by ${t.pending_edit.requested_by} at ${new Date(t.pending_edit.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</div>`:''}
     <h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;">TIMELINE</h3>
     ${tlHtml}
     ${adminActions}`;
   openModal('modal-ticket');if(autoPrint)setTimeout(printJobSheet,500);
+  loadLinkedProducts(t);
+}
+
+// ── MULTI-PRODUCT / SAME-CUSTOMER LINKED CALLS ─────────────────────────
+// Products for the same customer visit share a group_id (the first
+// ticket's own id becomes the anchor). Each product still lives as its
+// own independent ticket — own status, close, invoice, warranty — so
+// nothing about per-product handling or counting changes; this only adds
+// a lightweight link + a quick way to add another product without
+// re-typing customer details.
+async function loadLinkedProducts(t){
+  var box=document.getElementById('linked-products-box');if(!box)return;
+  var gid=t.group_id;
+  var addBtn=`<button class="btn btn-outline btn-sm" onclick="addProductForSameCustomer('${t.id}')">➕ Add Another Product (Same Customer)</button>`;
+  if(!gid){box.innerHTML=addBtn;return;}
+  var sibs=[];
+  try{sibs=await sb('tickets','GET',null,`?group_id=eq.${encodeURIComponent(gid)}&id=neq.${encodeURIComponent(t.id)}&select=id,model,serial,status,call_type&order=created_at.asc`);}catch(e){}
+  var list=sibs.length?`<div style="margin-top:8px;">`+sibs.map(s=>`<div onclick="closeModal('modal-ticket');viewTicket('${s.id}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:12px;"><span><b>${s.id}</b> — ${s.model||'-'} / ${s.serial||'-'}</span>${statusBadge(s.status)}</div>`).join('')+`</div>`:'';
+  box.innerHTML=`<b style="font-size:12px;color:var(--text-muted);">🔗 LINKED PRODUCTS — SAME CUSTOMER (Group: ${gid})</b>${list||'<div style="font-size:12px;color:var(--text-muted);margin-top:6px;">No other linked products yet.</div>'}<div style="margin-top:8px;">${addBtn}</div>`;
+}
+
+async function addProductForSameCustomer(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t){alert('Ticket not found');return;}
+  var gid=t.group_id;
+  if(!gid){
+    gid=t.id;
+    try{
+      await sb('tickets','PATCH',{group_id:gid},`?id=eq.${t.id}`);
+      t.group_id=gid;
+      var idx=allTickets.findIndex(x=>x.id===t.id);if(idx>=0)allTickets[idx].group_id=gid;
+    }catch(e){
+      var msg=(e&&e.message)||String(e);
+      if(msg.indexOf('group_id')!==-1){alert('⚠️ Setup needed: add a "group_id" (text) column to the tickets table, then try again.');}
+      else{alert('❌ Error: '+msg);}
+      return;
+    }
+  }
+  closeModal('modal-ticket');
+  await openNewCall();
+  window._callGroupId=gid;
+  const setVal=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  setVal('call-cname',t.cname||'');
+  setVal('call-mobile',t.mobile||'');
+  setVal('call-alt',t.alt_mobile||'');
+  setVal('call-email',t.email||'');
+  const addr=(t.address||'').split(', ');
+  setVal('call-address',addr[0]||'');
+  setVal('call-address2',addr.slice(1).join(', ')||'');
+  setVal('call-area',t.area||'');
+  const stateEl=document.getElementById('call-state');
+  if(stateEl){stateEl.value=t.state||'Gujarat';onStateChange();}
+  setTimeout(()=>{setVal('call-city',t.city||'');},150);
+  const pinEl=document.getElementById('call-pin');
+  if(pinEl){pinEl.value=t.pin||'';pinEl.dataset.pin=t.pin||'';}
+  setVal('call-service-type',t.service_type||'On Site');
+  document.getElementById('modal-call-title').textContent='➕ Add Product — Same Customer ('+(t.cname||'')+')';
+  var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
+  var body=document.querySelector('#modal-call .modal-body');
+  var banner=document.getElementById('call-group-banner');
+  if(!banner&&body){banner=document.createElement('div');banner.id='call-group-banner';body.insertBefore(banner,body.firstChild);}
+  if(banner)banner.innerHTML=`<div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#065f46;">🔗 Linked to Call Group <b>${gid}</b> — same customer, new product. Customer details pre-filled below — model/serial/problem niche bharo naya product mate.</div>`;
 }
 
 async function generateInvoice(id){
@@ -24038,6 +24109,120 @@ async function uploadCrmPhoto(dataUrl,fname){
   var res=await fetch(SB_URL+'/storage/v1/object/product-images/'+fname,{method:'POST',headers:{'Authorization':'Bearer '+SB_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
   if(!res.ok)throw new Error(await res.text());
   return SB_URL+'/storage/v1/object/public/product-images/'+fname;
+}
+
+// ── SERIAL NO EDIT (any role: engineer/WC/manager/admin) ──────────────
+// Lets whoever is on-site correct an auto-generated "NO-SN-…" placeholder
+// (or any wrong serial) to the real serial once it's actually readable on
+// the unit. Photo proof + remark are mandatory so the change is auditable;
+// it applies immediately (no approval step) and is logged in serial_edit_log
+// + the ticket timeline so who/why/when can always be checked later.
+function closeSerialEditModal(){var m=document.getElementById('modal-serial-edit');if(m)m.remove();window._serialEditTicket=null;window._serialEditPhoto=null;}
+
+async function openSerialEditModal(ticketId){
+  let t=allTickets.find(x=>x.id===ticketId);
+  if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
+  if(!t){alert('Ticket not found');return;}
+  window._serialEditTicket=t;
+  window._serialEditPhoto=t.serial_photo?{url:t.serial_photo,isNew:false}:null;
+  var existing=document.getElementById('modal-serial-edit');if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='modal-serial-edit';m.className='modal-overlay';
+  m.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div class="modal-header"><h2>🔢 Edit Serial No — '+ticketId+'</h2><button class="close-btn" onclick="closeSerialEditModal()">✕</button></div>'
+    +'<div class="modal-body" style="padding:14px 18px;">'
+    +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Current Serial: <b>'+escHtml(t.serial||'-')+'</b></div>'
+    +'<label style="font-size:12px;font-weight:700;">New Serial No <span style="color:#ef4444;">*</span></label>'
+    +'<input type="text" id="sn-edit-new" value="'+escHtml((t.serial||'').startsWith('NO-SN-')?'':(t.serial||''))+'" placeholder="Actual serial number from device" style="display:block;width:100%;margin-top:4px;margin-bottom:12px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">'
+    +'<label style="font-size:12px;font-weight:700;">Serial No Photo <span style="color:#ef4444;">*</span></label>'
+    +'<div style="margin-top:4px;margin-bottom:12px;">'
+    +'<input type="file" id="sn-edit-cam" accept="image/*" capture="environment" style="display:none;" onchange="onSnEditPhotoPick(this)">'
+    +'<input type="file" id="sn-edit-gal" accept="image/*" style="display:none;" onchange="onSnEditPhotoPick(this)">'
+    +'<div style="display:flex;gap:8px;">'
+    +'<button type="button" class="btn btn-outline btn-sm" style="flex:1;" onclick="document.getElementById(\'sn-edit-cam\').click()">📷 Camera</button>'
+    +'<button type="button" class="btn btn-outline btn-sm" style="flex:1;" onclick="document.getElementById(\'sn-edit-gal\').click()">🖼️ Gallery</button>'
+    +'</div>'
+    +'<div id="sn-edit-photo-preview" style="margin-top:8px;"></div>'
+    +'</div>'
+    +'<label style="font-size:12px;font-weight:700;">Remark — why is this being changed? <span style="color:#ef4444;">*</span></label>'
+    +'<textarea id="sn-edit-remark" style="display:block;width:100%;margin-top:4px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-height:60px;" placeholder="e.g. Actual serial no. checked on-site, previous was auto-generated placeholder"></textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:14px;">'
+    +'<button class="btn btn-outline" style="flex:1;" onclick="closeSerialEditModal()">Cancel</button>'
+    +'<button class="btn btn-primary" style="flex:1;" onclick="saveSerialEdit()">💾 Update Serial</button>'
+    +'</div>'
+    +'</div></div>';
+  document.body.appendChild(m);
+  renderSnEditPhotoPreview();
+}
+
+function renderSnEditPhotoPreview(){
+  var box=document.getElementById('sn-edit-photo-preview');if(!box)return;
+  var p=window._serialEditPhoto;
+  box.innerHTML=p?('<img src="'+p.url+'" class="photo-preview" style="max-height:120px;display:block;"><button type="button" class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="window._serialEditPhoto=null;renderSnEditPhotoPreview();">🗑️ Remove</button>'):'<div style="font-size:12px;color:var(--text-muted);">No photo selected</div>';
+}
+
+function onSnEditPhotoPick(input){
+  var file=input.files&&input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var maxW=1400;var scale=Math.min(1,maxW/img.width);
+      var canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      window._serialEditPhoto={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
+      renderSnEditPhotoPreview();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+var _savingSnEdit=false;
+async function saveSerialEdit(){
+  if(_savingSnEdit)return;
+  var t=window._serialEditTicket;if(!t)return;
+  var newSerial=(document.getElementById('sn-edit-new')?.value||'').trim();
+  var remark=(document.getElementById('sn-edit-remark')?.value||'').trim();
+  var photo=window._serialEditPhoto;
+  if(!newSerial){alert('⚠️ Please enter the serial number.');return;}
+  if(!photo){alert('📷 Serial number photo is required.');return;}
+  if(!remark){alert('⚠️ Please add a remark explaining this change.');return;}
+  _savingSnEdit=true;
+  var btn=document.querySelector('#modal-serial-edit .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  try{
+    var photoUrl=photo.url;
+    if(photo.isNew){
+      photoUrl=await uploadCrmPhoto(photo.url,'serial_'+String(t.id).replace(/[^A-Za-z0-9_-]/g,'')+'_'+Date.now()+'.jpg');
+    }
+    var oldSerial=t.serial||'-';
+    var logEntry={old_serial:oldSerial,new_serial:newSerial,by:currentUser.name||currentUser.email,role:currentUser.role,at:new Date().toISOString(),remark:remark,photo:photoUrl};
+    var existingLog=t.serial_edit_log;
+    if(typeof existingLog==='string'){try{existingLog=JSON.parse(existingLog);}catch(e){existingLog=[];}}
+    if(!Array.isArray(existingLog))existingLog=[];
+    var serial_edit_log=[...existingLog,logEntry];
+    var tl=[...(t.timeline||[]),{action:'Serial No Updated',by:currentUser.name||currentUser.email,at:new Date().toISOString(),note:remark+' (Old: '+oldSerial+' → New: '+newSerial+')'}];
+    var patch={serial:newSerial,serial_photo:photoUrl,serial_edit_log,timeline:tl,updated_at:new Date().toISOString()};
+    await sb('tickets','PATCH',patch,`?id=eq.${t.id}`);
+    var idx=allTickets.findIndex(x=>x.id===t.id);if(idx>=0)Object.assign(allTickets[idx],patch);
+    Object.assign(t,patch);
+    closeSerialEditModal();
+    if(document.getElementById('modal-ticket')&&viewingTicketId===t.id){try{await viewTicket(t.id);}catch(e){}}
+    if(currentPage==='my-calls'){try{await renderMyCalls();}catch(e){}}
+  }catch(e){
+    var msg=(e&&e.message)||String(e);
+    if(msg.indexOf('serial_edit_log')!==-1){
+      alert('⚠️ Setup needed: add a "serial_edit_log" (jsonb) column to the tickets table, then try again.');
+    }else{
+      alert('❌ Error: '+msg);
+    }
+  }finally{
+    _savingSnEdit=false;
+    if(btn){btn.disabled=false;btn.textContent='💾 Update Serial';}
+  }
 }
 
 // Today's km_logs for the current user. Returns null if the table is missing /
