@@ -2372,7 +2372,10 @@ function onStateChange(){
   if(!cityEl||!pinEl)return;
   const cities=getCities(state).sort();
   cityEl.innerHTML='<option value="">-- Select District --</option>'+cities.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
-  pinEl.value=''; pinEl._allPins=[];
+  pinEl._allPins=[];
+  // Don't wipe an already-filled Pin Code (e.g. auto-filled from a jobsheet
+  // scan) just because State was (re)selected — only clearing/editing the
+  // Pin field itself should clear it.
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 function onCityChange(){
@@ -26631,6 +26634,12 @@ document.addEventListener('paste',function(e){
 // Fill the New Call form from the extracted fields; returns how many were set.
 function applyJobsheetFields(f){
   var count=0;
+  // Model No has repeatedly come back empty even though the jobsheet clearly
+  // shows a "Model Code" — logging the raw extracted object makes it
+  // possible to see the actual key the scan function used (in case it isn't
+  // f.model / f.model_code) instead of guessing blind. Check DevTools
+  // Console (F12) after a scan to see this.
+  try{console.log('[jobsheet-scan] raw fields:',f);}catch(e){}
   // CRM convention is ALL CAPS everywhere (manual entries are typed in caps) —
   // OCR'd text comes back in whatever case the source document used, so
   // upper-case it here to match instead of leaving it mixed-case.
@@ -26662,7 +26671,7 @@ function applyJobsheetFields(f){
   setText('call-address',f.address);
   // Model Code comes as "MF465DW II [7188C010AA]" — only the part before the
   // bracket is the actual model no.; the bracketed code is dropped.
-  var modelOnly=((f.model||f.model_code||'')+'').split('[')[0].trim();
+  var modelOnly=((f.model||f.model_code||f.model_no||f.model_number||f.product_model||'')+'').split('[')[0].trim();
   setText('call-model',modelOnly);
   if(modelOnly){try{applyModelServiceFields();}catch(e){}}
   setText('call-problem',f.problem);
@@ -26705,34 +26714,53 @@ function applyJobsheetFields(f){
 // lower-casing. Comparing with vowels stripped ("hmdbd" both ways) makes the
 // match spelling-tolerant without needing a hardcoded alias list.
 function _locKey(s){return String(s||'').toLowerCase().replace(/[^a-z]/g,'').replace(/[aeiou]/g,'');}
-function aiFillLocation(state,city,pin,area,addressText){
+function _aiSelectState(val){
   var stateEl=document.getElementById('call-state');
-  if(stateEl&&state){
-    var so=Array.prototype.slice.call(stateEl.options).find(function(o){return _locKey(o.value)===_locKey(state);});
-    if(so){stateEl.value=so.value;stateEl.style.background='#fef9c3';try{onStateChange();}catch(e){}}
-  }
+  if(!stateEl||!val)return false;
+  var so=Array.prototype.slice.call(stateEl.options).find(function(o){return _locKey(o.value)===_locKey(val);});
+  if(so){stateEl.value=so.value;stateEl.style.background='#fef9c3';try{onStateChange();}catch(e){}return true;}
+  return false;
+}
+function _aiSelectCity(val){
   var cityEl=document.getElementById('call-city');
-  if(cityEl&&city){
-    var co=Array.prototype.slice.call(cityEl.options).find(function(o){return _locKey(o.value)===_locKey(city);});
-    if(co){cityEl.value=co.value;cityEl.style.background='#fef9c3';try{onCityChange();}catch(e){}}
-  }
-  // Pin + Area last (onStateChange/onCityChange clear the pin field)
+  if(!cityEl||!val)return false;
+  var co=Array.prototype.slice.call(cityEl.options).find(function(o){return _locKey(o.value)===_locKey(val);});
+  if(co){cityEl.value=co.value;cityEl.style.background='#fef9c3';try{onCityChange();}catch(e){}return true;}
+  return false;
+}
+function aiFillLocation(state,city,pin,area,addressText){
+  // The Pin Code is the most reliable signal — the OCR'd City/State text
+  // is free-form and often doesn't match the CRM's district-level dropdown
+  // (locality names, alternate spellings, etc). So when a pin is present,
+  // look up its actual state/district from the pincodes table FIRST and use
+  // that to drive State/City selection, only falling back to the scanned
+  // state/city text if the pin lookup comes back empty.
   if(pin){
     var pinEl=document.getElementById('call-pin');
     if(pinEl){pinEl.value=pin;pinEl.dataset.pin=pin;pinEl.style.background='#fef9c3';}
-    // A pincode can map to several candidate areas — prefer whichever one
-    // actually appears in the scanned address text (e.g. address says
-    // "...SHAHIBAUG..." → pick "Shahibag" over other areas sharing the same
-    // pincode); fall back to the OCR'd locality, then just the first area.
-    sb('pincodes','GET',null,'?pincode=eq.'+encodeURIComponent(pin)+'&select=area&limit=25').then(function(rows){
-      var a=document.getElementById('call-area');if(!a)return;
-      var areas=(rows||[]).map(function(r){return r.area;}).filter(Boolean);
+    sb('pincodes','GET',null,'?pincode=eq.'+encodeURIComponent(pin)+'&select=area,district,state&limit=25').then(function(rows){
+      rows=rows||[];
+      var district=rows[0]&&rows[0].district;
+      var pinState=rows[0]&&rows[0].state;
+      if(!_aiSelectState(pinState))_aiSelectState(state);
+      if(!_aiSelectCity(district))_aiSelectCity(city);
+      // A pincode can map to several candidate areas — prefer whichever one
+      // actually appears in the scanned address text (e.g. address says
+      // "...SHAHIBAUG..." → pick "Shahibag" over other areas sharing the
+      // same pincode); fall back to the OCR'd locality, then the first area.
+      var a=document.getElementById('call-area');
+      var areas=rows.map(function(r){return r.area;}).filter(Boolean);
       var addrKey=_locKey(addressText);
       var matched=addrKey?areas.find(function(ar){return addrKey.indexOf(_locKey(ar))!==-1;}):null;
-      a.value=matched||area||areas[0]||'';
-    }).catch(function(){var a=document.getElementById('call-area');if(a&&area)a.value=area;});
-  }else if(area){
-    var a2=document.getElementById('call-area');if(a2)a2.value=area;
+      if(a)a.value=matched||area||areas[0]||'';
+    }).catch(function(){
+      _aiSelectState(state);_aiSelectCity(city);
+      var a2=document.getElementById('call-area');if(a2&&area)a2.value=area;
+    });
+  }else{
+    _aiSelectState(state);
+    _aiSelectCity(city);
+    if(area){var a3=document.getElementById('call-area');if(a3)a3.value=area;}
   }
 }
 
