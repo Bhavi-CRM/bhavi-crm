@@ -2382,7 +2382,9 @@ function onCityChange(){
   if(!pinEl)return;
   pinEl._allPins=getPins(state,city); // static fallback
   pinEl._pinState=state; pinEl._pinDistrict=city;
-  pinEl.value='';
+  // Don't wipe an already-filled Pin Code (e.g. auto-filled from a jobsheet
+  // scan) just because City was (re)selected — only clearing/editing the
+  // Pin field itself should clear it.
   var drop=document.getElementById('call-pin-drop');if(drop)drop.style.display='none';
 }
 var _pinTimer=null;
@@ -6134,6 +6136,22 @@ async function addProductForSameCustomer(ticketId){
   const pinEl=document.getElementById('call-pin');
   if(pinEl){pinEl.value=t.pin||'';pinEl.dataset.pin=t.pin||'';}
   setVal('call-service-type',t.service_type||'On Site');
+  setVal('call-priority',t.priority||'Normal');
+  // Brand + Sub-Category default to the same as the last (anchor) call — still changeable.
+  const brandEl=document.getElementById('call-brand-input');
+  if(brandEl&&t.brand_name){
+    const wanted=t.brand_name.trim().toLowerCase();
+    Array.from(brandEl.options).forEach(o=>{if(o.text.trim().toLowerCase()===wanted)o.selected=true;});
+    selectBrandFromDrop(brandEl.value,brandEl.options[brandEl.selectedIndex]?.text||t.brand_name);
+    if(t.wc_type){
+      const subcatEl=document.getElementById('call-subcat-input');
+      if(subcatEl){
+        const wantedSub=String(t.wc_type).trim().toLowerCase();
+        Array.from(subcatEl.options).forEach(o=>{if(o.text.trim().toLowerCase()===wantedSub)o.selected=true;});
+        selectSubcatFromDrop(subcatEl.value);
+      }
+    }
+  }
   document.getElementById('modal-call-title').textContent='➕ Add Product — Same Customer ('+(t.cname||'')+')';
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   var body=document.querySelector('#modal-call .modal-body');
@@ -26567,18 +26585,37 @@ document.addEventListener('paste',function(e){
 // Fill the New Call form from the extracted fields; returns how many were set.
 function applyJobsheetFields(f){
   var count=0;
-  function setText(id,val){var el=document.getElementById(id);if(el&&val){el.value=val;el.style.background='#fef9c3';count++;}}
+  // CRM convention is ALL CAPS everywhere (manual entries are typed in caps) —
+  // OCR'd text comes back in whatever case the source document used, so
+  // upper-case it here to match instead of leaving it mixed-case.
+  function setText(id,val,noUpper){var el=document.getElementById(id);if(el&&val){el.value=noUpper?val:String(val).toUpperCase();el.style.background='#fef9c3';count++;}}
   var mob=(f.mobile||'').replace(/\D/g,'').slice(-10);
   var alt=(f.alt_mobile||'').replace(/\D/g,'').slice(-10);
   setText('call-cname',f.caller_name);
-  setText('call-mobile',mob);
-  setText('call-alt',alt);
+  setText('call-mobile',mob,true);
+  setText('call-alt',alt,true);
   setText('call-serial',f.serial_no);
-  setText('call-se-id',f.jobsheet_no);
+  // SE Call ID — normalize case/spacing. Canon jobsheet IDs follow
+  // CSP/YYYYMMDD/###### (or ICP/...); flag with a warning colour instead of
+  // silently accepting when the scanned text doesn't look like that, since a
+  // misread SE Call ID has caused wrong entries before.
+  if(f.jobsheet_no){
+    var seVal=String(f.jobsheet_no).trim().toUpperCase().replace(/\s+/g,'');
+    var seEl=document.getElementById('call-se-id');
+    if(seEl){
+      seEl.value=seVal;count++;
+      var seOk=/^[A-Z]{2,4}\/\d{8}\/\d{4,8}$/.test(seVal);
+      seEl.style.background=seOk?'#fef9c3':'#fee2e2';
+      seEl.title=seOk?'':'⚠️ Format Canon SE Call ID (e.g. CSP/20260813/77194) jevu nathi lagtu — jobsheet screenshot sathe check karo.';
+    }
+  }
   // Address: combine street; keep locality out (goes to Area)
   setText('call-address',f.address);
-  setText('call-model',f.model);
-  if(f.model){try{applyModelServiceFields();}catch(e){}}
+  // Model Code comes as "MF465DW II [7188C010AA]" — only the part before the
+  // bracket is the actual model no.; the bracketed code is dropped.
+  var modelOnly=(f.model||'').split('[')[0].trim();
+  setText('call-model',modelOnly);
+  if(modelOnly){try{applyModelServiceFields();}catch(e){}}
   setText('call-problem',f.problem);
   var emailEl=document.getElementById('call-email');if(emailEl&&f.email){emailEl.value=f.email;count++;}
   // Brand — match dropdown option by name
