@@ -5260,6 +5260,7 @@ async function openNewCall(){
   window._callGroupId=null;
   var oldBanner=document.getElementById('wi-source-banner');if(oldBanner)oldBanner.remove();
   var oldGroupBanner=document.getElementById('call-group-banner');if(oldGroupBanner)oldGroupBanner.remove();
+  setAddProductMiniMode(false);
   // WC002 (CSP Work Controller): default Brand = Canon and Sub-Category = CSP
   // so calls land under the CSP report. Fully changeable by the user.
   applyCallDefaultsForWC();
@@ -5609,6 +5610,17 @@ async function saveCall(){
   if(!ct){alert('⚠️ Call Type is required! Please select Warranty / Non-Warranty / AMC etc.');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   if((ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other')&&!serviceCharges&&serviceCharges!==0&&!(document.getElementById('call-service-charges')?.value)){alert('⚠️ Service Charge is required for Non-Warranty calls!');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
+  // Sub-Category is mandatory whenever the selected brand actually has
+  // sub-categories to pick from (not left on "-- All / General --") — a
+  // missing sub-category previously caused a call to not show under the
+  // correct Work Controller. Skipped in the "Add Product (Same Customer)"
+  // mini form, where Sub-Category is hidden and already best-effort copied
+  // from the anchor call — the field isn't reachable there to fix.
+  const subcatSel=document.getElementById('call-subcat-input');
+  if(subcatSel&&subcatSel.options.length>1&&!subcatSel.value&&!window._callGroupId){
+    alert('⚠️ Sub-Category select karvu farjiyat chhe — jethi call sahi Work Controller ma dekhaay.');
+    _savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;
+  }
   // Hard block: re-check open calls for this serial at save time (in case user bypassed the blur check)
   if(!editingCallId&&!data.serial.startsWith('NO-SN-')){
     try{
@@ -6100,6 +6112,39 @@ async function loadLinkedProducts(t){
   box.innerHTML=`<b style="font-size:12px;color:var(--text-muted);">🔗 LINKED PRODUCTS — SAME CUSTOMER (Group: ${gid})</b>${list||'<div style="font-size:12px;color:var(--text-muted);margin-top:6px;">No other linked products yet.</div>'}<div style="margin-top:8px;">${addBtn}</div>`;
 }
 
+// Shrinks the New Call form down to just Model No / Serial No / Call Type /
+// Problem / Description / Engineer for the "Add Another Product (Same
+// Customer)" flow — customer/address/brand/sub-category/service type/
+// priority are already carried over from the anchor call and don't need
+// re-entry or re-confirmation. openNewCall() always calls this with
+// on=false first, so a genuine New Call is never left in mini mode.
+function setAddProductMiniMode(on){
+  var d=on?'none':'';
+  ['call-brand-input','call-subcat-input','call-service-type','call-se-id','call-priority','call-condition','call-accessories','call-rerepair','call-phys-js'].forEach(function(id){
+    var el=document.getElementById(id);
+    var fg=el&&el.closest('.form-group');
+    if(fg)fg.style.display=d;
+  });
+  var canonWrap=document.getElementById('call-canon-recv-wrap');
+  var canonGroup=canonWrap&&canonWrap.closest('.form-group');
+  if(canonGroup)canonGroup.style.display=d;
+  var body=document.querySelector('#modal-call .modal-body');
+  if(body){
+    Array.prototype.slice.call(body.querySelectorAll('h3')).forEach(function(h){
+      if((h.textContent||'').indexOf('Customer')===-1)return;
+      h.style.display=d;
+      var prevHr=h.previousElementSibling;if(prevHr&&prevHr.tagName==='HR')prevHr.style.display=d;
+      var grid=h.nextElementSibling;if(grid)grid.style.display=d;
+    });
+  }
+  var scanInput=document.getElementById('js-scan-input');
+  var scanBox=scanInput&&scanInput.closest('div[style*="linear-gradient"]');
+  if(scanBox)scanBox.style.display=d;
+  var custSearch=document.getElementById('search-customer-q');
+  var custBox=custSearch&&custSearch.closest('.alert.alert-info');
+  if(custBox)custBox.style.display=d;
+}
+
 async function addProductForSameCustomer(ticketId){
   let t=allTickets.find(x=>x.id===ticketId);
   if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
@@ -6154,10 +6199,11 @@ async function addProductForSameCustomer(ticketId){
   }
   document.getElementById('modal-call-title').textContent='➕ Add Product — Same Customer ('+(t.cname||'')+')';
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
+  setAddProductMiniMode(true);
   var body=document.querySelector('#modal-call .modal-body');
   var banner=document.getElementById('call-group-banner');
   if(!banner&&body){banner=document.createElement('div');banner.id='call-group-banner';body.insertBefore(banner,body.firstChild);}
-  if(banner)banner.innerHTML=`<div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#065f46;">🔗 Linked to Call Group <b>${gid}</b> — same customer, new product. Customer details pre-filled below — model/serial/problem niche bharo naya product mate.</div>`;
+  if(banner)banner.innerHTML=`<div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#065f46;">🔗 Linked to Call Group <b>${gid}</b> — Customer/Address/Brand same as ${t.id} thi liyu chhe (fari check karvani jarur nathi). Fakt Model No, Serial No, Call Type, Problem, Description ane Engineer bharo — Save kartani sathe naya ticket ID sathe alag call banse.</div>`;
 }
 
 async function generateInvoice(id){
@@ -26590,11 +26636,14 @@ function applyJobsheetFields(f){
   // upper-case it here to match instead of leaving it mixed-case.
   function setText(id,val,noUpper){var el=document.getElementById(id);if(el&&val){el.value=noUpper?val:String(val).toUpperCase();el.style.background='#fef9c3';count++;}}
   var mob=(f.mobile||'').replace(/\D/g,'').slice(-10);
-  var alt=(f.alt_mobile||'').replace(/\D/g,'').slice(-10);
-  setText('call-cname',f.caller_name);
+  // CRM's "Alternate" = the jobsheet's "Phone Number" (a separate field from
+  // Mobile No.) — the scan function may key it phone_number/phone/alt_mobile
+  // depending on version, so check all of them.
+  var alt=(f.phone_number||f.phone||f.alt_mobile||'').replace(/\D/g,'').slice(-10);
+  setText('call-cname',f.caller_name||f.name);
   setText('call-mobile',mob,true);
   setText('call-alt',alt,true);
-  setText('call-serial',f.serial_no);
+  setText('call-serial',f.serial_no||f.serial);
   // SE Call ID — normalize case/spacing. Canon jobsheet IDs follow
   // CSP/YYYYMMDD/###### (or ICP/...); flag with a warning colour instead of
   // silently accepting when the scanned text doesn't look like that, since a
@@ -26613,19 +26662,28 @@ function applyJobsheetFields(f){
   setText('call-address',f.address);
   // Model Code comes as "MF465DW II [7188C010AA]" — only the part before the
   // bracket is the actual model no.; the bracketed code is dropped.
-  var modelOnly=(f.model||'').split('[')[0].trim();
+  var modelOnly=((f.model||f.model_code||'')+'').split('[')[0].trim();
   setText('call-model',modelOnly);
   if(modelOnly){try{applyModelServiceFields();}catch(e){}}
   setText('call-problem',f.problem);
   var emailEl=document.getElementById('call-email');if(emailEl&&f.email){emailEl.value=f.email;count++;}
-  // Brand — match dropdown option by name
-  if(f.brand){
+  // Brand + Sub-Category — every jobsheet scanned here is a Canon CSP
+  // jobsheet, so these are always forced to Canon / CSP regardless of what
+  // the scan detected. Fixed by business rule — not meant to vary.
+  (function(){
     var bd=document.getElementById('call-brand-input');
     if(bd&&bd.tagName==='SELECT'){
-      var bo=Array.prototype.slice.call(bd.options).find(function(o){return o.text.toLowerCase()===String(f.brand).toLowerCase();});
-      if(bo){bd.value=bo.value;try{selectBrandFromDrop(bo.value,bo.text);}catch(e){}count++;}
+      var bo=Array.prototype.slice.call(bd.options).find(function(o){return o.text.trim().toLowerCase()==='canon';});
+      if(bo){
+        bd.value=bo.value;try{selectBrandFromDrop(bo.value,bo.text);}catch(e){}count++;
+        var scEl=document.getElementById('call-subcat-input');
+        if(scEl){
+          var so2=Array.prototype.slice.call(scEl.options).find(function(o){return o.text.trim().toLowerCase()==='csp';});
+          if(so2){scEl.value=so2.value;try{selectSubcatFromDrop(so2.value);}catch(e){}count++;}
+        }
+      }
     }
-  }
+  })();
   // Call type — default Warranty for Canon CSP jobsheets
   var ct=f.call_type||(String(f.jobsheet_no||'').toUpperCase().indexOf('CSP')!==-1?'Warranty':'');
   if(ct){var cte=document.getElementById('call-type');if(cte){cte.value=ct;try{handleCallTypeChange();}catch(e){}count++;}}
@@ -26638,29 +26696,40 @@ function applyJobsheetFields(f){
     if(!isNaN(_rd)&&document.getElementById('call-canon-recv-date')){_tat12Write('call-canon-recv',_rd);try{autoCalcCallTAT();}catch(e){}count++;}
   }
   // Location: state → city → pin (order matters; city/state resets pin)
-  aiFillLocation(f.state,f.city,f.pin_code,f.locality);
+  aiFillLocation(f.state,f.city,f.pin_code,f.locality,f.address);
   if(f.pin_code)count++;
   return count;
 }
-function aiFillLocation(state,city,pin,area){
+// District names in the static list are census spellings (e.g. "Ahmadabad")
+// that often don't match the OCR'd/common spelling ("Ahmedabad") even after
+// lower-casing. Comparing with vowels stripped ("hmdbd" both ways) makes the
+// match spelling-tolerant without needing a hardcoded alias list.
+function _locKey(s){return String(s||'').toLowerCase().replace(/[^a-z]/g,'').replace(/[aeiou]/g,'');}
+function aiFillLocation(state,city,pin,area,addressText){
   var stateEl=document.getElementById('call-state');
   if(stateEl&&state){
-    var so=Array.prototype.slice.call(stateEl.options).find(function(o){return o.value.toLowerCase()===String(state).toLowerCase();});
+    var so=Array.prototype.slice.call(stateEl.options).find(function(o){return _locKey(o.value)===_locKey(state);});
     if(so){stateEl.value=so.value;stateEl.style.background='#fef9c3';try{onStateChange();}catch(e){}}
   }
   var cityEl=document.getElementById('call-city');
   if(cityEl&&city){
-    var co=Array.prototype.slice.call(cityEl.options).find(function(o){return o.value.toLowerCase()===String(city).toLowerCase();});
+    var co=Array.prototype.slice.call(cityEl.options).find(function(o){return _locKey(o.value)===_locKey(city);});
     if(co){cityEl.value=co.value;cityEl.style.background='#fef9c3';try{onCityChange();}catch(e){}}
   }
   // Pin + Area last (onStateChange/onCityChange clear the pin field)
   if(pin){
     var pinEl=document.getElementById('call-pin');
     if(pinEl){pinEl.value=pin;pinEl.dataset.pin=pin;pinEl.style.background='#fef9c3';}
-    // Look up the area name for this pincode; fall back to the OCR'd locality.
-    sb('pincodes','GET',null,'?pincode=eq.'+encodeURIComponent(pin)+'&select=area&limit=1').then(function(rows){
-      var a=document.getElementById('call-area');
-      if(a)a.value=(rows&&rows.length&&rows[0].area)||area||'';
+    // A pincode can map to several candidate areas — prefer whichever one
+    // actually appears in the scanned address text (e.g. address says
+    // "...SHAHIBAUG..." → pick "Shahibag" over other areas sharing the same
+    // pincode); fall back to the OCR'd locality, then just the first area.
+    sb('pincodes','GET',null,'?pincode=eq.'+encodeURIComponent(pin)+'&select=area&limit=25').then(function(rows){
+      var a=document.getElementById('call-area');if(!a)return;
+      var areas=(rows||[]).map(function(r){return r.area;}).filter(Boolean);
+      var addrKey=_locKey(addressText);
+      var matched=addrKey?areas.find(function(ar){return addrKey.indexOf(_locKey(ar))!==-1;}):null;
+      a.value=matched||area||areas[0]||'';
     }).catch(function(){var a=document.getElementById('call-area');if(a&&area)a.value=area;});
   }else if(area){
     var a2=document.getElementById('call-area');if(a2)a2.value=area;
