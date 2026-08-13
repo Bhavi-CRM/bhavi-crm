@@ -12863,11 +12863,11 @@ async function loadEngDailyReport(){
   if(!from||!to){if(wrap)wrap.innerHTML='';return;}
   if(wrap)wrap.innerHTML='<div class="loading">Loading...</div>';
   try{
-    var q='?select=id,status,call_type,model,timeline,assigned_to,assigned_name';
+    var q='?select=id,status,call_type,model,timeline,assigned_to,assigned_name,payment_mode,service_charges,final_charges,labor,other_charge,spares';
     q+=engFilter?('&assigned_to=eq.'+encodeURIComponent(engFilter)):'&assigned_to=not.is.null';
     var tickets=await sbAll('tickets',q);
     var byEng={};
-    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,invoice:0,otherWork:0,list:[]};return byEng[id];}
+    function ensure(id,name){if(!byEng[id])byEng[id]={name:name||id,w:0,ow:0,pending:0,paymentCollected:0,otherWork:0,list:[]};return byEng[id];}
     (tickets||[]).forEach(function(t){
       if(!t.assigned_to)return;
       var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
@@ -12878,6 +12878,11 @@ async function loadEngDailyReport(){
         var d=_engClosedDate(t);
         if(d&&d>=from&&d<=to){
           var row=ensure(t.assigned_to,t.assigned_name);if(isW)row.w++;else row.ow++;
+          // Payment Collection — the engineer records payment_mode + the final
+          // amount at the same moment they close a Non-Warranty On-Site call
+          // (Payment Confirmation Popup), so it's attributed to the same
+          // closed date as the call itself.
+          if(t.payment_mode)row.paymentCollected+=_pcAmount(t);
           var _ce=_engClosedEntry(t);
           var _bd=!!(_ce&&_ce.action&&_ce.action.indexOf('Back-Date')!==-1);
           var _tm=(_ce&&_ce.at&&!_bd)?new Date(_ce.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'';
@@ -12890,7 +12895,6 @@ async function loadEngDailyReport(){
         var d2=myRptStatusEventDate(t);
         if(d2&&d2>=from&&d2<=to)ensure(t.assigned_to,t.assigned_name).pending++;
       }
-      myRptInvoiceDates(t).forEach(function(d3){if(d3>=from&&d3<=to)ensure(t.assigned_to,t.assigned_name).invoice++;});
     });
     // Other Work (field_tasks) — count Done tasks by done_date in the range,
     // per engineer. Additive; if the table is missing it silently stays 0.
@@ -12908,14 +12912,14 @@ async function loadEngDailyReport(){
     var rows=Object.keys(byEng).map(function(id){var r=byEng[id];r.id=id;r.total=r.w+r.ow;return r;});
     rows.sort(function(a,b){return b.total-a.total;});
     window._edrRows=rows;window._edrRange={from:from,to:to};
-    var totW=0,totOW=0,totPending=0,totInvoice=0,totOtherWork=0;
-    rows.forEach(function(r){totW+=r.w;totOW+=r.ow;totPending+=r.pending;totInvoice+=r.invoice;totOtherWork+=(r.otherWork||0);});
+    var totW=0,totOW=0,totPending=0,totPayment=0,totOtherWork=0;
+    rows.forEach(function(r){totW+=r.w;totOW+=r.ow;totPending+=r.pending;totPayment+=(r.paymentCollected||0);totOtherWork+=(r.otherWork||0);});
     if(summaryEl)summaryEl.innerHTML=
       '<div style="background:#eff6ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#1d4ed8;font-weight:700;">🛡️ Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#1d4ed8;">'+totW+'</div></div>'
       +'<div style="background:#fff7ed;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#c2410c;font-weight:700;">💳 Non-Warranty Closed</div><div style="font-size:20px;font-weight:800;color:#c2410c;">'+totOW+'</div></div>'
       +'<div style="background:#f0fdf4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#15803d;font-weight:700;">✅ Total Closed</div><div style="font-size:20px;font-weight:800;color:#15803d;">'+(totW+totOW)+'</div></div>'
       +'<div style="background:#fefce8;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#a16207;font-weight:700;">⏳ Total Pending</div><div style="font-size:20px;font-weight:800;color:#a16207;">'+totPending+'</div></div>'
-      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">🧾 Payment/Invoice Done</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">'+totInvoice+'</div></div>'
+      +'<div style="background:#f5f3ff;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#6d28d9;font-weight:700;">💰 Payment Collection</div><div style="font-size:20px;font-weight:800;color:#6d28d9;">₹'+totPayment.toLocaleString('en-IN')+'</div></div>'
       +'<div style="background:#eef7f4;border-radius:10px;padding:10px 16px;"><div style="font-size:11px;color:#0d9488;font-weight:700;">🚚 Other Work</div><div style="font-size:20px;font-weight:800;color:#0d9488;">'+totOtherWork+'</div></div>';
     var rowsHtml=rows.map(function(r){
       var clk=r.total>0?' style="cursor:pointer;" onclick="showEdrClosedDetail(\''+String(r.id).replace(/'/g,"\\'")+'\')" title="Click to see which '+r.total+' calls are counted"':'';
@@ -12923,12 +12927,12 @@ async function loadEngDailyReport(){
         +'<td style="text-align:center;font-weight:800;color:#15803d;font-size:15px;">'+r.total+'</td>'
         +'<td style="text-align:center;">'+r.w+'</td><td style="text-align:center;">'+r.ow+'</td>'
         +'<td style="text-align:center;">'+r.pending+'</td>'
-        +'<td style="text-align:center;">'+r.invoice+'</td>'
+        +'<td style="text-align:center;font-weight:700;color:#6d28d9;">₹'+(r.paymentCollected||0).toLocaleString('en-IN')+'</td>'
         +'<td style="text-align:center;color:#0d9488;font-weight:700;">'+(r.otherWork||0)+'</td></tr>';
     }).join('');
     if(wrap)wrap.innerHTML='<div class="table-wrap"><table><thead><tr>'
       +'<th style="text-align:left;padding:8px;">Engineer</th><th style="padding:8px;">Total Closed</th><th style="padding:8px;">Warranty Closed</th><th style="padding:8px;">Non-Warranty Closed</th>'
-      +'<th style="padding:8px;">Pending</th><th style="padding:8px;">Payment/Invoice Done</th><th style="padding:8px;">🚚 Other Work</th>'
+      +'<th style="padding:8px;">Pending</th><th style="padding:8px;">💰 Payment Collection</th><th style="padding:8px;">🚚 Other Work</th>'
       +'</tr></thead><tbody>'+(rowsHtml||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No data</td></tr>')+'</tbody></table></div>';
   }catch(e){if(wrap)wrap.innerHTML='<div class="alert alert-danger">Error: '+e.message+'</div>';}
 }
@@ -12970,7 +12974,7 @@ function downloadEngDailyReport(){
   if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
   var rows=window._edrRows||[];
   if(!rows.length){alert('No data to download — run Search first.');return;}
-  var data=rows.map(function(r){return {'Engineer':r.name,'Total Closed':r.total,'Warranty Closed':r.w,'Non-Warranty Closed':r.ow,'Pending':r.pending,'Payment/Invoice Done':r.invoice,'Other Work':r.otherWork||0};});
+  var data=rows.map(function(r){return {'Engineer':r.name,'Total Closed':r.total,'Warranty Closed':r.w,'Non-Warranty Closed':r.ow,'Pending':r.pending,'Payment Collection (₹)':r.paymentCollected||0,'Other Work':r.otherWork||0};});
   var ws=XLSX.utils.json_to_sheet(data);
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Engineer Report');
@@ -26649,7 +26653,23 @@ function applyJobsheetFields(f){
   // Mobile No.) — the scan function may key it phone_number/phone/alt_mobile
   // depending on version, so check all of them.
   var alt=(f.phone_number||f.phone||f.alt_mobile||'').replace(/\D/g,'').slice(-10);
-  setText('call-cname',f.caller_name||f.name);
+  // Caller Name has repeatedly come back scrambled (a fragment of the real
+  // name, or the Address's text) from the scan function itself — that's an
+  // extraction-accuracy issue upstream, not a mapping issue here, so flag it
+  // red instead of silently trusting it: too short to be a real name, or it
+  // reads as the start of the Address (a common Name/Address mix-up).
+  (function(){
+    var nameVal=f.caller_name||f.name;
+    var cnEl=document.getElementById('call-cname');
+    if(cnEl&&nameVal){
+      cnEl.value=String(nameVal).toUpperCase();count++;
+      var nk=_locKey(nameVal);
+      var addrStart=_locKey(String(f.address||'').slice(0,nameVal.length+15));
+      var suspicious=nk.length<6||(addrStart&&addrStart.indexOf(nk)!==-1);
+      cnEl.style.background=suspicious?'#fee2e2':'#fef9c3';
+      cnEl.title=suspicious?'⚠️ Aa naam scan ma barabar na lagatu hoy sakay (bahu tunku chhe athva Address sathe match thay chhe) — jobsheet screenshot sathe check karo.':'';
+    }
+  })();
   setText('call-mobile',mob,true);
   setText('call-alt',alt,true);
   setText('call-serial',f.serial_no||f.serial);
