@@ -5224,6 +5224,11 @@ async function openNewCall(){
   }
   document.getElementById('modal-call-title').textContent='New Call Log';
   ['call-serial','call-se-id','call-cname','call-mobile','call-alt','call-email','call-area','call-address','call-address2','call-desc','call-condition','call-accessories','call-phys-js','call-brand-input','call-model','call-problem','call-tat-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Clear the yellow/red highlight + warning tooltip a jobsheet scan may have
+  // left on these fields — without this, reopening New Call for the NEXT
+  // customer still showed the previous scan's colours even though the
+  // values themselves were blanked above.
+  ['call-cname','call-mobile','call-alt','call-email','call-se-id','call-address','call-model','call-problem','call-state','call-city','call-pin'].forEach(id=>{const el=document.getElementById(id);if(el){el.style.background='';el.title='';}});
   // Canon received time — 12-hour (AM/PM) picker, injected once into its wrap.
   var _crWrap=document.getElementById('call-canon-recv-wrap');
   if(_crWrap&&!document.getElementById('call-canon-recv-date')){_crWrap.innerHTML=_tat12Controls('call-canon-recv','autoCalcCallTAT()');}
@@ -5232,7 +5237,7 @@ async function openNewCall(){
   var hint=document.getElementById('call-cust-hint');if(hint)hint.style.display='none';
   const stateEl=document.getElementById('call-state');if(stateEl)stateEl.value='';
   const cityEl=document.getElementById('call-city');if(cityEl)cityEl.innerHTML='<option value="">-- Select City --</option>';
-  const pinEl=document.getElementById('call-pin');if(pinEl)pinEl.value='';
+  const pinEl=document.getElementById('call-pin');if(pinEl){pinEl.value='';delete pinEl.dataset.pin;}
   document.getElementById('call-type').value='';document.getElementById('call-service-type').value='On Site';
   document.getElementById('call-priority').value='Normal';document.getElementById('call-rerepair').value='No';
   // Reset service charges input (may have been disabled by FOC repeat detection on previous call)
@@ -26612,13 +26617,16 @@ async function _jsScanProcess(fileArr){
     if(st)st.innerHTML='<span style="color:#dc2626;font-weight:700;">⚠️ Vanchi na shakayu:</span> <span style="color:#64748b;">'+(e.message||e)+'</span><br><span style="font-size:11px;color:#94a3b8;">Jo "jobsheet-scan" function deploy na thayu hoy to niche na steps juo, athva fields jate bharo.</span>';
   }
 }
-// Paste-to-scan: Ctrl+V a screenshot straight from the clipboard while the New
-// Call modal is open — no save-to-disk-then-upload round trip needed. Only
-// intercepts when the clipboard actually carries image data, so normal text
-// pasting into form fields is untouched.
+// Paste-to-scan: Ctrl+V a screenshot straight from the clipboard, but ONLY
+// when the dedicated "Screenshot lidha pachi ahi click kari ne Ctrl+V dabo"
+// zone is actually focused — pasting into Serial No or any other field (e.g.
+// a clipboard that still has an old screenshot in it) must never trigger a
+// full-form re-scan. Click the paste zone first, then Ctrl+V.
 document.addEventListener('paste',function(e){
   var mc=document.getElementById('modal-call');
   if(!mc||mc.classList.contains('hidden'))return;
+  var zone=document.getElementById('js-paste-zone');
+  if(!zone||document.activeElement!==zone)return;
   var items=(e.clipboardData||window.clipboardData)&&(e.clipboardData||window.clipboardData).items;
   if(!items)return;
   var blobs=[];
