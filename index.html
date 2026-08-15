@@ -513,7 +513,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group" style="grid-column:1/-1;">
           <label>Canon Call Received Date &amp; Time <small style="color:var(--text-muted);">(CSP/Warranty)</small></label>
           <div id="call-canon-recv-wrap"></div>
-          <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours (+48h if next day is Sunday or a national holiday)</div>
+          <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours — automatically pushed further past Sunday and any Holidays (Settings → Holidays), including multi-day blocks like Diwali week</div>
           <div id="call-tat-preview" style="display:none;margin-top:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:12px;color:#166534;font-weight:600;"></div>
           <input type="hidden" id="call-tat-date">
         </div>
@@ -4730,6 +4730,7 @@ function ticketProblemFilterOptions(){
   (allTickets||[]).forEach(function(t){if(t.problem)set.add(t.problem.trim());});
   return Array.from(set).filter(Boolean).sort(function(a,b){return a.localeCompare(b);});
 }
+window._ticketPage=1;window._ticketPageSize=50;
 function renderTicketTable(filtered){
   const tickets=filtered||allTickets.filter(t=>!TERMINAL_TICKET_STATUSES.includes(t.status));
   document.getElementById('page-content').innerHTML=`
@@ -4772,9 +4773,36 @@ function renderTicketTable(filtered){
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Sr. No.</th><th>Problem</th><th>Type</th><th>Engineer</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody id="ticket-tbody">${tickets.map(t=>ticketRow(t)).join('')}</tbody>
+        <tbody id="ticket-tbody">${_ticketPageSlice(tickets).slice.map(t=>ticketRow(t)).join('')}</tbody>
       </table></div>
+      <div id="ticket-pager">${ticketPagerHtml(_ticketPageSlice(tickets))}</div>
     </div>`;
+}
+// Client-side pagination — keeps the DOM from having to render hundreds of
+// rows at once (search/filter still runs across the full fetched dataset,
+// only the rendered table is paged).
+function _ticketPageSlice(arr){
+  var size=window._ticketPageSize||50;
+  var totalPages=Math.max(1,Math.ceil(arr.length/size));
+  if(window._ticketPage>totalPages)window._ticketPage=totalPages;
+  if(window._ticketPage<1)window._ticketPage=1;
+  var start=(window._ticketPage-1)*size;
+  return {slice:arr.slice(start,start+size),totalPages:totalPages,page:window._ticketPage,total:arr.length};
+}
+function ticketPagerHtml(info){
+  if(!info.total)return'';
+  var size=window._ticketPageSize||50;
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 4px;font-size:13px;">'
+    +'<div style="color:var(--text-muted);">Showing '+((info.page-1)*size+1)+'–'+Math.min(info.page*size,info.total)+' of '+info.total+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<label style="color:var(--text-muted);">Page size</label>'
+    +'<select onchange="window._ticketPageSize=parseInt(this.value);window._ticketPage=1;filterTickets(true);" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;">'
+    +[30,50,100,200].map(function(n){return '<option value="'+n+'"'+(size===n?' selected':'')+'>'+n+'</option>';}).join('')
+    +'</select>'
+    +'<button class="btn btn-outline btn-sm" '+(info.page<=1?'disabled':'')+' onclick="window._ticketPage--;filterTickets(true);">‹ Prev</button>'
+    +'<span>Page '+info.page+' / '+info.totalPages+'</span>'
+    +'<button class="btn btn-outline btn-sm" '+(info.page>=info.totalPages?'disabled':'')+' onclick="window._ticketPage++;filterTickets(true);">Next ›</button>'
+    +'</div></div>';
 }
 function ticketRow(t){
   const isCarryIn=t.service_type==='Carry In';
@@ -4794,7 +4822,8 @@ function ticketRow(t){
       <button class="btn-icon" title="Print Job Sheet" onclick="viewingTicketId='${t.id}';printJobSheet()">🖨️</button>
     </td></tr>`;
 }
-function filterTickets(){
+function filterTickets(keepPage){
+  if(!keepPage)window._ticketPage=1;
   if(window._pendingInvFilter){window._pendingInvFilter=false;var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='Closed';}
   const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
   const s=document.getElementById('ticket-status-filter')?.value||'';
@@ -4814,7 +4843,9 @@ function filterTickets(){
     const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
     return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
   });
-  document.getElementById('ticket-tbody').innerHTML=f.map(t=>ticketRow(t)).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  const pageInfo=_ticketPageSlice(f);
+  document.getElementById('ticket-tbody').innerHTML=pageInfo.slice.map(t=>ticketRow(t)).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  const pagerEl=document.getElementById('ticket-pager');if(pagerEl)pagerEl.innerHTML=ticketPagerHtml(pageInfo);
 }
 async function exportFilteredTickets(){
   const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
@@ -5693,18 +5724,22 @@ async function saveCall(){
   }
 }
 async function generateTicketNo(){
-  // Format: BEA-YYYYMMDD-XXXX (e.g. BEA-20260814-1028), same date convention
-  // as the Canon SE Call ID (CSP/YYYYMMDD/NNNNN). Series resets daily.
+  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-1028). Series runs across months
+  // and resets only on year change — reverted back to this (was briefly
+  // changed to a daily-reset BEA-YYYYMMDD-XXXX format, which broke the
+  // continuity of the running series admin/engineers were already used to —
+  // reverted so numbering just continues from wherever it already was).
   // Ticket numbers are assigned in creation order, so the highest number is
-  // always among the most-recently created tickets of the same day. We
-  // ORDER BY created_at DESC and take a window of the latest rows — this
-  // guarantees the true max is seen even if the server caps the row count.
+  // always among the most-recently created tickets. We ORDER BY created_at
+  // DESC and take a window of the latest rows — this guarantees the true
+  // max is seen even if the server caps the row count.
   const now=new Date();
-  const ymd=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0');
-  const rows=await sb('tickets','GET',null,`?id=like.BEA-${ymd}*&select=id&order=created_at.desc&limit=300`);
+  const year=now.getFullYear();
+  const ym=year+String(now.getMonth()+1).padStart(2,'0');
+  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&order=created_at.desc&limit=300`);
   let max=0;
   for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(!isNaN(n)&&n>max)max=n;}
-  return `BEA-${ymd}-${String(max+1).padStart(4,'0')}`;
+  return `BEA-${ym}-${String(max+1).padStart(4,'0')}`;
 }
 
 // Point 13: Admin edit — only remark
@@ -5972,18 +6007,29 @@ function autoCalcCallTAT(){
   var preview=document.getElementById('call-tat-preview');
   var hidden=document.getElementById('call-tat-date');
   if(!recvD){if(preview)preview.style.display='none';if(hidden)hidden.value='';return;}
-  // Normally +24h. But if the NEXT calendar day is a holiday (Sunday, or a
-  // national holiday like 15-Aug/26-Jan/2-Oct, or one added via the
-  // holidays table), give +48h since no working day counts on a holiday.
-  var nextDay=new Date(recvD.getTime());nextDay.setDate(nextDay.getDate()+1);
-  var nextIsHoliday=isHolidayDate(nextDay);
-  var hrs=nextIsHoliday?48:24;
-  var d=new Date(recvD.getTime()+hrs*3600000);
+  // Step 1 — if the call itself was logged DURING a holiday (or a run of
+  // consecutive holidays, e.g. Saturday-holiday running into Sunday), the
+  // clock shouldn't start ticking until the next actual working day at the
+  // same time — otherwise a call logged mid-holiday would burn holiday
+  // hours it never had. Shift the start forward first.
+  var start=new Date(recvD.getTime());
+  var shiftedDays=0;
+  while(isHolidayDate(start)&&shiftedDays<14){start=new Date(start.getTime()+24*3600000);shiftedDays++;}
+  // Step 2 — from that (possibly shifted) start, +24h, then keep pushing
+  // forward another +24h for every further consecutive holiday day the
+  // deadline still lands on — so a call received just before a multi-day
+  // block (Diwali week, 2-day Uttarayan, etc.) skips the WHOLE block and
+  // lands on the next actual working day. Capped at 14 pushes as a sanity limit.
+  var d=new Date(start.getTime()+24*3600000);
+  var pushedDays=0;
+  while(isHolidayDate(d)&&pushedDays<14){d=new Date(d.getTime()+24*3600000);pushedDays++;}
+  var hrs=24+pushedDays*24;
   var iso=d.toISOString();
   if(hidden)hidden.value=iso;
   if(preview){
     var label=d.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
-    preview.textContent='⏱ TAT Deadline: '+label+' (Canon received + '+hrs+'h'+(nextIsHoliday?' — next day is a holiday':'')+')';
+    var note=shiftedDays?' — call logged on a holiday, TAT starts next working day':(pushedDays?' — skipped '+pushedDays+' consecutive holiday day'+(pushedDays>1?'s':''):'');
+    preview.textContent='⏱ TAT Deadline: '+label+' (Canon received + '+hrs+'h'+note+')';
     preview.style.display='block';
   }
 }
@@ -6154,6 +6200,7 @@ async function viewTicket(id,autoPrint=false){
         <div style="font-size:13px;line-height:1.9;">Model: <b>${t.model}</b><br>Serial: <b>${t.serial}</b> ${(t.serial||'').startsWith('NO-SN-')?`<button class="btn btn-outline btn-sm" style="padding:1px 8px;font-size:11px;" onclick="openSerialEditModal('${t.id}')">✏️ Edit</button>`:''}<br>
         Type: ${t.call_type} | ${t.service_type}<br>
         ${t.se_call_id?'SE Call ID: <b>'+t.se_call_id+'</b><br>':''}
+        ${t.wc_type==='CSP'?(t.page_count!=null?'Page Count: <b>'+t.page_count+'</b><br>':(t.page_count_skip_reason?'Page Count: <b style="color:#b45309;">Skipped</b> — '+escHtml(t.page_count_skip_reason)+'<br>':'')):''}
         Engineer: <b>${t.assigned_name||'<span style="color:var(--danger);">Unassigned</span>'}</b><br>
         Status: ${statusBadge(t.status)}</div>
       </div>
@@ -7012,6 +7059,17 @@ async function openEngUpdate(id){
       <input type="text" id="upd-se-call-id" value="${escHtml(t.se_call_id||'')}" placeholder="e.g. CSP/20260618/123456" style="margin-top:4px;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;border-color:#f59e0b;">
       <div style="font-size:11px;color:#78716c;margin-top:3px;">Only the digits after the last / will be used for tracking (e.g. 123456)</div>
     </div>`:''}
+    ${t.wc_type==='CSP'?`<div class="form-group" style="margin-bottom:12px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;padding:10px 12px;">
+      <label style="font-weight:700;color:#5b21b6;font-size:12px;">📄 Page Count <span style="color:#ef4444;">*</span> <span style="font-size:11px;font-weight:400;color:#6d28d9;">(CSP call — required to close)</span></label>
+      <input type="number" id="upd-page-count" min="0" value="${t.page_count!=null?t.page_count:''}" placeholder="e.g. 1250" style="margin-top:4px;border-color:#c4b5fd;">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6d28d9;cursor:pointer;">
+        <input type="checkbox" id="upd-page-count-skip" onchange="document.getElementById('upd-page-count-skip-reason-box').style.display=this.checked?'block':'none';document.getElementById('upd-page-count').disabled=this.checked;">
+        Page Count skip karvo chhe (specific remark aapo)
+      </label>
+      <div id="upd-page-count-skip-reason-box" style="display:none;margin-top:6px;">
+        <input type="text" id="upd-page-count-skip-reason" placeholder="Reason — e.g. counter not accessible, device not powering on" style="border-color:#c4b5fd;">
+      </div>
+    </div>`:''}
     <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">🔩 Spares / Part Request</h3>
     <div id="spares-list">${currentSpares.map((s,i)=>spareRow(s,i)).join('')}</div>
     <!-- Point 6: Part request button -->
@@ -7025,7 +7083,7 @@ async function openEngUpdate(id){
     <div id="estimate-total-bar" style="display:none;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
     <hr class="divider">
     <div class="form-group" style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments <span class="req">*</span> <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo farjiyat (Close mate). Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
+      <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments ${t.wc_type==='CSP'?'<span class="req">*</span>':''} <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo${t.wc_type==='CSP'?' farjiyat (Close mate, CSP call)':' (optional, ICP call)'}. Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
       <div id="js-attach-slots" style="margin-top:8px;"></div>
       <input type="file" id="js-cam-input" accept="image/*" capture="environment" style="display:none;" onchange="onJsPhotoPick(this)">
       <input type="file" id="js-gal-input" accept="image/*" style="display:none;" onchange="onJsPhotoPick(this)">
@@ -7254,10 +7312,20 @@ async function savePartRequest(addAnother){
   }
 }
 
-function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>₹${(s.qty*(s.price||0)).toFixed(2)}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
+// Warranty (and not Out of Coverage) calls never bill the customer for
+// parts — price must show ₹0 there, same rule the ticket-view/invoice
+// pages already use, checked against the ticket currently open in the
+// Update modal (window._currentUpdateTicket).
+function _spareHidesPrice(){
+  var t=window._currentUpdateTicket;if(!t)return false;
+  var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  var isOOC=t.warranty_coverage==='Out of Coverage';
+  return isW&&!isOOC;
+}
+function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice();const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
 function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');refreshEstimateTotal();}
 function refreshEstimateTotal(){
-  var parts=currentSpares.reduce(function(a,s){return a+(s.qty||1)*(s.price||0);},0);
+  var parts=_spareHidesPrice()?0:currentSpares.reduce(function(a,s){return a+(s.qty||1)*(s.price||0);},0);
   var svc=parseFloat(document.getElementById('upd-labor')?.value)||0;
   var other=parseFloat(document.getElementById('upd-other')?.value)||0;
   var total=parts+svc+other;
@@ -7408,8 +7476,11 @@ async function saveEngUpdate(){
   // ATTACHMENTS — Job Sheet (slot 0) & extras are governed by Field Rules.
   // Resolved By Phone is exempt: no visit happened, so there is no job sheet.
   var _photos=window._jsPhotos||[null,null,null];
-  if(status==='Closed'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
-    alert('📄 Job Sheet Photo is required to close this call!\n\nUpar "Attachments" ma Job Sheet no photo (camera ke gallery) attach karo, pachhi Save karo.');
+  // Job Sheet Photo is mandatory to close a CSP call — On Site or Carry In,
+  // doesn't matter. ICP calls stay optional (still governed by the Field
+  // Rules admin override if set explicitly).
+  if(status==='Closed'&&t.wc_type==='CSP'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
+    alert('📄 Job Sheet Photo is required to close a CSP call!\n\nUpar "Attachments" ma Job Sheet no photo (camera ke gallery) attach karo, pachhi Save karo.');
     return;
   }
   if(status==='Closed'&&isFieldRequired('call_close','extra_attachments')&&!(_photos[1]&&_photos[1].url)){
@@ -7419,6 +7490,18 @@ async function saveEngUpdate(){
   // SE Call ID — enforced only if admin marked it compulsory, and only for warranty calls.
   if(status==='Closed'&&isFieldRequired('call_close','se_call_id')&&['Warranty','Warranty Repeat','AMC'].includes(t.call_type||'')&&!(document.getElementById('upd-se-call-id')?.value||t.se_call_id||'').trim()){
     alert('🔖 SE Call ID required chhe (admin e farjiyat karyu chhe).');document.getElementById('upd-se-call-id')?.focus();return;
+  }
+  // Page Count — CSP calls only. Required, but the engineer can skip it by
+  // ticking the box and giving a specific reason instead (e.g. counter not
+  // accessible) — never a silent skip.
+  var pageCountSkip=document.getElementById('upd-page-count-skip')?.checked;
+  var pageCountReason=(document.getElementById('upd-page-count-skip-reason')?.value||'').trim();
+  var pageCountVal=(document.getElementById('upd-page-count')?.value||'').trim();
+  if(status==='Closed'&&t.wc_type==='CSP'){
+    if(pageCountSkip&&!pageCountReason){alert('📄 Page Count skip karvu hoy to reason lakhvo farjiyat chhe.');document.getElementById('upd-page-count-skip-reason')?.focus();return;}
+    if(!pageCountSkip&&!pageCountVal){alert('📄 Page Count required chhe (CSP call) — ya to lakho, ya "Skip" tick kari ne reason aapo.');document.getElementById('upd-page-count')?.focus();return;}
+    data.page_count=pageCountSkip?null:parseInt(pageCountVal,10);
+    data.page_count_skip_reason=pageCountSkip?pageCountReason:null;
   }
   // Upload any newly-added photos; keep already-uploaded URLs as-is.
   async function _resolvePhoto(p,tag){
@@ -7468,10 +7551,11 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
       // (setup SQL not run) — don't brick call closing: retry without the
       // missing field(s).
       var _msg=String(pe&&pe.message);
-      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)){
+      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)||(data.page_count!==undefined&&_msg.indexOf('page_count')!==-1)){
         if(_msg.indexOf('jobsheet_photo')!==-1)delete data.jobsheet_photo;
         if(_msg.indexOf('attachments')!==-1)delete data.attachments;
         if(_msg.indexOf('payment_mode')!==-1)delete data.payment_mode;
+        if(_msg.indexOf('page_count')!==-1){delete data.page_count;delete data.page_count_skip_reason;}
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
         console.log('column(s) missing — run the relevant setup SQL in Supabase');
       }else throw pe;
@@ -9428,13 +9512,27 @@ async function renderEngParts(tab){
   c.innerHTML='<div class="loading">Loading...</div>';
   const role=currentUser.role||'';
   const isEng=role==='engineer';
+  // CSP Managers (ENG001/ENG002 — role is still 'engineer') get Parts
+  // Request approve/reject access like a Manager, not the plain-engineer
+  // self-service-only view.
+  const isCspMgr=!!window._isCspMgr;
   const isWC=(role==='admin'&&(currentUser.role_type||'')==='work_controller')||role==='work_controller';
   const isAdmin=!isEng&&!isWC;
-  if(!tab) tab=isEng?'my-requests':(isWC?'pending':'overview');
+  if(!tab) tab=(isEng&&!isCspMgr)?'my-stock':(isWC||isCspMgr?'pending':'overview');
   try{
     if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name');
     if(!allEngineers||!allEngineers.length) await loadMasterData();
-    if(isEng){await renderEngSelfService(tab);return;}
+    if(isEng&&!isCspMgr){await renderEngSelfService(tab);return;}
+    if(isEng&&isCspMgr){
+      c.innerHTML=`
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1e40af;">
+          ℹ️ Manager access — approve/reject any engineer's Parts Request (Receive or Return).
+        </div>
+        <div class="tabs">${(t=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">⏳ Pending Requests</button>`)('pending')}</div>
+        <div id="ep-content"></div>`;
+      await renderEPPending(null);
+      return;
+    }
     allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     const engineers=[...new Set(allEngStock.map(s=>s.owner))].sort();
     const totalEngVal=allEngStock.reduce((a,s)=>{const p=allInventory.find(x=>x.id===s.part_id);return a+(s.qty||0)*(p?.unit_price||0);},0);
@@ -10348,9 +10446,39 @@ async function renderEngSelfService(tab){
       <button class="btn btn-primary" onclick="openEngReqReceive()">📥 Parts Request (Receive)</button>
       <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReqReturn()">↩️ Return Parts to Store</button>
     </div>
-    <div class="tabs">${tabHtml('my-requests','📋 My Requests')}</div>
+    <div class="tabs">${tabHtml('my-stock','📦 My Stock')}${tabHtml('my-requests','📋 My Requests')}</div>
     <div id="ep-content"></div>`;
-  await renderEPMyRequests();
+  if(tab==='my-stock')await renderEPMyStockView();
+  else await renderEPMyRequests();
+}
+// Engineer's own current holdings — how many of each part they're actually
+// carrying right now (eng_stock rows keyed by owner = engineer's name).
+async function renderEPMyStockView(){
+  const el=document.getElementById('ep-content');
+  el.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    const engName=currentUser.name;
+    const rows=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(engName)+'&qty=gt.0&order=part_id');
+    const getPart=id=>(allInventory||[]).find(x=>x.id===id);
+    const items=(rows||[]).map(r=>{const p=getPart(r.part_id);return{code:p?.part_code||'-',name:p?.item_name||'Unknown part',qty:r.qty,value:(r.qty||0)*(p?.unit_price||0)};}).sort((a,b)=>(a.code||'').localeCompare(b.code||''));
+    const totalVal=items.reduce((a,i)=>a+i.value,0);
+    const bodyRows=items.map(i=>`<tr><td style="padding:8px 12px;"><b style="color:var(--primary);">${escHtml(i.code)}</b></td><td style="padding:8px 12px;">${escHtml(i.name)}</td><td style="padding:8px 12px;text-align:center;font-weight:700;">${i.qty}</td><td style="padding:8px 12px;text-align:right;color:#059669;">₹${i.value.toFixed(0)}</td></tr>`).join('')
+      ||'<tr><td colspan="4" style="padding:24px;text-align:center;color:#94a3b8;">No parts in your stock right now.</td></tr>';
+    el.innerHTML=`<div class="card" style="margin-bottom:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;color:var(--text-muted);">Total parts: <b>${items.length}</b></div>
+        <div style="font-size:15px;font-weight:800;color:#059669;">Total Value: ₹${totalVal.toFixed(0)}</div>
+      </div>
+      <div class="card" style="padding:0;overflow:auto;">
+      <table style="min-width:500px;border-collapse:collapse;width:100%;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Part Code</th>
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Item Name</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Qty</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Value</th>
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table></div>`;
+  }catch(e){el.innerHTML=`<div class="card"><p style="color:red;">Error: ${e.message}</p></div>`;}
 }
 async function renderEPMyRequests(){
   const el=document.getElementById('ep-content');
