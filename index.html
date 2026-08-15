@@ -513,7 +513,7 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group" style="grid-column:1/-1;">
           <label>Canon Call Received Date &amp; Time <small style="color:var(--text-muted);">(CSP/Warranty)</small></label>
           <div id="call-canon-recv-wrap"></div>
-          <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours (Saturday call → +48h, kem ke Sunday holiday)</div>
+          <div style="font-size:11px;color:#166534;margin-top:4px;">Enter date &amp; time from Canon portal → TAT auto-set to +24 hours (+48h if next day is Sunday or a national holiday)</div>
           <div id="call-tat-preview" style="display:none;margin-top:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:12px;color:#166534;font-weight:600;"></div>
           <input type="hidden" id="call-tat-date">
         </div>
@@ -2956,6 +2956,9 @@ function setupNav(){
 
 // MASTER DATA
 async function loadMasterData(){
+  // Fire-and-forget: populates window._extraHolidays for the TAT holiday
+  // check (autoCalcCallTAT) — not awaited so it never blocks the modal open.
+  try{loadExtraHolidays();}catch(e){}
   // Each dataset is fetched independently (not Promise.all) so one failing
   // request can't silently blank out all five — a single bad table load used
   // to leave every dropdown fed by this function empty for the rest of the
@@ -4775,7 +4778,7 @@ function renderTicketTable(filtered){
 }
 function ticketRow(t){
   const isCarryIn=t.service_type==='Carry In';
-  const rowStyle=isCarryIn?'background:#fff7ed;':'background:#eff6ff;';
+  const rowStyle=isCarryIn?'background:#ffedd5;':'';
   return `<tr style="${rowStyle}"><td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
     <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
     <td>${t.model||'-'}</td><td>${t.serial||'-'}</td>
@@ -5690,20 +5693,18 @@ async function saveCall(){
   }
 }
 async function generateTicketNo(){
-  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-1028). Series runs across months and resets only on year change.
-  // Ticket numbers are assigned in creation order, so the highest number is always
-  // among the most-recently created tickets. We ORDER BY created_at DESC and take a
-  // window of the latest rows — this guarantees the true max is seen even if the
-  // server caps the row count. (The old unordered limit=5000 fetch could silently
-  // drop the highest ticket once the table grew, producing a number that already
-  // existed → "duplicate key ... tickets_pkey" and a blocked call.)
+  // Format: BEA-YYYYMMDD-XXXX (e.g. BEA-20260814-1028), same date convention
+  // as the Canon SE Call ID (CSP/YYYYMMDD/NNNNN). Series resets daily.
+  // Ticket numbers are assigned in creation order, so the highest number is
+  // always among the most-recently created tickets of the same day. We
+  // ORDER BY created_at DESC and take a window of the latest rows — this
+  // guarantees the true max is seen even if the server caps the row count.
   const now=new Date();
-  const year=now.getFullYear();
-  const ym=year+String(now.getMonth()+1).padStart(2,'0');
-  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&order=created_at.desc&limit=300`);
+  const ymd=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0');
+  const rows=await sb('tickets','GET',null,`?id=like.BEA-${ymd}*&select=id&order=created_at.desc&limit=300`);
   let max=0;
   for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(!isNaN(n)&&n>max)max=n;}
-  return `BEA-${ym}-${String(max+1).padStart(4,'0')}`;
+  return `BEA-${ymd}-${String(max+1).padStart(4,'0')}`;
 }
 
 // Point 13: Admin edit — only remark
@@ -5886,21 +5887,103 @@ function autoCalcTAT(){
   nd.setDate(nd.getDate()+1); // next day, same time
   _tat12Write('tat-set',nd);
 }
+// Fixed-date Indian national holidays that fall on the same MM-DD every
+// year (Republic Day, Independence Day, Gandhi Jayanti) — recognized
+// automatically, no admin setup needed. Other holidays (Diwali, Eid, etc.)
+// can be added via an optional "holidays" table (date column) — loaded once
+// into window._extraHolidays; if that table doesn't exist, only Sundays +
+// the fixed 3 dates above are recognized.
+var FIXED_NATIONAL_HOLIDAYS=['01-26','08-15','10-02'];
+async function loadExtraHolidays(){
+  if(window._extraHolidays)return;
+  try{
+    var rows=await sb('holidays','GET',null,'?select=holiday_date');
+    window._extraHolidays=new Set((rows||[]).map(function(r){return r.holiday_date;}));
+  }catch(e){window._extraHolidays=new Set();}
+}
+function isHolidayDate(d){
+  if(d.getDay()===0)return true; // Sunday
+  var mmdd=String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(FIXED_NATIONAL_HOLIDAYS.indexOf(mmdd)!==-1)return true;
+  var ymd=d.toLocaleDateString('en-CA');
+  return !!(window._extraHolidays&&window._extraHolidays.has(ymd));
+}
+
+// ── HOLIDAYS SETTINGS TAB (admin-managed variable holidays: Diwali, Eid, etc.) ──
+// Sunday + the 3 fixed national holidays always work with zero setup; this
+// tab lets admin add/remove the movable ones so TAT +48h picks them up too.
+async function renderHolidaysTab(){
+  var box=document.getElementById('settings-content');if(!box)return;
+  box.innerHTML='<div class="card"><div class="loading">Loading...</div></div>';
+  try{
+    var rows=await sb('holidays','GET',null,'?select=holiday_date,name&order=holiday_date.asc');
+    var todayYmd=new Date().toLocaleDateString('en-CA');
+    var upcoming=(rows||[]).filter(function(r){return r.holiday_date>=todayYmd;});
+    box.innerHTML='<div class="card">'
+      +'<h3 style="font-weight:700;margin-bottom:6px;">🎉 Holidays (for TAT +48h auto-calc)</h3>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Sunday, 15-Aug, 26-Jan &amp; 2-Oct are always recognized automatically — add movable holidays here (Diwali, Eid, etc.) so a call received the day before also gets +48h TAT.</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;">'
+      +'<div class="form-group" style="margin:0;"><label>Date</label><input type="date" id="hol-new-date" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"></div>'
+      +'<div class="form-group" style="margin:0;flex:1;min-width:160px;"><label>Name</label><input type="text" id="hol-new-name" placeholder="e.g. Diwali" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;width:100%;"></div>'
+      +'<button class="btn btn-primary btn-sm" onclick="addHoliday()">➕ Add Holiday</button>'
+      +'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Date</th><th style="padding:6px 8px;">Name</th><th style="padding:6px 8px;"></th></tr></thead>'
+      +'<tbody>'+((rows&&rows.length)?rows.map(function(r){
+        var isPast=r.holiday_date<todayYmd;
+        return '<tr style="border-bottom:1px solid #f1f5f9;'+(isPast?'opacity:0.5;':'')+'">'
+          +'<td style="padding:6px 8px;font-weight:600;">'+new Date(r.holiday_date+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</td>'
+          +'<td style="padding:6px 8px;">'+escHtml(r.name||'-')+'</td>'
+          +'<td style="padding:6px 8px;text-align:right;"><button class="btn btn-outline btn-sm" onclick="deleteHoliday(\''+r.holiday_date+'\')">🗑️ Remove</button></td>'
+          +'</tr>';
+      }).join(''):'<tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-muted);">No holidays added yet.</td></tr>')
+      +'</tbody></table>'
+      +'</div>';
+  }catch(e){
+    var msg=String(e&&e.message||e);
+    if(msg.indexOf('holidays')!==-1||msg.indexOf('relation')!==-1||msg.indexOf('404')!==-1){
+      box.innerHTML='<div class="card"><div class="alert alert-warning">⚠️ Setup needed: create a "holidays" table in Supabase with columns <code>holiday_date</code> (date, primary key) and <code>name</code> (text), then reload this tab.<br><br><code>create table holidays (holiday_date date primary key, name text);</code></div></div>';
+    }else{
+      box.innerHTML='<div class="card"><div class="alert alert-danger">Error: '+escHtml(msg)+'</div></div>';
+    }
+  }
+}
+async function addHoliday(){
+  var d=document.getElementById('hol-new-date')?.value;
+  var n=(document.getElementById('hol-new-name')?.value||'').trim();
+  if(!d){alert('⚠️ Date select karo.');return;}
+  if(!n){alert('⚠️ Holiday name lakho.');return;}
+  try{
+    await sb('holidays','POST',{holiday_date:d,name:n});
+    window._extraHolidays=null;await loadExtraHolidays();
+    renderHolidaysTab();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteHoliday(dateStr){
+  if(!confirm('Remove holiday on '+dateStr+'?'))return;
+  try{
+    await sb('holidays','DELETE',null,'?holiday_date=eq.'+encodeURIComponent(dateStr));
+    window._extraHolidays=null;await loadExtraHolidays();
+    renderHolidaysTab();
+  }catch(e){alert('Error: '+e.message);}
+}
 function autoCalcCallTAT(){
   var recvD=_tat12Read('call-canon-recv');
   var preview=document.getElementById('call-tat-preview');
   var hidden=document.getElementById('call-tat-date');
   if(!recvD){if(preview)preview.style.display='none';if(hidden)hidden.value='';return;}
-  // Normally +24h. But if the call was received on a SATURDAY, give +48h because
-  // Sunday is a holiday (no working day counts on Sunday). getDay(): 6 = Saturday.
-  var isSat=recvD.getDay()===6;
-  var hrs=isSat?48:24;
+  // Normally +24h. But if the NEXT calendar day is a holiday (Sunday, or a
+  // national holiday like 15-Aug/26-Jan/2-Oct, or one added via the
+  // holidays table), give +48h since no working day counts on a holiday.
+  var nextDay=new Date(recvD.getTime());nextDay.setDate(nextDay.getDate()+1);
+  var nextIsHoliday=isHolidayDate(nextDay);
+  var hrs=nextIsHoliday?48:24;
   var d=new Date(recvD.getTime()+hrs*3600000);
   var iso=d.toISOString();
   if(hidden)hidden.value=iso;
   if(preview){
     var label=d.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
-    preview.textContent='⏱ TAT Deadline: '+label+' (Canon received + '+hrs+'h'+(isSat?' — Saturday, Sunday holiday':'')+')';
+    preview.textContent='⏱ TAT Deadline: '+label+' (Canon received + '+hrs+'h'+(nextIsHoliday?' — next day is a holiday':'')+')';
     preview.style.display='block';
   }
 }
@@ -11374,6 +11457,7 @@ async function renderSettings(){
       <button class="tab" onclick="switchSettings('telegram',this)">📱 Telegram</button>
       <button class="tab" onclick="switchSettings('navperms',this)">🔐 Nav Permissions</button>
       <button class="tab" onclick="switchSettings('fieldrules',this)">📋 Field Rules</button>
+      <button class="tab" onclick="switchSettings('holidays',this)">🎉 Holidays</button>
     </div>
     <div id="settings-content">${renderEngTab(engineers)}</div>`;
 }
@@ -11387,6 +11471,7 @@ function switchSettings(tab,el){
   else if(tab==='telegram') renderTelegramSettings();
   else if(tab==='navperms') renderNavPermsTab();
   else if(tab==='fieldrules') renderFieldRulesTab();
+  else if(tab==='holidays') renderHolidaysTab();
   else if(tab==='company'){
     var ci=JSON.parse(localStorage.getItem('bhavi_company')||'{}');
     document.getElementById('settings-content').innerHTML=`<div class="card">
@@ -12204,7 +12289,14 @@ async function approveReportEdit(ticketId){
   if(!confirm(`Approve report edit for ${t.id} — ${t.cname}?`))return;
   const pe=t.pending_edit;const ch=pe.changes||{};const now=new Date().toISOString();
   const patch={pending_edit:null,updated_at:now};
-  ['cname','mobile','alt_mobile','city','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
+  // NOTE: this whitelist must cover every field the two edit-request flows
+  // can put into pending_edit.changes (openReportEditModal's newVals + this
+  // page's own 're-*' fields) — a field missing here gets shown as
+  // "approved" in the diff/email but is silently never written to the
+  // ticket. model/serial/se_call_id/brand_name/state were missing (bug: a
+  // Serial/Model edit request could be approved without actually changing
+  // the ticket) — added below.
+  ['cname','mobile','alt_mobile','city','state','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge','model','serial','se_call_id','brand_name'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
   let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
   const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
   tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
@@ -25404,7 +25496,7 @@ async function renderPendingList(){
   try{
     var tickets=await sb('tickets','GET',null,
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired&status=neq.Resolved+By+Phone&status=neq.Pending+for+Delivery'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem,remarks'
       +'&order=created_at.desc&limit=2000');
     window._pendingData=tickets||[];
     if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
@@ -25581,7 +25673,10 @@ function pendingListRender(){
         +'<td style="padding:10px 12px;font-size:12px;color:#374151;">'+areaDisplay+'</td>'
         +'<td style="padding:10px 12px;"><div style="font-size:12px;font-weight:600;color:#1f2937;">'+escHtml(t.model||'—')+'</div>'
         +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
-        +'<td style="padding:10px 12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#374151;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</td>'
+        +'<td style="padding:10px 12px;max-width:160px;font-size:12px;color:#374151;">'
+        +'<div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</div>'
+        +(t.remarks?'<div style="margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="'+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
+        +'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)+_plHoldBadge
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
         +'<td style="padding:10px 12px;">'+tatBadge(t.tat_date)+'</td>'
@@ -25684,7 +25779,10 @@ function pendingListRenderResults(){
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.cname||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div>'+escHtml(t.area||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.pin||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.model||'-')+'</div><div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'MISSING')+'</div></td>'
-        +'<td style="padding:10px 12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#374151;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</td>'
+        +'<td style="padding:10px 12px;max-width:160px;font-size:12px;color:#374151;">'
+        +'<div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</div>'
+        +(t.remarks?'<div style="margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="'+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
+        +'</td>'
         +'<td style="padding:10px 12px;"><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">'+escHtml(t.status||'')+'</span><br><span style="font-size:11px;color:#6b7280;">'+escHtml(t.assigned_name||'UNASSIGNED')+'</span></td>'
         +'<td style="padding:10px 12px;">'+tatB+'</td>'
         +'<td style="padding:10px 12px;text-align:center;"><button onclick="viewTicket(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;">✏️ Update</button></td>'
