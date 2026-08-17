@@ -6238,6 +6238,7 @@ async function viewTicket(id,autoPrint=false){
     ${t.remarks?`<div style="font-size:13px;margin-bottom:10px;background:var(--bg);padding:8px;border-radius:8px;"><b>Remarks:</b> ${t.remarks}</div>`:''}
     ${t.serial_photo?`<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">📷 SERIAL NUMBER PHOTO</b><br><img src="${t.serial_photo}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'120px':'none'" style="max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border);margin-top:6px;cursor:zoom-in;display:block;" title="Click to expand"><span style="font-size:10px;color:var(--text-muted);">Click image to expand</span></div>`:''}
     ${(()=>{let log=t.serial_edit_log;if(typeof log==='string'){try{log=JSON.parse(log);}catch(e){log=[];}}if(!Array.isArray(log)||!log.length)return'';return `<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">🔢 SERIAL NO EDIT HISTORY</b>`+log.slice().reverse().map(l=>`<div style="font-size:12px;background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:6px;"><b>${escHtml(l.old_serial||'-')}</b> → <b>${escHtml(l.new_serial||'-')}</b><br><span style="color:var(--text-muted);">By: ${escHtml(l.by||'-')}${l.role?' ('+escHtml(l.role)+')':''} | ${l.at?new Date(l.at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'}):'-'}</span><br><span>Remark: ${escHtml(l.remark||'-')}</span>${l.photo?`<br><img src="${l.photo}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'100px':'none'" style="max-height:100px;border-radius:6px;margin-top:4px;cursor:zoom-in;">`:''}</div>`).join('')+`</div>`;})()}
+    ${(()=>{let cph=t.condition_photos;if(typeof cph==='string'){try{cph=JSON.parse(cph);}catch(e){cph=[];}}if(!t.condition_type&&(!Array.isArray(cph)||!cph.length))return'';return `<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">📦 PRODUCT CONDITION</b>`+(t.condition_type?`<div style="font-size:13px;margin-top:4px;"><b>${escHtml(t.condition_type)}</b></div>`:'')+(Array.isArray(cph)&&cph.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">`+cph.map(u=>`<img src="${u}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'100px':'none'" style="max-height:100px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;">`).join('')+`</div>`:'')+`</div>`;})()}
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
@@ -7138,6 +7139,23 @@ async function openEngUpdate(id){
       <input type="file" id="js-gal-input" accept="image/*" style="display:none;" onchange="onJsPhotoPick(this)">
       <input type="file" id="js-gal-multi-input" accept="image/*" multiple style="display:none;" onchange="onJsPhotoPickMulti(this)">
     </div>
+    <div class="form-group" style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px;margin-bottom:10px;">
+      <label style="font-weight:700;color:#991b1b;font-size:13px;">📦 Product Condition <span style="font-size:11px;font-weight:400;color:#64748b;">(Optional — note + photo proof if leakage/physical/liquid damage found)</span></label>
+      <select id="upd-cond-type" style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;width:100%;box-sizing:border-box;">
+        <option value="">-- Select (optional) --</option>
+        <option value="Normal">Normal — no issue</option>
+        <option value="Physical Damage">Physical Damage</option>
+        <option value="Liquid/Leakage Damage">Liquid / Leakage Damage</option>
+        <option value="Burnt/Electrical Damage">Burnt / Electrical Damage</option>
+        <option value="Missing Parts">Missing Parts</option>
+        <option value="Other">Other</option>
+      </select>
+      <button type="button" onclick="document.getElementById('cond-gal-multi-input').value='';document.getElementById('cond-gal-multi-input').click();" style="margin-top:8px;width:100%;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">📁 Select Multiple Photos at Once (Gallery)</button>
+      <div id="cond-photo-slots" style="margin-top:8px;"></div>
+      <input type="file" id="cond-cam-input" accept="image/*" capture="environment" style="display:none;" onchange="onCondPhotoPick(this)">
+      <input type="file" id="cond-gal-input" accept="image/*" style="display:none;" onchange="onCondPhotoPick(this)">
+      <input type="file" id="cond-gal-multi-input" accept="image/*" multiple style="display:none;" onchange="onCondPhotoPickMulti(this)">
+    </div>
     <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
   // Preload existing photos: slot 0 = jobsheet (mandatory), slots 1-2 = extras.
   window._jsPhotos=[t.jobsheet_photo?{url:t.jobsheet_photo,isNew:false}:null,null,null];
@@ -7145,6 +7163,13 @@ async function openEngUpdate(id){
   if(Array.isArray(_ex)){_ex.slice(0,2).forEach(function(u,i){if(u)window._jsPhotos[i+1]={url:u,isNew:false};});}
   window._jsTargetSlot=0;
   setTimeout(renderJsAttachSlots,0);
+  // Preload Product Condition (fully optional — all 3 slots, no progressive gating).
+  var condTypeEl=document.getElementById('upd-cond-type');if(condTypeEl)condTypeEl.value=t.condition_type||'';
+  var _condPh=t.condition_photos;if(typeof _condPh==='string'){try{_condPh=JSON.parse(_condPh);}catch(e){_condPh=[];}}
+  window._condPhotos=[null,null,null];
+  if(Array.isArray(_condPh))_condPh.slice(0,3).forEach(function(u,i){if(u)window._condPhotos[i]={url:u,isNew:false};});
+  window._condTargetSlot=0;
+  setTimeout(renderCondPhotoSlots,0);
   openModal('modal-eng-update');
   loadMSCCentersDropdown();
   if(t.status==='Sent to MSC') loadMSCDispatchInfo(t.id);
@@ -7576,6 +7601,15 @@ async function saveEngUpdate(){
   data.attachments=_extras;
   window._jsPhotos=[null,null,null];
 
+  // Product Condition — fully optional, both the type and the photos.
+  var _condType=(document.getElementById('upd-cond-type')?.value||'').trim();
+  var _condPhotosOut=[];
+  var _condSrc=window._condPhotos||[null,null,null];
+  for(var _ci=0;_ci<3;_ci++){var _cu=await _resolvePhoto(_condSrc[_ci],'condition');if(_cu)_condPhotosOut.push(_cu);}
+  if(_condType)data.condition_type=_condType;
+  if(_condPhotosOut.length)data.condition_photos=_condPhotosOut;
+  window._condPhotos=[null,null,null];
+
   // Payment Confirmation Popup — Non-Warranty Onsite calls only
   const needsPaymentConfirm=(status==='Closed'||status==='Resolved By Phone')&&(t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other'))&&t.service_type==='On Site';
   if(needsPaymentConfirm){
@@ -7611,11 +7645,13 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
       // (setup SQL not run) — don't brick call closing: retry without the
       // missing field(s).
       var _msg=String(pe&&pe.message);
-      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)||(data.page_count!==undefined&&_msg.indexOf('page_count')!==-1)){
+      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)||(data.page_count!==undefined&&_msg.indexOf('page_count')!==-1)||(data.condition_type&&_msg.indexOf('condition_type')!==-1)||(data.condition_photos&&_msg.indexOf('condition_photos')!==-1)){
         if(_msg.indexOf('jobsheet_photo')!==-1)delete data.jobsheet_photo;
         if(_msg.indexOf('attachments')!==-1)delete data.attachments;
         if(_msg.indexOf('payment_mode')!==-1)delete data.payment_mode;
         if(_msg.indexOf('page_count')!==-1){delete data.page_count;delete data.page_count_skip_reason;}
+        if(_msg.indexOf('condition_type')!==-1)delete data.condition_type;
+        if(_msg.indexOf('condition_photos')!==-1)delete data.condition_photos;
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
         console.log('column(s) missing — run the relevant setup SQL in Supabase');
       }else throw pe;
@@ -25177,6 +25213,90 @@ function onJsPhotoPickMulti(input){
         window._jsPhotos[slot]={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
         remaining--;
         if(remaining<=0)renderJsAttachSlots();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+
+// ── PRODUCT CONDITION PHOTOS (optional, up to 3 — leakage/damage proof) ──
+// Same pattern as the Job Sheet attachment slots above, kept as a fully
+// separate window._condPhotos array/DOM ids since it's an independent,
+// entirely optional field (not tied to closing the call).
+function renderCondPhotoSlots(){
+  var wrap=document.getElementById('cond-photo-slots');if(!wrap)return;
+  var html='';
+  for(var i=0;i<3;i++){
+    var cur=window._condPhotos[i];
+    html+='<div style="border:1px solid #fecaca;border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;">'
+      +'<div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px;">Photo '+(i+1)+' (optional)</div>';
+    if(cur&&cur.url){
+      html+='<div style="display:flex;align-items:center;gap:8px;">'
+        +'<img src="'+cur.url+'" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer;" onclick="showPhotoFull(\''+encodeURIComponent(cur.url)+'\')">'
+        +'<span style="color:#15803d;font-size:12px;font-weight:700;">✅ Attached</span>'
+        +'<button type="button" onclick="condRemovePhoto('+i+')" style="margin-left:auto;background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">✕ Remove</button>'
+        +'</div>';
+    }else{
+      html+='<div style="display:flex;gap:8px;">'
+        +'<button type="button" onclick="condPick('+i+',true)" style="flex:1;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">📷 Camera</button>'
+        +'<button type="button" onclick="condPick('+i+',false)" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">🖼️ Gallery</button>'
+        +'</div>';
+    }
+    html+='</div>';
+  }
+  wrap.innerHTML=html;
+}
+function condPick(slot,useCamera){
+  window._condTargetSlot=slot;
+  var inp=document.getElementById(useCamera?'cond-cam-input':'cond-gal-input');
+  if(inp){inp.value='';inp.click();}
+}
+function condRemovePhoto(i){
+  window._condPhotos[i]=null;
+  renderCondPhotoSlots();
+}
+function onCondPhotoPick(input){
+  var file=input.files&&input.files[0];if(!file)return;
+  var slot=window._condTargetSlot||0;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var maxW=1400;var scale=Math.min(1,maxW/img.width);
+      var canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      window._condPhotos[slot]={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
+      renderCondPhotoSlots();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function onCondPhotoPickMulti(input){
+  var files=input.files?Array.prototype.slice.call(input.files):[];
+  if(!files.length)return;
+  var emptySlots=[];
+  for(var i=0;i<3;i++){if(!(window._condPhotos[i]&&window._condPhotos[i].url))emptySlots.push(i);}
+  var toProcess=files.slice(0,emptySlots.length);
+  var remaining=toProcess.length;
+  if(!remaining){alert('📦 Badha condition photo slots bharai gaya chhe — pehla ek remove karo, pachi biju add karo.');input.value='';return;}
+  toProcess.forEach(function(file,idx){
+    var slot=emptySlots[idx];
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var maxW=1400;var scale=Math.min(1,maxW/img.width);
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        window._condPhotos[slot]={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
+        remaining--;
+        if(remaining<=0)renderCondPhotoSlots();
       };
       img.src=e.target.result;
     };
