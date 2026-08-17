@@ -2621,7 +2621,19 @@ async function doLogin(){
       }catch(_le){console.log('leave check:',_le);}
     }
     const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
-    try{await sb('users','PATCH',{session_token:_stok},'?user_id=eq.'+encodeURIComponent(user.user_id));}catch(e){}
+    // Up to 2 concurrent device sessions per account (FIFO) — logging in on a
+    // 3rd device kicks the OLDEST of the previous two out; the two most
+    // recent logins both stay valid.
+    var _existingToks=Array.isArray(user.session_tokens)?user.session_tokens.slice():(user.session_token?[user.session_token]:[]);
+    var _newToks=[..._existingToks,_stok].filter(function(t,i,arr){return t&&arr.indexOf(t)===i;}).slice(-2);
+    try{
+      await sb('users','PATCH',{session_token:_stok,session_tokens:_newToks},'?user_id=eq.'+encodeURIComponent(user.user_id));
+    }catch(e){
+      // session_tokens column not added yet — fall back to old single-session behavior.
+      if(String(e&&e.message||'').indexOf('session_tokens')!==-1){
+        try{await sb('users','PATCH',{session_token:_stok},'?user_id=eq.'+encodeURIComponent(user.user_id));}catch(e2){}
+      }
+    }
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     document.getElementById('login-screen').style.display='none';
@@ -2762,9 +2774,15 @@ async function tryAutoLogin(){
   }
   currentUser=null;
   currentUser=normalizeWCUser(users[0]);
-  if(session.session_token&&currentUser.session_token&&currentUser.session_token!==session.session_token){
+  // Valid = matches one of the up-to-2 currently allowed device sessions.
+  // Falls back to the old single-token field if session_tokens isn't set
+  // (e.g. column just added, or this account hasn't logged in since).
+  var _validToks=Array.isArray(currentUser.session_tokens)&&currentUser.session_tokens.length
+    ?currentUser.session_tokens
+    :(currentUser.session_token?[currentUser.session_token]:[]);
+  if(session.session_token&&_validToks.length&&_validToks.indexOf(session.session_token)===-1){
     localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
-    alert('Session Expired\n\nYour account was signed in on another device. Please log in again.');
+    alert('Session Expired\n\nYour account was signed in on a 3rd device, and this session was the oldest of the two — please log in again.');
     restoreLoginFormHTML();
     return;
   }
@@ -5180,7 +5198,16 @@ async function renderMyCalls(){
             // Regular engineers see only their OPEN calls — closed call details are
             // not available to them. CSP managers can still see everything.
             const _listT=window._isCspMgr?tickets:tickets.filter(isTicketActive);
+            const routeOrderMap={};
+            todayRoute.forEach((t,i)=>{routeOrderMap[t.id]=t.sequence_no||(i+1);});
             const sorted=[..._listT].sort((a,b)=>{
+              // Today's route calls come first, in their planned sequence order —
+              // once the route sequence no longer applies (badge gone next day),
+              // this falls back to the normal open-first / newest-id sort.
+              const aSeq=routeOrderMap[a.id],bSeq=routeOrderMap[b.id];
+              if(aSeq!=null&&bSeq!=null)return aSeq-bSeq;
+              if(aSeq!=null)return -1;
+              if(bSeq!=null)return 1;
               const aOpen=isTicketActive(a);
               const bOpen=isTicketActive(b);
               if(aOpen!==bOpen) return aOpen?-1:1;
@@ -5189,10 +5216,13 @@ async function renderMyCalls(){
             if(!sorted.length) return '<div style="text-align:center;padding:30px;color:var(--text-muted);">No calls</div>';
             return sorted.map(t=>{
               const isClosed=!isTicketActive(t);
-              return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${isClosed?'var(--border)':'#bfdbfe'};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};">
+              const hasRoute=!!routeSeqMap[t.id];
+              return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${hasRoute?'#1d4ed8':(isClosed?'var(--border)':'#bfdbfe')};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};display:flex;gap:10px;align-items:stretch;">
+                ${hasRoute?`<div style="flex-shrink:0;width:38px;height:38px;border-radius:19px;background:#1d4ed8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;align-self:flex-start;">🗺️${routeSeqMap[t.id]}</div>`:''}
+                <div style="flex:1;min-width:0;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                   <div>
-                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${routeSeqMap[t.id]?`<span style="background:#1d4ed8;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-right:5px;">🗺️ ${routeSeqMap[t.id]}</span>`:''}${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
+                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
                     ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
                   </div>
@@ -5214,6 +5244,7 @@ async function renderMyCalls(){
                 ${mcHasPrevLoc(t)?`<div onclick="mcConfirmPrevLocation('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;margin-left:6px;">📍 Previous Location</div>`:''}
                 <div onclick="event.stopPropagation();addProductForSameCustomer('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#065f46;margin-bottom:8px;margin-left:6px;">➕ Add Product (Same Customer)</div>
                 <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
+                </div>
               </div>`;
             }).join('');
           })()}</div>
