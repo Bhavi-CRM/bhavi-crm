@@ -2890,7 +2890,7 @@ function setupNav(){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
       sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
-      sv('nav-work-log-report',false);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-sales',true);
+      sv('nav-work-log-report',true);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-peon-activity',false);
       // ACCT001 (Chaula Trivedi, the Accountant) is a WC-role account but needs
@@ -11297,7 +11297,7 @@ var _NAV_ALL_ITEMS=[
   {id:'nav-payment-collection',label:'Payment Collection',engDef:true, wcDef:false},
   {id:'nav-targets',       label:'Targets',            engDef:false, wcDef:false},
   {id:'nav-reports',       label:'Reports',            engDef:false, wcDef:false},
-  {id:'nav-work-log-report',label:'Work Log Report',   engDef:false, wcDef:false},
+  {id:'nav-work-log-report',label:'Work Log Report',   engDef:false, wcDef:true},
   {id:'nav-tat-report',    label:'TAT Compliance',     engDef:false, wcDef:true},
 ];
 
