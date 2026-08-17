@@ -3810,7 +3810,7 @@ async function renderDashboard(){
         <div class="section-header"><h2>Recent Tickets</h2>${currentUser.role==='admin'?'<button class="btn btn-primary btn-sm" onclick="openNewCall()">+ New Call</button>':''}</div>
         <div class="table-wrap"><table>
           <thead><tr><th>Ticket</th><th>Customer</th><th>Model</th><th>Problem</th><th>Engineer</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-          <tbody>${allTickets.slice(0,10).map(t=>`<tr>
+          <tbody>${allTickets.filter(t=>!['Delivered','Call Cancel'].includes(t.status)).slice(0,10).map(t=>`<tr>
             <td><b>${t.id}</b></td><td>${t.cname||'-'}</td><td>${t.model||'-'}</td><td>${t.problem||'-'}</td>
             <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">Unassigned</span>'}</td>
             <td>${statusBadge(t.status)}</td>
@@ -4012,6 +4012,28 @@ async function doPunchIn(){
       return;
     }
   }catch(e){console.log('Punch check error:',e);}
+
+  // A still-"active" punch_logs row from a PREVIOUS day means the engineer
+  // forgot to Punch Out. Rather than forcing them through a Punch Out flow
+  // for yesterday before they can Punch In today (the old 2-step morning
+  // routine that kept generating spurious overtime), auto-close that stale
+  // row here — flagged the same way a late/next-day punch-out already is
+  // (status late_pending, so it lands in the SAME admin approval queue) —
+  // and let today's Punch In proceed in one tap.
+  try{
+    const stale=await sb('punch_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(currentUser.eng_id||currentUser.user_id)+'&status=eq.active&punch_in_date=neq.'+today+'&order=created_at.desc&limit=5');
+    for(const s of (stale||[])){
+      try{
+        await sb('punch_logs','PATCH',{
+          status:'late_pending',
+          is_late:true,
+          is_next_day:true,
+          late_remark:'Auto-closed — engineer punched in fresh the next day without punching out (Admin: please verify/correct the actual punch-out time).',
+          updated_at:new Date().toISOString()
+        },'?id=eq.'+s.id);
+      }catch(e2){console.log('auto-close stale punch error:',e2);}
+    }
+  }catch(e){console.log('stale punch check error:',e);}
 
   // True admin only — simple punch in without camera/selfie/meter. ACCT001 has
   // role='admin' too (for other permissions) but is a real staff member who
@@ -4570,6 +4592,7 @@ async function savePunchOut(key){
   const today=now.toLocaleDateString('en-CA');
   const punchOutTime=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   const hour=now.getHours();
+  const nowMinsOfDay=hour*60+now.getMinutes();
 
   // Check if this is a NEXT-DAY punch out (punched in yesterday, punching out today morning)
   let isNextDay=false;
@@ -4592,15 +4615,15 @@ async function savePunchOut(key){
 
   if(!ps){alert('Punch In record not found. Please Punch In first.');return;}
 
-  // Determine if late: after 10PM OR next day morning
-  const isLatePunchOut = hour>=22 || hour<6 || isNextDay;
+  // Determine if late: after 8:30 PM OR next day morning
+  const isLatePunchOut = nowMinsOfDay>=(20*60+30) || hour<6 || isNextDay;
 
   // If next day — mandatory remark
   let lateRemark='';
   if(isNextDay || isLatePunchOut){
     const msg = isNextDay
       ? '⚠️ Next Day Punch Out!\nYou did not punch out yesterday.\n\nReason is mandatory (Admin approval required):'
-      : '⚠️ Late Punch Out (After 10 PM)!\n\nReason is mandatory (Admin approval required):';
+      : '⚠️ Late Punch Out (After 8:30 PM)!\n\nReason is mandatory (Admin approval required):';
     lateRemark=prompt(msg);
     if(lateRemark===null)return; // User cancelled
     if(!lateRemark.trim()){alert('Reason is mandatory!');return;}
@@ -5056,14 +5079,25 @@ async function renderMyCalls(){
     await mcBuildPrevLocMap(tickets);
     const todayStr=new Date().toLocaleDateString('en-CA');
     const todayRoute=tickets.filter(t=>t.planned_date===todayStr&&isTicketActive(t)).sort((a,b)=>(a.sequence_no||999)-(b.sequence_no||999));
+    // Route-sequence badge (e.g. Y1, Y2 — engineer initial + seq no.) shown
+    // inline on each call's own card below, instead of a separate "Today's
+    // Route" list up top duplicating the same calls. Naturally clears itself
+    // the next day since it's keyed off today's planned_date — tomorrow's
+    // route just repopulates this map fresh.
+    const routeSeqMap={};
+    todayRoute.forEach((t,i)=>{
+      const _seqN=t.sequence_no||(i+1);
+      const _pfx=((t.assigned_name||currentUser.name||'').trim().charAt(0)||'#').toUpperCase();
+      routeSeqMap[t.id]=_pfx+_seqN;
+    });
     // Punch bar
     const ps=JSON.parse(localStorage.getItem(`punch_${currentUser.user_id}`)||'null');
-    // Check 10PM auto punch out
-    const nowHr=new Date().getHours();
-    if(ps&&ps.punched_in&&(nowHr>=22||nowHr<6)){
+    // Check 8:30 PM auto punch out
+    const _nowD=new Date();const nowHr=_nowD.getHours();const nowMinsOfDay2=nowHr*60+_nowD.getMinutes();
+    if(ps&&ps.punched_in&&(nowMinsOfDay2>=(20*60+30)||nowHr<6)){
       // Auto punch out reminder
       setTimeout(()=>{
-        if(confirm('⚠️ 10 PM passed! Punch Out is mandatory.\nWould you like to punch out now?'))doPunchOut();
+        if(confirm('⚠️ 8:30 PM passed! Punch Out is mandatory.\nWould you like to punch out now?'))doPunchOut();
       },500);
     }
     // If localStorage says not punched in, check Supabase (cross-device sync)
@@ -5128,53 +5162,6 @@ async function renderMyCalls(){
         <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${tickets.filter(isTicketActive).length}</div></div>
         <div class="kpi-card" style="border-color:#0e9f6e"><div class="kpi-label">Closed</div><div class="kpi-value">${tickets.filter(isTicketClosed).length}</div></div>
       </div>
-      ${todayRoute.length?`<div class="card" style="margin-bottom:14px;border-left:4px solid #1d4ed8;">
-        <div class="section-header" style="margin-bottom:10px;">
-          <h2 style="font-size:15px;">🗺️ Today's Route — ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</h2>
-          <span style="font-size:12px;color:var(--text-muted);">${todayRoute.length} calls planned</span>
-        </div>
-        ${todayRoute.map((t,i)=>{
-          var tatHtml='';
-          if(t.tat_date){
-            var isDO=/T00:00:00/.test(t.tat_date);
-            var td=new Date(t.tat_date);
-            var tdl=isDO?new Date(td.getUTCFullYear(),td.getUTCMonth(),td.getUTCDate(),23,59,59):td;
-            var ttStr=isDO?'End of Day':tdl.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
-            var tdStr=tdl.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-            var tlabel=tdStr+' · '+ttStr;
-            var diff=tdl-new Date();
-            if(diff<0){
-              tatHtml='<span style="background:#fef2f2;color:#dc2626;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;">⚠️ '+tlabel+'</span><div style="font-size:10px;color:#dc2626;">Overdue</div>';
-            }else{
-              var hrs=Math.floor(diff/3600000);var mins=Math.round((diff%3600000)/60000);
-              var tleft=(hrs>0?hrs+'h'+(mins?' '+mins+'m':''):mins+'m')+' left';
-              var tbg=hrs<2?'#fee2e2':hrs<24?'#fef9c3':'#f0fdf4';
-              var tcol=hrs<2?'#dc2626':hrs<24?'#ca8a04':'#15803d';
-              tatHtml='<span style="background:'+tbg+';color:'+tcol+';padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;">'+tlabel+'</span><div style="font-size:10px;color:'+tcol+';">⏰ '+tleft+'</div>';
-            }
-          }
-          // Route-sequence badge like the pending list: engineer initial + seq
-          // (e.g. Yogesh → Y1, Y2 · Gaurav → G1, G2). Falls back to position.
-          var _seqN=t.sequence_no||(i+1);
-          var _pfx=((t.assigned_name||currentUser.name||'').trim().charAt(0)||'#').toUpperCase();
-          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
-            +'<div style="min-width:34px;height:34px;padding:0 6px;background:#1d4ed8;color:#fff;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;">'+_pfx+_seqN+'</div>'
-            +'<div style="flex:1;min-width:0;">'
-            +'<div style="font-weight:700;font-size:11px;color:#1d4ed8;">'+t.id+' &nbsp;'+priorityBadge(t.priority)+'</div>'
-            +'<div style="font-weight:800;font-size:15px;margin-top:1px;">'+(t.cname||'-')+'</div>'
-            +'<div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-            +'<span style="background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;">📱 '+(t.model||'-')+'</span>'
-            +'<span style="background:#ecfeff;color:#0369a1;font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;">📍 '+(t.area||t.city||'-')+'</span>'
-            +'</div>'
-            +(tatHtml?'<div style="margin-top:4px;">'+tatHtml+'</div>':'')
-            +'</div>'
-            +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'
-            +statusBadge(t.status)
-            +'<button onclick="openEngUpdate(\''+t.id+'\')" style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Update</button>'
-            +'</div>'
-            +'</div>';
-        }).join('')}
-      </div>`:''}
 
       ${last7.length?`<div class="card" style="margin-bottom:14px;"><h3 style="font-weight:700;margin-bottom:12px;font-size:14px;">📊 My Daily Calls</h3>
         <div class="chart-bar-wrap">${last7.map(([d,v])=>`<div class="chart-bar-row"><div class="chart-bar-label">${d}</div><div class="chart-bar-bg"><div class="chart-bar-fill" style="width:${Math.round(v/maxD*100)}%">${v}</div></div></div>`).join('')}</div>
@@ -5205,7 +5192,7 @@ async function renderMyCalls(){
               return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${isClosed?'var(--border)':'#bfdbfe'};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                   <div>
-                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
+                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${routeSeqMap[t.id]?`<span style="background:#1d4ed8;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-right:5px;">🗺️ ${routeSeqMap[t.id]}</span>`:''}${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
                     ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
                   </div>
@@ -5724,22 +5711,21 @@ async function saveCall(){
   }
 }
 async function generateTicketNo(){
-  // Format: BEA-YYYYMM-XXXX (e.g. BEA-202607-1028). Series runs across months
-  // and resets only on year change — reverted back to this (was briefly
-  // changed to a daily-reset BEA-YYYYMMDD-XXXX format, which broke the
-  // continuity of the running series admin/engineers were already used to —
-  // reverted so numbering just continues from wherever it already was).
+  // Format: BEA-YYYYMMDD-XXXX (e.g. BEA-20260816-0001), same date convention
+  // as the Canon SE Call ID (CSP/YYYYMMDD/NNNNN). Series resets daily —
+  // confirmed working correctly on 15-Aug, this is the permanent format
+  // going forward (an earlier revert to the old monthly BEA-YYYYMM-XXXX
+  // format was a misread of separate feedback and has been undone).
   // Ticket numbers are assigned in creation order, so the highest number is
-  // always among the most-recently created tickets. We ORDER BY created_at
-  // DESC and take a window of the latest rows — this guarantees the true
-  // max is seen even if the server caps the row count.
+  // always among the most-recently created tickets of the same day. We
+  // ORDER BY created_at DESC and take a window of the latest rows — this
+  // guarantees the true max is seen even if the server caps the row count.
   const now=new Date();
-  const year=now.getFullYear();
-  const ym=year+String(now.getMonth()+1).padStart(2,'0');
-  const rows=await sb('tickets','GET',null,`?id=like.BEA-${year}*&select=id&order=created_at.desc&limit=300`);
+  const ymd=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0');
+  const rows=await sb('tickets','GET',null,`?id=like.BEA-${ymd}*&select=id&order=created_at.desc&limit=300`);
   let max=0;
   for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(!isNaN(n)&&n>max)max=n;}
-  return `BEA-${ym}-${String(max+1).padStart(4,'0')}`;
+  return `BEA-${ymd}-${String(max+1).padStart(4,'0')}`;
 }
 
 // Point 13: Admin edit — only remark
@@ -6082,8 +6068,13 @@ async function viewTicket(id,autoPrint=false){
   // inspection/visit charge (set when rejecting) applies; parts must not
   // count toward the bill even though they're still listed below for record.
   // Also excludes any still-"requested" (not yet approved/fitted) spare on
-  // any other status, matching the same convention used across all reports.
-  const total=isCustReject?0:spares.filter(s=>!s.requested).reduce((a,s)=>a+s.qty*(s.price||0),0);
+  // any other status, matching the same convention used across all reports —
+  // EXCEPT while the call is actually sitting in Pending Customer Approval:
+  // there the "requested" parts ARE the estimate being reviewed, so WC/
+  // Manager/Engineer need to see the real Labour + Parts total right now,
+  // not a ₹0 total just because nothing's been approved yet.
+  const isPendingApprovalView=t.status==='Pending Customer Approval';
+  const total=isCustReject?0:spares.filter(s=>!s.requested||isPendingApprovalView).reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const svcCharge=labCharge;
@@ -6816,36 +6807,57 @@ async function processApproval(decision){
   try{
     await sb('tickets','PATCH',updateData,`?id=eq.${approvalTicketId}`);
     
-    // If approved - auto check stock and set next status
+    // If approved - auto check stock and set next status. Same 3-way rule as
+    // the mid-repair "Request Part" flow (savePartRequest), so it behaves
+    // identically whether Admin/WC or the Engineer themselves clicks Approve:
+    //  - On Site: check the ASSIGNED ENGINEER's own bag (eng_stock) — if the
+    //    part's already in their bag → straight to Pending Repair On Site.
+    //    In company inventory but not their bag → Pending Engineer Stock
+    //    (admin needs to hand it over first). Nowhere → Pending Parts.
+    //  - Carry In: only company inventory matters (no personal-bag concept,
+    //    the device is at the office) → Pending Repair Carry In or Pending Parts.
     if(decision==='approve'){
       const spares=(t.spares||[]).filter(s=>s.requested&&s.code);
-      let allInStock=true;
-      
-      if(spares.length>0){
-        // Check inventory for each requested part
-        for(const s of spares){
-          try{
-            const inv=await sb('inventory','GET',null,`?part_code=eq.${s.code}`);
-            if(!inv.length||inv[0].qty_in_stock<(s.qty||1)){
-              allInStock=false;break;
+      let anyPendingEngStock=false,anyPendingNoParts=false;
+      for(const s of spares){
+        try{
+          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
+          const invItem=inv&&inv[0];
+          const companyQty=invItem?(invItem.qty_in_stock||0):0;
+          if(t.service_type==='On Site'){
+            let bagQty=0;
+            if(t.assigned_name&&invItem){
+              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
+              bagQty=esCheck.length?esCheck[0].qty:0;
             }
-          }catch(e){allInStock=false;break;}
-        }
+            if(bagQty<(s.qty||1)){
+              if(companyQty>=(s.qty||1))anyPendingEngStock=true;else anyPendingNoParts=true;
+            }
+          }else{
+            if(companyQty<(s.qty||1))anyPendingNoParts=true;
+          }
+        }catch(e){anyPendingNoParts=true;}
       }
-      
+
       // Set auto status based on stock
-      let autoStatus;
-      if(!spares.length||allInStock){
-        // No parts needed OR all parts in stock → Pending Repair
+      let autoStatus,statusNote;
+      if(!spares.length){
         autoStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-      }else{
-        // Parts not in stock → Pending Parts
+        statusNote='No parts needed';
+      }else if(anyPendingNoParts){
         autoStatus='Pending Parts';
+        statusNote='Part(s) not in stock anywhere — waiting for order';
+      }else if(anyPendingEngStock){
+        autoStatus='Pending Engineer Stock';
+        statusNote='Part(s) in company stock — waiting to be issued to engineer';
+      }else{
+        autoStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+        statusNote='All parts available';
       }
-      
-      const tl2=[...tl,{action:'Auto → '+autoStatus,by:'System',at:new Date().toISOString(),note:allInStock?'All parts available':'Parts not in stock — waiting'}];
+
+      const tl2=[...tl,{action:'Auto → '+autoStatus,by:'System',at:new Date().toISOString(),note:statusNote}];
       await sb('tickets','PATCH',{status:autoStatus,timeline:tl2,updated_at:new Date().toISOString()},`?id=eq.${approvalTicketId}`);
-      
+
       closeModal('modal-approval');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
       alert('✅ Approved! Final: Rs'+finalAmount.toFixed(0)+' | Status: '+autoStatus);
@@ -7084,9 +7096,11 @@ async function openEngUpdate(id){
     <hr class="divider">
     <div class="form-group" style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:12px;margin-bottom:10px;">
       <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments ${t.wc_type==='CSP'?'<span class="req">*</span>':''} <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo${t.wc_type==='CSP'?' farjiyat (Close mate, CSP call)':' (optional, ICP call)'}. Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
+      <button type="button" onclick="document.getElementById('js-gal-multi-input').value='';document.getElementById('js-gal-multi-input').click();" style="margin-top:8px;width:100%;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">📁 Select Multiple Photos at Once (Gallery)</button>
       <div id="js-attach-slots" style="margin-top:8px;"></div>
       <input type="file" id="js-cam-input" accept="image/*" capture="environment" style="display:none;" onchange="onJsPhotoPick(this)">
       <input type="file" id="js-gal-input" accept="image/*" style="display:none;" onchange="onJsPhotoPick(this)">
+      <input type="file" id="js-gal-multi-input" accept="image/*" multiple style="display:none;" onchange="onJsPhotoPickMulti(this)">
     </div>
     <input type="hidden" id="upd-remarks" value="${t.eng_remarks||''}">`;
   // Preload existing photos: slot 0 = jobsheet (mandatory), slots 1-2 = extras.
@@ -7360,6 +7374,16 @@ async function saveEngUpdate(){
   if(status!==t.status && !allowedEng.includes(status)){
     alert('❌ Cannot change to "'+status+'" at this stage.\nCurrent: '+t.status+'\nAllowed: '+(allowedEng.length?allowedEng.join(', '):'None — contact Admin'));
     return;
+  }
+  // Engineer must tap "Work Start" before changing status at all — except
+  // Resolved By Phone, which by definition has no visit/work session.
+  if(currentUser.role==='engineer'&&status!==t.status&&status!=='Resolved By Phone'){
+    var _wsTl=t.timeline;if(typeof _wsTl==='string'){try{_wsTl=JSON.parse(_wsTl);}catch(e){_wsTl=[];}}
+    var _hasWorkStart=Array.isArray(_wsTl)&&_wsTl.some(function(e){return e&&e.action&&e.action.indexOf('Work Start')!==-1;});
+    if(!_hasWorkStart){
+      alert('🔧 Pehla "Work Start" button dabao, pachi j status update kari shakso (Resolved By Phone sivay biju badhu).');
+      return;
+    }
   }
 
   // MSC Dispatch — engineer just marks status, WC adds dispatch details later
@@ -25090,6 +25114,38 @@ function onJsPhotoPick(input){
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
+  input.value='';
+}
+// Pick 2-3 photos from the gallery in ONE go — first empty slot gets filled
+// first (usually the Job Sheet Photo), any remaining files fill the extra
+// slots in order, up to however many slots are actually free. Same resize
+// pipeline as the single-photo picker, just fanned out across files.
+function onJsPhotoPickMulti(input){
+  var files=input.files?Array.prototype.slice.call(input.files):[];
+  if(!files.length)return;
+  var emptySlots=[];
+  for(var i=0;i<3;i++){if(!(window._jsPhotos[i]&&window._jsPhotos[i].url))emptySlots.push(i);}
+  var toProcess=files.slice(0,emptySlots.length);
+  var remaining=toProcess.length;
+  if(!remaining){alert('📎 Badha attachment slots bharai gaya chhe — pehla ek remove karo, pachi biju add karo.');input.value='';return;}
+  toProcess.forEach(function(file,idx){
+    var slot=emptySlots[idx];
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var maxW=1400;var scale=Math.min(1,maxW/img.width);
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        window._jsPhotos[slot]={url:canvas.toDataURL('image/jpeg',0.72),isNew:true};
+        remaining--;
+        if(remaining<=0)renderJsAttachSlots();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
   input.value='';
 }
 
