@@ -9518,27 +9518,24 @@ async function renderEngParts(tab){
   const isCspMgr=!!window._isCspMgr;
   const isWC=(role==='admin'&&(currentUser.role_type||'')==='work_controller')||role==='work_controller';
   const isAdmin=!isEng&&!isWC;
-  if(!tab) tab=(isEng&&!isCspMgr)?'my-stock':(isWC||isCspMgr?'pending':'overview');
+  // CSP Managers get the SAME full page as Admin (stock overview, issue/use/
+  // warranty/return tools, approve+reject on any request) — not a cut-down
+  // view — plus their own Parts Request buttons so they can request parts
+  // for themselves too (and then approve their own request, same as they
+  // can approve anyone else's; the approval history always records who
+  // approved it via approved_by).
+  const isFullAccess=isAdmin||isCspMgr;
+  if(!tab) tab=(isEng&&!isCspMgr)?'my-stock':(isFullAccess?'overview':'pending');
   try{
     if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name');
     if(!allEngineers||!allEngineers.length) await loadMasterData();
     if(isEng&&!isCspMgr){await renderEngSelfService(tab);return;}
-    if(isEng&&isCspMgr){
-      c.innerHTML=`
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1e40af;">
-          ℹ️ Manager access — approve/reject any engineer's Parts Request (Receive or Return).
-        </div>
-        <div class="tabs">${(t=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">⏳ Pending Requests</button>`)('pending')}</div>
-        <div id="ep-content"></div>`;
-      await renderEPPending(null);
-      return;
-    }
     allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     const engineers=[...new Set(allEngStock.map(s=>s.owner))].sort();
     const totalEngVal=allEngStock.reduce((a,s)=>{const p=allInventory.find(x=>x.id===s.part_id);return a+(s.qty||0)*(p?.unit_price||0);},0);
     const totalInvVal=allInventory.reduce((a,i)=>a+(i.qty_in_stock||0)*(i.unit_price||0),0);
     const tabHtml=(t,label)=>`<button class="tab ${tab===t?'active':''}" onclick="renderEngParts('${t}')">${label}</button>`;
-    if(isAdmin){
+    if(isFullAccess){
       c.innerHTML=`
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
           <div class="kpi-card" style="padding:12px;"><div class="kpi-label">Inventory Items</div><div class="kpi-value" style="font-size:22px;">${allInventory.length}</div></div>
@@ -9552,13 +9549,15 @@ async function renderEngParts(tab){
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
           <button class="btn" style="background:#0369a1;color:#fff;" onclick="openDirectWarrantyIssue()">📦 Direct Warranty Issue</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
+          ${isCspMgr?`<button class="btn" style="background:#0d9488;color:#fff;" onclick="openEngReqReceive()">📥 Request Parts (Self)</button><button class="btn" style="background:#be185d;color:#fff;" onclick="openEngReqReturn()">↩️ Return My Parts</button>`:''}
         </div>
-        <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}</div>
+        <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}${isCspMgr?tabHtml('my-requests','📋 My Requests'):''}</div>
         <div id="ep-content"></div>`;
       if(tab==='overview') renderEPOverview();
       else if(tab==='analysis') renderEPAnalysis(engineers);
       else if(tab==='pending') await renderEPPending(null);
       else if(tab==='warranty-pending') await renderWarrantyPending();
+      else if(tab==='my-requests') await renderEPMyRequests();
       else await renderEPLog();
     }else{
       // WC: only approve Returns
@@ -13504,7 +13503,15 @@ function addPaymentRow(){
   div.innerHTML='<input type="text" placeholder="Customer Name" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;">'
     +'<input type="number" placeholder="₹ Amount" min="0" class="pay-amount" oninput="updatePaymentTotal()" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;">'
     +'<select class="pay-mode" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;">'
-    +'<option value="Cash">💵 Cash</option><option value="Online">📱 Online</option><option value="Cheque">🏦 Cheque</option></select>'
+    // Values MUST match the ticket's actual payment_mode values exactly
+    // (set at call-close time in the Payment Confirmation popup: Cash /
+    // Online / Check / Card) — this list previously said "Cheque" (not
+    // "Check") and had no "Card" option, so the auto-fill below could never
+    // match those two modes and silently left the dropdown on its default
+    // first option (Cash) instead — a call actually paid by Cheque/Card
+    // would show as Cash in the Daily Report. No default option now either,
+    // so an unmatched mode is visibly blank instead of silently "Cash".
+    +'<option value="">— Select —</option><option value="Cash">💵 Cash</option><option value="Online">📱 Online</option><option value="Check">🏦 Cheque</option><option value="Card">💳 Card</option></select>'
     +'<button onclick="this.parentElement.remove();updatePaymentTotal();" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;">✕</button>';
   pr.appendChild(div);
 }
@@ -13735,15 +13742,18 @@ async function saveDailyReport(){
   // Collect payment details
   var payments=[];
   var totalAmt=0;
+  var _missingModeRow=false;
   document.querySelectorAll('.payment-row').forEach(function(row){
     var name=row.querySelector('input[type="text"]')?.value||'';
     var amt=parseFloat(row.querySelector('.pay-amount')?.value)||0;
-    var mode=row.querySelector('.pay-mode')?.value||'Cash';
+    var mode=row.querySelector('.pay-mode')?.value||'';
+    if(amt>0&&!mode)_missingModeRow=true;
     if(name||amt>0){
       payments.push({customer:name,amount:amt,mode:mode});
       totalAmt+=amt;
     }
   });
+  if(_missingModeRow){alert('💳 Ek ke vadhu Payment row ma Mode (Cash/Online/Cheque/Card) select nathi karyu — check kari ne select karo, pachi Save karo.');return;}
 
   // Collect Google Reviews
   var googleReviews=[];
