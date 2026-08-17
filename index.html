@@ -20987,6 +20987,10 @@ async function loadWorkLogReport(){
   var from=document.getElementById('wlr-from')?.value||'';
   var to=document.getElementById('wlr-to')?.value||'';
   var eng=document.getElementById('wlr-eng')?.value||'';
+  // A plain engineer (not CSP Manager) can only ever see their OWN entries
+  // here — force the filter to themselves regardless of what the Member
+  // dropdown says, so no other engineer/WC's log rows are returned at all.
+  if(currentUser.role==='engineer'&&!window._isCspMgr){eng=currentUser.eng_id||currentUser.user_id;}
   var res=document.getElementById('wlr-results');
   if(!res)return;
   res.innerHTML='<div class="loading">Loading...</div>';
@@ -21140,9 +21144,20 @@ async function loadWorkLogReport(){
           // arrival-KM location captured at "📍 Reached Location" for that call.
           var _wArrival=(isTravel&&!isOpen&&l.ticket_id&&window._wlrArrivalMap&&window._wlrArrivalMap[l.ticket_id])||null;
           var _wArrivalLink=_wArrival?' <a href="https://maps.google.com/?q='+_wArrival.lat+','+_wArrival.lng+'" target="_blank" title="Open reached location in Google Maps'+(_wArrival.accuracy?' (±'+Math.round(_wArrival.accuracy)+'m)':'')+'" style="color:#2563eb;font-weight:700;text-decoration:none;white-space:nowrap;">📍 Reached</a>':'';
+          // Ticket ID inside the description is only clickable (opens the
+          // ticket) for Admin/WC/CSP-Manager, or an engineer viewing their
+          // OWN entry — an engineer can't open another engineer's ticket
+          // from here.
+          var _wlDesc=l.task_description||'';
+          // Engineers can only READ their entries here, never click through to
+          // open the ticket (even their own) — only Admin/WC/CSP-Manager can.
+          var _wlCanOpen=(currentUser.role!=='engineer')||window._isCspMgr;
+          if(l.ticket_id&&_wlCanOpen&&_wlDesc.indexOf(l.ticket_id)!==-1){
+            _wlDesc=_wlDesc.split(l.ticket_id).join('<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:700;text-decoration:none;">'+l.ticket_id+'</a>');
+          }
           html+='<div style="display:flex;gap:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';">'
             +'<div style="flex-shrink:0;font-size:11px;font-weight:700;color:'+timeColor+';background:'+timeBg+';padding:3px 8px;border-radius:99px;white-space:nowrap;">'+timeLabel+'</div>'
-            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+l.task_description+_wArea+_wGpsLink+_wArrivalLink+'</div>'
+            +'<div style="font-size:13px;color:var(--text);line-height:1.5;">'+_wlDesc+_wArea+_wGpsLink+_wArrivalLink+'</div>'
             +'</div>';
         });
         html+='</div>';
@@ -25229,7 +25244,12 @@ function renderCondPhotoSlots(){
   var wrap=document.getElementById('cond-photo-slots');if(!wrap)return;
   var html='';
   for(var i=0;i<3;i++){
+    // Progressive: only show the next slot once the previous one is filled —
+    // same as the Job Sheet attachment slots, keeps this block small instead
+    // of always showing all 3 empty pickers at once.
+    var prevFilled=i===0||(window._condPhotos[i-1]&&window._condPhotos[i-1].url);
     var cur=window._condPhotos[i];
+    if(i>0&&!prevFilled&&!(cur&&cur.url))continue;
     html+='<div style="border:1px solid #fecaca;border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;">'
       +'<div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px;">Photo '+(i+1)+' (optional)</div>';
     if(cur&&cur.url){
