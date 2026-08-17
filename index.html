@@ -3100,7 +3100,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
     switch(current){
       case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
       case 'Pending Allocation': return['Assigned','Pending Repair Carry In','Pending Repair On Site','Call Cancel'];
-      case 'Pending Customer Approval': return['Customer Approved','Customer Reject'];
+      case 'Pending Customer Approval': return[]; // use the dedicated Approve/Reject Estimate button — see engineer case below for why
       case 'Pending Engineer Stock': return['In Progress','Assigned']; // Admin issued part to engineer
       case 'Pending Parts': return['In Progress','Assigned']; // Admin got parts and issued
       case 'Repaired': return['Delivered','Sent to MSC'];
@@ -3151,9 +3151,14 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // Handled by system after approval
 
       case 'Pending Customer Approval':
-        // Engineer handles their own call's approval/rejection directly —
-        // no need to wait on admin/WC (matches what admin/WC could already do here).
-        return['Customer Approved','Customer Reject'];
+        // NOT selectable from the plain status dropdown — approving/rejecting
+        // here must go through the dedicated "✅ Approve / Reject Estimate"
+        // button (openApproval → processApproval), which runs the stock
+        // check and auto-moves to Pending Repair/Pending Engineer Stock/
+        // Pending Parts. Picking "Customer Approved" from this generic
+        // dropdown used to skip all of that and leave the call stuck on
+        // Customer Approved with nothing happening next.
+        return[];
 
       default: return[];
     }
@@ -7054,7 +7059,7 @@ async function openEngUpdate(id){
           ${getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage).map(s=>`<option value="${s}">${s}</option>`).join('')||`<option value="${t.status}">${t.status}</option>`}
         </select>
         ${t.status==='Pending Parts'?'<small style="color:var(--warning);">⏳ Waiting for parts — auto moves when stock arrives</small>':''}
-        ${t.status==='Pending Customer Approval'?'<small style="color:var(--warning);">⏳ Waiting for Admin/WC approval</small>':''}
+        ${t.status==='Pending Customer Approval'?`<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 12px;margin-top:6px;"><small style="color:#92400e;display:block;margin-bottom:6px;">⏳ Estimate sent — approve/reject the customer's decision below (this also checks parts stock and auto-moves the call).</small><button type="button" class="btn btn-success btn-sm" onclick="closeModal('modal-eng-update');openApproval('${t.id}')" style="width:100%;">✅ Approve / Reject Estimate</button></div>`:''}
         ${(t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat')?'<div style="background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:6px;font-size:12px;"><b>🔁 Re-Repair Call</b> — Same problem reported again. Close directly — no new estimate required.</div>':''}
       </div>
       <div class="form-group"><label>Fault Code</label><input type="text" id="upd-fault" value="${t.fault_code||''}"></div>
