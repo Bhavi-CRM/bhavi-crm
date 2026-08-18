@@ -5774,17 +5774,18 @@ async function saveCall(){
 }
 async function generateTicketNo(){
   // Format: BEA-YYYYMMDD-XXXX (e.g. BEA-20260816-0001), same date convention
-  // as the Canon SE Call ID (CSP/YYYYMMDD/NNNNN). Series resets daily —
-  // confirmed working correctly on 15-Aug, this is the permanent format
-  // going forward (an earlier revert to the old monthly BEA-YYYYMM-XXXX
-  // format was a misread of separate feedback and has been undone).
-  // Ticket numbers are assigned in creation order, so the highest number is
-  // always among the most-recently created tickets of the same day. We
-  // ORDER BY created_at DESC and take a window of the latest rows — this
-  // guarantees the true max is seen even if the server caps the row count.
+  // as the Canon SE Call ID (CSP/YYYYMMDD/NNNNN).
+  // The trailing XXXX MUST be a single continuous counter across the WHOLE
+  // ticket table, never reset per day — a daily reset was tried earlier and
+  // is exactly what caused two different tickets on different dates to both
+  // end up "...-0010", which is genuinely confusing (which "0010" is being
+  // talked about?). So the "find max" scan below is intentionally NOT
+  // scoped to today — it looks at every ticket ever created (across every
+  // ID format this table has used: BEA-YYYY-NNN, BEA-YYYYMM-NNNN,
+  // BEA-YYYYMMDD-NNNN) and always returns max-seen-anywhere + 1.
   const now=new Date();
   const ymd=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0');
-  const rows=await sb('tickets','GET',null,`?id=like.BEA-${ymd}*&select=id&order=created_at.desc&limit=300`);
+  const rows=await sbAll('tickets','?id=like.BEA-*&select=id');
   let max=0;
   for(const r of rows){const n=parseInt(String(r.id).split('-').pop(),10);if(!isNaN(n)&&n>max)max=n;}
   return `BEA-${ymd}-${String(max+1).padStart(4,'0')}`;
@@ -6719,6 +6720,13 @@ async function doForceStatusChange(id,newStatus){
   if(!t){const r=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));t=r[0];}
   const tl=[...(await _freshTimeline(id,t)),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
   await sb('tickets','PATCH',{status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));
+  // Force-changing a call straight to a terminal status bypasses the normal
+  // engineer close flow entirely — without this, any spares on the ticket
+  // would just never get deducted from stock (the actual bug reported: an
+  // engineer's bag not reducing after a call that was Force-closed by WC).
+  if(['Closed','Resolved By Phone','Repaired','Pending for Delivery'].includes(newStatus)){
+    try{await _deductTicketParts(id);}catch(e){console.log('Force-status deduct error:',e);}
+  }
   // Auto work log entry for admin/WC force status change
   try{
     var _fsNow=new Date();
@@ -7733,53 +7741,13 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
       }else throw pe;
     }
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
-    // (Resolved By Phone included: harmless no-op if no spares were added, since there was no visit.)
-    if(status==='Closed'||status==='Resolved By Phone'){
-      const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
-      const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
-      const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
-      const closedByEng=currentUser.role==='engineer' && freshT?.service_type==='On Site';
-      for(const s of sparesToDeduct){
-        try{
-          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
-          if(!inv.length)continue;
-          if(closedByEng){
-            // Engineer closes: deduct from engineer's bag (eng_stock), NOT office inventory
-            // Office stock was already reduced when part was issued to the engineer
-            await engStockAdjust(currentUser.name,inv[0].id,-(s.qty||1)).catch(e=>console.log('Eng stock deduct err:',e));
-          }else{
-            // Admin/WC closes: deduct from office inventory directly
-            if(inv[0].qty_in_stock>0){
-              const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
-              const patchData={qty_in_stock:newQty,updated_at:new Date().toISOString()};
-              if(isWarrantyForDeduct&&(inv[0].warranty_qty||0)>0){
-                patchData.warranty_qty=Math.max(0,(inv[0].warranty_qty||0)-(s.qty||1));
-              }
-              await sb('inventory','PATCH',patchData,`?part_code=eq.${encodeURIComponent(s.code)}`);
-              const idx=(allInventory||[]).findIndex(x=>x.id===inv[0].id);
-              if(idx>=0){allInventory[idx].qty_in_stock=newQty;if(patchData.warranty_qty!=null)allInventory[idx].warranty_qty=patchData.warranty_qty;}
-              await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
-            }
-          }
-          // Always record in inventory_sales for tracking
-          await sb('inventory_sales','POST',{
-            sale_date:new Date().toLocaleDateString('en-CA'),
-            part_code:s.code,part_name:s.name||'',
-            sale_type:'call',reference:id,
-            customer_name:freshT?.cname||'',
-            qty:s.qty||1,unit_price:s.price||0,
-            total_amount:(s.qty||1)*(s.price||0),
-            note:'Auto - Ticket '+id+(closedByEng?' (Eng Bag)':''),
-            added_by:currentUser.name,
-            created_at:new Date().toISOString()
-          }).catch(()=>{});
-        }catch(e){console.log('Inv deduct error:',e);}
-      }
-      // Mark parts as deducted
-      if(sparesToDeduct.length>0){
-        const updatedSpares=(freshT?.spares||[]).map(s=>({...s,stock_deducted:true}));
-        await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
-      }
+    // (Resolved By Phone included: harmless no-op if no spares were added, since there was no visit.
+    // Pending for Delivery included: that's what a Carry-In "Repaired" close actually becomes a few
+    // lines above — the part physically left stock the moment the engineer finished the repair, it
+    // shouldn't wait for a separate Delivered step days later.)
+    let freshT;
+    if(status==='Closed'||status==='Resolved By Phone'||status==='Pending for Delivery'){
+      freshT=await _deductTicketParts(id);
 
       // ── AUTO WARRANTY TRACKING — log eng_movements for warranty/AMC/Warranty Repeat calls ──
       const isWarrantyCall=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
@@ -10593,6 +10561,66 @@ async function saveEngReturn(){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// Deducts every not-yet-deducted spare on a ticket from the correct stock
+// pool, and marks them stock_deducted so this never double-deducts. Which
+// pool depends ONLY on the ticket's service_type — On Site parts always
+// come out of the ASSIGNED ENGINEER's physical bag (freshT.assigned_name),
+// Carry-In parts always come out of office inventory directly (no personal
+// bag concept there, the device sits at the office). This deliberately does
+// NOT look at who is currently logged in / clicking the button — a WC,
+// CSP Manager, or Admin closing/force-changing a call on an engineer's
+// behalf must still deduct from THAT engineer's bag, not their own, or a
+// different person's, or (worse) nobody's if the deduction only ran for
+// role==='engineer' callers. Returns the fresh ticket row fetched inside.
+async function _deductTicketParts(id){
+  const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
+  if(!sparesToDeduct.length)return freshT;
+  const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
+  const bagOwner=freshT?.service_type==='On Site'?(freshT?.assigned_name||''):'';
+  for(const s of sparesToDeduct){
+    try{
+      const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
+      if(!inv.length)continue;
+      if(bagOwner){
+        // On Site: deduct from the assigned engineer's bag (eng_stock), NOT
+        // office inventory — office stock was already reduced when the part
+        // was issued to that engineer.
+        await engStockAdjust(bagOwner,inv[0].id,-(s.qty||1)).catch(e=>console.log('Eng stock deduct err:',e));
+      }else{
+        // Carry-In (or no assigned engineer on record): deduct from office
+        // inventory directly.
+        if(inv[0].qty_in_stock>0){
+          const newQty=Math.max(0,inv[0].qty_in_stock-(s.qty||1));
+          const patchData={qty_in_stock:newQty,updated_at:new Date().toISOString()};
+          if(isWarrantyForDeduct&&(inv[0].warranty_qty||0)>0){
+            patchData.warranty_qty=Math.max(0,(inv[0].warranty_qty||0)-(s.qty||1));
+          }
+          await sb('inventory','PATCH',patchData,`?part_code=eq.${encodeURIComponent(s.code)}`);
+          const idx=(allInventory||[]).findIndex(x=>x.id===inv[0].id);
+          if(idx>=0){allInventory[idx].qty_in_stock=newQty;if(patchData.warranty_qty!=null)allInventory[idx].warranty_qty=patchData.warranty_qty;}
+          await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
+        }
+      }
+      // Always record in inventory_sales for tracking
+      await sb('inventory_sales','POST',{
+        sale_date:new Date().toLocaleDateString('en-CA'),
+        part_code:s.code,part_name:s.name||'',
+        sale_type:'call',reference:id,
+        customer_name:freshT?.cname||'',
+        qty:s.qty||1,unit_price:s.price||0,
+        total_amount:(s.qty||1)*(s.price||0),
+        note:'Auto - Ticket '+id+(bagOwner?' (Eng Bag: '+bagOwner+')':''),
+        added_by:currentUser.name,
+        created_at:new Date().toISOString()
+      }).catch(()=>{});
+    }catch(e){console.log('Inv deduct error:',e);}
+  }
+  const updatedSpares=(freshT?.spares||[]).map(s=>({...s,stock_deducted:true}));
+  await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
+  freshT.spares=updatedSpares;
+  return freshT;
+}
 async function engStockAdjust(owner,partId,delta){
   const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
   const newQty=Math.max(0,(existing?.qty||0)+delta);
