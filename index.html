@@ -20700,7 +20700,7 @@ async function openAddVisitModal(siteId,siteName){
     +'<div class="modal-body">'
     +'<div class="form-grid">'
     +'<div class="form-group"><label>Visit Date <span class="req">*</span></label><input type="date" id="av-date-'+siteId+'" value="'+new Date().toLocaleDateString('en-CA')+'"></div>'
-    +'<div class="form-group"><label>Time</label><input type="time" id="av-time-'+siteId+'"></div>'
+    +'<div class="form-group"><label>Time</label><input type="time" id="av-time-'+siteId+'" value="'+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'"></div>'
     +'</div>'
     +'<div class="form-group" style="margin-top:10px;"><label>Work Done 🔧</label><textarea id="av-work-'+siteId+'" rows="3" placeholder="Describe the work done..."></textarea>'
     +'<button class="ai-remark-btn" onclick="showAIRemarkPicker(\'av-work-'+siteId+'\')">✨ AI Remark</button></div>'
@@ -20808,7 +20808,10 @@ function calcVisitGrandTotal(listId){}
 
 async function saveVisitWithMaterial(siteId,btn){
   var date=document.getElementById('av-date-'+siteId)?.value;
-  var time=document.getElementById('av-time-'+siteId)?.value||null;
+  // Time field is pre-filled with "now" when the form opens, but fall back
+  // here too in case it somehow arrives empty — Visit Report's Time column
+  // reads this field directly, so a blank value here always showed "—".
+  var time=document.getElementById('av-time-'+siteId)?.value||new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   var work=document.getElementById('av-work-'+siteId)?.value.trim()||null;
   if(!date){alert('Date required!');return;}
 
