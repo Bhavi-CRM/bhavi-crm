@@ -2889,12 +2889,14 @@ function setupNav(){
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
-      sv('nav-inventory',false);sv('nav-customers',true);sv('nav-reports',false);
+      sv('nav-inventory',window._isAcct);sv('nav-customers',true);sv('nav-reports',false);
       sv('nav-work-log-report',true);sv('nav-walk-in-report',false);sv('nav-courier-report',false);sv('nav-master',true);sv('nav-settings',false);sv('nav-sales',true);
       sv('nav-pending-list',true);sv('nav-route-planning',true);sv('nav-inquiries',true);sv('nav-field-tasks',true);sv('nav-site-visits',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-peon-activity',false);
       // ACCT001 (Chaula Trivedi, the Accountant) is a WC-role account but needs
-      // the manager-level Payment Collection view — other plain WCs don't.
+      // the manager-level Payment Collection view and full Inventory access
+      // (she runs stock/purchase/sales as the accountant) — other plain WCs
+      // don't get either.
       sv('nav-payment-collection',window._isAcct);
       sv('nav-tat-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
@@ -4859,7 +4861,7 @@ function ticketRow(t){
     <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span> <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;${isCarryIn?'background:#fed7aa;color:#9a3412;':'background:#bfdbfe;color:#1e40af;'}">${isCarryIn?'🏠 CARRY IN':'📍 ON SITE'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
-    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&t.status==='Closed'?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
+    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
@@ -4868,9 +4870,14 @@ function ticketRow(t){
       <button class="btn-icon" title="Print Job Sheet" onclick="viewingTicketId='${t.id}';printJobSheet()">🖨️</button>
     </td></tr>`;
 }
+// Carry-In non-warranty calls never reach "Closed" — they finish as
+// Delivered (repaired & handed over, or rejected estimate but the device
+// was still collected) — so Pending Invoice must include those too, not
+// just On-Site's "Closed", or every Carry-In invoice silently never shows up.
+var INVOICE_ELIGIBLE_STATUSES=['Closed','Delivered','Customer Reject'];
 function filterTickets(keepPage){
   if(!keepPage)window._ticketPage=1;
-  if(window._pendingInvFilter){window._pendingInvFilter=false;var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='Closed';}
+  if(window._pendingInvFilter){window._pendingInvFilter=false;var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='';}
   const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
   const s=document.getElementById('ticket-status-filter')?.value||'';
   const tp=document.getElementById('ticket-type-filter')?.value||'';
@@ -4885,7 +4892,7 @@ function filterTickets(keepPage){
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
     const mOpen=showAll||!TERMINAL_TICKET_STATUSES.includes(t.status);
     const isNW=t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat';
-    const mInv=!inv||(inv==='pending'&&isNW&&t.status==='Closed'&&!t.invoice_done)||(inv==='done'&&isNW&&t.status==='Closed'&&t.invoice_done);
+    const mInv=!inv||(inv==='pending'&&isNW&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)&&!t.invoice_done)||(inv==='done'&&isNW&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)&&t.invoice_done);
     const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
     return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
   });
@@ -6618,7 +6625,13 @@ async function quickStatusChange(id,status){
         status:'Delivered',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString(),
         payment_mode:paymentData.payment_mode,
         service_charges:paymentData.service_charges,
-        final_charges:paymentData.parts_cost+paymentData.service_charges
+        final_charges:paymentData.parts_cost+paymentData.service_charges,
+        // Payment Collection groups pending-to-clear amounts by whoever
+        // actually COLLECTED the money at handover (WC/office), not by the
+        // field engineer who did the repair — they may have nothing to do
+        // with this device sitting at the counter for days before pickup.
+        payment_collected_by:currentUser.name,
+        payment_collected_by_id:currentUser.eng_id||currentUser.user_id||''
       };
       if(paymentData.cname)data.cname=paymentData.cname;
       if(paymentData.payment_notes)data.charges_note=(t.charges_note?t.charges_note+'\n':'')+'Payment notes: '+paymentData.payment_notes;
@@ -6626,7 +6639,9 @@ async function quickStatusChange(id,status){
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
       }catch(pe){
         const _msg=String(pe&&pe.message);
-        if(data.payment_mode&&_msg.indexOf('payment_mode')!==-1){delete data.payment_mode;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        if(_msg.indexOf('payment_collected_by_id')!==-1){delete data.payment_collected_by_id;delete data.payment_collected_by;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        else if(_msg.indexOf('payment_collected_by')!==-1){delete data.payment_collected_by;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        else if(data.payment_mode&&_msg.indexOf('payment_mode')!==-1){delete data.payment_mode;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
         else throw pe;
       }
       currentSpares=[];
@@ -9447,20 +9462,32 @@ async function renderPaymentCollection(view){
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
     const canManage=_pcCanManage();
-    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by,invoice_done,invoice_no&order=updated_at.desc';
+    let q='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by,payment_collected_by,payment_collected_by_id,invoice_done,invoice_no&order=updated_at.desc';
     if(!canManage){
+      // A Carry-In device's payment is attributed to whoever actually
+      // COLLECTED it at handover (payment_collected_by_id), which is often
+      // the WC at the counter, not the field engineer in assigned_to — so a
+      // non-manager must see BOTH: their own assigned calls, and any call
+      // where they personally collected the payment.
       const myId=currentUser.eng_id||currentUser.user_id;
-      q+='&assigned_to=eq.'+encodeURIComponent(myId);
+      q+='&or=(assigned_to.eq.'+encodeURIComponent(myId)+',payment_collected_by_id.eq.'+encodeURIComponent(myId)+')';
     }
     let tickets;
     try{
       tickets=await sb('tickets','GET',null,q);
     }catch(qe){
-      if(String(qe.message||'').indexOf('payment_received')!==-1){
+      const _qmsg=String(qe.message||'');
+      if(_qmsg.indexOf('payment_collected_by')!==-1){
+        // Column(s) not added yet — retry without them so the page still
+        // works (falls back to the old assigned_to-only visibility).
+        const myId=currentUser.eng_id||currentUser.user_id;
+        let q2='?payment_mode=not.is.null&select=id,cname,mobile,area,model,payment_mode,service_charges,final_charges,labor,other_charge,spares,updated_at,assigned_to,assigned_name,payment_received,payment_received_at,payment_received_by,invoice_done,invoice_no&order=updated_at.desc';
+        if(!canManage)q2+='&assigned_to=eq.'+encodeURIComponent(myId);
+        tickets=await sb('tickets','GET',null,q2);
+      }else if(_qmsg.indexOf('payment_received')!==-1){
         pc.innerHTML='<div class="alert alert-warning">⚠️ Setup needed: the payment_received columns don\'t exist on the tickets table yet. Run the Payment Collection setup SQL in Supabase, then reload this page.</div>';
         return;
-      }
-      throw qe;
+      }else throw qe;
     }
     window._pcTickets=tickets;
     if(!tickets.length){
@@ -9469,8 +9496,11 @@ async function renderPaymentCollection(view){
     }
     const byEng={};
     tickets.forEach(function(t){
-      const k=t.assigned_to||'unassigned';
-      if(!byEng[k])byEng[k]={name:t.assigned_name||'Unassigned',pendingRows:[],receivedRows:[],pending:0,received:0};
+      // Group by whoever COLLECTED the payment when that's recorded (Carry-In
+      // delivery handover) — otherwise fall back to the assigned engineer,
+      // same as before.
+      const k=t.payment_collected_by_id||t.assigned_to||'unassigned';
+      if(!byEng[k])byEng[k]={name:t.payment_collected_by||t.assigned_name||'Unassigned',pendingRows:[],receivedRows:[],pending:0,received:0};
       const amt=_pcAmount(t);
       if(t.payment_received){byEng[k].receivedRows.push(t);byEng[k].received+=amt;}
       else{byEng[k].pendingRows.push(t);byEng[k].pending+=amt;}
@@ -22984,17 +23014,44 @@ async function doFtTravelStart(id){
   }
   try{
     await sb('field_tasks','PATCH',{status:'Traveling',travel_start_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);
+    await _ftAutoWorkLog(id,t,'travel','🚗 Travel Start',now);
     alert('🚗 Travel Start — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
     renderFieldTasks();
   }catch(e){alert('Error: '+e.message);}
 }
+// Mirrors the call flow's "AUTO WORK LOG" — every Other Work lifecycle step
+// (Travel Start / Reached / Done) must land in Work Log with date/time and
+// location, exactly like a call's Travel/Work Start does, so nothing is
+// missing when the report is checked later. Closes any still-OPEN log for
+// this member first (chaining travel → work → done, same as calls).
+async function _ftAutoWorkLog(id,t,logType,actionLabel,now){
+  try{
+    var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+    var dateNow=now.toLocaleDateString('en-CA');
+    var timeNow=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    var memberRole=currentUser.role_type==='work_controller'?'WC':(currentUser.role==='engineer'?'Engineer':'Other');
+    var loc=t&&(t.address||t.location);
+    var label=(t&&t.customer_name?t.customer_name:'Task')+(t&&t.task_type?' | '+t.task_type:'')+(loc?' | 📍 '+loc:'');
+    var openLogs=await sb('work_logs','GET',null,'?eng_id=eq.'+encodeURIComponent(engId)+'&log_date=eq.'+dateNow+'&to_time=eq.OPEN');
+    for(var oi=0;oi<(openLogs||[]).length;oi++){await sb('work_logs','PATCH',{to_time:timeNow},'?id=eq.'+openLogs[oi].id).catch(function(){});}
+    await sb('work_logs','POST',{
+      eng_id:engId,eng_name:currentUser.name,member_role:memberRole,
+      log_date:dateNow,from_time:timeNow,to_time:logType==='done'?timeNow:'OPEN',
+      task_description:actionLabel+' — '+label,
+      ticket_id:'FT'+id,log_type:logType==='done'?'work':logType,created_at:now.toISOString()
+    }).catch(function(){});
+  }catch(e){}
+}
 async function doFtReached(id){
   var isEng=currentUser&&currentUser.role==='engineer';
   var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
+  var t=(window._ftCache||[]).find(function(x){return String(x.id)===String(id);});
+  if(!t){try{t=(await sb('field_tasks','GET',null,'?id=eq.'+id))[0];}catch(e){}}
   var _finish=async function(skipped){
     var now=new Date();
     try{
       await sb('field_tasks','PATCH',{status:'Reached',reached_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);
+      await _ftAutoWorkLog(id,t,'work','📍 Reached',now);
       alert('📍 Reached — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+(skipped?'\n\n⏭️ KM skip karyu — next travel start par levase.':''));
       renderFieldTasks();
     }catch(e){alert('Error: '+e.message);}
@@ -23007,8 +23064,11 @@ async function doFtReached(id){
 }
 async function doFtDone(id){
   var now=new Date();
+  var t=(window._ftCache||[]).find(function(x){return String(x.id)===String(id);});
+  if(!t){try{t=(await sb('field_tasks','GET',null,'?id=eq.'+id))[0];}catch(e){}}
   try{
     await sb('field_tasks','PATCH',{status:'Done',done_at:now.toISOString(),done_date:now.toLocaleDateString('en-CA'),updated_at:now.toISOString()},'?id=eq.'+id);
+    await _ftAutoWorkLog(id,t,'done','✅ Task Done',now);
     alert('✅ Task Done — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
     renderFieldTasks();
   }catch(e){alert('Error: '+e.message);}
