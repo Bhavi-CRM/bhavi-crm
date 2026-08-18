@@ -9849,9 +9849,9 @@ function epaRenderResults(engineers){
                 <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Percentage</th>
               </tr></thead>
               <tbody>
-                ${engDistribution.map(d=>{const pct=((d.qty/totalDistributed)*100).toFixed(0);return`<tr style="border-bottom:1px solid #f1f5f9;">
+                ${engDistribution.map(d=>{const pct=((d.qty/totalDistributed)*100).toFixed(0);const canCorrect=currentUser.role==='admin'&&!window._isCspMgr;const qtyClick=canCorrect?`onclick="openEngAdj('${d.eng}','${filterPartId}','${d.qty}')" style="cursor:pointer;text-decoration:underline dotted;" title="Click to correct (Admin only)"`:'';return`<tr style="border-bottom:1px solid #f1f5f9;">
                   <td style="padding:8px;font-weight:600;">${d.eng}</td>
-                  <td style="padding:8px;text-align:center;font-weight:700;">${d.qty}</td>
+                  <td style="padding:8px;text-align:center;font-weight:700;" ${qtyClick}>${d.qty}</td>
                   <td style="padding:8px;text-align:right;"><div style="background:#eff6ff;color:#0891b2;padding:4px 8px;border-radius:4px;display:inline-block;font-weight:600;font-size:11px;">${pct}%</div></td>
                 </tr>`;}).join('')}
               </tbody>
@@ -9888,10 +9888,10 @@ function epaRenderResults(engineers){
             <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Value</th>
           </tr></thead>
           <tbody>
-            ${d.parts.map(s=>{const p=allInventory.find(x=>x.id===s.part_id);const val=(s.qty||0)*(p?.unit_price||0);return`<tr style="border-bottom:1px solid #f1f5f9;">
+            ${d.parts.map(s=>{const p=allInventory.find(x=>x.id===s.part_id);const val=(s.qty||0)*(p?.unit_price||0);const canCorrect=currentUser.role==='admin'&&!window._isCspMgr;const qtyClick=canCorrect?`onclick="openEngAdj('${d.eng}','${s.part_id}','${s.qty||0}')" style="cursor:pointer;text-decoration:underline dotted;" title="Click to correct (Admin only)"`:'';return`<tr style="border-bottom:1px solid #f1f5f9;">
               <td style="padding:8px;font-weight:600;color:var(--primary);">${p?.part_code||'—'}</td>
               <td style="padding:8px;">${p?.item_name||'Unknown'}</td>
-              <td style="padding:8px;text-align:center;font-weight:700;">${s.qty||0}</td>
+              <td style="padding:8px;text-align:center;font-weight:700;" ${qtyClick}>${s.qty||0}</td>
               <td style="padding:8px;text-align:right;">₹${p?.unit_price||0}</td>
               <td style="padding:8px;text-align:right;font-weight:600;color:#059669;">₹${val.toFixed(0)}</td>
             </tr>`;}).join('')}
@@ -10180,7 +10180,8 @@ function epLogRender(){
       const to=(m.to_owner||'').toLowerCase();
       const job=(m.job_sheet||'').toLowerCase();
       const notes=(m.notes||'').toLowerCase();
-      if(!pname.includes(q)&&!from.includes(q)&&!to.includes(q)&&!job.includes(q)&&!notes.includes(q))return false;
+      const by=(m.created_by||'').toLowerCase();
+      if(!pname.includes(q)&&!from.includes(q)&&!to.includes(q)&&!job.includes(q)&&!notes.includes(q)&&!by.includes(q))return false;
     }
     return true;
   });
@@ -10194,7 +10195,8 @@ function epLogRender(){
     <td style="padding:8px 12px;font-size:12px;">${m.to_owner||'—'}</td>
     <td style="padding:8px 12px;font-size:12px;color:#1d4ed8;">${m.job_sheet||'—'}</td>
     <td style="padding:8px 12px;font-size:11px;">${m.warranty?'<span style="color:#059669;font-weight:700;">Warranty</span>':m.notes||'—'}</td>
-  </tr>`).join('')||'<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-muted);">No movements found</td></tr>';
+    <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#7c3aed;white-space:nowrap;">${m.created_by||'—'}</td>
+  </tr>`).join('')||'<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text-muted);">No movements found</td></tr>';
 
   const savedQ=document.getElementById('ep-log-search')?.value||'';
   const savedType=document.getElementById('ep-log-type')?.value||'';
@@ -10234,6 +10236,7 @@ function epLogRender(){
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">To</th>
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Jobsheet</th>
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
+          <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">By</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -10274,7 +10277,10 @@ function epEngOpts(){
   const fromStock=[...new Set(allEngStock.map(s=>s.owner))];
   const fromUsers=(allEngineers||[]).map(e=>e.name);
   const all=[...new Set([...fromStock,...fromUsers])].sort();
-  return all.map(n=>`<option value="${n}">${n}</option>`).join('')||'<option disabled>No engineers found</option>';
+  // No default selection — the browser otherwise silently pre-selects the
+  // first name alphabetically, so a form submitted without touching this
+  // dropdown quietly issues/uses parts against the wrong engineer.
+  return '<option value="">— Select Engineer —</option>'+(all.map(n=>`<option value="${n}">${n}</option>`).join('')||'<option disabled>No engineers found</option>');
 }
 
 function openEngIssue(){
