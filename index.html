@@ -1194,6 +1194,25 @@ async function tgNotifyEngineer(engId,text){
 // ===== END TELEGRAM BOT CONFIG =====
 
 function normalizeWCUser(u){if(u&&u.role==='work_controller'){u=Object.assign({},u);if(!u.role_type)u.role_type='work_controller';}return u;}
+// Always fetch the ticket's CURRENT timeline from the DB right before
+// appending to it and saving — never build the new array off the
+// in-memory `allTickets` cache. Two people can act on the same ticket
+// close together (e.g. engineer closes a call while WC/Accountant already
+// has the ticket list open); building `tl` from a stale cached ticket and
+// PATCHing it back silently WIPES OUT whatever the other person just
+// saved, since PATCH replaces the whole timeline array. Falls back to the
+// cached ticket's timeline only if the fresh fetch itself fails.
+async function _freshTimeline(id,fallbackTicket){
+  try{
+    var row=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=timeline'))[0];
+    var tl=row&&row.timeline;
+    if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=null;}}
+    if(Array.isArray(tl))return tl;
+  }catch(e){}
+  var fb=fallbackTicket&&fallbackTicket.timeline;
+  if(typeof fb==='string'){try{fb=JSON.parse(fb);}catch(e){fb=[];}}
+  return Array.isArray(fb)?fb:[];
+}
 async function sb(t,m='GET',b=null,q=''){
   const url=`${SB_URL}/rest/v1/${t}${q||''}`;
   const h={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':m==='POST'?'return=representation':m==='PATCH'?'return=representation':''};
@@ -5772,11 +5791,12 @@ async function generateTicketNo(){
 }
 
 // Point 13: Admin edit — only remark
-function openAdminEdit(id){
+async function openAdminEdit(id){
   const t=allTickets.find(x=>x.id===id);if(!t)return;
   const remark=prompt(`Add remark for ${t.id}:\n(Note: Customer & product details cannot be changed after job sheet creation)`);
   if(remark===null)return;
-  sb('tickets','PATCH',{remarks:remark,timeline:[...(t.timeline||[]),{action:'Admin Remark Added',by:currentUser.name,at:new Date().toISOString(),note:remark}],updated_at:new Date().toISOString()},`?id=eq.${id}`)
+  const tl=await _freshTimeline(id,t);
+  sb('tickets','PATCH',{remarks:remark,timeline:[...tl,{action:'Admin Remark Added',by:currentUser.name,at:new Date().toISOString(),note:remark}],updated_at:new Date().toISOString()},`?id=eq.${id}`)
     .then(()=>{if(currentPage==='tickets')renderTickets();else renderDashboard();})
     .catch(e=>alert('Error: '+e.message));
 }
@@ -6596,7 +6616,7 @@ async function quickStatusChange(id,status){
   if(status==='Call Cancel'){
     const reason=prompt('🚫 Cancel Reason (mandatory):');
     if(!reason||!reason.trim()){alert('Reason is mandatory!');return;}
-    const tl=[...(t.timeline||[]),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
+    const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
     await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     closeModal('modal-ticket');
     if(currentPage==='tickets')renderTickets();else renderDashboard();
@@ -6620,7 +6640,7 @@ async function quickStatusChange(id,status){
     currentSpares=isRejectDelivery?[]:(t.spares||[]);
     const ptData=Object.assign({},t,{service_charges:isRejectDelivery?(parseFloat(t.final_charges)||parseFloat(t.labor)||0):(parseFloat(t.labor)||parseFloat(t.service_charges)||0)});
     showPaymentConfirmation(ptData,async function(paymentData){
-      const tl=[...(t.timeline||[]),{action:'Status → Delivered',by:currentUser.name,at:new Date().toISOString(),note:(isRejectDelivery?'Customer collected device after rejecting estimate. ':'')+'Payment collected on delivery.'}];
+      const tl=[...(await _freshTimeline(id,t)),{action:'Status → Delivered',by:currentUser.name,at:new Date().toISOString(),note:(isRejectDelivery?'Customer collected device after rejecting estimate. ':'')+'Payment collected on delivery.'}];
       const data={
         status:'Delivered',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString(),
         payment_mode:paymentData.payment_mode,
@@ -6664,7 +6684,7 @@ async function quickStatusChange(id,status){
   const reason=await validateStatusChange(id,t.status,status,currentUser.role);
   if(reason===null)return;
   const note=reason?`Reason: ${reason}`:'';
-  const tl=[...(t.timeline||[]),{action:'Status → '+status,by:currentUser.name,at:new Date().toISOString(),note}];
+  const tl=[...(await _freshTimeline(id,t)),{action:'Status → '+status,by:currentUser.name,at:new Date().toISOString(),note}];
   await sb('tickets','PATCH',{status,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else renderDashboard();
@@ -6697,7 +6717,7 @@ async function doForceStatusChange(id,newStatus){
   var modal=document.getElementById('force-status-modal');if(modal)modal.remove();
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));t=r[0];}
-  const tl=[...(t?.timeline||[]),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
+  const tl=[...(await _freshTimeline(id,t)),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
   await sb('tickets','PATCH',{status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));
   // Auto work log entry for admin/WC force status change
   try{
@@ -6885,8 +6905,8 @@ async function processApproval(decision){
   }
   
   const estimateNote='Estimate: Rs'+finalAmount.toFixed(0)+' | Parts: Rs'+partsFinal.toFixed(0)+' | Service: Rs'+labourFinal.toFixed(0)+(note?' | Note: '+note:'');
-  
-  const tl=[...(t?.timeline||[]),{action,by:currentUser.name,at:new Date().toISOString(),note:estimateNote}];
+
+  const tl=[...(await _freshTimeline(approvalTicketId,t)),{action,by:currentUser.name,at:new Date().toISOString(),note:estimateNote}];
   
   // Save estimate details to ticket
   const updateData={
@@ -12640,7 +12660,7 @@ async function approveReportEdit(ticketId){
   // Serial/Model edit request could be approved without actually changing
   // the ticket) — added below.
   ['cname','mobile','alt_mobile','city','state','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge','model','serial','se_call_id','brand_name'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
-  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  let tl=await _freshTimeline(ticketId,t);
   const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
   tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
   patch.timeline=tl;
@@ -12660,7 +12680,7 @@ async function rejectReportEdit(ticketId){
   if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
   if(!t||!t.pending_edit){alert('No pending edit found.');return;}
   const pe=t.pending_edit;const now=new Date().toISOString();
-  let tl=t.timeline||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  let tl=await _freshTimeline(ticketId,t);
   tl=[...tl,{action:'Report Edit Rejected',by:currentUser.name||'Admin',at:now,note:`Edit by ${pe.requested_by} rejected. Reason: ${rejectReason||'No reason given'}`}];
   try{
     await sb('tickets','PATCH',{pending_edit:null,timeline:tl,updated_at:now},`?id=eq.${ticketId}`);
@@ -12710,7 +12730,7 @@ async function saveInvoiceEntry(ticketId){
   if(!invNo){alert('⚠️ Invoice Number farjiyat chhe!');return;}
   var now=new Date().toISOString();
   var t=allTickets.find(function(x){return x.id===ticketId;});
-  var tl=(t&&t.timeline)||[];if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  var tl=await _freshTimeline(ticketId,t);
   tl=[...tl,{action:'Invoice Done',by:currentUser.name||'WC',at:now,note:'Invoice No: '+invNo}];
   try{
     await sb('tickets','PATCH',{invoice_done:true,invoice_no:invNo,timeline:tl,updated_at:now},'?id=eq.'+ticketId);
