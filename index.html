@@ -9748,7 +9748,10 @@ function epGetQty(owner,partId){
 function epQtyCell(qty,owner,partId){
   const bg=qty<=0?'#fef2f2':qty<=2?'#fefce8':'#f0fdf4';
   const col=qty<=0?'#dc2626':qty<=2?'#d97706':'#059669';
-  const click=owner?`onclick="openEngAdj('${owner}','${partId}','${qty}')" style="cursor:pointer;" title="Click to adjust"`:'';
+  // Stock correction is ADMIN ONLY — not CSP Managers, not WC — and always
+  // requires a remark (enforced in saveEngAdj), logged to Movement Log.
+  const canCorrect=owner&&currentUser.role==='admin'&&!window._isCspMgr;
+  const click=canCorrect?`onclick="openEngAdj('${owner}','${partId}','${qty}')" style="cursor:pointer;" title="Click to correct (Admin only)"`:'';
   return `<td ${click} style="text-align:center;padding:8px 6px;background:${bg};color:${col};font-weight:700;font-size:13px;border-top:1px solid #f1f5f9;">${qty}</td>`;
 }
 
@@ -9934,7 +9937,7 @@ function renderEPOverview(){
     return `<tr>
       <td style="padding:8px 12px;font-weight:700;font-size:12px;color:var(--primary);border-top:1px solid #f1f5f9;white-space:nowrap;">${p.part_code||'—'}</td>
       <td style="padding:8px 12px;font-weight:600;font-size:13px;border-top:1px solid #f1f5f9;">${p.item_name}</td>
-      ${epQtyCell(officeQty)}
+      ${epQtyCell(officeQty,'MAIN',p.id)}
       ${engCell}
       <td style="text-align:center;padding:8px;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-top:1px solid #f1f5f9;">${officeQty+engTotal}</td>
     </tr>`;
@@ -9955,7 +9958,7 @@ function renderEPOverview(){
           <tbody>${rows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No results found</td></tr>'}</tbody>
         </table>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Click on <b style="color:#0891b2;">With Engineers</b> qty to see per-engineer breakdown.</p>`;
+      <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">Click on <b style="color:#0891b2;">With Engineers</b> qty to see per-engineer breakdown.${(currentUser.role==='admin'&&!window._isCspMgr)?' Click on <b style=\"color:#059669;\">Office Stock</b> qty to correct it (Admin only, remark required, logged in Movement Log).':''}</p>`;
   }
 }
 
@@ -10548,15 +10551,21 @@ async function invQtyAdjust(partId,delta){
   if(item) item.qty_in_stock=newQty;
 }
 
-// ── Manual Adjust ─────────────────────────────────────────────
+// ── Manual Adjust (Admin only) — owner==='MAIN' corrects the office
+// inventory qty_in_stock directly; any other owner corrects that
+// engineer's bag (eng_stock). Both require a remark and are logged to
+// eng_movements (type ADJUST) so they show up in the Movement Log.
 function openEngAdj(owner,partId,currentQty){
+  if(!(currentUser.role==='admin'&&!window._isCspMgr)){alert('⛔ Stock correction is Admin only.');return;}
   const part=allInventory.find(x=>x.id===partId);
-  document.getElementById('adj-label').textContent=`👷 ${owner}  ·  ${part?.part_code?part.part_code+' — '+part.item_name:part?.item_name||'Part'}  ·  Current: ${currentQty}`;
+  const ownerLabel=owner==='MAIN'?'🏢 Office Stock':'👷 '+owner;
+  document.getElementById('adj-label').textContent=`${ownerLabel}  ·  ${part?.part_code?part.part_code+' — '+part.item_name:part?.item_name||'Part'}  ·  Current: ${currentQty}`;
   document.getElementById('adj-owner').value=owner;
   document.getElementById('adj-part-id').value=partId;
   document.getElementById('adj-qty-set').value='';
   document.getElementById('adj-qty-add').value='';
   document.getElementById('adj-qty-sub').value='';
+  const remarkEl=document.getElementById('adj-remark');if(remarkEl)remarkEl.value='';
   showModal('modal-eng-adj');
 }
 async function saveEngAdj(){
@@ -10565,17 +10574,26 @@ async function saveEngAdj(){
   const setVal=document.getElementById('adj-qty-set').value;
   const addVal=parseInt(document.getElementById('adj-qty-add').value)||0;
   const subVal=parseInt(document.getElementById('adj-qty-sub').value)||0;
-  const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
-  const curQty=existing?.qty||0;
+  const remark=(document.getElementById('adj-remark')?.value||'').trim();
+  if(!remark){alert('⚠️ Remark is mandatory for a stock correction — explain why.');document.getElementById('adj-remark')?.focus();return;}
+  const isMain=owner==='MAIN';
+  const invItem=isMain?allInventory.find(x=>x.id===partId):null;
+  const existing=isMain?null:allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
+  const curQty=isMain?(invItem?.qty_in_stock||0):(existing?.qty||0);
   let newQty;
   if(setVal!=='') newQty=Math.max(0,parseInt(setVal)||0);
   else newQty=Math.max(0,curQty+addVal-subVal);
   if(newQty===curQty){alert('No change.');return;}
   try{
-    const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
-    if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
-    else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
-    await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(newQty-curQty),from_owner:newQty>curQty?'MANUAL':owner,to_owner:newQty>curQty?owner:'MANUAL',notes:`Manual adjust: ${curQty}→${newQty}`,created_by:currentUser?.name||'Admin'});
+    if(isMain){
+      await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${partId}`);
+      if(invItem)invItem.qty_in_stock=newQty;
+    }else{
+      const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
+      if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
+      else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
+    }
+    await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(newQty-curQty),from_owner:newQty>curQty?'CORRECTION':owner,to_owner:newQty>curQty?owner:'CORRECTION',notes:`Stock correction: ${curQty}→${newQty} | Reason: ${remark}`,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-adj');renderEngParts('overview');
   }catch(e){alert('Error: '+e.message);}
 }
@@ -10866,11 +10884,30 @@ async function saveEngReqReturn(){
 }
 
 // ── Approve / Reject requests (Admin + WC for RETURN) ─────
+// window._epApproving guards against a fast double-click firing this twice
+// before the first click's network calls finish (the fresh-status re-check
+// below alone can't catch that — both clicks would still see PENDING).
+window._epApproving=window._epApproving||{};
 async function approveEngReq(reqId,req){
   const parts=req.parts||[];
   if(!parts.length){alert('No parts found in this request.');return;}
+  if(window._epApproving[reqId])return; // already processing this exact request
   if(!confirm(`Approve this request?\nEngineer: ${req.engineer_name}\nParts: ${parts.length} item(s)`))return;
+  window._epApproving[reqId]=true;
   try{
+    // Atomically claim the request FIRST, conditioned on it still being
+    // PENDING (?status=eq.PENDING in the filter) — a double-click, two
+    // admins clicking at once, or re-clicking an already-approved request
+    // must never issue the same parts twice. Postgres only lets ONE such
+    // conditional PATCH actually match a row; if ours comes back empty, the
+    // race was already lost (or it was rejected/approved earlier) — abort
+    // before touching any stock.
+    const claimed=await sb('eng_part_requests','PATCH',{status:'APPROVED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}&status=eq.PENDING`);
+    if(!claimed||!claimed.length){
+      alert('⚠️ This request was already approved/rejected — not approving again.');
+      renderEngParts('pending');
+      return;
+    }
     if(!allEngStock) allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name');
     for(const p of parts){
@@ -10899,10 +10936,10 @@ async function approveEngReq(reqId,req){
         await sb('eng_movements','POST',{type:'ENG_RETURN',part_id:p.part_id,qty:p.qty,from_owner:req.engineer_name,to_owner:'MAIN',notes:req.engineer_name?'Request by '+req.engineer_name:'',created_by:currentUser?.name||'Admin'});
       }
     }
-    await sb('eng_part_requests','PATCH',{status:'APPROVED',approved_by:currentUser.name||currentUser.user_id,approved_at:new Date().toISOString()},`?id=eq.${reqId}`);
     alert('✅ Approved! Stock has been updated.');
     renderEngParts('pending');
   }catch(e){alert('Error: '+e.message);console.error(e);}
+  finally{delete window._epApproving[reqId];}
 }
 async function rejectEngReq(reqId){
   if(!confirm('Reject this request?'))return;
@@ -23798,6 +23835,10 @@ async function saveInquiry(editId){
           <label>Remove (−)</label>
           <input type="number" id="adj-qty-sub" class="form-control" min="1" placeholder="Remove qty">
         </div>
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label>Remark <span style="color:#dc2626;">*</span> (mandatory — why is this being corrected?)</label>
+        <textarea id="adj-remark" class="form-control" rows="2" placeholder="e.g. Physical stock count mismatch, found short during audit..."></textarea>
       </div>
       <input type="hidden" id="adj-owner">
       <input type="hidden" id="adj-part-id">
