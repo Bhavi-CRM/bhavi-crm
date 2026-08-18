@@ -5222,8 +5222,8 @@ async function renderMyCalls(){
             return sorted.map(t=>{
               const isClosed=!isTicketActive(t);
               const hasRoute=!!routeSeqMap[t.id];
-              return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${hasRoute?'#1d4ed8':(isClosed?'var(--border)':'#bfdbfe')};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};display:flex;gap:10px;align-items:stretch;">
-                ${hasRoute?`<div style="flex-shrink:0;width:38px;height:38px;border-radius:19px;background:#1d4ed8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;align-self:flex-start;">🗺️${routeSeqMap[t.id]}</div>`:''}
+              return `<div data-id="${t.id}" data-cname="${(t.cname||'').toLowerCase()}" data-mobile="${t.mobile||''}" data-model="${(t.model||'').toLowerCase()}" data-serial="${(t.serial||'').toLowerCase()}" data-status="${isClosed?'closed':'active'}" style="border:1.5px solid ${hasRoute?'#1d4ed8':(isClosed?'var(--border)':'#bfdbfe')};border-radius:12px;padding:14px 16px;margin-bottom:10px;background:${isClosed?'var(--card)':'#f0f7ff'};display:flex;gap:10px;align-items:${hasRoute?'center':'stretch'};">
+                ${hasRoute?`<div style="flex-shrink:0;width:38px;height:38px;border-radius:19px;background:#1d4ed8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;">${routeSeqMap[t.id]}</div>`:''}
                 <div style="flex:1;min-width:0;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                   <div>
@@ -6595,6 +6595,47 @@ async function quickStatusChange(id,status){
     if(currentPage==='tickets')renderTickets();else renderDashboard();
     return;
   }
+  // Carry-In Non-Warranty device handover: bill & collect payment at the
+  // moment the customer actually TAKES the device (Delivered) — not when the
+  // engineer finishes the repair (Repaired), since the device can then sit
+  // at the office for days before pickup. Also covers a Customer Reject
+  // that still ends in the customer collecting the device (visit/inspection
+  // charge set at reject time gets billed right here, same popup/flow) —
+  // whichever day this actually happens, that day's payment records/report
+  // pick it up automatically since it's saved the same way as any other
+  // payment confirmation.
+  const isRejectDelivery=t.status==='Customer Reject';
+  const needsDeliveryPayment=status==='Delivered'&&t.service_type==='Carry In'&&t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other')&&!t.payment_mode;
+  if(needsDeliveryPayment){
+    // Rejected estimate: parts were never fitted/billed — only the
+    // inspection/visit charge (final_charges/labor, set at reject time)
+    // applies. Repaired & delivered: bill the approved parts + labour.
+    currentSpares=isRejectDelivery?[]:(t.spares||[]);
+    const ptData=Object.assign({},t,{service_charges:isRejectDelivery?(parseFloat(t.final_charges)||parseFloat(t.labor)||0):(parseFloat(t.labor)||parseFloat(t.service_charges)||0)});
+    showPaymentConfirmation(ptData,async function(paymentData){
+      const tl=[...(t.timeline||[]),{action:'Status → Delivered',by:currentUser.name,at:new Date().toISOString(),note:(isRejectDelivery?'Customer collected device after rejecting estimate. ':'')+'Payment collected on delivery.'}];
+      const data={
+        status:'Delivered',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString(),
+        payment_mode:paymentData.payment_mode,
+        service_charges:paymentData.service_charges,
+        final_charges:paymentData.parts_cost+paymentData.service_charges
+      };
+      if(paymentData.cname)data.cname=paymentData.cname;
+      if(paymentData.payment_notes)data.charges_note=(t.charges_note?t.charges_note+'\n':'')+'Payment notes: '+paymentData.payment_notes;
+      try{
+        await sb('tickets','PATCH',data,`?id=eq.${id}`);
+      }catch(pe){
+        const _msg=String(pe&&pe.message);
+        if(data.payment_mode&&_msg.indexOf('payment_mode')!==-1){delete data.payment_mode;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        else throw pe;
+      }
+      currentSpares=[];
+      closeModal('modal-ticket');
+      if(currentPage==='tickets')renderTickets();else renderDashboard();
+    });
+    return;
+  }
+
   // Admin/WC force status change → always mandatory remark (bypasses allowed check)
   if(isAdminOrWC){
     showForceStatusRemarkModal(id,t,status);
@@ -10300,7 +10341,7 @@ async function saveEngUse(){
     if(warranty&&jobSheet){
       try{
         const trackKey=jobSheet.split('/').pop().trim().toUpperCase();
-        const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id&limit=10').catch(()=>[]);
+        const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline&limit=10').catch(()=>[]);
         const matchTkt=matchTickets&&matchTickets.find(t=>{const raw=(t.se_call_id||'').trim().toUpperCase();return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);});
         if(matchTkt){
           const invItem=(allInventory&&allInventory.find(x=>x.id===partId))||(await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
@@ -10308,7 +10349,10 @@ async function saveEngUse(){
           const alreadyHas=existingSpares.some(s=>s.code&&invItem&&s.code===invItem.part_code);
           if(!alreadyHas){
             const newSpare={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:true,stock_deducted:false,warranty_supplied:true};
-            await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
+            let linkTl=matchTkt.timeline;if(typeof linkTl==='string'){try{linkTl=JSON.parse(linkTl);}catch(e){linkTl=[];}}
+            if(!Array.isArray(linkTl))linkTl=[];
+            linkTl=[...linkTl,{action:'Part Auto-Linked (Eng Use)',by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part: '+(newSpare.code||'')+' '+(newSpare.name||'')+' × '+qty+' | SE Call ID: '+jobSheet}];
+            await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],timeline:linkTl,updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
           }
         }
       }catch(linkErr){console.log('Auto-link to ticket failed:',linkErr);}
@@ -10371,7 +10415,7 @@ async function saveDirectWarrantyIssue(){
     });
     // Auto-link part to the matching ticket (by SE call ID)
     try{
-      const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id&limit=10').catch(()=>[]);
+      const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline&limit=10').catch(()=>[]);
       const matchTkt=matchTickets&&matchTickets.find(t=>{
         const raw=(t.se_call_id||'').trim().toUpperCase();
         return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
@@ -10381,7 +10425,10 @@ async function saveDirectWarrantyIssue(){
         const alreadyHas=existingSpares.some(s=>s.code&&s.code===invItem?.part_code);
         if(!alreadyHas){
           const newSpare={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:true,stock_deducted:false,warranty_supplied:true};
-          await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
+          let dwiTl=matchTkt.timeline;if(typeof dwiTl==='string'){try{dwiTl=JSON.parse(dwiTl);}catch(e){dwiTl=[];}}
+          if(!Array.isArray(dwiTl))dwiTl=[];
+          dwiTl=[...dwiTl,{action:'Part Auto-Linked (Direct Warranty Issue)',by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part: '+(newSpare.code||'')+' '+(newSpare.name||'')+' × '+qty+' | SE Call ID: '+jobSheetRaw}];
+          await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],timeline:dwiTl,updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
         }
       }
     }catch(autoErr){console.log('Auto-link to ticket failed:',autoErr);}
@@ -25850,7 +25897,20 @@ async function saveRoutePlanInline(){
     var patch={planned_date:today};
     if(c.eng_id){patch.assigned_to=c.eng_id;patch.assigned_name=c.eng_name;patch.status='Assigned';}
     if(c.seq)patch.sequence_no=parseInt(c.seq)||null;
-    try{await sb('tickets','PATCH',patch,'?id=eq.'+encodeURIComponent(tid));saved++;}catch(e){console.error(e);}
+    try{
+      if(c.eng_id){
+        // Route Plan assigns/reassigns the engineer AND flips status → Assigned —
+        // that must leave a timeline trace like every other status change does,
+        // otherwise the ticket history has an unexplained jump.
+        var rpT=(window._pendingData||[]).find(function(x){return x.id===tid;});
+        var rpTl=rpT&&rpT.timeline;
+        if(rpTl==null){try{var rpFresh=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(tid)+'&select=timeline'))[0];rpTl=rpFresh&&rpFresh.timeline;}catch(e){rpTl=[];}}
+        if(typeof rpTl==='string'){try{rpTl=JSON.parse(rpTl);}catch(e){rpTl=[];}}
+        if(!Array.isArray(rpTl))rpTl=[];
+        patch.timeline=[...rpTl,{action:'Assigned to '+c.eng_name+' (Route Plan)',by:currentUser.name,at:new Date().toISOString(),note:'Planned date: '+today+(c.seq?' | Seq: '+c.seq:'')}];
+      }
+      await sb('tickets','PATCH',patch,'?id=eq.'+encodeURIComponent(tid));saved++;
+    }catch(e){console.error(e);}
   }
   if(btn){btn.disabled=false;btn.textContent='💾 Save Route Plan';}
   window._routeChanges={};
