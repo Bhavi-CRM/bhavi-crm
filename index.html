@@ -7451,7 +7451,23 @@ function askWarrantyOrChargeable(label){
     document.getElementById('wty-choice-paid').onclick=function(){ov.remove();resolve(true);};
   });
 }
+var _savingPartRequest=false;
 async function savePartRequest(addAnother){
+  // Guards against a fast double-click on "Save & Add Another"/"Done" firing
+  // two overlapping saves — they'd both try to use the SAME
+  // #modal-wty-charge Warranty/Chargeable popup at once, and the second
+  // click's version silently replaces the first's before its buttons get
+  // wired up, so that part's question effectively never got answered and
+  // defaulted to unbilled. One save at a time, always.
+  if(_savingPartRequest)return;
+  _savingPartRequest=true;
+  try{
+    await _savePartRequestInner(addAnother);
+  }finally{
+    _savingPartRequest=false;
+  }
+}
+async function _savePartRequestInner(addAnother){
   const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const code=document.getElementById('req-part-code').value;
   const name=document.getElementById('req-part-name').value;
