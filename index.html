@@ -677,6 +677,9 @@ tr:hover td{background:#f8fafc;}
         </div>
         <div class="form-group"><label style="color:#6b7280;font-size:12px;">DTP + GST = Stock Cost</label><div id="inv-dtp-preview" style="padding:8px;background:#f0fdf4;border-radius:8px;font-size:13px;font-weight:600;color:#065f46;">—</div></div>
       </div>
+      <div class="form-group" style="margin-bottom:10px;background:#fef3c7;border-radius:8px;padding:8px 10px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#92400e;"><input type="checkbox" id="inv-consumable" style="width:16px;height:16px;"> Consumable (ink/cartridge/toner/print head — billed to customer even on Warranty calls)</label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-inventory')">Cancel</button>
@@ -6102,6 +6105,17 @@ async function saveTATDate(ticketId){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// Consumable parts (ink bottles, cartridges, toner, print heads, etc.) are
+// billed to the customer EVERY time, even on a Warranty/AMC call — Canon
+// never covers these under warranty and never takes them back, so the
+// normal "Warranty = ₹0 to customer" rule must not apply to them. Every
+// place that zeroes out a spare's price for a warranty call must check
+// this per-spare first.
+function isConsumableCode(code){
+  if(!code)return false;
+  const it=(allInventory||[]).find(function(x){return (x.part_code||'').toUpperCase()===String(code).toUpperCase();});
+  return !!(it&&it.is_consumable);
+}
 // VIEW TICKET
 async function viewTicket(id,autoPrint=false){
   // Refresh engineers if not loaded
@@ -6138,7 +6152,10 @@ async function viewTicket(id,autoPrint=false){
   // Manager/Engineer need to see the real Labour + Parts total right now,
   // not a ₹0 total just because nothing's been approved yet.
   const isPendingApprovalView=t.status==='Pending Customer Approval';
-  const total=isCustReject?0:spares.filter(s=>!s.requested||isPendingApprovalView).reduce((a,s)=>a+s.qty*(s.price||0),0);
+  // "Billable" parts total: normally excludes ALL parts on a Warranty call
+  // (Canon covers them, ₹0 to customer) — EXCEPT a Consumable part, which is
+  // charged even under warranty (Canon never covers/replaces consumables).
+  const total=isCustReject?0:spares.filter(s=>(!s.requested||isPendingApprovalView)&&(!isWarranty||isConsumableCode(s.code))).reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const svcCharge=labCharge;
@@ -6270,10 +6287,10 @@ async function viewTicket(id,autoPrint=false){
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>{const sp=(isWarranty||isCustReject)?0:(s.price||0);const sa=(isWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${isWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      <tbody>${spares.map(s=>{const isCons=isConsumableCode(s.code);const freeOnWarranty=isWarranty&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
     </table>
     <div style="font-size:13px;background:${isCustReject?'#fef2f2':'#f0fdf4'};padding:10px;border-radius:8px;">
-    ${isWarranty?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`:isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
+    ${isWarranty?(total>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Service: ₹0</span> <span>+ Consumable Parts: <b>₹${total.toFixed(0)}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Consumables are not covered under warranty — customer pays for these.</span>`:`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`):isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
     </div>`:''}
     ${svcCharge>0&&!spares.length&&!isWarranty?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
@@ -6633,7 +6650,11 @@ async function quickStatusChange(id,status){
   // pick it up automatically since it's saved the same way as any other
   // payment confirmation.
   const isRejectDelivery=t.status==='Customer Reject';
-  const needsDeliveryPayment=status==='Delivered'&&t.service_type==='Carry In'&&t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other')&&!t.payment_mode;
+  // Carry-In Warranty call: still needs the payment popup if it used a
+  // Consumable part — same "never covered under warranty" rule as On-Site.
+  const isWarrantyCallTypeDelivery=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  const warrantyConsumableCostDelivery=(!isRejectDelivery&&isWarrantyCallTypeDelivery)?(t.spares||[]).filter(function(s){return isConsumableCode(s.code);}).reduce(function(a,s){return a+(parseFloat(s.price||0)*parseInt(s.qty||1));},0):0;
+  const needsDeliveryPayment=status==='Delivered'&&t.service_type==='Carry In'&&t.call_type&&((t.call_type.includes('Non-Warranty')||t.call_type==='Other')||warrantyConsumableCostDelivery>0)&&!t.payment_mode;
   if(needsDeliveryPayment){
     // Rejected estimate: parts were never fitted/billed — only the
     // inspection/visit charge (final_charges/labor, set at reject time)
@@ -7455,7 +7476,18 @@ async function savePartRequest(addAnother){
     const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`);
     if(inv.length){partPrice=parseFloat(inv[0].unit_price)||0;partGst=inv[0].gst_pct!=null?parseFloat(inv[0].gst_pct):18;}
   }catch(e){}
-  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,gst_pct:partGst,requested:true,stock_deducted:false}];
+  // A Warranty call skips the customer-approval step entirely (see newStatus
+  // above), so nothing ever flips "requested" to false the way approval does
+  // for Non-Warranty parts — a Consumable part added here would otherwise
+  // stay requested:true forever and get silently excluded from every
+  // Reports/Invoice revenue calc that filters on !s.requested, even though
+  // it's genuinely billed. Mark it requested:false immediately for
+  // Consumables on a Warranty call since there's no approval gate for it to
+  // wait on; leave it true for a normal warranty-covered part (₹0, no
+  // approval needed either, but also nothing to bill/count as revenue).
+  const skipsApprovalHere=isW&&!isOOC;
+  const isConsumableHere=isConsumableCode(code);
+  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,gst_pct:partGst,requested:!(skipsApprovalHere&&isConsumableHere),stock_deducted:false}];
   const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered | ${note}`:`Part: ${code} ${name} × ${qty} | ${note}`;
   const tl=[...(t.timeline||[]),{action:'Part Indented — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:tlNote}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
@@ -7484,17 +7516,20 @@ async function savePartRequest(addAnother){
 // Warranty (and not Out of Coverage) calls never bill the customer for
 // parts — price must show ₹0 there, same rule the ticket-view/invoice
 // pages already use, checked against the ticket currently open in the
-// Update modal (window._currentUpdateTicket).
-function _spareHidesPrice(){
+// Update modal (window._currentUpdateTicket). EXCEPT a Consumable part
+// (ink/cartridge/toner/print head etc, flagged in Inventory) — those are
+// billed even under warranty, since Canon never covers consumables.
+function _spareHidesPrice(s){
   var t=window._currentUpdateTicket;if(!t)return false;
+  if(s&&isConsumableCode(s.code))return false;
   var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   var isOOC=t.warranty_coverage==='Out of Coverage';
   return isW&&!isOOC;
 }
-function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice();const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
+function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice(s);const isCons=isConsumableCode(s.code);const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
 function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');refreshEstimateTotal();}
 function refreshEstimateTotal(){
-  var parts=_spareHidesPrice()?0:currentSpares.reduce(function(a,s){return a+(s.qty||1)*(s.price||0);},0);
+  var parts=currentSpares.reduce(function(a,s){return a+(_spareHidesPrice(s)?0:(s.qty||1)*(s.price||0));},0);
   var svc=parseFloat(document.getElementById('upd-labor')?.value)||0;
   var other=parseFloat(document.getElementById('upd-other')?.value)||0;
   var total=parts+svc+other;
@@ -7649,6 +7684,21 @@ async function saveEngUpdate(){
       // Append to tl (not t.timeline) so the 'Updated — Closed' / 'Updated — Resolved By Phone'
       // entry survives — daily reports count closed calls from that entry.
       data.timeline=[...tl,{action:'Charges Set'+(isRepeatFOC?' (Re-Repair FOC)':''),by:currentUser.name,at:new Date().toISOString(),note:data.charges_note}];
+    }else{
+      // Warranty/AMC call — normally ₹0, but a Consumable part (ink/cartridge/
+      // toner/print head etc.) is ALWAYS billed even under warranty, Canon
+      // doesn't cover or replace those. Service stays ₹0; only the
+      // consumable part(s)' cost gets charged.
+      const isWarrantyCallForCharge=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC')&&!isOutCoverage;
+      if(isWarrantyCallForCharge){
+        const consumableCost=(currentSpares||[]).filter(function(s){return isConsumableCode(s.code);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+        if(consumableCost>0){
+          data.service_charges=0;
+          data.final_charges=consumableCost;
+          data.charges_note='Warranty call — Consumable part(s) charged: ₹'+consumableCost.toFixed(0)+' (not covered under warranty)';
+          data.timeline=[...tl,{action:'Charges Set (Consumable under Warranty)',by:currentUser.name,at:new Date().toISOString(),note:data.charges_note}];
+        }
+      }
     }
   }
 
@@ -7704,8 +7754,13 @@ async function saveEngUpdate(){
   if(_condPhotosOut.length)data.condition_photos=_condPhotosOut;
   window._condPhotos=[null,null,null];
 
-  // Payment Confirmation Popup — Non-Warranty Onsite calls only
-  const needsPaymentConfirm=(status==='Closed'||status==='Resolved By Phone')&&(t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other'))&&t.service_type==='On Site';
+  // Payment Confirmation Popup — Non-Warranty On-Site calls, OR a Warranty
+  // On-Site call that ended up with a nonzero final_charges (a Consumable
+  // part was used — see AUTO-CALCULATE above, which already ran and set
+  // data.final_charges by this point).
+  const isWarrantyCallType=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  const warrantyHasConsumableCharge=isWarrantyCallType&&(parseFloat(data.final_charges)||0)>0;
+  const needsPaymentConfirm=(status==='Closed'||status==='Resolved By Phone')&&((t.call_type&&(t.call_type.includes('Non-Warranty')||t.call_type==='Other'))||warrantyHasConsumableCharge)&&t.service_type==='On Site';
   if(needsPaymentConfirm){
     return new Promise(async function(resolve){
       // data.service_charges was just auto-calculated above (line ~7193) from
@@ -7974,12 +8029,13 @@ async function renderInventory(tab){
         <div class="kpi-card" style="padding:12px;border-color:#7c3aed;"><div class="kpi-label">Total Sales</div><div class="kpi-value" style="font-size:16px;color:#7c3aed;">₹${totalSaleVal.toFixed(0)}</div></div>
         <div class="kpi-card" style="padding:12px;border-color:var(--warning);"><div class="kpi-label">Low / Out</div><div class="kpi-value" style="font-size:20px;color:var(--warning);">${low} / ${out}</div></div>
       </div>
-      <div class="tabs">${tabHtml('stock','📦 Stock')}${tabHtml('purchase','🛒 Purchase')}${tabHtml('sales','💰 Sales')}</div>
+      <div class="tabs">${tabHtml('stock','📦 Stock')}${tabHtml('purchase','🛒 Purchase')}${tabHtml('sales','💰 Sales')}${(currentUser.role==='admin'||window._isAcct)?tabHtml('tally','🧮 Stock Tally'):''}</div>
       <div id="inv-tab-content"></div>`;
 
     if(tab==='stock') renderInvStockTab();
     else if(tab==='purchase') renderInvPurchaseTab(purchases);
     else if(tab==='sales') renderInvSalesTab(salesLogs);
+    else if(tab==='tally') renderInvTallyTab();
 
     checkPendingPartsAuto();
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
@@ -8166,6 +8222,123 @@ function invSalesRender(){
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
+}
+
+// ── Weekly Stock Tally — physical count vs system count, Office + per-Engineer,
+// with a final variance report. Admin/Accountant only (gated at the tab level).
+async function renderInvTallyTab(){
+  const c=document.getElementById('inv-tab-content');
+  if(!c)return;
+  c.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var engStock=await sb('eng_stock','GET',null,'?order=owner');
+    window._tallyEngStock=engStock||[];
+  }catch(e){window._tallyEngStock=[];}
+  window._tallyPhysical=window._tallyPhysical||{};
+  invTallyRender();
+}
+function invTallyRender(){
+  const c=document.getElementById('inv-tab-content');
+  if(!c)return;
+  const engStock=window._tallyEngStock||[];
+  const q=(document.getElementById('inv-tally-search')?.value||'').toLowerCase();
+  const items=allInventory.filter(function(i){
+    if(!q)return true;
+    return (i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q);
+  }).sort(function(a,b){return (a.part_code||'').localeCompare(b.part_code||'');});
+  const savedQ=document.getElementById('inv-tally-search')?.value||'';
+  const rows=items.map(function(i){
+    const withEng=engStock.filter(function(s){return s.part_id===i.id;}).reduce(function(a,s){return a+(s.qty||0);},0);
+    const officeQty=i.qty_in_stock||0;
+    const phys=window._tallyPhysical[i.id];
+    const hasPhys=phys!==undefined&&phys!=='';
+    const variance=hasPhys?(parseInt(phys)||0)-officeQty:null;
+    const varHtml=variance===null?'<span style="color:#94a3b8;">—</span>':
+      (variance===0?'<span style="color:#059669;font-weight:700;">0 ✓</span>':
+      '<span style="color:'+(variance>0?'#0891b2':'#dc2626')+';font-weight:700;">'+(variance>0?'+':'')+variance+'</span>');
+    return '<tr id="tally-row-'+i.id+'">'
+      +'<td style="padding:8px;font-weight:700;color:var(--primary);">'+(i.part_code||'—')+'</td>'
+      +'<td style="padding:8px;">'+i.item_name+'</td>'
+      +'<td style="padding:8px;text-align:center;">'+officeQty+'</td>'
+      +'<td style="padding:8px;text-align:center;color:#0891b2;font-weight:600;">'+withEng+'</td>'
+      +'<td style="padding:8px;text-align:center;"><input type="number" min="0" value="'+(hasPhys?phys:'')+'" placeholder="Count" style="width:80px;text-align:center;border:1.5px solid #e2e8f0;border-radius:6px;padding:5px;font-size:13px;" oninput="tallySetPhysical(\''+i.id+'\',this.value)"></td>'
+      +'<td style="padding:8px;text-align:center;" id="tally-var-'+i.id+'">'+varHtml+'</td>'
+      +'</tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No items found</td></tr>';
+  const enteredCount=Object.keys(window._tallyPhysical).filter(function(k){return window._tallyPhysical[k]!==''&&window._tallyPhysical[k]!==undefined;}).length;
+  c.innerHTML='<div class="card">'
+    +'<div class="section-header" style="flex-wrap:wrap;gap:8px;"><h2>🧮 Weekly Stock Tally</h2>'
+    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="window._tallyPhysical={};invTallyRender();">↺ Clear Counts</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="saveStockTally()">💾 Save Tally & Generate Report</button></div></div>'
+    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">'
+    +'📋 <b>How to use:</b> Physically count each part in the office and type the counted qty in the "Physical Count" column. "With Engineers" is shown for reference only (that stock is out with engineers, not counted here). When done, click <b>Save Tally &amp; Generate Report</b> — any part where Physical ≠ System gets corrected (logged in Movement Log as a Weekly Tally adjustment) and a report downloads automatically.'
+    +'</div>'
+    +'<input id="inv-tally-search" type="text" placeholder="🔍 Search part code or name..." value="'+escHtml(savedQ)+'" oninput="invTallyRender()" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;margin-bottom:10px;">'
+    +'<div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px;">'+enteredCount+' of '+allInventory.length+' parts counted so far</div>'
+    +'<div class="table-wrap"><table><thead><tr style="background:#f8fafc;">'
+    +'<th style="padding:8px;text-align:left;">Part Code</th><th style="padding:8px;text-align:left;">Item Name</th>'
+    +'<th style="padding:8px;">🏢 System (Office)</th><th style="padding:8px;">👷 With Engineers</th>'
+    +'<th style="padding:8px;">✏️ Physical Count</th><th style="padding:8px;">Variance</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'</div>';
+}
+function tallySetPhysical(partId,val){
+  window._tallyPhysical[partId]=val;
+  const item=allInventory.find(function(i){return i.id===partId;});
+  const officeQty=item?(item.qty_in_stock||0):0;
+  const el=document.getElementById('tally-var-'+partId);
+  if(!el)return;
+  if(val===''){el.innerHTML='<span style="color:#94a3b8;">—</span>';return;}
+  const variance=(parseInt(val)||0)-officeQty;
+  el.innerHTML=variance===0?'<span style="color:#059669;font-weight:700;">0 ✓</span>':
+    '<span style="color:'+(variance>0?'#0891b2':'#dc2626')+';font-weight:700;">'+(variance>0?'+':'')+variance+'</span>';
+}
+async function saveStockTally(){
+  const entries=Object.keys(window._tallyPhysical||{}).filter(function(k){return window._tallyPhysical[k]!==''&&window._tallyPhysical[k]!==undefined;});
+  if(!entries.length){alert('⚠️ Enter at least one physical count before saving.');return;}
+  const today=new Date().toLocaleDateString('en-CA');
+  const nowIso=new Date().toISOString();
+  const reportRows=[];
+  let mismatches=0;
+  try{
+    for(const partId of entries){
+      const item=allInventory.find(function(i){return i.id===partId;});
+      if(!item)continue;
+      const systemQty=item.qty_in_stock||0;
+      const physicalQty=parseInt(window._tallyPhysical[partId])||0;
+      const variance=physicalQty-systemQty;
+      reportRows.push({
+        'Part Code':item.part_code||'',
+        'Item Name':item.item_name||'',
+        'System Qty':systemQty,
+        'Physical Qty':physicalQty,
+        'Variance':variance,
+        'Value Impact ₹':(variance*(item.purchase_price||item.unit_price||0)).toFixed(0)
+      });
+      if(variance!==0){
+        mismatches++;
+        await sb('inventory','PATCH',{qty_in_stock:physicalQty,updated_at:nowIso},'?id=eq.'+partId).catch(()=>{});
+        item.qty_in_stock=physicalQty;
+        await sb('inventory_log','POST',{inventory_id:partId,type:variance>0?'in':'out',qty:Math.abs(variance),note:'Weekly Stock Tally correction ('+today+'): System '+systemQty+' → Physical '+physicalQty,done_by:currentUser.name}).catch(()=>{});
+        await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(variance),from_owner:variance>0?'TALLY':'MAIN',to_owner:variance>0?'MAIN':'TALLY',notes:'Weekly Stock Tally ('+today+'): '+systemQty+' → '+physicalQty,created_by:currentUser?.name||'Admin'}).catch(()=>{});
+      }
+    }
+    // Optional history table — degrades silently if not set up yet.
+    try{
+      await sb('stock_tallies','POST',{tally_date:today,rows:reportRows,mismatches,done_by:currentUser.name,created_at:nowIso});
+    }catch(e){}
+    alert('✅ Tally saved! '+entries.length+' part(s) counted, '+mismatches+' corrected. Report downloading...');
+    downloadTallyReportExcel(reportRows,today);
+    window._tallyPhysical={};
+    renderInventory('tally');
+  }catch(e){alert('Error saving tally: '+e.message);}
+}
+function downloadTallyReportExcel(rows,date){
+  if(!rows||!rows.length)return;
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Stock Tally');
+  XLSX.writeFile(wb,'Stock_Tally_'+date+'.xlsx');
 }
 
 async function openPurchaseEntry(){
@@ -8501,13 +8674,20 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
-function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';const wQty=i.warranty_qty||0;const purQty=Math.max(0,(i.qty_in_stock||0)-wQty);const stockCell=wQty>0?`<span style="${st}">${i.qty_in_stock}</span><br><span style="font-size:10px;color:#64748b;">🛒 ${purQty} + 🏭 ${wQty}</span>`:`<span style="${st}">${i.qty_in_stock}</span>`;const dtp=i.purchase_price||0;const mrp=i.unit_price||0;const stockVal=(i.qty_in_stock||0)*dtp*(1+((i.gst_pct||0)/100));const cat=i.category||'';const catShort=cat.length>28?cat.slice(0,26)+'…':cat;const catCell=cat.length>28?`<span style="cursor:pointer;color:#6b7280;font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(cat)}" onclick="this.style.whiteSpace=this.style.whiteSpace==='normal'?'nowrap':'normal';this.textContent=this.style.whiteSpace==='normal'?'${escHtml(cat).replace(/'/g,"\\'")}':'${escHtml(catShort).replace(/'/g,"\\'")}'">${catShort}</span>`:`<span style="color:#6b7280;font-size:12px;">${cat||'-'}</span>`;return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="${escHtml(i.item_name)}">${i.item_name}</span></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${bn}</td><td style="overflow:hidden;">${catCell}</td><td>${stockCell}</td><td>${i.min_stock}</td><td style="color:#0369a1;font-weight:600;">${dtp>0?'₹'+dtp:'-'}</td><td style="color:#065f46;font-weight:600;">₹${mrp}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td style="font-weight:600;">₹${dtp>0?stockVal.toFixed(0):((i.qty_in_stock||0)*mrp).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
+function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';const wQty=i.warranty_qty||0;const purQty=Math.max(0,(i.qty_in_stock||0)-wQty);const stockCell=wQty>0?`<span style="${st}">${i.qty_in_stock}</span><br><span style="font-size:10px;color:#64748b;">🛒 ${purQty} + 🏭 ${wQty}</span>`:`<span style="${st}">${i.qty_in_stock}</span>`;const dtp=i.purchase_price||0;const mrp=i.unit_price||0;const stockVal=(i.qty_in_stock||0)*dtp*(1+((i.gst_pct||0)/100));const cat=i.category||'';const catShort=cat.length>28?cat.slice(0,26)+'…':cat;const catCell=cat.length>28?`<span style="cursor:pointer;color:#6b7280;font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(cat)}" onclick="this.style.whiteSpace=this.style.whiteSpace==='normal'?'nowrap':'normal';this.textContent=this.style.whiteSpace==='normal'?'${escHtml(cat).replace(/'/g,"\\'")}':'${escHtml(catShort).replace(/'/g,"\\'")}'">${catShort}</span>`:`<span style="color:#6b7280;font-size:12px;">${cat||'-'}</span>`;return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="${escHtml(i.item_name)}">${i.item_name}</span>${i.is_consumable?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${bn}</td><td style="overflow:hidden;">${catCell}</td><td>${stockCell}</td><td>${i.min_stock}</td><td style="color:#0369a1;font-weight:600;">${dtp>0?'₹'+dtp:'-'}</td><td style="color:#065f46;font-weight:600;">₹${mrp}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td style="font-weight:600;">₹${dtp>0?stockVal.toFixed(0):((i.qty_in_stock||0)*mrp).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
 function invUpdateDtpPreview(){const dtp=parseFloat(document.getElementById('inv-purchase-price')?.value)||0;const gst=parseFloat(document.getElementById('inv-gst')?.value)||0;const total=dtp*(1+gst/100);const el=document.getElementById('inv-dtp-preview');if(el)el.textContent=dtp>0?'₹'+dtp.toFixed(0)+' + '+gst+'% = ₹'+total.toFixed(0):'—';}
-function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-purchase-price').value='0';document.getElementById('inv-price').value='0';document.getElementById('inv-gst').value='18';document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');invUpdateDtpPreview();openModal('modal-inventory');}
-function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;openAddInv();editingInvId=id;document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-purchase-price').value=inv.purchase_price||0;document.getElementById('inv-price').value=inv.unit_price||0;document.getElementById('inv-gst').value=inv.gst_pct!=null?inv.gst_pct:18;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;invUpdateDtpPreview();}
-async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,purchase_price:parseFloat(document.getElementById('inv-purchase-price').value)||0,unit_price:parseFloat(document.getElementById('inv-price').value)||0,gst_pct:parseFloat(document.getElementById('inv-gst').value)||0,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){alert('Error: '+e.message);}}
+function openAddInv(){editingInvId=null;document.getElementById('inv-modal-title').textContent='Add Part';['inv-code','inv-name','inv-model-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('inv-qty').value='0';document.getElementById('inv-min').value='2';document.getElementById('inv-purchase-price').value='0';document.getElementById('inv-price').value='0';document.getElementById('inv-gst').value='18';var consEl=document.getElementById('inv-consumable');if(consEl)consEl.checked=false;document.getElementById('inv-brand').innerHTML='<option value="">All Brands</option>'+allBrands.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');invUpdateDtpPreview();openModal('modal-inventory');}
+function editInv(id){const inv=allInventory.find(i=>i.id===id);if(!inv)return;openAddInv();editingInvId=id;document.getElementById('inv-modal-title').textContent='Edit Part';document.getElementById('inv-code').value=inv.part_code||'';document.getElementById('inv-name').value=inv.item_name||'';document.getElementById('inv-model-no').value=inv.category||'';document.getElementById('inv-qty').value=inv.qty_in_stock||0;document.getElementById('inv-min').value=inv.min_stock||2;document.getElementById('inv-purchase-price').value=inv.purchase_price||0;document.getElementById('inv-price').value=inv.unit_price||0;document.getElementById('inv-gst').value=inv.gst_pct!=null?inv.gst_pct:18;var consEl2=document.getElementById('inv-consumable');if(consEl2)consEl2.checked=!!inv.is_consumable;if(inv.brand_id)document.getElementById('inv-brand').value=inv.brand_id;invUpdateDtpPreview();}
+async function saveInventory(){const data={part_code:document.getElementById('inv-code').value.trim()||null,item_name:document.getElementById('inv-name').value.trim(),brand_id:document.getElementById('inv-brand').value||null,category:document.getElementById('inv-model-no').value.trim(),qty_in_stock:parseInt(document.getElementById('inv-qty').value)||0,min_stock:parseInt(document.getElementById('inv-min').value)||2,purchase_price:parseFloat(document.getElementById('inv-purchase-price').value)||0,unit_price:parseFloat(document.getElementById('inv-price').value)||0,gst_pct:parseFloat(document.getElementById('inv-gst').value)||0,is_consumable:document.getElementById('inv-consumable')?.checked||false,updated_at:new Date().toISOString()};if(!data.item_name){alert('Enter part name');return;}try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();}catch(e){
+  // is_consumable column not added yet — save the rest, don't brick the form.
+  if(String(e.message||'').indexOf('is_consumable')!==-1){
+    delete data.is_consumable;
+    try{if(editingInvId)await sb('inventory','PATCH',data,`?id=eq.${editingInvId}`);else await sb('inventory','POST',data);closeModal('modal-inventory');renderInventory();return;}catch(e2){alert('Error: '+e2.message);return;}
+  }
+  alert('Error: '+e.message);
+}}
 function switchInvStockType(t){
   window._invStockType=t;
   ['in','out','sell'].forEach(function(x){
@@ -10588,10 +10768,26 @@ async function _deductTicketParts(id){
   if(!sparesToDeduct.length)return freshT;
   const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
   const bagOwner=freshT?.service_type==='On Site'?(freshT?.assigned_name||''):'';
+  // Track exactly which spares actually got deducted — a part_code that
+  // doesn't match any inventory row (case/space difference, typo, or the
+  // part was deleted from Inventory since) must NOT be silently marked as
+  // deducted anyway, which is what used to happen: the whole spares array
+  // got blanket-marked stock_deducted:true after the loop regardless of
+  // whether each individual lookup actually found the part. That silently
+  // and PERMANENTLY hid the failure — nothing ever retried it, and nobody
+  // was ever told a part didn't deduct. Only codes that genuinely matched
+  // get marked here; anything else stays stock_deducted:false so it's
+  // still visible/fixable (e.g. via Stock Correction) instead of vanishing.
+  const actuallyDeducted=new Set();
+  const notFound=[];
   for(const s of sparesToDeduct){
     try{
-      const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}`);
-      if(!inv.length)continue;
+      // Case/whitespace-insensitive match — ticket spare codes and the
+      // Inventory master's part_code should be identical, but a stray
+      // space or different casing from manual entry elsewhere must not
+      // cause a silent skip.
+      const inv=await sb('inventory','GET',null,`?part_code=ilike.${encodeURIComponent(s.code.trim())}`);
+      if(!inv.length){notFound.push(s.code);continue;}
       if(bagOwner){
         // On Site: deduct from the assigned engineer's bag (eng_stock), NOT
         // office inventory — office stock was already reduced when the part
@@ -10635,11 +10831,19 @@ async function _deductTicketParts(id){
         added_by:currentUser.name,
         created_at:new Date().toISOString()
       }).catch(()=>{});
+      actuallyDeducted.add(s);
     }catch(e){console.log('Inv deduct error:',e);}
   }
-  const updatedSpares=(freshT?.spares||[]).map(s=>({...s,stock_deducted:true}));
+  const updatedSpares=(freshT?.spares||[]).map(s=>actuallyDeducted.has(s)?{...s,stock_deducted:true}:s);
   await sb('tickets','PATCH',{spares:updatedSpares},`?id=eq.${id}`).catch(()=>{});
   freshT.spares=updatedSpares;
+  if(notFound.length){
+    // Surface this loudly instead of letting it vanish — a part_code on the
+    // ticket that doesn't exist in Inventory needs a human to fix either
+    // the ticket's part code or the Inventory master record.
+    console.warn('Part code(s) not found in Inventory — stock NOT deducted for ticket '+id+': '+notFound.join(', '));
+    alert('⚠️ Stock warning — '+notFound.length+' part(s) on this ticket ('+notFound.join(', ')+") don't match any Inventory part code, so stock could NOT be auto-deducted for them. Please check Inventory / fix the part code, then correct the stock manually if needed.");
+  }
   return freshT;
 }
 async function engStockAdjust(owner,partId,delta){
@@ -15751,7 +15955,12 @@ document.addEventListener('mouseup',function(e){
 // Payment Confirmation Popup (Non-Warranty Onsite calls only)
 async function showPaymentConfirmation(ticketData,onConfirm){
   var ex=document.getElementById('modal-payment-confirm');if(ex)ex.remove();
-  var partsCost=(currentSpares||[]).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+  // On a Warranty/AMC call, only a Consumable part is billable — a normal
+  // warranty-covered spare must NOT be counted here even though its
+  // inventory price is nonzero (that price is real, it's just not charged
+  // to the customer). Non-warranty calls bill every spare as before.
+  var _pcIsWarranty=ticketData.call_type&&(ticketData.call_type==='Warranty'||ticketData.call_type==='Warranty Repeat'||ticketData.call_type==='AMC');
+  var partsCost=(currentSpares||[]).filter(function(s){return !_pcIsWarranty||isConsumableCode(s.code);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
   var serviceCost=parseFloat(ticketData.service_charges)||0;
   var totalCost=partsCost+serviceCost;
   var ov=document.createElement('div');ov.id='modal-payment-confirm';ov.className='modal-overlay';
