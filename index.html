@@ -7496,7 +7496,40 @@ async function _savePartRequestInner(addAnother){
   }
   const isOOC=t.warranty_coverage==='Out of Coverage';
 
-  // Status based on call type + stock + bag availability
+  // Fetch price + the Consumable flag from Inventory FRESH, right now — never
+  // trust the in-memory allInventory cache for this decision. allInventory
+  // can be stale (loaded before is_consumable was set on this part, or just
+  // not reloaded since this session started), which is exactly what caused
+  // the Warranty/Chargeable popup to silently not appear the first time a
+  // newly-flagged Consumable part was added, then work the second time only
+  // because visiting the Inventory page happened to refresh the cache.
+  let partPrice=0,partGst=18,isConsumableHere=false;
+  try{
+    const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`);
+    if(inv.length){
+      partPrice=parseFloat(inv[0].unit_price)||0;
+      partGst=inv[0].gst_pct!=null?parseFloat(inv[0].gst_pct):18;
+      isConsumableHere=!!inv[0].is_consumable;
+    }
+  }catch(e){}
+
+  // Consumable parts that can go either way (e.g. Print Head) get asked
+  // per-use on a Warranty call — see askWarrantyOrChargeable above. Asked
+  // BEFORE the status decision below, because the answer changes which
+  // status this goes to (see next block).
+  const skipsApprovalHere=isW&&!isOOC;
+  let isChargeableHere=isConsumableHere;
+  if(skipsApprovalHere&&isConsumableHere){
+    isChargeableHere=await askWarrantyOrChargeable(name||code);
+  }
+
+  // Status based on call type + stock + bag availability. A Warranty call
+  // that just got a CHARGEABLE consumable added must go through customer
+  // approval exactly like Non-Warranty does — real money is now involved,
+  // the customer has to see and approve it, it cannot silently skip
+  // straight to "Pending Engineer Stock"/"Pending Repair" the way a free
+  // warranty part correctly does.
+  const needsApprovalHere=!skipsApprovalHere||isChargeableHere;
   let newStatus;
   if(_pendingEngStock){
     // Company has it but not in engineer bag — wait for admin to issue
@@ -7504,16 +7537,16 @@ async function _savePartRequestInner(addAnother){
   }else if(_pendingNoParts){
     // Nobody has it — need to order
     newStatus='Pending Parts';
-  }else if(isW&&!isOOC){
-    // WARRANTY: No charges - check stock
+  }else if(!needsApprovalHere){
+    // WARRANTY, free part: No charges - check stock
     if(hasStock){
       newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
     }else{
       newStatus='Pending Parts';
     }
   }else{
-    // NON-WARRANTY or OUT-OF-COVERAGE: Need customer approval for parts
-    // Re-Repair FOC — service = 0 but parts estimate still required
+    // NON-WARRANTY / OUT-OF-COVERAGE / Warranty-call-with-a-chargeable-part:
+    // Need customer approval before proceeding.
     newStatus='Pending Customer Approval';
     if(t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'))){
       // Mark as FOC in timeline note
@@ -7522,34 +7555,11 @@ async function _savePartRequestInner(addAnother){
     }
   }
 
-  // Fetch price from inventory
-  let partPrice=0,partGst=18;
-  try{
-    const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`);
-    if(inv.length){partPrice=parseFloat(inv[0].unit_price)||0;partGst=inv[0].gst_pct!=null?parseFloat(inv[0].gst_pct):18;}
-  }catch(e){}
-  // A Warranty call skips the customer-approval step entirely (see newStatus
-  // above), so nothing ever flips "requested" to false the way approval does
-  // for Non-Warranty parts — a chargeable part added here would otherwise
-  // stay requested:true forever and get silently excluded from every
-  // Reports/Invoice revenue calc that filters on !s.requested, even though
-  // it's genuinely billed. Mark it requested:false immediately when it's
-  // chargeable since there's no approval gate for it to wait on; leave it
-  // true for a normal free warranty part (₹0, no approval needed either,
-  // but also nothing to bill/count as revenue).
-  const skipsApprovalHere=isW&&!isOOC;
-  const isConsumableHere=isConsumableCode(code);
-  // Consumable parts that can go either way (e.g. Print Head) get asked
-  // per-use on a Warranty call — see askWarrantyOrChargeable above. A
-  // consumable that's unambiguously always chargeable stays chargeable
-  // without asking (nothing currently in Inventory needs that distinction,
-  // but the hook is here: only prompt when skipsApprovalHere, i.e. on an
-  // actual Warranty call — Non-Warranty already bills everything anyway).
-  let isChargeableHere=isConsumableHere;
-  if(skipsApprovalHere&&isConsumableHere){
-    isChargeableHere=await askWarrantyOrChargeable(name||code);
-  }
-  const newSpare={code,name,qty,price:partPrice,gst_pct:partGst,requested:!(skipsApprovalHere&&isChargeableHere),stock_deducted:false,warranty_chargeable:isChargeableHere};
+  // A part waiting on customer approval must stay requested:true (it's still
+  // just an estimate) until Approve/Reject clears it — same convention used
+  // everywhere else. Only a free-and-already-decided warranty part (never
+  // needed approval to begin with) gets requested:false immediately.
+  const newSpare={code,name,qty,price:partPrice,gst_pct:partGst,requested:needsApprovalHere,stock_deducted:false,warranty_chargeable:isChargeableHere};
   // Build off the LOCAL currentSpares (which already reflects any spare the
   // user just removed with the ✕ button in the Update Call form), NOT a
   // fresh DB fetch of t.spares — that fetch reflects the ticket as it was
