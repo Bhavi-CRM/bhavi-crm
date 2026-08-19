@@ -8291,6 +8291,12 @@ function invSalesRender(){
 
 // ── Weekly Stock Tally — physical count vs system count, Office + per-Engineer,
 // with a final variance report. Admin/Accountant only (gated at the tab level).
+// Counts are DRAFT-SAVED to the stock_tally_draft table as you type (debounced)
+// so 1800+ parts can be tallied across multiple sessions/days/devices without
+// losing progress — reopening the tab (even on a different browser) reloads
+// whatever was already counted. "Save Tally & Generate Report" is the only
+// action that actually applies corrections and clears the draft.
+window._tallyConsumableOnly=window._tallyConsumableOnly||false;
 async function renderInvTallyTab(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
@@ -8299,19 +8305,49 @@ async function renderInvTallyTab(){
     var engStock=await sb('eng_stock','GET',null,'?order=owner');
     window._tallyEngStock=engStock||[];
   }catch(e){window._tallyEngStock=[];}
-  window._tallyPhysical=window._tallyPhysical||{};
-  invTallyRender();
+  window._tallyPhysical={};
+  try{
+    var draft=await sbAll('stock_tally_draft','?select=part_id,physical_qty');
+    (draft||[]).forEach(function(d){window._tallyPhysical[d.part_id]=String(d.physical_qty);});
+  }catch(e){/* table not set up yet — tally still works, just without cross-session persistence */}
+  invTallyRenderShell();
 }
-function invTallyRender(){
+// Renders the SEARCH BOX / FILTER / BUTTONS ONCE — never re-rendered on every
+// keystroke. Re-rendering the search input itself on each oninput was exactly
+// what caused it to lose focus after one character (a brand new <input> DOM
+// node replaces the old one mid-typing). Only invTallyRenderRows() below
+// (the table body) gets rebuilt as you type or filter.
+function invTallyRenderShell(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
+  const savedQ=document.getElementById('inv-tally-search')?.value||'';
+  c.innerHTML='<div class="card">'
+    +'<div class="section-header" style="flex-wrap:wrap;gap:8px;"><h2>🧮 Stock Tally</h2>'
+    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="tallyClearAll()">↺ Clear Counts</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="saveStockTally()">💾 Save Tally & Generate Report</button></div></div>'
+    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">'
+    +'📋 <b>How to use:</b> Physically count each part in the office and type the counted qty in the "Physical Count" column. Your counts auto-save as you type — close this and come back anytime (even a different device) and they\'ll still be here. "With Engineers" is shown for reference only (that stock is out with engineers, not counted here). When fully done, click <b>Save Tally &amp; Generate Report</b> — any part where Physical ≠ System gets corrected (logged in Movement Log) and a report downloads.'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+    +'<input id="inv-tally-search" type="text" placeholder="🔍 Search part code or name..." value="'+escHtml(savedQ)+'" oninput="invTallyRenderRows()" style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#92400e;background:#fef3c7;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;"><input type="checkbox" id="inv-tally-cons-only" '+(window._tallyConsumableOnly?'checked':'')+' onchange="window._tallyConsumableOnly=this.checked;invTallyRenderRows();"> 🧴 Consumables only (for weekly tally)</label>'
+    +'</div>'
+    +'<div id="tally-count-summary" style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px;"></div>'
+    +'<div id="tally-rows-wrap"></div>'
+    +'</div>';
+  invTallyRenderRows();
+}
+function invTallyRenderRows(){
+  const wrap=document.getElementById('tally-rows-wrap');
+  if(!wrap)return;
   const engStock=window._tallyEngStock||[];
   const q=(document.getElementById('inv-tally-search')?.value||'').toLowerCase();
+  const consOnly=!!window._tallyConsumableOnly;
   const items=allInventory.filter(function(i){
+    if(consOnly&&!i.is_consumable)return false;
     if(!q)return true;
     return (i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q);
   }).sort(function(a,b){return (a.part_code||'').localeCompare(b.part_code||'');});
-  const savedQ=document.getElementById('inv-tally-search')?.value||'';
   const rows=items.map(function(i){
     const withEng=engStock.filter(function(s){return s.part_id===i.id;}).reduce(function(a,s){return a+(s.qty||0);},0);
     const officeQty=i.qty_in_stock||0;
@@ -8322,7 +8358,7 @@ function invTallyRender(){
       (variance===0?'<span style="color:#059669;font-weight:700;">0 ✓</span>':
       '<span style="color:'+(variance>0?'#0891b2':'#dc2626')+';font-weight:700;">'+(variance>0?'+':'')+variance+'</span>');
     return '<tr id="tally-row-'+i.id+'">'
-      +'<td style="padding:8px;font-weight:700;color:var(--primary);">'+(i.part_code||'—')+'</td>'
+      +'<td style="padding:8px;font-weight:700;color:var(--primary);">'+(i.part_code||'—')+(i.is_consumable?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONS</span>':'')+'</td>'
       +'<td style="padding:8px;">'+i.item_name+'</td>'
       +'<td style="padding:8px;text-align:center;">'+officeQty+'</td>'
       +'<td style="padding:8px;text-align:center;color:#0891b2;font-weight:600;">'+withEng+'</td>'
@@ -8331,32 +8367,60 @@ function invTallyRender(){
       +'</tr>';
   }).join('')||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No items found</td></tr>';
   const enteredCount=Object.keys(window._tallyPhysical).filter(function(k){return window._tallyPhysical[k]!==''&&window._tallyPhysical[k]!==undefined;}).length;
-  c.innerHTML='<div class="card">'
-    +'<div class="section-header" style="flex-wrap:wrap;gap:8px;"><h2>🧮 Weekly Stock Tally</h2>'
-    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="window._tallyPhysical={};invTallyRender();">↺ Clear Counts</button>'
-    +'<button class="btn btn-primary btn-sm" onclick="saveStockTally()">💾 Save Tally & Generate Report</button></div></div>'
-    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">'
-    +'📋 <b>How to use:</b> Physically count each part in the office and type the counted qty in the "Physical Count" column. "With Engineers" is shown for reference only (that stock is out with engineers, not counted here). When done, click <b>Save Tally &amp; Generate Report</b> — any part where Physical ≠ System gets corrected (logged in Movement Log as a Weekly Tally adjustment) and a report downloads automatically.'
-    +'</div>'
-    +'<input id="inv-tally-search" type="text" placeholder="🔍 Search part code or name..." value="'+escHtml(savedQ)+'" oninput="invTallyRender()" style="width:100%;max-width:400px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;margin-bottom:10px;">'
-    +'<div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px;">'+enteredCount+' of '+allInventory.length+' parts counted so far</div>'
-    +'<div class="table-wrap"><table><thead><tr style="background:#f8fafc;">'
+  const summaryEl=document.getElementById('tally-count-summary');
+  if(summaryEl)summaryEl.textContent=enteredCount+' of '+allInventory.length+' parts counted so far'+(consOnly?' (showing Consumables only — '+items.length+' items)':'');
+  wrap.innerHTML='<div class="table-wrap"><table><thead><tr style="background:#f8fafc;">'
     +'<th style="padding:8px;text-align:left;">Part Code</th><th style="padding:8px;text-align:left;">Item Name</th>'
     +'<th style="padding:8px;">🏢 System (Office)</th><th style="padding:8px;">👷 With Engineers</th>'
     +'<th style="padding:8px;">✏️ Physical Count</th><th style="padding:8px;">Variance</th>'
-    +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-    +'</div>';
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
+var _tallySaveTimers={};
 function tallySetPhysical(partId,val){
   window._tallyPhysical[partId]=val;
   const item=allInventory.find(function(i){return i.id===partId;});
   const officeQty=item?(item.qty_in_stock||0):0;
   const el=document.getElementById('tally-var-'+partId);
-  if(!el)return;
-  if(val===''){el.innerHTML='<span style="color:#94a3b8;">—</span>';return;}
-  const variance=(parseInt(val)||0)-officeQty;
-  el.innerHTML=variance===0?'<span style="color:#059669;font-weight:700;">0 ✓</span>':
-    '<span style="color:'+(variance>0?'#0891b2':'#dc2626')+';font-weight:700;">'+(variance>0?'+':'')+variance+'</span>';
+  if(el){
+    if(val===''){el.innerHTML='<span style="color:#94a3b8;">—</span>';}
+    else{
+      const variance=(parseInt(val)||0)-officeQty;
+      el.innerHTML=variance===0?'<span style="color:#059669;font-weight:700;">0 ✓</span>':
+        '<span style="color:'+(variance>0?'#0891b2':'#dc2626')+';font-weight:700;">'+(variance>0?'+':'')+variance+'</span>';
+    }
+  }
+  var summaryEl=document.getElementById('tally-count-summary');
+  if(summaryEl){
+    var enteredCount=Object.keys(window._tallyPhysical).filter(function(k){return window._tallyPhysical[k]!==''&&window._tallyPhysical[k]!==undefined;}).length;
+    var consOnly=!!window._tallyConsumableOnly;
+    var shownCount=consOnly?allInventory.filter(function(i){return i.is_consumable;}).length:allInventory.length;
+    summaryEl.textContent=enteredCount+' of '+allInventory.length+' parts counted so far'+(consOnly?' (showing Consumables only — '+shownCount+' items)':'');
+  }
+  // Debounced draft save to DB — waits until typing pauses so we're not
+  // firing a request on every single keystroke.
+  clearTimeout(_tallySaveTimers[partId]);
+  _tallySaveTimers[partId]=setTimeout(function(){_tallyPersistDraft(partId,val);},700);
+}
+async function _tallyPersistDraft(partId,val){
+  try{
+    if(val===''||val===undefined){
+      await sb('stock_tally_draft','DELETE',null,'?part_id=eq.'+partId);
+      return;
+    }
+    const qty=parseInt(val)||0;
+    const existing=await sb('stock_tally_draft','GET',null,'?part_id=eq.'+partId+'&select=id');
+    if(existing&&existing.length){
+      await sb('stock_tally_draft','PATCH',{physical_qty:qty,updated_by:currentUser.name,updated_at:new Date().toISOString()},'?part_id=eq.'+partId);
+    }else{
+      await sb('stock_tally_draft','POST',{part_id:partId,physical_qty:qty,updated_by:currentUser.name,updated_at:new Date().toISOString()});
+    }
+  }catch(e){console.log('Tally draft save error (table may not be set up yet):',e);}
+}
+async function tallyClearAll(){
+  if(!confirm('Clear ALL entered counts (including saved progress)? This cannot be undone.'))return;
+  window._tallyPhysical={};
+  try{await sbAll('stock_tally_draft','?select=id').then(function(rows){return Promise.all((rows||[]).map(function(r){return sb('stock_tally_draft','DELETE',null,'?id=eq.'+r.id).catch(function(){});}));});}catch(e){}
+  invTallyRenderRows();
 }
 async function saveStockTally(){
   const entries=Object.keys(window._tallyPhysical||{}).filter(function(k){return window._tallyPhysical[k]!==''&&window._tallyPhysical[k]!==undefined;});
@@ -8387,6 +8451,8 @@ async function saveStockTally(){
         await sb('inventory_log','POST',{inventory_id:partId,type:variance>0?'in':'out',qty:Math.abs(variance),note:'Weekly Stock Tally correction ('+today+'): System '+systemQty+' → Physical '+physicalQty,done_by:currentUser.name}).catch(()=>{});
         await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(variance),from_owner:variance>0?'TALLY':'MAIN',to_owner:variance>0?'MAIN':'TALLY',notes:'Weekly Stock Tally ('+today+'): '+systemQty+' → '+physicalQty,created_by:currentUser?.name||'Admin'}).catch(()=>{});
       }
+      // Clear this part's draft row now that it's been finalized.
+      await sb('stock_tally_draft','DELETE',null,'?part_id=eq.'+partId).catch(()=>{});
     }
     // Optional history table — degrades silently if not set up yet.
     try{
