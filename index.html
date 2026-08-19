@@ -6116,6 +6116,19 @@ function isConsumableCode(code){
   const it=(allInventory||[]).find(function(x){return (x.part_code||'').toUpperCase()===String(code).toUpperCase();});
   return !!(it&&it.is_consumable);
 }
+// Whether THIS spare (not just the part in general) is billed to the
+// customer despite the call being Warranty/AMC. A part like a Print Head
+// can go either way case-by-case (genuine defect = free, customer-caused =
+// chargeable), so the decision is asked per-use and stored on the spare
+// itself (s.warranty_chargeable) — see askWarrantyOrChargeable. Older
+// spares added before that existed have no such field; for those, fall
+// back to the master Inventory "is_consumable" flag as before.
+function isChargeableSpare(s){
+  if(!s)return false;
+  if(s.warranty_chargeable===true)return true;
+  if(s.warranty_chargeable===false)return false;
+  return isConsumableCode(s.code);
+}
 // VIEW TICKET
 async function viewTicket(id,autoPrint=false){
   // Refresh engineers if not loaded
@@ -6155,7 +6168,7 @@ async function viewTicket(id,autoPrint=false){
   // "Billable" parts total: normally excludes ALL parts on a Warranty call
   // (Canon covers them, ₹0 to customer) — EXCEPT a Consumable part, which is
   // charged even under warranty (Canon never covers/replaces consumables).
-  const total=isCustReject?0:spares.filter(s=>(!s.requested||isPendingApprovalView)&&(!isWarranty||isConsumableCode(s.code))).reduce((a,s)=>a+s.qty*(s.price||0),0);
+  const total=isCustReject?0:spares.filter(s=>(!s.requested||isPendingApprovalView)&&(!isWarranty||isChargeableSpare(s))).reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const svcCharge=labCharge;
@@ -6287,7 +6300,7 @@ async function viewTicket(id,autoPrint=false){
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>{const isCons=isConsumableCode(s.code);const freeOnWarranty=isWarranty&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      <tbody>${spares.map(s=>{const isCons=isChargeableSpare(s);const freeOnWarranty=isWarranty&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
     </table>
     <div style="font-size:13px;background:${isCustReject?'#fef2f2':'#f0fdf4'};padding:10px;border-radius:8px;">
     ${isWarranty?(total>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Service: ₹0</span> <span>+ Consumable Parts: <b>₹${total.toFixed(0)}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Consumables are not covered under warranty — customer pays for these.</span>`:`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`):isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
@@ -6653,7 +6666,7 @@ async function quickStatusChange(id,status){
   // Carry-In Warranty call: still needs the payment popup if it used a
   // Consumable part — same "never covered under warranty" rule as On-Site.
   const isWarrantyCallTypeDelivery=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
-  const warrantyConsumableCostDelivery=(!isRejectDelivery&&isWarrantyCallTypeDelivery)?(t.spares||[]).filter(function(s){return isConsumableCode(s.code);}).reduce(function(a,s){return a+(parseFloat(s.price||0)*parseInt(s.qty||1));},0):0;
+  const warrantyConsumableCostDelivery=(!isRejectDelivery&&isWarrantyCallTypeDelivery)?(t.spares||[]).filter(isChargeableSpare).reduce(function(a,s){return a+(parseFloat(s.price||0)*parseInt(s.qty||1));},0):0;
   const needsDeliveryPayment=status==='Delivered'&&t.service_type==='Carry In'&&t.call_type&&((t.call_type.includes('Non-Warranty')||t.call_type==='Other')||warrantyConsumableCostDelivery>0)&&!t.payment_mode;
   if(needsDeliveryPayment){
     // Rejected estimate: parts were never fitted/billed — only the
@@ -7415,6 +7428,29 @@ function selectReqPart(code,name,stock,price){
   document.getElementById('req-part-stock').value=`${stock}`;
   document.getElementById('req-parts-ac').classList.remove('open');
 }
+// Some Consumable-flagged parts (Print Heads especially) get used BOTH as a
+// genuine free warranty replacement (Canon-covered defect) AND as a
+// customer-fault chargeable repair — there's no way to know which just from
+// the part code, it depends on THIS specific case. So on a Warranty call,
+// ask which one applies every time such a part gets added, instead of a
+// blanket always-free or always-charged rule.
+function askWarrantyOrChargeable(label){
+  return new Promise(function(resolve){
+    var ex=document.getElementById('modal-wty-charge');if(ex)ex.remove();
+    var ov=document.createElement('div');ov.id='modal-wty-charge';ov.className='modal-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10050;display:flex;align-items:center;justify-content:center;';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
+      +'<h3 style="font-weight:700;font-size:16px;margin-bottom:6px;">⚠️ '+escHtml(label)+'</h3>'
+      +'<p style="font-size:13px;color:#64748b;margin-bottom:16px;">This part can be either free (genuine Canon defect) or chargeable (customer-caused damage). Which applies to THIS call?</p>'
+      +'<div style="display:flex;flex-direction:column;gap:8px;">'
+      +'<button id="wty-choice-free" style="padding:12px;background:#f0fdf4;border:1.5px solid #059669;border-radius:10px;color:#059669;font-weight:700;font-size:14px;cursor:pointer;">🛡️ Under Warranty (Free)</button>'
+      +'<button id="wty-choice-paid" style="padding:12px;background:#fef2f2;border:1.5px solid #dc2626;border-radius:10px;color:#dc2626;font-weight:700;font-size:14px;cursor:pointer;">💰 Chargeable (Customer Pays)</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    document.getElementById('wty-choice-free').onclick=function(){ov.remove();resolve(false);};
+    document.getElementById('wty-choice-paid').onclick=function(){ov.remove();resolve(true);};
+  });
+}
 async function savePartRequest(addAnother){
   const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const code=document.getElementById('req-part-code').value;
@@ -7478,20 +7514,49 @@ async function savePartRequest(addAnother){
   }catch(e){}
   // A Warranty call skips the customer-approval step entirely (see newStatus
   // above), so nothing ever flips "requested" to false the way approval does
-  // for Non-Warranty parts — a Consumable part added here would otherwise
+  // for Non-Warranty parts — a chargeable part added here would otherwise
   // stay requested:true forever and get silently excluded from every
   // Reports/Invoice revenue calc that filters on !s.requested, even though
-  // it's genuinely billed. Mark it requested:false immediately for
-  // Consumables on a Warranty call since there's no approval gate for it to
-  // wait on; leave it true for a normal warranty-covered part (₹0, no
-  // approval needed either, but also nothing to bill/count as revenue).
+  // it's genuinely billed. Mark it requested:false immediately when it's
+  // chargeable since there's no approval gate for it to wait on; leave it
+  // true for a normal free warranty part (₹0, no approval needed either,
+  // but also nothing to bill/count as revenue).
   const skipsApprovalHere=isW&&!isOOC;
   const isConsumableHere=isConsumableCode(code);
-  const spares=[...(t.spares||[]),{code,name,qty,price:partPrice,gst_pct:partGst,requested:!(skipsApprovalHere&&isConsumableHere),stock_deducted:false}];
-  const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered | ${note}`:`Part: ${code} ${name} × ${qty} | ${note}`;
+  // Consumable parts that can go either way (e.g. Print Head) get asked
+  // per-use on a Warranty call — see askWarrantyOrChargeable above. A
+  // consumable that's unambiguously always chargeable stays chargeable
+  // without asking (nothing currently in Inventory needs that distinction,
+  // but the hook is here: only prompt when skipsApprovalHere, i.e. on an
+  // actual Warranty call — Non-Warranty already bills everything anyway).
+  let isChargeableHere=isConsumableHere;
+  if(skipsApprovalHere&&isConsumableHere){
+    isChargeableHere=await askWarrantyOrChargeable(name||code);
+  }
+  const newSpare={code,name,qty,price:partPrice,gst_pct:partGst,requested:!(skipsApprovalHere&&isChargeableHere),stock_deducted:false,warranty_chargeable:isChargeableHere};
+  // Build off the LOCAL currentSpares (which already reflects any spare the
+  // user just removed with the ✕ button in the Update Call form), NOT a
+  // fresh DB fetch of t.spares — that fetch reflects the ticket as it was
+  // BEFORE this session's local removals, since a ✕ removal only updates
+  // currentSpares in memory and isn't saved to the ticket until the whole
+  // Update Call form is submitted. Basing this off t.spares silently
+  // resurrected every previously-removed spare the moment a new part was
+  // requested.
+  const baseSpares=(typeof currentSpares!=='undefined'&&Array.isArray(currentSpares))?currentSpares:(t.spares||[]);
+  const spares=[...baseSpares,newSpare];
+  const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered | ${note}`:`Part: ${code} ${name} × ${qty}${isChargeableHere?' (Chargeable)':skipsApprovalHere?' (Warranty — Free)':''} | ${note}`;
   const tl=[...(t.timeline||[]),{action:'Part Indented — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:tlNote}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
-  
+  // Keep the Update Call form's local state in sync so the spares list
+  // shown there (if still open behind this modal) reflects the real,
+  // current, saved set of parts — not a stale snapshot.
+  if(typeof currentSpares!=='undefined'){
+    currentSpares=spares;
+    var _slEl=document.getElementById('spares-list');
+    if(_slEl&&typeof spareRow==='function'){_slEl.innerHTML=currentSpares.map(function(s,i){return spareRow(s,i);}).join('');}
+    if(typeof refreshEstimateTotal==='function')refreshEstimateTotal();
+  }
+
   if(addAnother){
     // Keep modal open, reset fields, show part added
     document.getElementById('req-part-code').value='';
@@ -7521,12 +7586,12 @@ async function savePartRequest(addAnother){
 // billed even under warranty, since Canon never covers consumables.
 function _spareHidesPrice(s){
   var t=window._currentUpdateTicket;if(!t)return false;
-  if(s&&isConsumableCode(s.code))return false;
+  if(s&&isChargeableSpare(s))return false;
   var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   var isOOC=t.warranty_coverage==='Out of Coverage';
   return isW&&!isOOC;
 }
-function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice(s);const isCons=isConsumableCode(s.code);const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
+function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice(s);const isCons=isChargeableSpare(s);const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
 function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');refreshEstimateTotal();}
 function refreshEstimateTotal(){
   var parts=currentSpares.reduce(function(a,s){return a+(_spareHidesPrice(s)?0:(s.qty||1)*(s.price||0));},0);
@@ -7691,7 +7756,7 @@ async function saveEngUpdate(){
       // consumable part(s)' cost gets charged.
       const isWarrantyCallForCharge=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC')&&!isOutCoverage;
       if(isWarrantyCallForCharge){
-        const consumableCost=(currentSpares||[]).filter(function(s){return isConsumableCode(s.code);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+        const consumableCost=(currentSpares||[]).filter(isChargeableSpare).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
         if(consumableCost>0){
           data.service_charges=0;
           data.final_charges=consumableCost;
@@ -15960,7 +16025,7 @@ async function showPaymentConfirmation(ticketData,onConfirm){
   // inventory price is nonzero (that price is real, it's just not charged
   // to the customer). Non-warranty calls bill every spare as before.
   var _pcIsWarranty=ticketData.call_type&&(ticketData.call_type==='Warranty'||ticketData.call_type==='Warranty Repeat'||ticketData.call_type==='AMC');
-  var partsCost=(currentSpares||[]).filter(function(s){return !_pcIsWarranty||isConsumableCode(s.code);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+  var partsCost=(currentSpares||[]).filter(function(s){return !_pcIsWarranty||isChargeableSpare(s);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
   var serviceCost=parseFloat(ticketData.service_charges)||0;
   var totalCost=partsCost+serviceCost;
   var ov=document.createElement('div');ov.id='modal-payment-confirm';ov.className='modal-overlay';
