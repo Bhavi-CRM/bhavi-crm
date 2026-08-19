@@ -6977,7 +6977,17 @@ async function processApproval(decision){
       }
 
       const tl2=[...tl,{action:'Auto → '+autoStatus,by:'System',at:new Date().toISOString(),note:statusNote}];
-      await sb('tickets','PATCH',{status:autoStatus,timeline:tl2,updated_at:new Date().toISOString()},`?id=eq.${approvalTicketId}`);
+      // Clear "requested" on every spare the customer just approved — the
+      // convention used EVERYWHERE ELSE in the app (ticket view total,
+      // every Reports revenue calc, invoice generation) treats
+      // requested:true as "still just an estimate, not billed yet" and
+      // filters it out of totals. Approval is exactly the moment a
+      // requested part becomes a real, billable, fitted part — without
+      // this flip, approved parts silently vanished from every one of
+      // those totals forever (they stayed "requested" permanently since
+      // nothing else in the app ever cleared it).
+      const approvedSpares=(t.spares||[]).map(s=>s.requested?{...s,requested:false}:s);
+      await sb('tickets','PATCH',{status:autoStatus,spares:approvedSpares,timeline:tl2,updated_at:new Date().toISOString()},`?id=eq.${approvalTicketId}`);
 
       closeModal('modal-approval');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
@@ -10602,6 +10612,17 @@ async function _deductTicketParts(id){
           await sb('inventory_log','POST',{inventory_id:inv[0].id,type:'out',qty:s.qty||1,note:'Used in ticket '+id+(isWarrantyForDeduct?' (Warranty)':''),done_by:currentUser.name}).catch(()=>{});
         }
       }
+      // Log to eng_movements too — this is what Eng Parts > Movement Log
+      // reads, so "which engineer used how many parts today, Warranty or
+      // Non-Warranty" is answerable there (search by engineer name/date,
+      // Type=Used, Warranty column) instead of having no record at all.
+      await sb('eng_movements','POST',{
+        type:'USE',part_id:inv[0].id,qty:s.qty||1,
+        from_owner:bagOwner||'MAIN',to_owner:null,
+        job_sheet:id,warranty:isWarrantyForDeduct,
+        notes:'Used in ticket '+id+(freshT?.cname?' — '+freshT.cname:''),
+        created_by:currentUser?.name||'Admin'
+      }).catch(()=>{});
       // Always record in inventory_sales for tracking
       await sb('inventory_sales','POST',{
         sale_date:new Date().toLocaleDateString('en-CA'),
