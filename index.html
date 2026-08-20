@@ -7541,27 +7541,33 @@ async function _savePartRequestInner(addAnother){
   // warranty part correctly does.
   const needsApprovalHere=!skipsApprovalHere||isChargeableHere;
   let newStatus;
-  if(_pendingEngStock){
-    // Company has it but not in engineer bag — wait for admin to issue
-    newStatus='Pending Engineer Stock';
-  }else if(_pendingNoParts){
-    // Nobody has it — need to order
-    newStatus='Pending Parts';
-  }else if(!needsApprovalHere){
-    // WARRANTY, free part: No charges - check stock
-    if(hasStock){
-      newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-    }else{
-      newStatus='Pending Parts';
-    }
-  }else{
+  if(needsApprovalHere){
     // NON-WARRANTY / OUT-OF-COVERAGE / Warranty-call-with-a-chargeable-part:
-    // Need customer approval before proceeding.
+    // Customer must approve BEFORE we even worry about where the stock is —
+    // this must win over the stock-location checks below. Previously the
+    // stock checks ran first, so a chargeable part that happened to need
+    // issuing from company stock to the engineer's bag went straight to
+    // "Pending Engineer Stock" and silently skipped customer approval on
+    // real money. Approving re-checks stock and routes to Pending Engineer
+    // Stock / Pending Parts / Pending Repair as appropriate (processApproval).
     newStatus='Pending Customer Approval';
     if(t.rerepair_foc===true||(t.rerepair==='Yes'&&(t.service_charges===0||t.service_charges==='0'))){
       // Mark as FOC in timeline note
       const ftiml=[...(t.timeline||[]),{action:'Re-Repair FOC — Part Estimate',by:currentUser.name,at:new Date().toISOString(),note:'Service charges waived. Parts estimate sent for approval.'}];
       await sb('tickets','PATCH',{timeline:ftiml},`?id=eq.${partReqTicketId}`).catch(()=>{});
+    }
+  }else if(_pendingEngStock){
+    // Company has it but not in engineer bag — wait for admin to issue
+    newStatus='Pending Engineer Stock';
+  }else if(_pendingNoParts){
+    // Nobody has it — need to order
+    newStatus='Pending Parts';
+  }else{
+    // WARRANTY, free part: No charges - check stock
+    if(hasStock){
+      newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
+    }else{
+      newStatus='Pending Parts';
     }
   }
 
@@ -7722,6 +7728,25 @@ async function saveEngUpdate(){
   if(isManualTime){
     const mRem=(document.getElementById('manual-time-remark')?.value||'').trim();
     if(!mRem){alert('⚠️ Please provide a reason for the manual time change.\n(Time In or Time Out was edited manually)');document.getElementById('manual-time-remark')?.focus();return;}
+  }
+
+  // Engineer must not be able to close/mark-repaired a call with parts they
+  // don't actually have yet — that used to be possible (see _missingBagParts
+  // / the Eng Parts approval fix) and left the call closed with no real part
+  // ever physically deducted. Block it here with a clear message instead of
+  // silently letting it through. On Site checks the engineer's own bag;
+  // Carry In has no personal-bag concept (device is at the office) so it
+  // checks company inventory stock instead — same rule, same message point,
+  // just a different stock location per service_type.
+  if(currentUser.role==='engineer'&&status!==t.status&&((t.service_type==='On Site'&&status==='Closed')||(t.service_type==='Carry In'&&status==='Repaired'))){
+    const physicalSpares=(currentSpares||[]).filter(function(s){return s.code&&!s.requested;});
+    if(physicalSpares.length){
+      const missing=t.service_type==='On Site'?await _missingBagParts(currentUser.name,physicalSpares):await _missingCompanyStockParts(physicalSpares);
+      if(missing.length){
+        alert('❌ Aa part(s) stock ma nathi, call '+(t.service_type==='On Site'?'close':'Repaired')+' kari shakay nahi:\n\n'+missing.join('\n')+'\n\nEng. Parts ma thi part request karo athva Admin/Office ne part issue/order karva janavo, pachi j aagad vadho.');
+        return;
+      }
+    }
   }
 
   const nowSave=new Date();
@@ -11388,6 +11413,39 @@ async function saveEngReqReturn(){
 // before the first click's network calls finish (the fresh-status re-check
 // below alone can't catch that — both clicks would still see PENDING).
 window._epApproving=window._epApproving||{};
+// A ticket may need several different parts. Issuing just ONE of them to the
+// engineer's bag must NOT move the call to "Pending Repair" — the engineer
+// still can't do the job without the rest. Checks the engineer's CURRENT bag
+// (fresh from DB) against every spare the ticket needs; returns the list of
+// still-missing part codes (empty = fully stocked, safe to move to repair).
+async function _missingBagParts(engineerName,spares){
+  const needed=(spares||[]).filter(function(s){return s.code;});
+  if(!needed.length)return[];
+  let stock=[];
+  try{stock=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(engineerName));}catch(e){stock=[];}
+  const missing=[];
+  for(const s of needed){
+    const invItem=await sb('inventory','GET',null,'?part_code=eq.'+encodeURIComponent(s.code)+'&select=id&limit=1').catch(function(){return[];});
+    const pid=invItem&&invItem[0]&&invItem[0].id;
+    const have=pid?((stock.find(function(x){return x.part_id===pid;})||{}).qty||0):0;
+    if(have<(s.qty||1))missing.push(s.code+' '+(s.name||''));
+  }
+  return missing;
+}
+// Carry In has no personal engineer-bag concept — the device is repaired at
+// the office, so the part just needs to be in COMPANY inventory (not issued
+// to anyone's bag). Fresh DB check, same shape/use as _missingBagParts.
+async function _missingCompanyStockParts(spares){
+  const needed=(spares||[]).filter(function(s){return s.code;});
+  if(!needed.length)return[];
+  const missing=[];
+  for(const s of needed){
+    const invItem=await sb('inventory','GET',null,'?part_code=eq.'+encodeURIComponent(s.code)+'&select=qty_in_stock&limit=1').catch(function(){return[];});
+    const have=(invItem&&invItem[0]&&invItem[0].qty_in_stock)||0;
+    if(have<(s.qty||1))missing.push(s.code+' '+(s.name||''));
+  }
+  return missing;
+}
 async function approveEngReq(reqId,req){
   const parts=req.parts||[];
   if(!parts.length){alert('No parts found in this request.');return;}
@@ -11423,8 +11481,16 @@ async function approveEngReq(reqId,req){
             const pendingTickets=await sb('tickets','GET',null,'?assigned_name=eq.'+encodeURIComponent(req.engineer_name)+'&status=eq.Pending+Engineer+Stock&select=id,spares,timeline,service_type');
             for(const t of(pendingTickets||[])){
               if((t.spares||[]).some(function(s){return s.code===partCode;})){
+                // Don't move to repair until EVERY part this ticket needs is
+                // actually in the engineer's bag — issuing just one of several
+                // requested parts used to move the call straight to "Pending
+                // Repair" anyway. No admin alert needed here (that's noisy) —
+                // the engineer gets stopped with a clear message at close-call
+                // time instead, see the bag-check inside _doSaveEngUpdate.
+                const missing=await _missingBagParts(req.engineer_name,t.spares);
+                if(missing.length)continue;
                 const ns=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-                const tl=[...(t.timeline||[]),{action:'Parts Approved → '+ns,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag via approved request.'}];
+                const tl=[...(t.timeline||[]),{action:'Parts Approved → '+ns,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag via approved request. All required parts now in bag.'}];
                 await sb('tickets','PATCH',{status:ns,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+t.id);
               }
             }
