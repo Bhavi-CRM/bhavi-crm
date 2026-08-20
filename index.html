@@ -13477,9 +13477,16 @@ async function doConfirmWorkHold(ticketId){
       task_description:'⏸️ Work on Hold — '+tkLabel+' ('+remark+')',
       ticket_id:ticketId,log_type:'work',created_at:now.toISOString()
     }).catch(()=>{});
-    // Add timeline entry (does NOT change status)
+    // Add timeline entry (does NOT change status). No .catch() swallow here on
+    // purpose — this write is the ONLY thing that makes "Ready to resume" show
+    // Visit Start/Work Start again next time the ticket is opened. If this
+    // silently failed (as it used to), the engineer still saw "Work paused ✅"
+    // and the modal closed as if it worked, but the hold was never actually
+    // saved — so reopening the call kept showing the old "Work Started" bar
+    // with no way back to Visit Start/Work Start. A real failure must now
+    // throw up to the outer catch and tell the engineer, not lie about success.
     var tl=[...(tk?.timeline||[]),{action:'Work on Hold',by:currentUser.name,at:now.toISOString(),note:remark+(workDur>0?' | Session: '+Math.floor(workDur/60)+'h '+workDur%60+'m':'')}];
-    await sb('tickets','PATCH',{timeline:tl,updated_at:now.toISOString()},'?id=eq.'+encodeURIComponent(ticketId)).catch(()=>{});
+    await sb('tickets','PATCH',{timeline:tl,updated_at:now.toISOString()},'?id=eq.'+encodeURIComponent(ticketId));
     alert('Work paused ✅\nYou can now go to another call.\nCome back and tap Work Start to resume.');
     closeModal('modal-eng-update');
     if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
