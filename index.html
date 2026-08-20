@@ -6875,8 +6875,13 @@ function calcApprovalTotal(){
 }
 async function openApproval(id){
   approvalTicketId=id;
-  let t=allTickets.find(x=>x.id===id);
-  if(!t){const res=await sb('tickets','GET',null,`?id=eq.${id}`);t=res[0];}
+  // ALWAYS fetch fresh — never trust the allTickets cache here. A part just
+  // requested moments ago (savePartRequest writes straight to the DB) may
+  // not exist yet in whatever stale copy of this ticket the page loaded
+  // earlier, which is exactly what showed "Parts: ₹0" here even though the
+  // part was genuinely just added and visible in the ticket's own timeline.
+  let t;
+  try{t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];}catch(e){t=allTickets.find(x=>x.id===id);}
   if(!t)return;
   
   // Show ticket info
@@ -6918,7 +6923,12 @@ function recalcEstimate(){
 async function processApproval(decision){
   const note=document.getElementById('est-note')?.value?.trim()||'';
   
-  const t=allTickets.find(x=>x.id===approvalTicketId)||(await sb('tickets','GET',null,`?id=eq.${approvalTicketId}`))[0];
+  // Fresh fetch first, cache only as a last-resort fallback — this ticket's
+  // spares were very likely just written moments ago by Request Part, and
+  // the stale allTickets cache not having them yet is exactly what caused
+  // the approved spares list to end up missing the just-added parts.
+  let t;
+  try{t=(await sb('tickets','GET',null,`?id=eq.${approvalTicketId}`))[0];}catch(e){t=allTickets.find(x=>x.id===approvalTicketId);}
   
   // Get estimate details
   const parts=parseFloat(document.getElementById('est-parts')?.value)||0;
@@ -10949,7 +10959,12 @@ async function _deductTicketParts(id){
         // On Site: deduct from the assigned engineer's bag (eng_stock), NOT
         // office inventory — office stock was already reduced when the part
         // was issued to that engineer.
-        await engStockAdjust(bagOwner,inv[0].id,-(s.qty||1)).catch(e=>console.log('Eng stock deduct err:',e));
+        // No .catch() here on purpose — if this actually fails, it must
+        // throw up to the surrounding try/catch below, which is what stops
+        // actuallyDeducted.add(s) from running. Swallowing the error here
+        // used to let it silently proceed to mark the spare "deducted"
+        // even when the bag was never actually touched.
+        await engStockAdjust(bagOwner,inv[0].id,-(s.qty||1));
       }else{
         // Carry-In (or no assigned engineer on record): deduct from office
         // inventory directly.
@@ -11004,11 +11019,30 @@ async function _deductTicketParts(id){
   return freshT;
 }
 async function engStockAdjust(owner,partId,delta){
-  const existing=allEngStock.find(s=>s.owner===owner&&s.part_id===partId);
+  // MUST check the DB fresh, never the in-memory allEngStock cache — that
+  // cache is only ever loaded on the Eng Parts admin pages. Called from an
+  // engineer's own "My Calls" close/update flow (the most common path this
+  // runs from), allEngStock is empty/stale, so `.find()` always came back
+  // undefined — every deduction looked like "no existing bag row" and
+  // POSTed a brand new row at qty 0 instead of decrementing the real one,
+  // which is exactly why an engineer's bag never actually went down.
+  let existing;
+  try{
+    const rows=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(owner)+'&part_id=eq.'+partId);
+    existing=rows&&rows[0];
+  }catch(e){
+    existing=(allEngStock||[]).find(function(s){return s.owner===owner&&s.part_id===partId;});
+  }
   const newQty=Math.max(0,(existing?.qty||0)+delta);
   const q=`?owner=eq.${encodeURIComponent(owner)}&part_id=eq.${partId}`;
   if(existing) await sb('eng_stock','PATCH',{qty:newQty,updated_at:new Date().toISOString()},q);
   else await sb('eng_stock','POST',{owner,part_id:partId,qty:newQty});
+  // Keep the in-memory cache in sync too, if some page has it loaded, so
+  // that page doesn't show stale numbers until its own next reload.
+  if(Array.isArray(allEngStock)){
+    const idx=allEngStock.findIndex(function(s){return s.owner===owner&&s.part_id===partId;});
+    if(idx>=0)allEngStock[idx].qty=newQty;else allEngStock.push({owner:owner,part_id:partId,qty:newQty});
+  }
 }
 async function invQtyAdjust(partId,delta){
   const item=allInventory.find(x=>x.id===partId);
