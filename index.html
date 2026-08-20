@@ -7730,6 +7730,24 @@ async function saveEngUpdate(){
     if(!mRem){alert('⚠️ Please provide a reason for the manual time change.\n(Time In or Time Out was edited manually)');document.getElementById('manual-time-remark')?.focus();return;}
   }
 
+  // A call must never be allowed to Close/Repair while any part is still
+  // sitting at requested:true (i.e. an estimate the customer never actually
+  // approved) — every Revenue report, Invoice, and Job Sheet in this app
+  // filters spares by "!s.requested", so a stuck requested:true part is
+  // PERMANENTLY invisible to billing/revenue from that point on, even after
+  // the call closes and the customer pays. This used to be reachable if the
+  // ticket's status ever got knocked out of "Pending Customer Approval"
+  // (e.g. the Work Start status-clobber bug) — status flow would then no
+  // longer force the estimate through Approve/Reject before Closed became
+  // selectable. Block it here directly, independent of what t.status says.
+  if(currentUser.role==='engineer'&&status!==t.status&&(status==='Closed'||status==='Repaired')){
+    const unapproved=(currentSpares||[]).filter(function(s){return s.code&&s.requested;});
+    if(unapproved.length){
+      alert('❌ Aa call close/repaired kari shakay nahi — nichena part(s) hajuu customer approval pending chhe (kimmat billing/invoice/revenue ma nahi ganay jya sudhi approve na thay):\n\n'+unapproved.map(function(s){return s.code+' '+(s.name||'');}).join('\n')+'\n\nPehla "Approve / Reject Estimate" thi customer nu decision save karo, pachi j call close karo.');
+      return;
+    }
+  }
+
   // Engineer must not be able to close/mark-repaired a call with parts they
   // don't actually have yet — that used to be possible (see _missingBagParts
   // / the Eng Parts approval fix) and left the call closed with no real part
@@ -13580,6 +13598,22 @@ async function doWorkStart(ticketId){
   // Update ticket
   try{
     const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];
+
+    // Work Start must NEVER blindly force status back to "In Progress" — it
+    // used to, unconditionally, regardless of what the ticket's real current
+    // status was. If a part had just been requested and correctly routed to
+    // Pending Customer Approval / Pending Parts / Pending Engineer Stock (see
+    // savePartRequest), a stale "Work Start"/"Resume Work" button — e.g. the
+    // Update Call modal still open from before the part was added — silently
+    // overwrote that back to "In Progress" and erased the real state, even
+    // though the timeline still showed the approval-pending entry. Repair
+    // work genuinely cannot proceed while one of these is open, so block it
+    // here with a clear message instead of corrupting the status.
+    const _wsBlockedStatuses=['Pending Customer Approval','Pending Parts','Pending Engineer Stock','Pending Spare','Customer Approved','Closed','Customer Reject','Call Cancel','Delivered'];
+    if(t&&_wsBlockedStatuses.includes(t.status)){
+      alert('❌ Work Start kari shakay nahi — aa call have "'+t.status+'" stage ma chhe.\n\nPehla e resolve karo (parts/approval), pachi j Work Start karo. Aa modal band kari call fari kholo, current sachi status dekhashe.');
+      return;
+    }
 
     // KM TRACKING — Work Start NEVER opens a KM popup. (Earlier it re-asked the
     // arrival KM here, which blocked work even after Reached Location / Skip.)
