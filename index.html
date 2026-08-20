@@ -5256,7 +5256,7 @@ async function renderMyCalls(){
                 <div style="flex:1;min-width:0;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                   <div>
-                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
+                    <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${(()=>{const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');return isW?` <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">🛡️ WARRANTY</span>`:` <span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">💳 NON-WARRANTY</span>`;})()}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
                     ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
                   </div>
