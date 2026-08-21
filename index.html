@@ -7053,6 +7053,19 @@ async function processApproval(decision){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// A part-request → customer-approval → parts-issued cycle genuinely ENDS the
+// engineer's current work session — they can't do anything more until the
+// customer decides and (if needed) the part physically arrives, which is
+// routinely a different day. Without recognizing this, the Update Call panel
+// kept showing the OLD "Work Started" session as still active (with only a
+// "Work on Hold" button) even after the call came back as "Pending Repair
+// Carry In/On Site" — there was no way to start a genuinely NEW session/visit.
+// This treats any of these timeline actions exactly like a "Work on Hold" for
+// the purpose of deciding whether Visit Start/Work Start should show again.
+function _wsIsPauseAction(a){
+  if(!a)return false;
+  return a==='Work on Hold'||a.indexOf('Part Indented')===0||a.indexOf('Auto →')===0||a.indexOf('Parts Approved')===0||a.indexOf('Customer Approved Estimate')===0||a.indexOf('Customer Rejected Estimate')===0;
+}
 // ENG UPDATE - Points 4, 6, 7, 8
 async function openEngUpdate(id){
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];if(!t)return;
@@ -7086,12 +7099,16 @@ async function openEngUpdate(id){
       const tl=(typeof t.timeline==='string'?JSON.parse(t.timeline||'[]'):(t.timeline||[]));
       const wsEntries=tl.filter(e=>e.action&&e.action.includes('Work Start'));
       const wsEntry=wsEntries.length?wsEntries[wsEntries.length-1]:null;
-      const holdEntries=tl.filter(e=>e.action==='Work on Hold');
+      const holdEntries=tl.filter(e=>_wsIsPauseAction(e.action));
       const lastHold=holdEntries.length?holdEntries[holdEntries.length-1]:null;
       // Work on Hold doesn't change t.status, so a hold that happened AFTER the
       // last Work Start must still make this look "paused" to the UI — otherwise
       // the panel keeps showing the green "already working" box with no way to
-      // start a genuinely new/second session when the engineer comes back.
+      // start a genuinely new/second session when the engineer comes back. A
+      // part request / customer approval / parts-issued cycle counts as a
+      // pause too (see _wsIsPauseAction) — that's exactly what left the panel
+      // stuck showing "still working" after a call came back as Pending
+      // Repair Carry In post-approval, with no way to start the new session.
       const isWorkHeld=!!(lastHold&&(!wsEntry||new Date(lastHold.at)>new Date(wsEntry.at)));
       const wsTime=wsEntry?new Date(wsEntry.at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):t.visit_in||'';
       const totalDone=tl.filter(e=>e.action==='Work Session End').reduce((s,e)=>s+(e.duration_min||0),0);
@@ -7122,13 +7139,17 @@ async function openEngUpdate(id){
       const vsStops=tl.filter(e=>e.action==='Visit Stop');
       const wsEntries=tl.filter(e=>e.action&&e.action.includes('Work Start'));
       const wsEntry=wsEntries.length?wsEntries[wsEntries.length-1]:null;
-      const holdEntries=tl.filter(e=>e.action==='Work on Hold');
+      const holdEntries=tl.filter(e=>_wsIsPauseAction(e.action));
       // A call can need several visits (3-4+ round trips), each ending in either
       // a Visit Stop or a Work on Hold and then starting again - so instead of a
       // one-shot flag, find the SINGLE most recent event across all four types
       // and let that alone decide the current state. This makes every round
       // fully cyclable: Visit Start → Work Start → Hold → Visit Start → ... with
-      // no dead end after the first pause.
+      // no dead end after the first pause. A part request / customer approval /
+      // parts-issued cycle counts as a pause too (see _wsIsPauseAction) — e.g.
+      // customer approves but the part isn't in stock, so the engineer's next
+      // action is genuinely a NEW visit the following day, not "resume" the
+      // old one.
       const evAll=[];
       vsEntries.forEach(e=>{if(e&&e.at)evAll.push({t:new Date(e.at).getTime(),kind:'visitstart'});});
       vsStops.forEach(e=>{if(e&&e.at)evAll.push({t:new Date(e.at).getTime(),kind:'visitstop'});});
