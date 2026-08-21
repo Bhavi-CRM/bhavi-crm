@@ -7682,6 +7682,20 @@ async function saveEngUpdate(){
 
   // Strict: cannot update terminal status
   if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)){alert('❌ This call is closed — no updates allowed');return;}
+  // These statuses mean the ball is in someone else's court (customer
+  // decision, or admin issuing/ordering a part) — an engineer saving the
+  // regular Update Call form here used to still go through (status dropdown
+  // was locked to the current value, but Save still wrote work_done/remarks/
+  // spares and added a bogus "Updated — <status>" timeline entry even though
+  // nothing the engineer can actually do happened), creating misleading work
+  // logs and status history. Blocked outright now — the only way through is
+  // the dedicated "Approve / Reject Estimate" button (a separate function,
+  // not this one) or an admin/WC action.
+  const _engLockedStatuses=['Pending Customer Approval','Pending Engineer Stock','Pending Parts','Pending Spare'];
+  if(currentUser.role==='engineer'&&_engLockedStatuses.includes(t.status)){
+    alert('❌ Aa call have "'+t.status+'" stage ma chhe — aa eng tarafthi kai update kari shakay tem nathi.\n\n'+(t.status==='Pending Customer Approval'?'Customer no Approve/Reject decision aavva do (WC/Admin/upper "Approve/Reject Estimate" button thi).':'Admin/Office e part issue/order karva do, pachi j aagad vadho.'));
+    return;
+  }
   // Action Taken — required unless admin made it optional (Field Rules).
   const workDone=(document.getElementById('upd-work')?.value||'').trim();
   if(!workDone&&isFieldRequired('call_close','action_taken')){alert('❌ Action Taken is required.\nPlease describe what was done.');document.getElementById('upd-work')?.focus();return;}
