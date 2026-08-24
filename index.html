@@ -3076,7 +3076,7 @@ function showEngPunchGate(){
 function hideEngPunchGate(){var g=document.getElementById('eng-punch-gate');if(g)g.remove();}
 
 // STATUS SYSTEM
-const STATUS_FLOW=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery','Resolved By Phone'];
+const STATUS_FLOW=['Pending Visit Charge Approval','Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery','Resolved By Phone'];
 // Canonical Active/Closed/Cancelled buckets — matches Dashboard's own numbers
 // (confirmed correct). Several pages each had their own slightly different
 // "closed status" list, so the same ticket could show as Closed on one page
@@ -3096,7 +3096,7 @@ function isTicketActive(t){return !isTicketClosed(t)&&!isTicketCancelled(t);}
 // false (admin unchecked the box) turns Onsite off for that model.
 function isModelOnsiteEligible(model){return !model||model.onsite_applicable!==false;}
 function statusBadge(s){
-  const m={'Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery','Resolved By Phone':'badge-closed'};
+  const m={'Pending Visit Charge Approval':'badge-pending','Pending Customer Arrival':'badge-pending','Pending Allocation':'badge-pending','Assigned':'badge-open','In Progress':'badge-progress','Closed':'badge-closed','Delivered':'badge-closed','Pending Customer Approval':'badge-pending','Customer Approved':'badge-approve','Customer Reject':'badge-reject','Call Cancel':'badge-cancel','Pending Parts':'badge-pending','Pending Engineer Stock':'badge-pending','Pending Repair Carry In':'badge-progress','Pending Repair On Site':'badge-progress','Repaired':'badge-progress','Sent to MSC':'badge-msc','Pending for Delivery':'badge-delivery','Resolved By Phone':'badge-closed'};
   return `<span class="badge ${m[s]||'badge-open'}">${s||'Open'}</span>`;
 }
 function priorityBadge(p){
@@ -3122,6 +3122,7 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
   // ADMIN / WC — handle approvals, allocation, and delivery
   if(isAdminOrWC){
     switch(current){
+      case 'Pending Visit Charge Approval': return[]; // use the dedicated Visit Charges Approved/Reject buttons
       case 'Pending Customer Arrival': return['Pending Allocation','Call Cancel'];
       case 'Pending Allocation': return['Assigned','Pending Repair Carry In','Pending Repair On Site','Call Cancel'];
       case 'Pending Customer Approval': return[]; // use the dedicated Approve/Reject Estimate button — see engineer case below for why
@@ -3701,7 +3702,7 @@ async function renderDashboard(){
       const pendRepairOS=dashTix.filter(t=>t.status==='Pending Repair On Site').length;
       const custRejectCount=dashTix.filter(t=>t.status==='Customer Reject').length;
       const cancelCount=dashTix.filter(t=>t.status==='Call Cancel').length;
-      const activeStatuses=['Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
+      const activeStatuses=['Pending Visit Charge Approval','Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
       const activeTickets=dashTix.filter(t=>activeStatuses.includes(t.status));
       const ciTotal=dashTix.filter(t=>t.service_type==='Carry In').length;
       const osTotal=dashTix.filter(t=>t.service_type==='On Site').length;
@@ -4815,7 +4816,7 @@ function renderTicketTable(filtered){
         <input type="text" id="ticket-search" placeholder="Search..." oninput="filterTickets()" style="flex:1;min-width:180px;">
         <select id="ticket-status-filter" onchange="filterTickets()">
           <option value="">All Status</option>
-          <option>Pending Customer Arrival</option><option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
+          <option>Pending Visit Charge Approval</option><option>Pending Customer Arrival</option><option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
           <option>Pending Customer Approval</option><option>Customer Approved</option>
           <option>Customer Reject</option><option>Pending Parts</option><option>Pending Engineer Stock</option>
           <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
@@ -5677,11 +5678,19 @@ async function saveCall(){
   const scInput=document.getElementById('call-service-charges');
   const serviceCharges=(ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other')&&scInput?parseFloat(scInput.value)||0:0;
   
+  const _wcTypeVal=(()=>{const scEl=document.getElementById('call-subcat-input');const sc=(scEl?.options[scEl?.selectedIndex]?.text||'').trim();if(sc==='ICP')return 'ICP';if(sc==='CSP')return 'CSP';const bn=(document.getElementById('call-brand-input')?.options[document.getElementById('call-brand-input')?.selectedIndex]?.text||'').toLowerCase();if(bn.includes('panasonic'))return 'ICP';if(bn.includes('fujifilm'))return 'CSP';if(currentUser&&currentUser.role_type==='work_controller'){const wcn=(currentUser.name||'').toUpperCase();if(wcn.includes('CSP'))return 'CSP';if(wcn.includes('ICP'))return 'ICP';}return 'ICP';})();
+  const _svcTypeVal=document.getElementById('call-service-type').value;
+  // A CSP Non-Warranty On Site call is logged before the customer has actually
+  // agreed to pay the visit/service charge on the phone — WC/Admin/Manager
+  // must confirm that FIRST. Until then it must sit in a separate gate, not
+  // in the normal Pending Allocation queue where it could get an engineer
+  // assigned before the customer even agreed to pay anything.
+  const _needsVisitChargeApproval=_wcTypeVal==='CSP'&&(ct==='Non-Warranty'||ct==='Non-Warranty Repeat')&&_svcTypeVal==='On Site';
   const data={
-    call_type:ct,service_type:document.getElementById('call-service-type').value,
+    call_type:ct,service_type:_svcTypeVal,
     service_charges:serviceCharges,
     brand_name:(()=>{const el=document.getElementById('call-brand-input');return el?.tagName==='SELECT'?(el.options[el.selectedIndex]?.text||''):(document.getElementById('call-brand-name').value||'');})(),
-    wc_type:(()=>{const scEl=document.getElementById('call-subcat-input');const sc=(scEl?.options[scEl?.selectedIndex]?.text||'').trim();if(sc==='ICP')return 'ICP';if(sc==='CSP')return 'CSP';const bn=(document.getElementById('call-brand-input')?.options[document.getElementById('call-brand-input')?.selectedIndex]?.text||'').toLowerCase();if(bn.includes('panasonic'))return 'ICP';if(bn.includes('fujifilm'))return 'CSP';if(currentUser&&currentUser.role_type==='work_controller'){const wcn=(currentUser.name||'').toUpperCase();if(wcn.includes('CSP'))return 'CSP';if(wcn.includes('ICP'))return 'ICP';}return 'ICP';})(),
+    wc_type:_wcTypeVal,
     model:document.getElementById('call-model').value,serial:document.getElementById('call-serial').value,
     se_call_id:document.getElementById('call-se-id').value,priority:document.getElementById('call-priority').value,
     cname:document.getElementById('call-cname').value,mobile:document.getElementById('call-mobile').value,
@@ -5695,8 +5704,8 @@ async function saveCall(){
     group_id:window._callGroupId||null,
     phys_js:document.getElementById('call-phys-js').value,
     tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v||null;})(),
-    assigned_to:engId||null,assigned_name:engName||null,
-    status:engId?'Assigned':'Pending Allocation',
+    assigned_to:_needsVisitChargeApproval?null:(engId||null),assigned_name:_needsVisitChargeApproval?null:(engName||null),
+    status:_needsVisitChargeApproval?'Pending Visit Charge Approval':(engId?'Assigned':'Pending Allocation'),
     warranty_coverage:isW?'Under Coverage':'NA',
     spares:[],timeline:[{action:'Call Logged',by:currentUser.name,at:new Date().toISOString()}],
     updated_at:new Date().toISOString()
@@ -6203,9 +6212,17 @@ async function viewTicket(id,autoPrint=false){
     const isPendingArrival = t.status==='Pending Customer Arrival';
     const isPendingAlloc = t.status==='Pending Allocation';
     const isPendingApproval = t.status==='Pending Customer Approval';
+    const isPendingVisitCharge = t.status==='Pending Visit Charge Approval';
     const isRepaired = t.status==='Repaired'||t.status==='Pending for Delivery';
-    const isCancelable = ['Pending Customer Arrival','Pending Allocation','Assigned'].includes(t.status);
+    const isCancelable = ['Pending Customer Arrival','Pending Allocation','Assigned','Pending Visit Charge Approval'].includes(t.status);
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${isPendingVisitCharge?`
+        <div style="width:100%;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:10px;padding:10px 14px;margin-bottom:4px;font-size:12px;color:#5b21b6;">
+          📞 <b>Call customer and confirm the visit/service charge before allocation.</b> This call won't show in Pending Allocation until you decide below.
+        </div>
+        <button class="btn btn-success btn-sm" onclick="approveVisitCharge('${t.id}')">✅ Visit Charges Approved</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectVisitCharge('${t.id}')">❌ Visit Charges Reject</button>
+      `:''}
       ${isPendingArrival?`
         <div style="width:100%;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-bottom:4px;font-size:12px;color:#92400e;">
           ⏳ <b>Waiting for customer to bring in the device.</b> Once the customer arrives with their device, click the button below.
@@ -6232,7 +6249,7 @@ async function viewTicket(id,autoPrint=false){
         </div>
         <button class="btn btn-success btn-sm" onclick="quickStatusChange('${t.id}','Delivered')" style="background:#15803d;font-size:13px;padding:8px 18px;">📦 Mark Delivered (Customer Collected)</button>
       `:''}
-      ${!isPendingArrival&&!isPendingApproval&&!isRepaired&&!isClosed?`
+      ${!isPendingArrival&&!isPendingApproval&&!isPendingVisitCharge&&!isRepaired&&!isClosed?`
         <select onchange="if(this.value&&confirm('Change status to: '+this.value+'?')){quickStatusChange('${t.id}',this.value);this.value='';}" style="border:1.5px solid #f59e0b;border-radius:8px;padding:6px 10px;font-size:13px;background:#fffbeb;color:#92400e;font-weight:600;">
           <option value="">⚙️ Force Status...</option>
           <option>Assigned</option><option>In Progress</option>
@@ -6636,6 +6653,30 @@ async function voidWarranty(id){
   const tl=[...(t?.timeline||[]),{action:'Warranty Void',by:currentUser.name,at:new Date().toISOString(),note:r}];
   await sb('tickets','PATCH',{warranty_coverage:'Out of Coverage',coverage_remark:r,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
+}
+// CSP Non-Warranty On Site calls sit in "Pending Visit Charge Approval" until
+// WC/Admin/Manager confirms on the phone that the customer actually agreed
+// to the visit/service charge — see saveNewCall's _needsVisitChargeApproval.
+// Approve → the call becomes normally allocatable; Reject → the call is over,
+// same as any other Customer Reject, no charges (per the agreed design).
+async function approveVisitCharge(id){
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
+  if(!t)return;
+  const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Approved',by:currentUser.name,at:new Date().toISOString(),note:'Customer agreed to visit/service charge on call — moved to Pending Allocation.'}];
+  await sb('tickets','PATCH',{status:'Pending Allocation',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
+}
+async function rejectVisitCharge(id){
+  const reason=prompt('❌ Visit Charges Rejected — reason (optional):')||'';
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
+  if(!t)return;
+  const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Rejected',by:currentUser.name,at:new Date().toISOString(),note:'Customer did not agree to visit/service charge — call closed, no charges.'+(reason?' Reason: '+reason:'')}];
+  await sb('tickets','PATCH',{status:'Customer Reject',service_charges:0,final_charges:0,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
 async function quickStatusChange(id,status){
   if(!status)return;
@@ -13605,14 +13646,36 @@ async function doWorkStart(ticketId){
       const ol=openLogs[0];
       let ticketClosed=false;
       let ticketPaused=false;
-      if(ol.ticket_id){
+      // Starting work again on the SAME ticket whose own open log wasn't
+      // closed (e.g. a part-request/approval cycle happened without ever
+      // going through the explicit "Work on Hold" button, which is the only
+      // thing that used to close it) is obviously fine — just carry on, this
+      // is a resume, not a conflicting second session.
+      if(ol.ticket_id===ticketId){
+        ticketPaused=true;
+      }else if(ol.ticket_id){
         try{
-          const olT=await sb('tickets','GET',null,'?id=eq.'+ol.ticket_id);
-          const olStatus=olT&&olT[0]?olT[0].status:'';
+          const olT=(await sb('tickets','GET',null,'?id=eq.'+ol.ticket_id+'&select=status,timeline'))[0];
+          const olStatus=olT?olT.status:'';
           if(['Closed','Customer Reject','Call Cancel','Delivered'].includes(olStatus)){
             ticketClosed=true;
           } else if(['Pending Parts','Pending Customer Approval','Pending Engineer Stock','Pending Spare','Hold'].some(s=>olStatus.toLowerCase().includes(s.toLowerCase()))){
             ticketPaused=true;
+          }else{
+            // Fall back to the same pause-event check the Update Call panel
+            // uses (_wsIsPauseAction) — covers statuses this hardcoded list
+            // can't predict, e.g. a call that moved all the way to "Pending
+            // Repair Carry In/On Site" after approval: that status isn't
+            // itself a "paused" one, but the part-request/approval cycle in
+            // between DID end the old session, so the stale open log must
+            // still be treated as closeable, not as "a call in progress."
+            let olTl=olT?olT.timeline:[];
+            if(typeof olTl==='string'){try{olTl=JSON.parse(olTl);}catch(e){olTl=[];}}
+            if(!Array.isArray(olTl))olTl=[];
+            const olWs=olTl.filter(function(e){return e&&e.action&&e.action.includes('Work Start')&&e.at;});
+            const olLastWs=olWs.length?new Date(olWs[olWs.length-1].at).getTime():0;
+            const hadPauseAfter=olTl.some(function(e){return e&&e.at&&_wsIsPauseAction(e.action)&&new Date(e.at).getTime()>olLastWs;});
+            if(hadPauseAfter)ticketPaused=true;
           }
         }catch(ex2){}
       }
