@@ -13344,6 +13344,24 @@ async function approveReportEdit(ticketId){
   let tl=await _freshTimeline(ticketId,t);
   const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
   tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
+  // If this edit just changed call_type/service_type so the ticket now
+  // matches "CSP + Non-Warranty + On Site" (same rule saveNewCall uses to
+  // route a brand-new call to the visit-charge gate), it must go through
+  // that SAME gate now too — a call created as Warranty (which skipped the
+  // gate) and later edited to Non-Warranty must not silently stay allocatable
+  // without the customer ever having confirmed the visit/service charge.
+  // Only applies while the ticket hasn't been allocated/worked on yet — an
+  // edit on a call already Assigned/In Progress must not yank it backwards.
+  const mergedCallType=patch.call_type||t.call_type;
+  const mergedServiceType=patch.service_type||t.service_type;
+  const needsVisitChargeApproval=t.wc_type==='CSP'&&(mergedCallType==='Non-Warranty'||mergedCallType==='Non-Warranty Repeat')&&mergedServiceType==='On Site';
+  const alreadyGated=tl.some(e=>e&&e.action&&(e.action==='Visit Charges Approved'||e.action==='Visit Charges Rejected'));
+  const stillPreAllocation=['Pending Allocation','Pending Visit Charge Approval'].includes(t.status);
+  if(needsVisitChargeApproval&&!alreadyGated&&stillPreAllocation&&t.status!=='Pending Visit Charge Approval'){
+    patch.status='Pending Visit Charge Approval';
+    patch.assigned_to=null;patch.assigned_name=null;
+    tl=[...tl,{action:'Routed to Pending Visit Charge Approval',by:'System',at:now,note:'Edit changed this call to CSP Non-Warranty On Site — visit/service charge must be confirmed with the customer before allocation, same as a new call of this type.'}];
+  }
   patch.timeline=tl;
   try{
     await sb('tickets','PATCH',patch,`?id=eq.${ticketId}`);
