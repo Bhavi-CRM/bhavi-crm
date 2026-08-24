@@ -11053,7 +11053,16 @@ async function _deductTicketParts(id){
   const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
   if(!sparesToDeduct.length)return freshT;
   const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
-  const bagOwner=freshT?.service_type==='On Site'?(freshT?.assigned_name||''):'';
+  // Some tickets have a blank/missing service_type (older data, before the
+  // field existed on every row) — the app's OWN edit-form fallback elsewhere
+  // (`t.service_type||'On Site'`) already treats that as On Site, but this
+  // deduction was checking for the exact string 'On Site' only. Any ticket
+  // with a missing service_type therefore fell through to the Carry-In
+  // (company-stock) branch even though it had a real assigned engineer —
+  // this is exactly why company stock decreased instead of the engineer's
+  // bag on some On-Site calls. Only an EXPLICIT 'Carry In' should skip bag
+  // deduction now; everything else (incl. missing/blank) defaults to On Site.
+  const bagOwner=freshT?.service_type!=='Carry In'?(freshT?.assigned_name||''):'';
   // Track exactly which spares actually got deducted — a part_code that
   // doesn't match any inventory row (case/space difference, typo, or the
   // part was deleted from Inventory since) must NOT be silently marked as
