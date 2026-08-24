@@ -9257,6 +9257,7 @@ async function renderReports(){
       <button class="tab" id="rtab-daily" onclick="switchReportTab('daily',this)">📋 Eng Daily Reports</button>
       <button class="tab" id="rtab-wcdaily" onclick="switchReportTab('wcdaily',this)">🎯 WC Daily Reports</button>
       <button class="tab" id="rtab-import" onclick="switchReportTab('import',this)">📥 Import Calls</button>
+      <button class="tab" id="rtab-wrongstock" onclick="switchReportTab('wrongstock',this)">⚠️ Wrong Stock Audit</button>
     </div>
     <div id="report-tab-content"><div class="loading">Loading...</div></div>`;
   await switchReportTab('filter', document.getElementById('rtab-filter'));
@@ -9283,10 +9284,77 @@ async function switchReportTab(tab, el){
     else if(tab==='daily') await renderDailyReports(c);
   else if(tab==='wcdaily') await renderWCDailyReports(c);
   else if(tab==='import') await renderImportCalls(c);
+  else if(tab==='wrongstock') await renderWrongStockAudit(c);
   }catch(e){
     c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }finally{
     clearTimeout(timeout);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// WRONG STOCK AUDIT — historical On-Site tickets where a part got deducted
+// from COMPANY stock instead of the assigned engineer's own bag. This was a
+// real bug (_deductTicketParts used to fall through to the company-stock
+// branch whenever a ticket's service_type was blank/missing, which affected
+// a lot of older tickets) — fixed going forward, but past wrong deductions
+// don't self-correct. _deductTicketParts always tags a company-stock USE
+// movement with from_owner:'MAIN', so any such movement whose ticket is NOT
+// actually Carry In (i.e. was really On Site, or blank/old data with a real
+// assigned engineer) is exactly one of these historical mistakes.
+async function renderWrongStockAudit(c){
+  c.innerHTML='<div class="loading">Scanning eng_movements + tickets — this can take a moment...</div>';
+  try{
+    const moves=await sbAll('eng_movements','?type=eq.USE&from_owner=eq.MAIN&job_sheet=not.is.null&select=id,part_id,qty,job_sheet,created_at,created_by,warranty,notes&order=created_at.desc');
+    if(!moves.length){c.innerHTML='<div class="alert alert-success">✅ No company-stock USE movements found at all.</div>';return;}
+    const ticketIds=[...new Set(moves.map(m=>m.job_sheet).filter(Boolean))];
+    const ticketMap={};
+    for(let i=0;i<ticketIds.length;i+=80){
+      const chunk=ticketIds.slice(i,i+80);
+      const q='?id=in.('+chunk.map(id=>encodeURIComponent(id)).join(',')+')&select=id,service_type,assigned_name,assigned_to,call_type,cname,model,status';
+      const rows=await sb('tickets','GET',null,q).catch(()=>[]);
+      (rows||[]).forEach(t=>{ticketMap[t.id]=t;});
+    }
+    const partIds=[...new Set(moves.map(m=>m.part_id).filter(Boolean))];
+    const partMap={};
+    for(let i=0;i<partIds.length;i+=80){
+      const chunk=partIds.slice(i,i+80);
+      const q='?id=in.('+chunk.map(id=>encodeURIComponent(id)).join(',')+')&select=id,part_code,item_name';
+      const rows=await sb('inventory','GET',null,q).catch(()=>[]);
+      (rows||[]).forEach(p=>{partMap[p.id]=p;});
+    }
+    // A wrong deduction = the ticket exists, was NOT explicitly Carry In
+    // (blank/missing service_type counts as a mistake too — same rule as the
+    // fix), and had a real assigned engineer whose bag should have taken it.
+    const wrong=moves.filter(m=>{
+      const t=ticketMap[m.job_sheet];
+      return t&&t.service_type!=='Carry In'&&t.assigned_name;
+    });
+    if(!wrong.length){
+      c.innerHTML='<div class="alert alert-success">✅ No wrong On-Site → Company-stock deductions found. Everything checked out correctly deducted from the engineer bag.</div>';
+      return;
+    }
+    const rowsHtml=wrong.map(m=>{
+      const t=ticketMap[m.job_sheet]||{};
+      const p=partMap[m.part_id]||{};
+      const dt=m.created_at?new Date(m.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
+      return `<tr>
+        <td style="padding:6px 8px;white-space:nowrap;">${dt}</td>
+        <td style="padding:6px 8px;"><a href="javascript:void(0)" onclick="viewTicket('${t.id}')" style="color:#1d4ed8;font-weight:700;">${t.id||m.job_sheet}</a></td>
+        <td style="padding:6px 8px;">${escHtml(t.cname||'-')}</td>
+        <td style="padding:6px 8px;font-weight:700;">${escHtml(t.assigned_name||'-')}</td>
+        <td style="padding:6px 8px;">${escHtml(p.part_code||m.part_id)} — ${escHtml(p.item_name||'')}</td>
+        <td style="padding:6px 8px;text-align:center;">${m.qty||1}</td>
+        <td style="padding:6px 8px;font-size:11px;color:#64748b;">${escHtml(t.service_type||'(blank)')}</td>
+      </tr>`;
+    }).join('');
+    c.innerHTML=`<div class="alert alert-warning" style="margin-bottom:12px;">⚠️ Found <b>${wrong.length}</b> historical part-use(s) that deducted from COMPANY stock instead of the engineer's bag (now fixed going forward — this list is only past mistakes that need manual Stock Correction if you want the numbers to match reality).</div>
+    <div class="card"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Date</th><th style="padding:6px 8px;">Ticket</th><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;">Engineer</th><th style="padding:6px 8px;">Part</th><th style="padding:6px 8px;">Qty</th><th style="padding:6px 8px;">Service Type (at time)</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div></div>`;
+  }catch(e){
+    c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }
 }
 
