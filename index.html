@@ -6753,7 +6753,11 @@ async function quickStatusChange(id,status){
     // engineer's own cancel does (see saveEngUpdate). This exists because a
     // careless/wrong cancel meant the customer's actual call sometimes never
     // got attended at all — a second set of eyes now confirms it first.
-    const isTrueAdmin=currentUser.role==='admin'||window._isCspMgr;
+    // WC accounts store role:'admin' + role_type:'work_controller' (same
+    // convention used everywhere else in this app, e.g. the pending_edit
+    // approval gate) — checking role==='admin' alone wrongly treated WC as
+    // a true Admin and let them cancel outright, skipping this gate entirely.
+    const isTrueAdmin=(currentUser.role==='admin'&&currentUser.role_type!=='work_controller')||window._isCspMgr;
     if(!isTrueAdmin){
       const pc={requested_by:currentUser.name,requested_by_role:currentUser.role_type==='work_controller'?'WC':(currentUser.role||''),reason:reason.trim(),at:new Date().toISOString(),prev_status:t.status,prev_assigned_to:t.assigned_to||null,prev_assigned_name:t.assigned_name||null};
       const tl=[...(await _freshTimeline(id,t)),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason.trim()}];
