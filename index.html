@@ -6259,7 +6259,7 @@ async function viewTicket(id,autoPrint=false){
           <option>Repaired</option><option>Closed</option><option>Call Cancel</option>
         </select>
       `:''}
-      ${isCancelable?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
+      ${isCancelable&&!t.pending_cancel?`<button class="btn btn-danger btn-sm" onclick="quickStatusChange('${t.id}','Call Cancel')">🚫 Cancel Call</button>`:''}
       ${(currentUser.role==='admin'||window._isCspMgr)&&!isClosed?`<button class="btn btn-sm" onclick="openBackdateClose('${t.id}')" style="background:#374151;color:#fff;border:none;">📅 Back-Date Close</button>`:''}
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
         <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
@@ -6278,6 +6278,15 @@ async function viewTicket(id,autoPrint=false){
             <button class="btn btn-success btn-sm" onclick="approveReportEdit('${t.id}')">✅ Approve</button>
             <button class="btn btn-danger btn-sm" onclick="rejectReportEdit('${t.id}')">❌ Reject</button>
             <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
+          </div>
+        </div>`:''}
+      ${t.pending_cancel&&(currentUser.role==='admin'&&currentUser.role_type!=='work_controller'||window._isCspMgr)?`
+        <div style="width:100%;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
+          🚫 <b>Cancel Requested — Pending Approval</b> — Requested by <b>${t.pending_cancel.requested_by}</b> (${t.pending_cancel.requested_by_role||''})<br>
+          <span style="font-size:12px;color:#991b1b;">Reason: ${t.pending_cancel.reason}</span><br>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger btn-sm" onclick="approveCancelRequest('${t.id}')">✅ Approve Cancel (Permanent)</button>
+            <button class="btn btn-outline btn-sm" onclick="rejectCancelRequest('${t.id}')">❌ Reject — Keep Call Active</button>
           </div>
         </div>`:''}
     </div>`;
@@ -6328,6 +6337,7 @@ async function viewTicket(id,autoPrint=false){
     <hr class="divider">
     <div id="linked-products-box" style="margin-bottom:12px;"></div>
     ${t.pending_edit?`<div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#92400e;">⏳ <b>Report Edit Pending Admin Approval</b> — Requested by ${t.pending_edit.requested_by} at ${new Date(t.pending_edit.requested_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</div>`:''}
+    ${t.pending_cancel?`<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991b1b;">🚫 <b>Cancel Requested — Pending Admin/Manager Approval</b> — Requested by ${t.pending_cancel.requested_by} (${t.pending_cancel.requested_by_role||''}). Call stays active until decided.</div>`:''}
     <h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;">TIMELINE</h3>
     ${tlHtml}
     ${adminActions}`;
@@ -6678,6 +6688,56 @@ async function rejectVisitCharge(id){
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
+// A WC/Engineer's Call Cancel request sits in t.pending_cancel until Admin/
+// Manager decides. Approve makes it permanent (same as today's immediate
+// cancel); Reject asks whether the call should go back to Unallocated or
+// stay with the same engineer it already had — see rejectCancelRequest.
+async function approveCancelRequest(id){
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
+  if(!t||!t.pending_cancel)return;
+  if(!confirm('Approve this cancellation? This is PERMANENT.'))return;
+  const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled (Approved)',by:currentUser.name,at:new Date().toISOString(),note:'Cancel requested by '+t.pending_cancel.requested_by+'. Reason: '+t.pending_cancel.reason}];
+  await sb('tickets','PATCH',{status:'Call Cancel',pending_cancel:null,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
+}
+function rejectCancelRequest(id){
+  var ex=document.getElementById('cancel-reject-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='cancel-reject-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div style="padding:20px;">'
+    +'<div style="font-size:16px;font-weight:800;color:#991b1b;margin-bottom:10px;">❌ Reject Cancel Request</div>'
+    +'<div style="font-size:13px;color:#374151;margin-bottom:16px;">Aa call have kai rite raakhvo chhe?</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;">'
+    +'<button class="btn btn-outline" onclick="_doRejectCancel(\''+id+'\',\'unallocate\')">📤 Unallocate (Pending Allocation)</button>'
+    +'<button class="btn btn-success" onclick="_doRejectCancel(\''+id+'\',\'keep\')">👤 Same Engineer sathe rakho</button>'
+    +'</div>'
+    +'<button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px;" onclick="document.getElementById(\'cancel-reject-modal\').remove()">Cancel</button>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+}
+async function _doRejectCancel(id,choice){
+  var overlay=document.getElementById('cancel-reject-modal');if(overlay)overlay.remove();
+  let t=allTickets.find(x=>x.id===id);
+  if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
+  if(!t||!t.pending_cancel)return;
+  const pc=t.pending_cancel;
+  const patch={pending_cancel:null,updated_at:new Date().toISOString()};
+  let note;
+  if(choice==='unallocate'){
+    patch.status='Pending Allocation';patch.assigned_to=null;patch.assigned_name=null;
+    note='Cancel request rejected by '+currentUser.name+' — call unallocated, needs re-assignment.';
+  }else{
+    note='Cancel request rejected by '+currentUser.name+' — kept with '+(pc.prev_assigned_name||'the same engineer')+', call continues as-is.';
+  }
+  const tl=[...(await _freshTimeline(id,t)),{action:'Cancel Request Rejected',by:currentUser.name,at:new Date().toISOString(),note}];
+  patch.timeline=tl;
+  await sb('tickets','PATCH',patch,`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
+}
 async function quickStatusChange(id,status){
   if(!status)return;
   let t=allTickets.find(x=>x.id===id);
@@ -6688,6 +6748,21 @@ async function quickStatusChange(id,status){
   if(status==='Call Cancel'){
     const reason=prompt('🚫 Cancel Reason (mandatory):');
     if(!reason||!reason.trim()){alert('Reason is mandatory!');return;}
+    // Only a true Admin (or CSP Manager) can cancel a call outright — a WC
+    // cancelling here must go through the same Admin/Manager approval an
+    // engineer's own cancel does (see saveEngUpdate). This exists because a
+    // careless/wrong cancel meant the customer's actual call sometimes never
+    // got attended at all — a second set of eyes now confirms it first.
+    const isTrueAdmin=currentUser.role==='admin'||window._isCspMgr;
+    if(!isTrueAdmin){
+      const pc={requested_by:currentUser.name,requested_by_role:currentUser.role_type==='work_controller'?'WC':(currentUser.role||''),reason:reason.trim(),at:new Date().toISOString(),prev_status:t.status,prev_assigned_to:t.assigned_to||null,prev_assigned_name:t.assigned_name||null};
+      const tl=[...(await _freshTimeline(id,t)),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason.trim()}];
+      await sb('tickets','PATCH',{pending_cancel:pc,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      closeModal('modal-ticket');
+      if(currentPage==='tickets')renderTickets();else renderDashboard();
+      alert('✅ Cancel request sent — waiting for Admin/Manager approval. Call stays active until decided.');
+      return;
+    }
     const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
     await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
     closeModal('modal-ticket');
@@ -7757,6 +7832,25 @@ async function saveEngUpdate(){
       alert('🔧 Pehla "Work Start" button dabao, pachi j status update kari shakso (Resolved By Phone sivay biju badhu).');
       return;
     }
+  }
+
+  // Call Cancel by an Engineer must go for Admin/Manager approval first, not
+  // cancel outright — a careless/wrong cancel sometimes meant the customer's
+  // actual call never got attended at all. The call stays exactly as it was
+  // (status/engineer untouched) until Admin/Manager decides — see
+  // approveCancelRequest/rejectCancelRequest.
+  if(status==='Call Cancel'&&currentUser.role==='engineer'){
+    if(!workDone){alert('❌ Cancel Reason required — describe it in Action Taken.');document.getElementById('upd-work')?.focus();return;}
+    if(!confirm('Send this Cancel request for Admin/Manager approval?'))return;
+    const pc={requested_by:currentUser.name,requested_by_role:'Engineer',reason:workDone,at:new Date().toISOString(),prev_status:t.status,prev_assigned_to:t.assigned_to||null,prev_assigned_name:t.assigned_name||null};
+    const tl=[...(t.timeline||[]),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+workDone}];
+    try{
+      await sb('tickets','PATCH',{pending_cancel:pc,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      closeModal('modal-eng-update');
+      if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
+      alert('✅ Cancel request sent — waiting for Admin/Manager approval. Call stays in your list until decided.');
+    }catch(e){alert('Error: '+e.message);}
+    return;
   }
 
   // MSC Dispatch — engineer just marks status, WC adds dispatch details later
