@@ -8607,7 +8607,8 @@ function invTallyRenderShell(){
   const savedQ=document.getElementById('inv-tally-search')?.value||'';
   c.innerHTML='<div class="card">'
     +'<div class="section-header" style="flex-wrap:wrap;gap:8px;"><h2>🧮 Stock Tally</h2>'
-    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="downloadBlankTallySheet()">📄 Blank Sheet (Excel/Print)</button>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="downloadBlankTallySheet()">📄 Blank Sheet (Excel/Print)</button>'
+    +(currentUser.role==='admin'&&!window._isCspMgr?'<button class="btn btn-outline btn-sm" style="border-color:#7c3aed;color:#7c3aed;" onclick="openBulkStockAdj()">🛠️ Bulk Correction (Multiple Parts)</button>':'')
     +'<button class="btn btn-outline btn-sm" onclick="tallyClearAll()">↺ Clear Counts</button>'
     +'<button class="btn btn-primary btn-sm" onclick="saveStockTally()">💾 Save Tally & Generate Report</button></div></div>'
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">'
@@ -11455,6 +11456,102 @@ async function saveEngAdj(){
     await sb('eng_movements','POST',{type:'ADJUST',part_id:partId,qty:Math.abs(newQty-curQty),from_owner:newQty>curQty?'CORRECTION':owner,to_owner:newQty>curQty?owner:'CORRECTION',notes:`Stock correction: ${curQty}→${newQty} | Reason: ${remark}`,created_by:currentUser?.name||'Admin'});
     closeModal('modal-eng-adj');renderEngParts('overview');
   }catch(e){alert('Error: '+e.message);}
+}
+// ── BULK STOCK CORRECTION (Admin only) ──────────────────────
+// Doing a full Stock Tally on 1800+ parts to fix ~50 real mismatches is slow
+// one-part-at-a-time via the single Stock Correction modal above. This lets
+// Admin type just the mismatched part codes + a +/- delta each (matching
+// exactly how a physical count actually comes back: some parts read higher
+// than CRM, some lower) and apply all of them together in one action, each
+// still logged individually (inventory_log + eng_movements, same as a single
+// correction) so the movement history/date trail stays identical either way.
+window._bulkAdjRows=[];
+function openBulkStockAdj(){
+  if(!(currentUser.role==='admin'&&!window._isCspMgr)){alert('⛔ Bulk stock correction is Admin only.');return;}
+  window._bulkAdjRows=[{code:'',partId:null,curQty:null,delta:'',itemName:''}];
+  var ex=document.getElementById('bulk-adj-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='bulk-adj-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;max-height:90vh;overflow-y:auto;">'
+    +'<div class="modal-header"><h2>🛠️ Bulk Stock Correction</h2><button class="close-btn" onclick="document.getElementById(\'bulk-adj-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#5b21b6;">📋 Enter each mismatched part code and the difference vs CRM stock (+ if physical count is higher, − if lower), then apply all at once — e.g. YH1-2401-000: CRM 5, physical 7 → enter <b>+2</b>. YG2-3114-000: CRM 10, physical 5 → enter <b>-5</b>.</div>'
+    +'<datalist id="bulk-adj-parts-dl">'+(allInventory||[]).map(function(i){return '<option value="'+escHtml(i.part_code||'')+'">';}).join('')+'</datalist>'
+    +'<div style="display:grid;grid-template-columns:1.3fr 0.8fr 0.8fr 0.8fr auto;gap:8px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;padding:0 8px;"><div>Part Code</div><div style="text-align:center;">CRM Stock</div><div style="text-align:center;">Adjust (+/-)</div><div style="text-align:center;">New Stock</div><div></div></div>'
+    +'<div id="bulk-adj-rows"></div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="bulkAdjAddRow()">+ Add Row</button>'
+    +'<div style="margin-top:16px;"><label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px;">Remark (mandatory, applies to all rows) <span style="color:#ef4444;">*</span></label>'
+    +'<input type="text" id="bulk-adj-remark" placeholder="e.g. Stock Tally correction — 25 Aug 2026" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:16px;" onclick="applyBulkStockAdj()">✅ Apply All Corrections</button>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+  bulkAdjRenderRows();
+}
+function bulkAdjAddRow(){
+  window._bulkAdjRows.push({code:'',partId:null,curQty:null,delta:'',itemName:''});
+  bulkAdjRenderRows();
+}
+function bulkAdjRemoveRow(idx){
+  window._bulkAdjRows.splice(idx,1);
+  if(!window._bulkAdjRows.length)window._bulkAdjRows.push({code:'',partId:null,curQty:null,delta:'',itemName:''});
+  bulkAdjRenderRows();
+}
+function bulkAdjSetCode(idx,val){
+  var row=window._bulkAdjRows[idx];if(!row)return;
+  row.code=val;
+  var match=(allInventory||[]).find(function(i){return (i.part_code||'').toLowerCase()===val.trim().toLowerCase();});
+  row.partId=match?match.id:null;
+  row.curQty=match?(match.qty_in_stock||0):null;
+  row.itemName=match?match.item_name:'';
+  bulkAdjRenderRows();
+}
+function bulkAdjSetDelta(idx,val){
+  var row=window._bulkAdjRows[idx];if(!row)return;
+  row.delta=val;
+  var newQtyEl=document.getElementById('bulk-adj-new-'+idx);
+  if(newQtyEl){
+    newQtyEl.textContent=(row.curQty!=null&&val!=='')?Math.max(0,row.curQty+(parseInt(val)||0)):'—';
+  }
+}
+function bulkAdjRenderRows(){
+  var wrap=document.getElementById('bulk-adj-rows');if(!wrap)return;
+  wrap.innerHTML=window._bulkAdjRows.map(function(row,idx){
+    var statusHtml=row.code&&!row.partId?'<span style="color:#dc2626;font-size:11px;">Not found</span>':(row.partId?'<span style="color:#059669;font-size:11px;">'+escHtml(row.itemName||'')+'</span>':'');
+    var newQty=(row.curQty!=null&&row.delta!=='')?Math.max(0,row.curQty+(parseInt(row.delta)||0)):null;
+    return '<div style="display:grid;grid-template-columns:1.3fr 0.8fr 0.8fr 0.8fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#f8fafc;border-radius:8px;">'
+      +'<div><input type="text" list="bulk-adj-parts-dl" placeholder="Part code..." value="'+escHtml(row.code||'')+'" oninput="bulkAdjSetCode('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;box-sizing:border-box;">'+(statusHtml?'<div style="margin-top:2px;">'+statusHtml+'</div>':'')+'</div>'
+      +'<div style="text-align:center;font-size:13px;font-weight:700;">'+(row.curQty!=null?row.curQty:'—')+'</div>'
+      +'<div><input type="number" placeholder="+2 / -5" value="'+escHtml(String(row.delta||''))+'" oninput="bulkAdjSetDelta('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;box-sizing:border-box;"></div>'
+      +'<div id="bulk-adj-new-'+idx+'" style="text-align:center;font-size:13px;font-weight:700;color:#7c3aed;">'+(newQty!=null?newQty:'—')+'</div>'
+      +'<button class="btn-icon" onclick="bulkAdjRemoveRow('+idx+')" style="color:var(--danger);">🗑️</button>'
+      +'</div>';
+  }).join('');
+}
+async function applyBulkStockAdj(){
+  var remark=(document.getElementById('bulk-adj-remark')?.value||'').trim();
+  if(!remark){alert('⚠️ Remark is mandatory.');document.getElementById('bulk-adj-remark')?.focus();return;}
+  var valid=window._bulkAdjRows.filter(function(r){return r.partId&&r.delta!==''&&(parseInt(r.delta)||0)!==0;});
+  if(!valid.length){alert('No valid corrections to apply — enter a part code + non-zero adjustment for at least one row.');return;}
+  if(!confirm('Apply '+valid.length+' stock correction(s)? This updates CRM stock immediately.'))return;
+  var applied=0,failed=[];
+  for(const row of valid){
+    try{
+      const inv=allInventory.find(function(i){return i.id===row.partId;});
+      const curQty=inv?(inv.qty_in_stock||0):0;
+      const delta=parseInt(row.delta)||0;
+      const newQty=Math.max(0,curQty+delta);
+      await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},'?id=eq.'+row.partId);
+      if(inv)inv.qty_in_stock=newQty;
+      await sb('inventory_log','POST',{inventory_id:row.partId,type:delta>0?'in':'out',qty:Math.abs(delta),note:'Bulk Stock Correction: '+curQty+'→'+newQty+' | '+remark,done_by:currentUser.name}).catch(function(){});
+      await sb('eng_movements','POST',{type:'ADJUST',part_id:row.partId,qty:Math.abs(delta),from_owner:delta>0?'CORRECTION':'MAIN',to_owner:delta>0?'MAIN':'CORRECTION',notes:'Bulk Stock Correction: '+curQty+'→'+newQty+' | Reason: '+remark,created_by:currentUser?.name||'Admin'}).catch(function(){});
+      applied++;
+    }catch(e){failed.push((row.code||row.partId)+': '+e.message);}
+  }
+  var msg='✅ Applied '+applied+' correction(s).';
+  if(failed.length)msg+='\n\n❌ Failed:\n'+failed.join('\n');
+  alert(msg);
+  var m=document.getElementById('bulk-adj-modal');if(m)m.remove();
+  renderInventory('tally');
 }
 // ── Engineer self-service view ─────────────────────────────
 async function renderEngSelfService(tab){
