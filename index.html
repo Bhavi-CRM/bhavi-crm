@@ -8536,20 +8536,24 @@ function invSalesRender(){
       <td>${s.part_name||'-'}</td>
       <td><span class="badge ${s.sale_type==='call'?'badge-open':s.sale_type==='dealer'?'badge-warranty':'badge-closed'}">${s.sale_type||'-'}</span></td>
       <td>${typeLabel}</td>
+      <td>${s.sale_type!=='call'?(s.reference||'-'):'-'}</td>
       <td style="text-align:center;">${s.qty||0}</td>
       <td style="text-align:right;">₹${s.unit_price||0}</td>
       <td style="text-align:right;font-weight:700;">₹${((s.qty||0)*(s.unit_price||0)).toFixed(0)}</td>
       <td>${s.added_by||'-'}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
+  }).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
 
   c.innerHTML=`<div class="card">
     <div class="section-header" style="flex-wrap:wrap;gap:8px;">
       <h2>Sales History</h2>
-      <button class="btn btn-primary btn-sm" onclick="openManualSale()">+ Manual Sale</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="openBulkSale()">📦 Bulk Sale Entry</button>
+        <button class="btn btn-primary btn-sm" onclick="openManualSale()">+ Manual Sale</button>
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-      <input id="inv-sal-search" type="text" placeholder="🔍 Part code, name, customer, reference..." value="${escHtml(savedQ)}"
+      <input id="inv-sal-search" type="text" placeholder="🔍 Part code, name, customer, invoice no..." value="${escHtml(savedQ)}"
         oninput="invSalesRender()"
         style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
       <select id="inv-sal-type" onchange="invSalesRender()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
@@ -8567,7 +8571,7 @@ function invSalesRender(){
       <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records | Qty: ${totalQty} | Total: ₹${Math.round(totalVal).toLocaleString('en-IN')}</span>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th></tr></thead>
+      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Invoice No</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
@@ -9039,6 +9043,7 @@ async function openManualSale(){
         </div>
         <div class="form-group"><label>Customer / Dealer Name <span class="req">*</span></label><input type="text" id="sale-customer" placeholder="Name"></div>
         <div class="form-group"><label>Mobile</label><input type="tel" id="sale-mobile" placeholder="Optional"></div>
+        <div class="form-group"><label>Invoice / Bill No</label><input type="text" id="sale-invoice" placeholder="e.g. 1740/26-27"></div>
         <div class="form-group"><label>Part <span class="req">*</span></label>
           <select id="sale-part" onchange="onSalePartChange(this)">
             <option value="">-- Select Part --</option>${partOpts}
@@ -9084,6 +9089,7 @@ async function saveManualSale(){
   const qty=parseInt(document.getElementById('sale-qty').value)||0;
   const price=parseFloat(document.getElementById('sale-price').value)||0;
   const note=document.getElementById('sale-note').value.trim();
+  const invoiceNo=(document.getElementById('sale-invoice')?.value||'').trim();
   if(!date||!customer||!partCode||!qty||!price){alert('Please fill all required fields');return;}
   if(qty>availStock){alert('Insufficient stock! Available: '+availStock);return;}
   try{
@@ -9091,6 +9097,7 @@ async function saveManualSale(){
       sale_date:date,part_code:partCode,part_name:partName,
       sale_type:saleType,customer_name:customer,mobile:mobile||null,
       qty,unit_price:price,total_amount:qty*price,
+      reference:invoiceNo||null,
       note:note||null,added_by:currentUser.name,
       created_at:new Date().toISOString()
     });
@@ -9103,6 +9110,129 @@ async function saveManualSale(){
     alert('✅ Sale saved! Stock updated.');
     renderInventory('sales');
   }catch(e){alert('Error: '+e.message);}
+}
+// ── BULK SALE ENTRY ─────────────────────────────────────────
+// Same idea as Bulk Stock Correction — enter Date + Part Code (auto-fills
+// name/price/available stock) + Qty + Invoice No per row, add as many rows as
+// needed, submit once. Each row becomes its own Manual Sale entry (same
+// inventory_sales POST + stock deduction saveManualSale does), so Sales
+// History/filtering behaves identically either way.
+window._bulkSaleRows=[];
+function openBulkSale(){
+  window._bulkSaleRows=[{date:new Date().toLocaleDateString('en-CA'),code:'',partId:null,itemName:'',price:0,avail:null,qty:1,invoice:''}];
+  var ex=document.getElementById('bulk-sale-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='bulk-sale-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:900px;max-height:90vh;overflow-y:auto;">'
+    +'<div class="modal-header"><h2>📦 Bulk Sale Entry</h2><button class="close-btn" onclick="document.getElementById(\'bulk-sale-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">📋 Pick a date, type the part code (name/price/stock auto-fill), enter Qty and Invoice No, add more rows as needed, then Save All — each row is recorded exactly like a Manual Sale and deducts stock immediately.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
+    +'<div class="form-group" style="flex:1;min-width:160px;"><label>Sale Type <span class="req">*</span></label><select id="bsale-type"><option value="dealer">Dealer</option><option value="customer">Direct Customer</option></select></div>'
+    +'<div class="form-group" style="flex:1;min-width:200px;"><label>Customer / Dealer Name <span class="req">*</span></label><input type="text" id="bsale-customer" placeholder="Applies to all rows below"></div>'
+    +'</div>'
+    +'<datalist id="bulk-sale-parts-dl">'+(allInventory||[]).map(function(i){return '<option value="'+escHtml(i.part_code||'')+'">';}).join('')+'</datalist>'
+    +'<div style="display:grid;grid-template-columns:1fr 1.3fr 0.7fr 0.8fr 0.9fr auto;gap:8px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;padding:0 8px;"><div>Date</div><div>Part Code</div><div style="text-align:center;">Qty</div><div style="text-align:center;">Price ₹</div><div>Invoice No</div><div></div></div>'
+    +'<div id="bulk-sale-rows"></div>'
+    +'<button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="bulkSaleAddRow()">+ Add Row</button>'
+    +'<div style="margin-top:16px;font-size:13px;font-weight:700;">Grand Total: <span id="bulk-sale-total" style="color:#16a34a;">₹0</span></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="applyBulkSale()">✅ Save All Sales</button>'
+    +'</div></div>';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  document.body.appendChild(ov);
+  bulkSaleRenderRows();
+}
+function bulkSaleAddRow(){
+  window._bulkSaleRows.push({date:new Date().toLocaleDateString('en-CA'),code:'',partId:null,itemName:'',price:0,avail:null,qty:1,invoice:''});
+  bulkSaleRenderRows();
+}
+function bulkSaleRemoveRow(idx){
+  window._bulkSaleRows.splice(idx,1);
+  if(!window._bulkSaleRows.length)window._bulkSaleRows.push({date:new Date().toLocaleDateString('en-CA'),code:'',partId:null,itemName:'',price:0,avail:null,qty:1,invoice:''});
+  bulkSaleRenderRows();
+}
+function bulkSaleUpdateTotal(){
+  var total=window._bulkSaleRows.reduce(function(a,r){return a+(r.qty||0)*(r.price||0);},0);
+  var el=document.getElementById('bulk-sale-total');if(el)el.textContent='₹'+total.toFixed(0);
+}
+// Same rule as Bulk Stock Correction: never rebuild #bulk-sale-rows on a
+// keystroke — that destroys/recreates every input and drops focus after one
+// character. Only the specific fields that actually change get updated
+// directly; bulkSaleRenderRows() (full rebuild) only runs on Add/Remove Row.
+function bulkSaleSetDate(idx,val){var r=window._bulkSaleRows[idx];if(r)r.date=val;}
+function bulkSaleSetCode(idx,val){
+  var row=window._bulkSaleRows[idx];if(!row)return;
+  row.code=val;
+  var match=(allInventory||[]).find(function(i){return (i.part_code||'').toLowerCase()===val.trim().toLowerCase();});
+  row.partId=match?match.id:null;
+  row.itemName=match?match.item_name:'';
+  row.price=match?(match.unit_price||0):0;
+  row.avail=match?(match.qty_in_stock||0):null;
+  var statusEl=document.getElementById('bsale-status-'+idx);
+  if(statusEl)statusEl.innerHTML=row.code&&!row.partId?'<span style="color:#dc2626;font-size:11px;">Not found</span>':(row.partId?'<span style="color:#059669;font-size:11px;">'+escHtml(row.itemName||'')+' — Stock: '+row.avail+'</span>':'');
+  var priceEl=document.getElementById('bsale-price-'+idx);
+  if(priceEl)priceEl.value=row.price;
+  bulkSaleUpdateTotal();
+}
+function bulkSaleSetQty(idx,val){
+  var r=window._bulkSaleRows[idx];if(!r)return;
+  r.qty=parseInt(val)||0;
+  bulkSaleUpdateTotal();
+}
+function bulkSaleSetPrice(idx,val){
+  var r=window._bulkSaleRows[idx];if(!r)return;
+  r.price=parseFloat(val)||0;
+  bulkSaleUpdateTotal();
+}
+function bulkSaleSetInvoice(idx,val){var r=window._bulkSaleRows[idx];if(r)r.invoice=val;}
+function bulkSaleRenderRows(){
+  var wrap=document.getElementById('bulk-sale-rows');if(!wrap)return;
+  wrap.innerHTML=window._bulkSaleRows.map(function(row,idx){
+    var statusHtml=row.code&&!row.partId?'<span style="color:#dc2626;font-size:11px;">Not found</span>':(row.partId?'<span style="color:#059669;font-size:11px;">'+escHtml(row.itemName||'')+' — Stock: '+row.avail+'</span>':'');
+    return '<div style="display:grid;grid-template-columns:1fr 1.3fr 0.7fr 0.8fr 0.9fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#f8fafc;border-radius:8px;">'
+      +'<div><input type="date" value="'+escHtml(row.date||'')+'" oninput="bulkSaleSetDate('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12.5px;box-sizing:border-box;"></div>'
+      +'<div><input type="text" list="bulk-sale-parts-dl" placeholder="Part code..." value="'+escHtml(row.code||'')+'" oninput="bulkSaleSetCode('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;box-sizing:border-box;"><div id="bsale-status-'+idx+'" style="margin-top:2px;">'+statusHtml+'</div></div>'
+      +'<div><input type="number" min="1" value="'+(row.qty||1)+'" oninput="bulkSaleSetQty('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;box-sizing:border-box;"></div>'
+      +'<div><input type="number" min="0" id="bsale-price-'+idx+'" value="'+(row.price||0)+'" oninput="bulkSaleSetPrice('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;box-sizing:border-box;"></div>'
+      +'<div><input type="text" placeholder="Invoice No" value="'+escHtml(row.invoice||'')+'" oninput="bulkSaleSetInvoice('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;box-sizing:border-box;"></div>'
+      +'<button class="btn-icon" onclick="bulkSaleRemoveRow('+idx+')" style="color:var(--danger);">🗑️</button>'
+      +'</div>';
+  }).join('');
+  bulkSaleUpdateTotal();
+}
+async function applyBulkSale(){
+  var saleType=document.getElementById('bsale-type')?.value||'dealer';
+  var customer=(document.getElementById('bsale-customer')?.value||'').trim();
+  if(!customer){alert('⚠️ Customer / Dealer Name is mandatory.');document.getElementById('bsale-customer')?.focus();return;}
+  var valid=window._bulkSaleRows.filter(function(r){return r.partId&&r.qty>0;});
+  if(!valid.length){alert('No valid rows — enter a part code + qty for at least one row.');return;}
+  var overStock=valid.filter(function(r){return r.avail!=null&&r.qty>r.avail;});
+  if(overStock.length&&!confirm('⚠️ '+overStock.length+' row(s) have Qty more than available stock (stock will floor at 0). Continue anyway?'))return;
+  if(!confirm('Save '+valid.length+' sale(s) for '+customer+'? This deducts stock immediately.'))return;
+  var applied=0,failed=[];
+  for(const row of valid){
+    try{
+      await sb('inventory_sales','POST',{
+        sale_date:row.date,part_code:row.code,part_name:row.itemName,
+        sale_type:saleType,customer_name:customer,
+        qty:row.qty,unit_price:row.price,total_amount:row.qty*row.price,
+        reference:row.invoice||null,note:'Bulk Sale Entry',added_by:currentUser.name,
+        created_at:new Date().toISOString()
+      });
+      const inv=allInventory.find(function(i){return i.id===row.partId;});
+      if(inv){
+        const newQty=Math.max(0,(inv.qty_in_stock||0)-row.qty);
+        await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+        inv.qty_in_stock=newQty;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:row.qty,note:'Bulk Sale to '+customer,done_by:currentUser.name}).catch(function(){});
+      }
+      applied++;
+    }catch(e){failed.push((row.code||'')+': '+e.message);}
+  }
+  var msg='✅ Saved '+applied+' sale(s). Stock updated.';
+  if(failed.length)msg+='\n\n❌ Failed:\n'+failed.join('\n');
+  alert(msg);
+  var m=document.getElementById('bulk-sale-modal');if(m)m.remove();
+  renderInventory('sales');
 }
 async function checkPendingPartsAuto(){
   try{
@@ -11496,6 +11626,13 @@ function bulkAdjRemoveRow(idx){
   if(!window._bulkAdjRows.length)window._bulkAdjRows.push({code:'',partId:null,curQty:null,delta:'',itemName:''});
   bulkAdjRenderRows();
 }
+// IMPORTANT: never rebuild the whole #bulk-adj-rows container on a keystroke
+// (innerHTML = ... destroys and recreates every <input>, which throws away
+// focus after every single character — exactly the "types one letter then
+// stops" bug already fixed once before for the Stock Tally search box). Each
+// row's dynamic bits (CRM stock, status, new-stock preview) get their own
+// stable id and are updated directly instead; bulkAdjRenderRows() (full
+// rebuild) only runs for structural changes — adding/removing a row.
 function bulkAdjSetCode(idx,val){
   var row=window._bulkAdjRows[idx];if(!row)return;
   row.code=val;
@@ -11503,7 +11640,12 @@ function bulkAdjSetCode(idx,val){
   row.partId=match?match.id:null;
   row.curQty=match?(match.qty_in_stock||0):null;
   row.itemName=match?match.item_name:'';
-  bulkAdjRenderRows();
+  var curEl=document.getElementById('bulk-adj-cur-'+idx);
+  if(curEl)curEl.textContent=row.curQty!=null?row.curQty:'—';
+  var statusEl=document.getElementById('bulk-adj-status-'+idx);
+  if(statusEl)statusEl.innerHTML=row.code&&!row.partId?'<span style="color:#dc2626;font-size:11px;">Not found</span>':(row.partId?'<span style="color:#059669;font-size:11px;">'+escHtml(row.itemName||'')+'</span>':'');
+  var newQtyEl=document.getElementById('bulk-adj-new-'+idx);
+  if(newQtyEl)newQtyEl.textContent=(row.curQty!=null&&row.delta!=='')?Math.max(0,row.curQty+(parseInt(row.delta)||0)):'—';
 }
 function bulkAdjSetDelta(idx,val){
   var row=window._bulkAdjRows[idx];if(!row)return;
@@ -11519,8 +11661,8 @@ function bulkAdjRenderRows(){
     var statusHtml=row.code&&!row.partId?'<span style="color:#dc2626;font-size:11px;">Not found</span>':(row.partId?'<span style="color:#059669;font-size:11px;">'+escHtml(row.itemName||'')+'</span>':'');
     var newQty=(row.curQty!=null&&row.delta!=='')?Math.max(0,row.curQty+(parseInt(row.delta)||0)):null;
     return '<div style="display:grid;grid-template-columns:1.3fr 0.8fr 0.8fr 0.8fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#f8fafc;border-radius:8px;">'
-      +'<div><input type="text" list="bulk-adj-parts-dl" placeholder="Part code..." value="'+escHtml(row.code||'')+'" oninput="bulkAdjSetCode('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;box-sizing:border-box;">'+(statusHtml?'<div style="margin-top:2px;">'+statusHtml+'</div>':'')+'</div>'
-      +'<div style="text-align:center;font-size:13px;font-weight:700;">'+(row.curQty!=null?row.curQty:'—')+'</div>'
+      +'<div><input type="text" list="bulk-adj-parts-dl" placeholder="Part code..." value="'+escHtml(row.code||'')+'" oninput="bulkAdjSetCode('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;box-sizing:border-box;">'+'<div id="bulk-adj-status-'+idx+'" style="margin-top:2px;">'+statusHtml+'</div></div>'
+      +'<div id="bulk-adj-cur-'+idx+'" style="text-align:center;font-size:13px;font-weight:700;">'+(row.curQty!=null?row.curQty:'—')+'</div>'
       +'<div><input type="number" placeholder="+2 / -5" value="'+escHtml(String(row.delta||''))+'" oninput="bulkAdjSetDelta('+idx+',this.value)" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:13px;text-align:center;box-sizing:border-box;"></div>'
       +'<div id="bulk-adj-new-'+idx+'" style="text-align:center;font-size:13px;font-weight:700;color:#7c3aed;">'+(newQty!=null?newQty:'—')+'</div>'
       +'<button class="btn-icon" onclick="bulkAdjRemoveRow('+idx+')" style="color:var(--danger);">🗑️</button>'
@@ -27234,8 +27376,11 @@ function pendingListRender(){
       var _plIsReady=t.status==='Pending Repair On Site';
       var _plRowStyle=_plIsPendParts?'border-bottom:1px solid #e2e8f0;background:repeating-linear-gradient(135deg,#f3f4f6,#f3f4f6 6px,#e5e7eb 6px,#e5e7eb 12px);':_plIsReady?'border-bottom:1px solid #bbf7d0;background:#dcfce7;':'border-bottom:1px solid #e2e8f0;';
       var _plHoldBadge=_plIsPendParts?' <span style="background:#fee2e2;color:#b91c1c;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">⛔ HOLD</span>':_plIsReady?' <span style="background:#bbf7d0;color:#15803d;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;">✅ READY</span>':'';
+      var _plIsW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+      var _plTypeBadge=_plIsW?'<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;">🛡️ WARRANTY</span>':'<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;">💳 NON-WARRANTY</span>';
       rows+='<tr style="'+_plRowStyle+'">'
         +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#1d4ed8;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
+        +'<div style="margin-top:3px;">'+_plTypeBadge+'</div>'
         +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">'+createdDate+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;color:#1f2937;font-size:13px;">'+escHtml(t.cname||'—')+'</div>'
         +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
