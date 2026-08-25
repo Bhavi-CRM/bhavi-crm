@@ -8607,7 +8607,8 @@ function invTallyRenderShell(){
   const savedQ=document.getElementById('inv-tally-search')?.value||'';
   c.innerHTML='<div class="card">'
     +'<div class="section-header" style="flex-wrap:wrap;gap:8px;"><h2>🧮 Stock Tally</h2>'
-    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="tallyClearAll()">↺ Clear Counts</button>'
+    +'<div style="display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="downloadBlankTallySheet()">📄 Blank Sheet (Excel/Print)</button>'
+    +'<button class="btn btn-outline btn-sm" onclick="tallyClearAll()">↺ Clear Counts</button>'
     +'<button class="btn btn-primary btn-sm" onclick="saveStockTally()">💾 Save Tally & Generate Report</button></div></div>'
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">'
     +'📋 <b>How to use:</b> Physically count each part in the office and type the counted qty in the "Physical Count" column. Your counts auto-save as you type — close this and come back anytime (even a different device) and they\'ll still be here. "With Engineers" is shown for reference only (that stock is out with engineers, not counted here). When fully done, click <b>Save Tally &amp; Generate Report</b> — any part where Physical ≠ System gets corrected (logged in Movement Log) and a report downloads.'
@@ -8747,6 +8748,39 @@ async function saveStockTally(){
     window._tallyPhysical={};
     renderInventory('tally');
   }catch(e){alert('Error saving tally: '+e.message);}
+}
+// A blank, printable/Excel count sheet — for taking a physical count somewhere
+// without a PC (a shop area, a store room). Write the counts on paper there,
+// then come back and type them into the app's Physical Count column, same as
+// always. Respects whatever the search box / Consumables-only checkbox is
+// currently filtering to, so a Consumables-only weekly tally gets a short
+// sheet instead of the full 1800+ part list every time.
+function downloadBlankTallySheet(){
+  const engStock=window._tallyEngStock||[];
+  const q=(document.getElementById('inv-tally-search')?.value||'').toLowerCase();
+  const consOnly=!!window._tallyConsumableOnly;
+  const items=(allInventory||[]).filter(function(i){
+    if(consOnly&&!i.is_consumable)return false;
+    if(!q)return true;
+    return (i.part_code||'').toLowerCase().includes(q)||(i.item_name||'').toLowerCase().includes(q);
+  }).sort(function(a,b){return (a.part_code||'').localeCompare(b.part_code||'');});
+  if(!items.length){alert('No parts to include — check your search/filter.');return;}
+  const rows=items.map(function(i){
+    const withEng=engStock.filter(function(s){return s.part_id===i.id;}).reduce(function(a,s){return a+(s.qty||0);},0);
+    return {
+      'Part Code':i.part_code||'',
+      'Item Name':i.item_name||'',
+      'System (Office)':i.qty_in_stock||0,
+      'With Engineers':withEng,
+      'Physical Count':'',
+      'Variance':''
+    };
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:16},{wch:32},{wch:14},{wch:14},{wch:14},{wch:10}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Blank Tally Sheet');
+  XLSX.writeFile(wb,'Blank_Stock_Tally_'+new Date().toLocaleDateString('en-CA')+(consOnly?'_Consumables':'')+'.xlsx');
 }
 function downloadTallyReportExcel(rows,date){
   if(!rows||!rows.length)return;
