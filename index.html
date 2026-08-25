@@ -2855,7 +2855,17 @@ function setupNav(){
     window._appIsWC=isWC;
     window._appIsAdmin=isAdmin;
     window._appIsPeon=isPeon;
-    
+    // Reset here EVERY time setupNav runs (i.e. every login) — this used to
+    // only ever be SET (true) inside the Engineer branch below and never
+    // reset otherwise, so if an Engineer-Manager (ENG001/ENG002) had been
+    // logged in earlier in the same browser session and the app then
+    // switched to an Admin/WC login without a full page reload, that WC
+    // silently inherited a stale window._isCspMgr=true — letting a plain WC
+    // bypass the Call Cancel approval gate (and other _isCspMgr-gated
+    // actions) as if they were a CSP Manager. Now defaults false on every
+    // login; only the Engineer branch below can turn it back on.
+    window._isCspMgr=false;
+
     // Debug log
     console.log('setupNav:', {role, roleType, isEng, isWC, isAdmin, user: currentUser.user_id});
 
@@ -6161,6 +6171,13 @@ async function viewTicket(id,autoPrint=false){
     return;
   }
   const isOnSite=t.service_type==='On Site';const isWarranty=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  // Out of Coverage means the warranty was voided for this call — parts must
+  // bill exactly like Non-Warranty from that point on, same as every other
+  // charge calc in the app already does (_spareHidesPrice, invoice/job sheet
+  // generation, savePartRequest's approval routing). This view was the one
+  // place still checking isWarranty alone, so a voided-warranty call kept
+  // showing "₹0 (W)" on a genuine part instead of billing it.
+  const isOOC=t.warranty_coverage==='Out of Coverage';
   const isCustReject=t.status==='Customer Reject';
   const spares=t.spares||[];
   // Customer Reject: the part(s) were only requested/estimated — customer
@@ -6177,7 +6194,7 @@ async function viewTicket(id,autoPrint=false){
   // "Billable" parts total: normally excludes ALL parts on a Warranty call
   // (Canon covers them, ₹0 to customer) — EXCEPT a Consumable part, which is
   // charged even under warranty (Canon never covers/replaces consumables).
-  const total=isCustReject?0:spares.filter(s=>(!s.requested||isPendingApprovalView)&&(!isWarranty||isChargeableSpare(s))).reduce((a,s)=>a+s.qty*(s.price||0),0);
+  const total=isCustReject?0:spares.filter(s=>(!s.requested||isPendingApprovalView)&&(!isWarranty||isOOC||isChargeableSpare(s))).reduce((a,s)=>a+s.qty*(s.price||0),0);
   const finalCharge=parseFloat(t.final_charges)||0;
   const labCharge=parseFloat(t.labor)||parseFloat(t.service_charges)||0;
   const svcCharge=labCharge;
@@ -6309,7 +6326,7 @@ async function viewTicket(id,autoPrint=false){
       </div>
       <div><h3 style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">CALL INFO</h3>
         <div style="font-size:13px;line-height:1.9;">Model: <b>${t.model}</b><br>Serial: <b>${t.serial}</b> ${(t.serial||'').startsWith('NO-SN-')?`<button class="btn btn-outline btn-sm" style="padding:1px 8px;font-size:11px;" onclick="openSerialEditModal('${t.id}')">✏️ Edit</button>`:''}<br>
-        Type: ${t.call_type} | ${t.service_type}<br>
+        Type: ${t.call_type} | ${t.service_type}${isOOC?' <span style="color:#dc2626;font-weight:700;font-size:11px;background:#fee2e2;padding:1px 6px;border-radius:4px;">⚠️ OUT OF COVERAGE</span>':''}<br>
         ${t.se_call_id?'SE Call ID: <b>'+t.se_call_id+'</b><br>':''}
         ${t.wc_type==='CSP'?(t.page_count!=null?'Page Count: <b>'+t.page_count+'</b><br>':(t.page_count_skip_reason?'Page Count: <b style="color:#b45309;">Skipped</b> — '+escHtml(t.page_count_skip_reason)+'<br>':'')):''}
         Engineer: <b>${t.assigned_name||'<span style="color:var(--danger);">Unassigned</span>'}</b><br>
@@ -6326,10 +6343,10 @@ async function viewTicket(id,autoPrint=false){
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
       <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>{const isCons=isChargeableSpare(s);const freeOnWarranty=isWarranty&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      <tbody>${spares.map(s=>{const isCons=isChargeableSpare(s);const freeOnWarranty=isWarranty&&!isOOC&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
     </table>
     <div style="font-size:13px;background:${isCustReject?'#fef2f2':'#f0fdf4'};padding:10px;border-radius:8px;">
-    ${isWarranty?(total>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Service: ₹0</span> <span>+ Consumable Parts: <b>₹${total.toFixed(0)}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Consumables are not covered under warranty — customer pays for these.</span>`:(grand>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0</span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Charges recorded on this call don't match the current parts list below — check Final Charges / re-run Approve-Reject if this looks wrong.</span>`:`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`)):isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
+    ${isWarranty?(total>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Service: ₹0</span> <span>+ Consumable Parts: <b>₹${total.toFixed(0)}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Consumables are not covered under warranty — customer pays for these.</span>`:(isOOC?`<span style="color:#dc2626;font-weight:700;">⚠️ Out of Coverage — Service: <b>₹${svcCharge}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Warranty void — billed like Non-Warranty.</span>`:(grand>svcCharge?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0</span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Charges recorded on this call don't match the current parts list below — check Final Charges / re-run Approve-Reject if this looks wrong.</span>`:`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`))):isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
     </div>`:''}
     ${svcCharge>0&&!spares.length&&!isWarranty?`<hr class="divider"><div style="font-size:13px;text-align:right;background:#f0fdf4;padding:8px;border-radius:8px;"><b style="color:#065f46;">Service Charges: ₹${svcCharge}${finalCharge>0?' | Final: ₹'+finalCharge:''}</b></div>`:''}
     ${t.customer_signature?`<hr class="divider"><b style="font-size:12px;">Customer Signature:</b><br><img src="${t.customer_signature}" style="max-height:60px;border:1px solid var(--border);border-radius:8px;margin-top:4px;">`:''}
