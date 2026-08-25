@@ -4891,7 +4891,7 @@ function ticketPagerHtml(info){
 function ticketRow(t){
   const isCarryIn=t.service_type==='Carry In';
   const rowStyle=isCarryIn?'background:#ffedd5;':'';
-  return `<tr style="${rowStyle}"><td><b>${t.id}</b></td><td>${t.cname||'-'}</td>
+  return `<tr style="${rowStyle}"><td onclick="viewTicket('${t.id}')" style="cursor:pointer;"><b style="color:#1d4ed8;">${t.id}</b></td><td onclick="viewTicket('${t.id}')" style="cursor:pointer;">${t.cname||'-'}</td>
     <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
     <td>${t.model||'-'}</td><td>${t.serial||'-'}</td>
     <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
