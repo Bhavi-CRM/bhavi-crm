@@ -133,6 +133,7 @@ tr:hover td{background:#f8fafc;}
 .kpi-prem-slate{background:linear-gradient(135deg,#1e293b 0%,#475569 100%);}
 .kpi-prem-violet{background:linear-gradient(135deg,#3b0764 0%,#7c3aed 100%);}
 .kpi-prem-cyan{background:linear-gradient(135deg,#164e63 0%,#0891b2 100%);}
+.kpi-prem-red{background:linear-gradient(135deg,#7f1d1d 0%,#dc2626 100%);}
 /* VERTICAL CHART */
 .vchart-wrap{display:flex;align-items:stretch;gap:6px;padding:0 2px;}
 .vchart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;}
@@ -3712,6 +3713,7 @@ async function renderDashboard(){
       const pendRepairOS=dashTix.filter(t=>t.status==='Pending Repair On Site').length;
       const custRejectCount=dashTix.filter(t=>t.status==='Customer Reject').length;
       const cancelCount=dashTix.filter(t=>t.status==='Call Cancel').length;
+      const pendCancelApprovalCount=dashTix.filter(t=>t.pending_cancel).length;
       const activeStatuses=['Pending Visit Charge Approval','Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Customer Approval','Customer Approved','Pending Parts','Pending Repair Carry In','Pending Repair On Site'];
       const activeTickets=dashTix.filter(t=>activeStatuses.includes(t.status));
       const ciTotal=dashTix.filter(t=>t.service_type==='Carry In').length;
@@ -3744,6 +3746,7 @@ async function renderDashboard(){
         <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Pending Parts',allTickets.filter(function(t){return t.status==='Pending Parts';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Parts</div><span class="kp-icon">🔩</span></div><div class="kp-val">${pendParts}</div><div class="kp-sub">Awaiting spare parts</div></div>
         <div class="kpi-prem kpi-prem-cyan" style="cursor:pointer;" onclick="showKpiDetail('Pending Repair',allTickets.filter(function(t){return t.status==='Pending Repair Carry In'||t.status==='Pending Repair On Site';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Repair</div><span class="kp-icon">🔧</span></div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Repair scheduled</div></div>
         <div class="kpi-prem kpi-prem-slate" style="cursor:pointer;" onclick="showKpiDetail('Cancelled',allTickets.filter(isTicketCancelled))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancelled</div><span class="kp-icon">🚫</span></div><div class="kp-val">${cancelled}</div><div class="kp-sub">Call cancelled</div></div>
+        ${(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)?`<div class="kpi-prem kpi-prem-red" style="cursor:pointer;${pendCancelApprovalCount?'':'opacity:.6;'}" onclick="showKpiDetail('Cancel — Pending Approval',allTickets.filter(function(t){return t.pending_cancel;}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancel Approval</div><span class="kp-icon">⏳</span></div><div class="kp-val">${pendCancelApprovalCount}</div><div class="kp-sub">Awaiting your decision</div></div>`:''}
       </div>
       <!-- Charts Row 1: Engineer vertical bars + Call type pie -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
@@ -4894,7 +4897,7 @@ function ticketRow(t){
     <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span> <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;${isCarryIn?'background:#fed7aa;color:#9a3412;':'background:#bfdbfe;color:#1e40af;'}">${isCarryIn?'🏠 CARRY IN':'📍 ON SITE'}</span></td>
     <td>${t.assigned_name||'<span style="color:var(--danger);font-size:12px;">⚠️ Unassigned</span>'}</td>
-    <td>${statusBadge(t.status)}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
+    <td>${statusBadge(t.status)}${t.pending_cancel?` <span style="background:#fecaca;color:#7f1d1d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🚫 Cancel Pending</span>`:''}${t.pending_edit?` <span style="background:#fbbf24;color:#78350f;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✏️ Edit</span>`:''}${(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat')&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)?(t.invoice_done?` <span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">✅ Inv</span>`:` <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;">🧾 Pending</span>`):''}</td>
     <td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'-'}</td>
     <td style="white-space:nowrap;">
       <button class="btn-icon" onclick="viewTicket('${t.id}')">👁️</button>
@@ -6788,6 +6791,7 @@ async function quickStatusChange(id,status){
         alert('❌ Could not send cancel request: '+pcErr.message+'\n\nIf this mentions "pending_cancel", the database is missing that column — run the setup SQL for it, then try again.');
         return;
       }
+      tgNotifyAll('🚫 <b>Cancel Request — Approval Needed</b>\nTicket: '+id+'\nCustomer: '+(t.cname||'')+'\nRequested by: '+currentUser.name+' ('+(currentUser.role_type==='work_controller'?'WC':currentUser.role)+')\nReason: '+reason.trim()+'\n\nOpen the ticket in All Tickets — look for the 🚫 Cancel Pending tag — to Approve or Reject.');
       closeModal('modal-ticket');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
       alert('✅ Cancel request sent — waiting for Admin/Manager approval. Call stays active until decided.');
@@ -7876,10 +7880,11 @@ async function saveEngUpdate(){
     const tl=[...(t.timeline||[]),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+workDone}];
     try{
       await sb('tickets','PATCH',{pending_cancel:pc,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      tgNotifyAll('🚫 <b>Cancel Request — Approval Needed</b>\nTicket: '+id+'\nCustomer: '+(t.cname||'')+'\nRequested by: '+currentUser.name+' (Engineer)\nReason: '+workDone+'\n\nOpen the ticket in All Tickets — look for the 🚫 Cancel Pending tag — to Approve or Reject.');
       closeModal('modal-eng-update');
       if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
       alert('✅ Cancel request sent — waiting for Admin/Manager approval. Call stays in your list until decided.');
-    }catch(e){alert('Error: '+e.message);}
+    }catch(e){alert('❌ Could not send cancel request: '+e.message+'\n\nIf this mentions "pending_cancel", the database is missing that column — run the setup SQL for it, then try again.');}
     return;
   }
 
