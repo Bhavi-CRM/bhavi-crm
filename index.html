@@ -6778,7 +6778,16 @@ async function quickStatusChange(id,status){
     if(!isTrueAdmin){
       const pc={requested_by:currentUser.name,requested_by_role:currentUser.role_type==='work_controller'?'WC':(currentUser.role||''),reason:reason.trim(),at:new Date().toISOString(),prev_status:t.status,prev_assigned_to:t.assigned_to||null,prev_assigned_name:t.assigned_name||null};
       const tl=[...(await _freshTimeline(id,t)),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason.trim()}];
-      await sb('tickets','PATCH',{pending_cancel:pc,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      try{
+        await sb('tickets','PATCH',{pending_cancel:pc,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+      }catch(pcErr){
+        // pending_cancel is a NEW column — if the DB migration hasn't been run
+        // yet this PATCH fails outright and used to do so silently (no catch
+        // at all), so the WC saw nothing happen with no explanation. Surface
+        // it clearly instead of failing invisibly.
+        alert('❌ Could not send cancel request: '+pcErr.message+'\n\nIf this mentions "pending_cancel", the database is missing that column — run the setup SQL for it, then try again.');
+        return;
+      }
       closeModal('modal-ticket');
       if(currentPage==='tickets')renderTickets();else renderDashboard();
       alert('✅ Cancel request sent — waiting for Admin/Manager approval. Call stays active until decided.');
