@@ -9128,7 +9128,7 @@ function openBulkSale(){
     +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#1e40af;">📋 Pick a date, type the part code (name/price/stock auto-fill), enter Qty and Invoice No, add more rows as needed, then Save All — each row is recorded exactly like a Manual Sale and deducts stock immediately.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
     +'<div class="form-group" style="flex:1;min-width:160px;"><label>Sale Type <span class="req">*</span></label><select id="bsale-type"><option value="dealer">Dealer</option><option value="customer">Direct Customer</option></select></div>'
-    +'<div class="form-group" style="flex:1;min-width:200px;"><label>Customer / Dealer Name <span class="req">*</span></label><input type="text" id="bsale-customer" placeholder="Applies to all rows below"></div>'
+    +'<div class="form-group" style="flex:1;min-width:200px;"><label>Customer / Dealer Name</label><input type="text" id="bsale-customer" value="RECEPTION" placeholder="Applies to all rows below"></div>'
     +'</div>'
     +'<datalist id="bulk-sale-parts-dl">'+(allInventory||[]).map(function(i){return '<option value="'+escHtml(i.part_code||'')+'">';}).join('')+'</datalist>'
     +'<div style="display:grid;grid-template-columns:1fr 1.3fr 0.7fr 0.8fr 0.9fr auto;gap:8px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;padding:0 8px;"><div>Date</div><div>Part Code</div><div style="text-align:center;">Qty</div><div style="text-align:center;">Price ₹</div><div>Invoice No</div><div></div></div>'
@@ -9137,7 +9137,9 @@ function openBulkSale(){
     +'<div style="margin-top:16px;font-size:13px;font-weight:700;">Grand Total: <span id="bulk-sale-total" style="color:#16a34a;">₹0</span></div>'
     +'<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="applyBulkSale()">✅ Save All Sales</button>'
     +'</div></div>';
-  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  // Deliberately NOT closing on a backdrop click — after entering many rows
+  // of a bulk sale, one accidental click outside the modal used to silently
+  // discard everything typed so far. Only the ✕ button closes this now.
   document.body.appendChild(ov);
   bulkSaleRenderRows();
 }
@@ -9201,8 +9203,7 @@ function bulkSaleRenderRows(){
 }
 async function applyBulkSale(){
   var saleType=document.getElementById('bsale-type')?.value||'dealer';
-  var customer=(document.getElementById('bsale-customer')?.value||'').trim();
-  if(!customer){alert('⚠️ Customer / Dealer Name is mandatory.');document.getElementById('bsale-customer')?.focus();return;}
+  var customer=(document.getElementById('bsale-customer')?.value||'').trim()||'RECEPTION';
   var valid=window._bulkSaleRows.filter(function(r){return r.partId&&r.qty>0;});
   if(!valid.length){alert('No valid rows — enter a part code + qty for at least one row.');return;}
   var overStock=valid.filter(function(r){return r.avail!=null&&r.qty>r.avail;});
@@ -11613,7 +11614,8 @@ function openBulkStockAdj(){
     +'<input type="text" id="bulk-adj-remark" placeholder="e.g. Stock Tally correction — 25 Aug 2026" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
     +'<button class="btn btn-primary" style="width:100%;margin-top:16px;" onclick="applyBulkStockAdj()">✅ Apply All Corrections</button>'
     +'</div></div>';
-  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  // No backdrop-click-to-close here either — same reason as Bulk Sale Entry,
+  // an accidental outside click must never wipe out a long list of typed rows.
   document.body.appendChild(ov);
   bulkAdjRenderRows();
 }
