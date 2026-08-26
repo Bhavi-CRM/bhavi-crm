@@ -6685,9 +6685,23 @@ function shareInvoiceWA(){
 async function voidWarranty(id){
   const r=prompt('Reason (required):');if(!r)return;
   const t=allTickets.find(x=>x.id===id)||(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
-  const tl=[...(t?.timeline||[]),{action:'Warranty Void',by:currentUser.name,at:new Date().toISOString(),note:r}];
-  await sb('tickets','PATCH',{warranty_coverage:'Out of Coverage',coverage_remark:r,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
-  closeModal('modal-ticket');if(currentPage==='tickets')renderTickets();else renderDashboard();
+  // Same gap as engVoidWarranty (the engineer-side version of this action):
+  // a part already indented as free warranty (requested:false) before this
+  // call is voided must go back through customer approval now that it bills
+  // like Non-Warranty — otherwise the customer is charged real money they
+  // were never shown/asked to approve.
+  const existingSpares=(t?.spares||[]);
+  const hasUnapprovedExisting=existingSpares.some(function(s){return s.code&&!s.requested&&(parseFloat(s.price)||0)>0;});
+  const revisedSpares=existingSpares.map(function(s){
+    return (s.code&&!s.requested&&(parseFloat(s.price)||0)>0)?Object.assign({},s,{requested:true}):s;
+  });
+  const tl=[...(t?.timeline||[]),{action:'Warranty Void',by:currentUser.name,at:new Date().toISOString(),note:r+(hasUnapprovedExisting?' | Existing part(s) on this call now need customer approval (no longer free warranty).':'')}];
+  const patchData={warranty_coverage:'Out of Coverage',coverage_remark:r,timeline:tl,updated_at:new Date().toISOString()};
+  if(hasUnapprovedExisting){patchData.spares=revisedSpares;patchData.status='Pending Customer Approval';}
+  await sb('tickets','PATCH',patchData,`?id=eq.${id}`);
+  closeModal('modal-ticket');
+  if(hasUnapprovedExisting){alert('⚠️ This call already had part(s) fitted as free warranty — since it\'s now Out of Coverage, those parts need customer approval. Call moved to Pending Customer Approval.');}
+  if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
 // CSP Non-Warranty On Site calls sit in "Pending Visit Charge Approval" until
 // WC/Admin/Manager confirms on the phone that the customer actually agreed
@@ -7557,21 +7571,43 @@ async function engVoidWarranty(id){
   const svcCharges=parseFloat(svcInput)||0;
   
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
+  // A part indented BEFORE this call was marked Out of Coverage was treated
+  // as free warranty at the time (requested:false, auto-approved, no customer
+  // sign-off needed) — that decision is no longer valid now that the whole
+  // call bills like Non-Warranty. Without this, the part silently starts
+  // showing as chargeable in every total/report from here on, but the
+  // customer was NEVER asked to approve that money — same gap the
+  // Non-Warranty flow always closes via Pending Customer Approval. Flip any
+  // such already-priced spare back to requested:true and route through the
+  // exact same approval step a fresh Non-Warranty part request would.
+  const existingSpares=(t?.spares||[]);
+  const hasUnapprovedExisting=existingSpares.some(function(s){return s.code&&!s.requested&&(parseFloat(s.price)||0)>0;});
+  const revisedSpares=existingSpares.map(function(s){
+    return (s.code&&!s.requested&&(parseFloat(s.price)||0)>0)?Object.assign({},s,{requested:true}):s;
+  });
   const tl=[...(t?.timeline||[]),{
     action:'Out of Coverage — Service Charges Set',
     by:currentUser.name,
     at:new Date().toISOString(),
-    note:'Reason: '+r+' | Service Charges: ₹'+svcCharges
+    note:'Reason: '+r+' | Service Charges: ₹'+svcCharges+(hasUnapprovedExisting?' | Existing part(s) on this call now need customer approval (no longer free warranty).':'')
   }];
-  await sb('tickets','PATCH',{
+  const patchData={
     warranty_coverage:'Out of Coverage',
     coverage_remark:r,
     service_charges:svcCharges,
     labor:svcCharges,
     timeline:tl,
     updated_at:new Date().toISOString()
-  },`?id=eq.${id}`);
+  };
+  if(hasUnapprovedExisting){
+    patchData.spares=revisedSpares;
+    patchData.status='Pending Customer Approval';
+  }
+  await sb('tickets','PATCH',patchData,`?id=eq.${id}`);
   closeModal('modal-eng-update');
+  if(hasUnapprovedExisting){
+    alert('⚠️ This call already had part(s) fitted as free warranty — since it\'s now Out of Coverage, those parts need customer approval like any Non-Warranty charge. Call moved to Pending Customer Approval.');
+  }
   openEngUpdate(id);
 }
 
@@ -10872,11 +10908,29 @@ async function renderWarrantyPending(showAll){
     // Also fetch warranty tickets with spares not yet in eng_movements
     var ticketWarrantyRows=[];
     try{
-      const wTickets=await sbAll('tickets','?call_type=in.(Warranty,Warranty Repeat,AMC)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at&order=created_at.desc');
+      // A part must be BOTH genuinely fitted (not still an estimate awaiting
+      // customer/stock decisions — s.requested===true means it's still just
+      // a line item in Pending Customer Approval/Pending Parts/etc, nothing
+      // has actually been used yet) AND the call itself must have actually
+      // finished — before it can count as "sent out on warranty, waiting for
+      // Canon to send it back". This used to fire the moment a part was
+      // merely INDENTED on a warranty call (added to spares[] via Request
+      // Part), regardless of whether the call had closed or the customer had
+      // even approved it yet — so a call still sitting in Pending Parts (or
+      // even Pending Customer Approval) already showed up here as if the
+      // part had been used and Canon owed a replacement.
+      var CLOSED_FOR_WARRANTY=['Closed','Delivered','Pending for Delivery','Resolved By Phone'];
+      const wTickets=await sbAll('tickets','?call_type=in.(Warranty,Warranty Repeat,AMC)&status=in.(Closed,Delivered,Pending for Delivery,Resolved By Phone)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at,timeline&order=created_at.desc');
       wTickets.forEach(function(t){
+        if(!CLOSED_FOR_WARRANTY.includes(t.status))return;
         var spares=t.spares||[];
-        if(typeof spares==='string'){try{spares=JSON.parse(spares);}catch(e){spares=[];}}        spares.forEach(function(s){
-          if(!s.code)return;
+        if(typeof spares==='string'){try{spares=JSON.parse(spares);}catch(e){spares=[];}}
+        // The date this part actually left the shelf — the call's real
+        // completion date, NOT when the ticket/part-request was first
+        // created — so "days overdue" counts from close day, as it should.
+        var completedDate=_engCompletionDate(t)||t.created_at;
+        spares.forEach(function(s){
+          if(!s.code||s.requested)return;
           // Check if already tracked in eng_movements (USE/DIRECT_IN) or already returned
           var trackKey=t.se_call_id?(t.se_call_id.split('/').pop().trim()):'';
           var matchesPart=function(m){return m.part_id&&allInventory.find(function(x){return x.id===m.part_id&&(x.part_code===s.code||x.item_name===s.name);});};
@@ -10896,7 +10950,7 @@ async function renderWarrantyPending(showAll){
               spare_name:s.name||s.code,
               qty:s.qty||1,
               status:t.status,
-              created_at:t.created_at,
+              created_at:completedDate,
             });
           }
         });
