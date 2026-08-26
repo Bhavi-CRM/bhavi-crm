@@ -2851,6 +2851,10 @@ function setupNav(){
     const isPeon=role==='peon';
     // ACCT001 = Chaula Trivedi (Accountant): sees all tickets, can add invoice
     window._isAcct=(currentUser.user_id==='ACCT001'||currentUser.eng_id==='ACCT001');
+    // WC001 (ICP Work Controller) gets cross-type visibility — sees and can
+    // manage BOTH CSP and ICP calls, not just ICP — same "no wc_type filter"
+    // treatment ACCT001 already gets.
+    window._isFullWC=(currentUser.user_id==='WC001'||currentUser.eng_id==='WC001');
     // Cache role flags globally so all page renderers use the same detection
     window._appIsEng=isEng;
     window._appIsWC=isWC;
@@ -3672,7 +3676,7 @@ async function renderDashboard(){
   pc.innerHTML='<div class="loading">Loading...</div>';
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc';
-    if(currentUser.role_type==='work_controller'){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc';}}
+    if(currentUser.role_type==='work_controller'&&!window._isAcct&&!window._isFullWC){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc';}}
     try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     // Dashboard period filter
     const _dpf=window._dashPeriod||'all';
@@ -4786,14 +4790,14 @@ async function renderTickets(){
     } else if(currentUser.role==='engineer'){
       q=`?assigned_to=eq.${engId}&order=created_at.desc`;
     } else if(currentUser.role_type==='work_controller'){
-      if(!window._isAcct){
+      if(!window._isAcct&&!window._isFullWC){
         const wcName=(currentUser.name||'').toUpperCase();
         let wcType='ICP';
         if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
         else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
         if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
       }
-      // ACCT001: no wc_type filter — sees all tickets
+      // ACCT001 / WC001: no wc_type filter — sees all tickets (CSP + ICP)
     }
     try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     renderTicketTable();
@@ -5140,7 +5144,7 @@ async function renderMyCalls(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
     const engId=currentUser.eng_id||currentUser.user_id;
-    const tickets=await sb('tickets','GET',null,`?assigned_to=eq.${engId}&select=id,assigned_name,created_at,cname,mobile,alt_mobile,model,serial,problem,status,priority,call_type,service_type,se_call_id,tat_date,address,area,city,state,pin,planned_date,sequence_no&order=created_at.desc`);
+    const tickets=await sb('tickets','GET',null,`?assigned_to=eq.${engId}&select=id,assigned_name,created_at,cname,mobile,alt_mobile,model,serial,problem,status,priority,call_type,service_type,se_call_id,tat_date,address,area,city,state,pin,planned_date,sequence_no,remarks&order=created_at.desc`);
     window._myCallsTickets=tickets;
     await mcBuildPrevLocMap(tickets);
     const todayStr=new Date().toLocaleDateString('en-CA');
@@ -5273,6 +5277,7 @@ async function renderMyCalls(){
                     <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${(()=>{const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');return isW?` <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">🛡️ WARRANTY</span>`:` <span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">💳 NON-WARRANTY</span>`;})()}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
                     ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
+                    ${t.remarks?`<div style="font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:6px;padding:3px 8px;margin-top:4px;">📝 WC Remark: ${t.remarks}</div>`:''}
                   </div>
                   <div style="flex-shrink:0;">${statusBadge(t.status)}</div>
                 </div>
@@ -27193,6 +27198,17 @@ async function saveRoutePlanInline(){
         patch.timeline=[...rpTl,{action:'Assigned to '+c.eng_name+' (Route Plan)',by:currentUser.name,at:new Date().toISOString(),note:'Planned date: '+today+(c.seq?' | Seq: '+c.seq:'')}];
       }
       await sb('tickets','PATCH',patch,'?id=eq.'+encodeURIComponent(tid));saved++;
+      // Assigning/reassigning from Pending List's Route Plan mode used to save
+      // fine but never tell the engineer — quickEngChange (the ticket-view
+      // "Reassign Engineer" dropdown) already sends this notification, this
+      // was the one other place a ticket gets assigned that didn't.
+      if(c.eng_id){
+        var _rpT=(window._pendingData||[]).find(function(x){return x.id===tid;})||{};
+        var _rpPrevEng=_rpT.assigned_name||'';
+        var _rpReassign=(_rpPrevEng&&_rpPrevEng!==c.eng_name)?'♻️ Reassigned (was: '+_rpPrevEng+')':'🆕 New Assignment';
+        tgNotifyAll('📋 <b>Ticket '+_rpReassign+' (Route Plan)</b>\n🎫 #'+tid+'\n👤 '+(_rpT.cname||'')+' | 📱 '+(_rpT.mobile||'')+'\n📍 '+(_rpT.area||'')+'\n🔧 '+(_rpT.model||'')+' | S/N: '+(_rpT.serial||'—')+'\n❗ '+(_rpT.problem||'')+'\n👷 Assigned to: '+c.eng_name+'\n📅 Planned: '+today);
+        tgNotifyEngineer(c.eng_id,'📋 <b>Ticket Assigned to You</b>\n🎫 #'+tid+'\n👤 '+(_rpT.cname||'')+' | 📱 '+(_rpT.mobile||'')+'\n📍 '+(_rpT.area||'')+'\n🔧 '+(_rpT.model||'')+' | S/N: '+(_rpT.serial||'—')+'\n❗ '+(_rpT.problem||'')+'\n📅 Planned: '+today);
+      }
     }catch(e){console.error(e);}
   }
   if(btn){btn.disabled=false;btn.textContent='💾 Save Route Plan';}
@@ -27223,7 +27239,7 @@ function pendingListRender(){
   var pc=document.getElementById('page-content');if(!pc)return;
   var all=window._pendingData||[];
 
-  var wcFilter=window._pendingWCFilter||'CSP';
+  var wcFilter=window._pendingWCFilter!=null?window._pendingWCFilter:(window._isFullWC?'':'CSP');
   var brandFilter=window._pendingBrandFilter||'';
   var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
   var searchQ=(window._pendingSearch||'').toLowerCase();
@@ -27436,7 +27452,7 @@ function pendingListRender(){
     +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
     +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
     +'</select>'
-    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\'CSP\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';pendingListRender();" '
+    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\''+(window._isFullWC?'':'CSP')+'\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
     +'<span id="pending-count" style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
@@ -27464,7 +27480,7 @@ function pendingListRender(){
 // Only re-render results (tbody + count) when search box changes — preserves focus
 function pendingListRenderResults(){
   var all=window._pendingData||[];
-  var wcFilter=window._pendingWCFilter||'CSP';
+  var wcFilter=window._pendingWCFilter!=null?window._pendingWCFilter:(window._isFullWC?'':'CSP');
   var brandFilter=window._pendingBrandFilter||'';
   var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
   var searchQ=(window._pendingSearch||'').toLowerCase();
@@ -27532,7 +27548,7 @@ async function markDelivered(ticketId){
 async function exportPendingListExcel(){
   try{
     var all=window._pendingData||[];
-    var wcFilter=window._pendingWCFilter||'CSP';
+    var wcFilter=window._pendingWCFilter!=null?window._pendingWCFilter:(window._isFullWC?'':'CSP');
     var brandFilter=window._pendingBrandFilter||'';
     var searchQ=(window._pendingSearch||'').toLowerCase();
 
