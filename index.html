@@ -6293,7 +6293,7 @@ async function viewTicket(id,autoPrint=false){
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
       <button class="btn btn-sm" onclick="generateInvoice('${t.id}')" style="background:#7c3aed;color:#fff;border:none;">🧾 Invoice</button>
-      ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller')&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
+      ${!isClosed&&(currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||window._isCspMgr)&&!t.pending_edit?`<button class="btn btn-sm" onclick="openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Edit Report</button>`:''}
       ${(()=>{var isNW=(t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat');var canInv=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||currentUser.role==='admin'||window._isCspMgr||window._isAcct;if(!isNW||!isClosed||!canInv)return'';var inner='';if(t.invoice_done){inner=`<div style="display:inline-flex;align-items:center;gap:6px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#15803d;">✅ Invoice Done${t.invoice_no?' — #'+t.invoice_no:''}</div><button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#6b7280;color:#fff;border:none;margin-left:6px;">✏️ Edit</button>`;}else{var canMark=currentUser.role_type==='work_controller'||currentUser.role==='work_controller'||window._isAcct;inner=canMark?`<button class="btn btn-sm" onclick="openInvoiceModal('${t.id}')" style="background:#f59e0b;color:#fff;border:none;">🧾 Add Invoice No.</button>`:`<div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;color:#92400e;">⚠️ Invoice Pending</div>`;}return`<span id="inv-status-${t.id}">${inner}</span>`;})()}
       ${t.pending_edit&&(currentUser.role==='admin'&&currentUser.role_type!=='work_controller'||window._isCspMgr)?`
         <div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
@@ -6315,11 +6315,16 @@ async function viewTicket(id,autoPrint=false){
           </div>
         </div>`:''}
     </div>`;
-  } else if(currentUser.role==='engineer' && t.status==='Pending Customer Approval' && t.assigned_to===(currentUser.eng_id||currentUser.user_id)){
+  } else if(currentUser.role==='engineer' && !isClosed && t.assigned_to===(currentUser.eng_id||currentUser.user_id)){
     // Engineer handles approval/rejection on their own assigned call directly —
     // no need to wait for admin/WC (same Approve/Reject Estimate modal admin uses).
+    // Separately — if something about the call's DETAILS looks wrong (wrong
+    // model, serial, mobile, etc.), the engineer can request a correction the
+    // same way WC/Manager do: it goes to Admin/Manager approval, never
+    // applies directly, so wrong data can't silently slip in unreviewed.
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>
+      ${t.status==='Pending Customer Approval'?`<button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>`:''}
+      ${t.pending_edit?'<span style="font-size:12px;color:#92400e;background:#fef3c7;padding:6px 12px;border-radius:8px;font-weight:600;">⏳ Edit request pending approval</span>':`<button class="btn btn-sm" onclick="closeModal('modal-ticket');openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Request Edit</button>`}
     </div>`;
   }
 
