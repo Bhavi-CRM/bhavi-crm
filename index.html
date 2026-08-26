@@ -9285,19 +9285,49 @@ async function checkPendingPartsAuto(){
   try{
     const pendingParts=await sb('tickets','GET',null,'?status=eq.Pending Parts');
     for(const t of pendingParts){
-      const spares=t.spares||[];
-      let allAvailable=true;
+      // BUG (fixed): this used to only check spares with requested===true —
+      // but the moment a customer approves an estimate, EVERY spare on it
+      // flips to requested:false (that flag means "billing finalized", not
+      // "physically in stock"). So once approved, this loop found nothing
+      // left to check at all, defaulted allAvailable=true, and promoted the
+      // ticket to Pending Repair the next time this ran (e.g. anyone just
+      // opening the Inventory page) — even with most of the needed parts
+      // still missing. A 5-part call with only 3 purchased in would jump
+      // straight to Pending Repair, then fail with "part not in stock" at
+      // actual close time. Every spare with a code must be checked here,
+      // regardless of requested — this status is purely about physical
+      // availability, all parts must be in hand before repair can start.
+      const spares=(t.spares||[]).filter(s=>s.code);
+      if(!spares.length)continue;
+      // Same 3-way rule used everywhere else a stock check drives status
+      // (processApproval, savePartRequest): On Site needs the part in the
+      // ASSIGNED ENGINEER's own bag, not just company stock — company stock
+      // alone only gets it to "Pending Engineer Stock" (admin still has to
+      // hand it over). Carry In only cares about company stock.
+      let anyPendingEngStock=false,anyPendingNoParts=false;
       for(const s of spares){
-        if(s.requested&&s.code){
-          const inv=await sb('inventory','GET',null,`?part_code=eq.${s.code}`);
-          if(!inv.length||inv[0].qty_in_stock<(s.qty||1)){allAvailable=false;break;}
-        }
+        try{
+          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
+          const invItem=inv&&inv[0];
+          const companyQty=invItem?(invItem.qty_in_stock||0):0;
+          if(t.service_type==='On Site'){
+            let bagQty=0;
+            if(t.assigned_name&&invItem){
+              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
+              bagQty=esCheck.length?esCheck[0].qty:0;
+            }
+            if(bagQty<(s.qty||1)){
+              if(companyQty>=(s.qty||1))anyPendingEngStock=true;else anyPendingNoParts=true;
+            }
+          }else{
+            if(companyQty<(s.qty||1))anyPendingNoParts=true;
+          }
+        }catch(e){anyPendingNoParts=true;}
       }
-      if(allAvailable&&spares.length){
-        const newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
-        const tl=[...(t.timeline||[]),{action:'Parts Available — Auto Status Update',by:'System',at:new Date().toISOString()}];
-        await sb('tickets','PATCH',{status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
-      }
+      if(anyPendingNoParts)continue; // still missing at least one part — stay in Pending Parts
+      const newStatus=anyPendingEngStock?'Pending Engineer Stock':(t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site');
+      const tl=[...(t.timeline||[]),{action:'Parts Available — Auto Status Update',by:'System',at:new Date().toISOString(),note:anyPendingEngStock?'All parts now in company stock — waiting to be issued to engineer.':'All required parts now available — ready to repair.'}];
+      await sb('tickets','PATCH',{status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
     }
   }catch(e){}
 }
