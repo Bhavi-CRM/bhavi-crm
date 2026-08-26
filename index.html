@@ -3677,6 +3677,10 @@ async function renderDashboard(){
   try{
     let q=currentUser.role==='engineer'?`?assigned_to=eq.${currentUser.eng_id}&order=created_at.desc`:'?order=created_at.desc';
     if(currentUser.role_type==='work_controller'&&!window._isAcct&&!window._isFullWC){const wcName=(currentUser.name||'').toUpperCase();let wcType='ICP';if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';if(wcType==='ICP'){q='?or=(wc_type.eq.ICP,wc_type.is.null)&order=created_at.desc';}else{q='?wc_type=eq.'+wcType+'&order=created_at.desc';}}
+    // WC001 (ICP WC, full cross-type visibility): all ICP calls, but CSP only
+    // its Carry In calls — CSP On Site volume is high and not this WC's
+    // concern, they only need CSP's Carry In counter-work.
+    else if(window._isFullWC){q='?or=(wc_type.eq.ICP,wc_type.is.null,and(wc_type.eq.CSP,service_type.eq.Carry In))&order=created_at.desc';}
     try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     // Dashboard period filter
     const _dpf=window._dashPeriod||'all';
@@ -4796,8 +4800,11 @@ async function renderTickets(){
         if(wcName.includes('CSP')||(currentUser.user_id||'').toUpperCase().includes('CSP'))wcType='CSP';
         else if(wcName.includes('ICP')||(currentUser.user_id||'').toUpperCase().includes('ICP'))wcType='ICP';
         if(wcType==='ICP'){q+='&or=(wc_type.eq.ICP,wc_type.is.null)';}else{q+='&wc_type=eq.'+wcType;}
+      }else if(window._isFullWC){
+        // All ICP calls, but CSP only its Carry In calls — see renderDashboard for why.
+        q+='&or=(wc_type.eq.ICP,wc_type.is.null,and(wc_type.eq.CSP,service_type.eq.Carry In))';
       }
-      // ACCT001 / WC001: no wc_type filter — sees all tickets (CSP + ICP)
+      // ACCT001: no wc_type filter — sees all tickets (CSP + ICP)
     }
     try{allTickets=await sbAll('tickets',q);}catch(qe){allTickets=await sbAll('tickets','?order=created_at.desc');}
     renderTicketTable();
@@ -27316,7 +27323,10 @@ async function renderPendingList(){
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired&status=neq.Resolved+By+Phone&status=neq.Pending+for+Delivery'
       +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem,remarks'
       +'&order=created_at.desc&limit=2000');
-    window._pendingData=tickets||[];
+    // WC001 (ICP WC, full cross-type visibility): sees all ICP calls, but
+    // CSP only its Carry In calls — CSP On Site volume is high and isn't
+    // this WC's concern, see renderDashboard for the same rule.
+    window._pendingData=window._isFullWC?(tickets||[]).filter(function(t){return t.wc_type!=='CSP'||t.service_type==='Carry In';}):(tickets||[]);
     if(!allEngineers||!allEngineers.length)try{allEngineers=await sb('users','GET',null,'?role=eq.engineer&is_active=eq.true&order=name');}catch(e){}
     pendingListRender();
   }catch(e){
