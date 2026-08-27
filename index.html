@@ -3709,7 +3709,19 @@ async function renderDashboard(){
       const monthEntries=Object.entries(byMonth).slice(-6);const maxM=Math.max(...monthEntries.map(([,v])=>v),1);
       const inProgress=dashTix.filter(t=>t.status==='In Progress').length;
       const pendParts=dashTix.filter(t=>t.status==='Pending Parts').length;
-      const pendRepair=dashTix.filter(t=>['Pending Repair Carry In','Pending Repair On Site'].includes(t.status)).length;
+      // "Pending Repair" was too narrow (literally status==='Pending Repair
+      // Carry In/On Site' only) — redefined per request: for Carry In, this
+      // now means EVERY call still in the pipeline before repair actually
+      // starts (Pending Allocation/Approval/Parts/Repair etc, anything not
+      // yet Repaired/Delivered/Closed/Cancelled) — one number for "how many
+      // carry-in devices are sitting here in any pending state right now."
+      const CI_PENDING_EXCLUDE=['Closed','Delivered','Call Cancel','Customer Reject','Resolved By Phone','Repaired','Pending for Delivery'];
+      const pendRepair=dashTix.filter(t=>t.service_type==='Carry In'&&!CI_PENDING_EXCLUDE.includes(t.status)).length;
+      // NEW — Carry In devices already repaired but still sitting in the
+      // office waiting for the customer to collect (Repaired/Pending for
+      // Delivery) — separate from "pending repair" above since the repair
+      // itself is done here, only delivery is outstanding.
+      const pendDeliveryCI=dashTix.filter(t=>t.service_type==='Carry In'&&['Repaired','Pending for Delivery'].includes(t.status)).length;
       const cancelled=dashTix.filter(isTicketCancelled).length;
       const warranty=dashTix.filter(t=>t.call_type==='Warranty'||t.call_type==='Warranty Repeat').length;
       const nonWarranty=dashTix.filter(t=>t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat').length;
@@ -3752,7 +3764,8 @@ async function renderDashboard(){
       <div class="kpi-prem-grid">
         <div class="kpi-prem kpi-prem-blue" style="cursor:pointer;" onclick="showKpiDetail('In Progress',allTickets.filter(function(t){return t.status==='In Progress';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">In Progress</div><span class="kp-icon">⚡</span></div><div class="kp-val">${inProgress}</div><div class="kp-sub">Being worked on</div></div>
         <div class="kpi-prem kpi-prem-amber" style="cursor:pointer;" onclick="showKpiDetail('Pending Parts',allTickets.filter(function(t){return t.status==='Pending Parts';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Parts</div><span class="kp-icon">🔩</span></div><div class="kp-val">${pendParts}</div><div class="kp-sub">Awaiting spare parts</div></div>
-        <div class="kpi-prem kpi-prem-cyan" style="cursor:pointer;" onclick="showKpiDetail('Pending Repair',allTickets.filter(function(t){return t.status==='Pending Repair Carry In'||t.status==='Pending Repair On Site';}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Repair</div><span class="kp-icon">🔧</span></div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Repair scheduled</div></div>
+        <div class="kpi-prem kpi-prem-cyan" style="cursor:pointer;" onclick="showKpiDetail('Pending (Carry In)',allTickets.filter(function(t){return t.service_type==='Carry In'&&!['Closed','Delivered','Call Cancel','Customer Reject','Resolved By Phone','Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Repair</div><span class="kp-icon">🔧</span></div><div class="kp-val">${pendRepair}</div><div class="kp-sub">Carry In — any pending stage</div></div>
+        <div class="kpi-prem kpi-prem-teal" style="cursor:pointer;" onclick="showKpiDetail('Pending Delivery (Carry In)',allTickets.filter(function(t){return t.service_type==='Carry In'&&['Repaired','Pending for Delivery'].includes(t.status);}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Pending Delivery</div><span class="kp-icon">📦</span></div><div class="kp-val">${pendDeliveryCI}</div><div class="kp-sub">Repaired — awaiting pickup</div></div>
         <div class="kpi-prem kpi-prem-slate" style="cursor:pointer;" onclick="showKpiDetail('Cancelled',allTickets.filter(isTicketCancelled))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancelled</div><span class="kp-icon">🚫</span></div><div class="kp-val">${cancelled}</div><div class="kp-sub">Call cancelled</div></div>
         ${(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)?`<div class="kpi-prem kpi-prem-red" style="cursor:pointer;${pendCancelApprovalCount?'':'opacity:.6;'}" onclick="showKpiDetail('Cancel — Pending Approval',allTickets.filter(function(t){return t.pending_cancel;}))"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="kp-label">Cancel Approval</div><span class="kp-icon">⏳</span></div><div class="kp-val">${pendCancelApprovalCount}</div><div class="kp-sub">Awaiting your decision</div></div>`:''}
       </div>
@@ -4853,6 +4866,9 @@ function renderTicketTable(filtered){
         <select id="ticket-wc-filter" onchange="filterTickets()">
           <option value="">All WC Type</option><option>ICP</option><option>CSP</option>
         </select>
+        <select id="ticket-service-filter" onchange="filterTickets()">
+          <option value="">Carry In / On Site</option><option>Carry In</option><option>On Site</option>
+        </select>
         <select id="ticket-brand-filter" onchange="filterTickets()" style="min-width:140px;">
           <option value="">All Brands</option><option>Printer</option><option>Scanner</option>
         </select>
@@ -4929,6 +4945,7 @@ function filterTickets(keepPage){
   const s=document.getElementById('ticket-status-filter')?.value||'';
   const tp=document.getElementById('ticket-type-filter')?.value||'';
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
+  const svc=document.getElementById('ticket-service-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
   const problem=document.getElementById('ticket-problem-filter')?.value||'';
@@ -4941,7 +4958,7 @@ function filterTickets(keepPage){
     const isNW=t.call_type==='Non-Warranty'||t.call_type==='Non-Warranty Repeat';
     const mInv=!inv||(inv==='pending'&&isNW&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)&&!t.invoice_done)||(inv==='done'&&isNW&&INVOICE_ELIGIBLE_STATUSES.includes(t.status)&&t.invoice_done);
     const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
-    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
+    return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&(!svc||t.service_type===svc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
   });
   const pageInfo=_ticketPageSlice(f);
   document.getElementById('ticket-tbody').innerHTML=pageInfo.slice.map(t=>ticketRow(t)).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
@@ -4952,6 +4969,7 @@ async function exportFilteredTickets(){
   const s=document.getElementById('ticket-status-filter')?.value||'';
   const tp=document.getElementById('ticket-type-filter')?.value||'';
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
+  const svc=document.getElementById('ticket-service-filter')?.value||'';
   const brand=document.getElementById('ticket-brand-filter')?.value||'';
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
   const problem=document.getElementById('ticket-problem-filter')?.value||'';
@@ -4959,7 +4977,7 @@ async function exportFilteredTickets(){
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
     const mBrand=!brand||t.brand_name?.toLowerCase().includes(brand.toLowerCase());
     const mProblem=!problem||(t.problem||'').toLowerCase().includes(problem.toLowerCase());
-    return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&mBrand&&(!eng||t.assigned_to===eng)&&mProblem;
+    return mQ&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&(!svc||t.service_type===svc)&&mBrand&&(!eng||t.assigned_to===eng)&&mProblem;
   });
   if(!filtered.length){alert('No records to export.');return;}
 
@@ -10934,6 +10952,30 @@ function showPartEngBreakdown(partId){
   },0);
 }
 
+// A part accidentally logged as a genuine Canon warranty return (e.g. it was
+// actually chargeable/consumable, or a plain mis-click) needs a way out
+// without hand-editing the database — this removes it from the Warranty
+// Returns list permanently. Real eng_movements rows just get warranty:false
+// (drops out of every warranty=eq.true query used here); a "From Ticket"
+// synthetic row has no DB row of its own yet, so the flag lives directly on
+// that spare in the ticket instead.
+async function reclassifyWarrantyMovement(movId){
+  if(!confirm('Mark this as NOT a genuine warranty return (wrong part logged)?\n\nIt will be removed from this list permanently.'))return;
+  try{
+    await sb('eng_movements','PATCH',{warranty:false},'?id=eq.'+movId);
+    renderWarrantyPending();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function reclassifyWarrantyTicketSpare(ticketId,spareCode){
+  if(!confirm('Mark this as NOT a genuine warranty return on this call (wrong part logged)?\n\nIt will be removed from this list permanently.'))return;
+  try{
+    const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(ticketId)))[0];
+    if(!t){alert('Ticket not found.');return;}
+    const spares=(t.spares||[]).map(function(s){return s.code===spareCode?Object.assign({},s,{warranty_return_na:true}):s;});
+    await sb('tickets','PATCH',{spares,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(ticketId));
+    renderWarrantyPending();
+  }catch(e){alert('Error: '+e.message);}
+}
 async function renderWarrantyPending(showAll){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
@@ -10972,7 +11014,7 @@ async function renderWarrantyPending(showAll){
         // created — so "days overdue" counts from close day, as it should.
         var completedDate=_engCompletionDate(t)||t.created_at;
         spares.forEach(function(s){
-          if(!s.code||s.requested)return;
+          if(!s.code||s.requested||s.warranty_return_na)return;
           // Check if already tracked in eng_movements (USE/DIRECT_IN) or already returned
           var trackKey=t.se_call_id?(t.se_call_id.split('/').pop().trim()):'';
           var matchesPart=function(m){return m.part_id&&allInventory.find(function(x){return x.id===m.part_id&&(x.part_code===s.code||x.item_name===s.name);});};
@@ -11041,6 +11083,7 @@ async function renderWarrantyPending(showAll){
         +'<td style="padding:10px 12px;font-size:12px;">'+(m.from_owner||'—')+engineerLabel+'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge+'</td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#64748b;">'+receivedAt+'</td>'
+        +'<td style="padding:10px 12px;text-align:center;">'+(status==='RECEIVED'?'':'<button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyMovement(\''+m.id+'\')">🔀</button>')+'</td>'
         +'</tr>';
     }).join('');
 
@@ -11058,6 +11101,7 @@ async function renderWarrantyPending(showAll){
         +'<td style="padding:10px 12px;font-size:12px;">'+(r.assigned_name||'—')+'</td>'
         +'<td style="padding:10px 12px;"><span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'⏳')+' From Ticket'+(isOverdue?' ('+diffDays+'d)':'')+'</span></td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#94a3b8;">—</td>'
+        +'<td style="padding:10px 12px;text-align:center;"><button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyTicketSpare(\''+r.ticket_id+'\',\''+String(r.spare_code).replace(/'/g,"\\'")+'\')">🔀</button></td>'
         +'</tr>';
     }).join('');
 
@@ -11090,6 +11134,7 @@ async function renderWarrantyPending(showAll){
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Engineer</th>'
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>'
       +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Received On</th>'
+      +'<th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;text-align:center;">Fix</th>'
       +'</tr></thead>'
       +'<tbody>'+rows+ticketRows+'</tbody>'
       +'</table></div>'
