@@ -27371,20 +27371,34 @@ function plQuickView(ticketId){
   var ov=document.createElement('div');ov.id='pl-quickview-modal';ov.className='modal-overlay';
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
   var createdDate=t.created_at?new Date(t.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'—';
-  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">'
-    +'<div class="modal-header"><h2 style="font-size:16px;">'+escHtml(t.id||'—')+'</h2><button class="close-btn" onclick="document.getElementById(\'pl-quickview-modal\').remove()">✕</button></div>'
-    +'<div class="modal-body" style="font-size:13px;line-height:1.8;">'
-    +'<div><b>Customer:</b> '+escHtml(t.cname||'—')+' ('+escHtml(t.mobile||'—')+')</div>'
-    +'<div><b>Area/Pin:</b> '+escHtml((t.area||'')+(t.pin?(t.area?' - ':'')+t.pin:'')||'—')+'</div>'
-    +'<div><b>Model/Serial:</b> '+escHtml(t.model||'—')+' — S/N: '+escHtml(t.serial||'—')+'</div>'
-    +'<div><b>Call Type:</b> '+escHtml(t.call_type||'—')+' · '+escHtml(t.service_type||'—')+' · '+escHtml(t.wc_type||'—')+'</div>'
-    +'<div style="margin-top:6px;"><b>Problem:</b> '+escHtml(t.problem||'—')+'</div>'
-    +(t.remarks?'<div style="margin-top:4px;font-size:12px;color:#92400e;background:#fef3c7;border-radius:4px;padding:5px 8px;">📝 WC Remark: '+escHtml(t.remarks)+'</div>':'')
-    +'<div style="margin-top:6px;"><b>Status:</b> '+escHtml(t.status||'—')+'</div>'
-    +'<div><b>Assigned Engineer:</b> '+escHtml(t.assigned_name||'Unassigned')+'</div>'
-    +'<div><b>Created:</b> '+createdDate+'</div>'
+  var fullAddr=[t.address,t.area,t.city,t.state,t.pin].filter(Boolean).join(', ')||'—';
+  var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+  var typeBadge=isW?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;">🛡️ WARRANTY</span>':'<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;">💳 NON-WARRANTY</span>';
+  var qvStatusBadge='<span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;">'+escHtml(t.status||'—')+'</span>';
+  function row(icon,label,val,valStyle){
+    return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'
+      +'<div style="width:20px;text-align:center;flex-shrink:0;">'+icon+'</div>'
+      +'<div style="flex:1;min-width:0;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:.3px;">'+label+'</div>'
+      +'<div style="font-size:13.5px;font-weight:600;color:#1e293b;'+(valStyle||'')+'">'+val+'</div></div></div>';
+  }
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:460px;padding:0;overflow:hidden;">'
+    +'<div style="background:linear-gradient(135deg,#1d4ed8,#1e40af);padding:16px 20px;color:#fff;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+    +'<div><div style="font-size:16px;font-weight:800;">'+escHtml(t.id||'—')+'</div>'
+    +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">'+typeBadge+qvStatusBadge+'</div></div>'
+    +'<button onclick="document.getElementById(\'pl-quickview-modal\').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;">✕</button>'
+    +'</div></div>'
+    +'<div style="padding:6px 20px;max-height:60vh;overflow-y:auto;">'
+    +row('👤','Customer',escHtml(t.cname||'—')+' &middot; <a href="tel:'+escHtml(t.mobile||'')+'" style="color:#1d4ed8;text-decoration:none;">📞 '+escHtml(t.mobile||'—')+'</a>')
+    +row('📍','Address',escHtml(fullAddr),'font-weight:500;white-space:normal;')
+    +row('🖨️','Model / Serial',escHtml(t.model||'—')+' — S/N: '+escHtml(t.serial||'—'))
+    +row('🏷️','Call Type',escHtml(t.call_type||'—')+' · '+escHtml(t.service_type||'—')+' · '+escHtml(t.wc_type||'—'))
+    +row('🛠️','Problem',escHtml(t.problem||'—'),'font-weight:500;white-space:normal;')
+    +(t.remarks?row('📝','WC Remark','<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:3px 7px;display:inline-block;">'+escHtml(t.remarks)+'</span>','white-space:normal;'):'')
+    +row('🧑‍🔧','Assigned Engineer',escHtml(t.assigned_name||'Unassigned'))
+    +row('🕒','Created',createdDate)
     +'</div>'
-    +'<div style="display:flex;gap:8px;padding:0 20px 20px;">'
+    +'<div style="display:flex;gap:8px;padding:14px 20px 18px;">'
     +'<button class="btn btn-outline" style="flex:1;" onclick="document.getElementById(\'pl-quickview-modal\').remove()">Close</button>'
     +'<button class="btn btn-primary" style="flex:1;" onclick="document.getElementById(\'pl-quickview-modal\').remove();viewTicket(\''+t.id+'\')">✏️ Update</button>'
     +'</div>'
@@ -27398,7 +27412,7 @@ async function renderPendingList(){
   try{
     var tickets=await sb('tickets','GET',null,
       '?status=neq.Closed&status=neq.Rejected&status=neq.Cancelled&status=neq.Call+Cancel&status=neq.Customer+Reject&status=neq.Delivered&status=neq.Repaired&status=neq.Resolved+By+Phone&status=neq.Pending+for+Delivery'
-      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem,remarks'
+      +'&select=id,cname,mobile,wc_type,brand_name,model,serial,pin,area,address,city,state,status,created_at,updated_at,assigned_to,assigned_name,call_type,service_type,sequence_no,tat_date,problem,remarks'
       +'&order=created_at.desc&limit=2000');
     // WC001 (ICP WC, full cross-type visibility): sees all ICP calls, but
     // CSP only its Carry In calls — CSP On Site volume is high and isn't
