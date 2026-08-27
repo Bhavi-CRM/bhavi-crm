@@ -27360,6 +27360,38 @@ async function saveRoutePlanInline(){
 
 // ===== PENDING LIST REPORT =====
 window._pendingData=null;
+// Lightweight read-only popup for the Pending List's ticket-ID click — just
+// for a quick check, not the full edit flow. Closes on the ✕ button, the
+// Close button, or a click on the backdrop (unlike bulk-entry modals, there's
+// no typed data here to lose).
+function plQuickView(ticketId){
+  var t=(window._pendingData||[]).find(function(x){return x.id===ticketId;});
+  if(!t){alert('Ticket not found.');return;}
+  var ex=document.getElementById('pl-quickview-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='pl-quickview-modal';ov.className='modal-overlay';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  var createdDate=t.created_at?new Date(t.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'—';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">'
+    +'<div class="modal-header"><h2 style="font-size:16px;">'+escHtml(t.id||'—')+'</h2><button class="close-btn" onclick="document.getElementById(\'pl-quickview-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body" style="font-size:13px;line-height:1.8;">'
+    +'<div><b>Customer:</b> '+escHtml(t.cname||'—')+' ('+escHtml(t.mobile||'—')+')</div>'
+    +'<div><b>Area/Pin:</b> '+escHtml((t.area||'')+(t.pin?(t.area?' - ':'')+t.pin:'')||'—')+'</div>'
+    +'<div><b>Model/Serial:</b> '+escHtml(t.model||'—')+' — S/N: '+escHtml(t.serial||'—')+'</div>'
+    +'<div><b>Call Type:</b> '+escHtml(t.call_type||'—')+' · '+escHtml(t.service_type||'—')+' · '+escHtml(t.wc_type||'—')+'</div>'
+    +'<div style="margin-top:6px;"><b>Problem:</b> '+escHtml(t.problem||'—')+'</div>'
+    +(t.remarks?'<div style="margin-top:4px;font-size:12px;color:#92400e;background:#fef3c7;border-radius:4px;padding:5px 8px;">📝 WC Remark: '+escHtml(t.remarks)+'</div>':'')
+    +'<div style="margin-top:6px;"><b>Status:</b> '+escHtml(t.status||'—')+'</div>'
+    +'<div><b>Assigned Engineer:</b> '+escHtml(t.assigned_name||'Unassigned')+'</div>'
+    +'<div><b>Created:</b> '+createdDate+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;padding:0 20px 20px;">'
+    +'<button class="btn btn-outline" style="flex:1;" onclick="document.getElementById(\'pl-quickview-modal\').remove()">Close</button>'
+    +'<button class="btn btn-primary" style="flex:1;" onclick="document.getElementById(\'pl-quickview-modal\').remove();viewTicket(\''+t.id+'\')">✏️ Update</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+
 async function renderPendingList(){
   var pc=document.getElementById('page-content');if(!pc)return;
   pc.innerHTML='<div style="padding:20px;"><div style="text-align:center;padding:40px;color:#9ca3af;">Loading pending calls...</div></div>';
@@ -27386,6 +27418,7 @@ function pendingListRender(){
   var wcFilter=window._pendingWCFilter!=null?window._pendingWCFilter:(window._isFullWC?'':'CSP');
   var brandFilter=window._pendingBrandFilter||'';
   var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
+  var engFilter=window._pendingEngFilter||'';
   var searchQ=(window._pendingSearch||'').toLowerCase();
 
   // Split: Ready for Pickup (Repaired) vs actionable (all other statuses)
@@ -27393,6 +27426,7 @@ function pendingListRender(){
     if(t.status!=='Repaired')return false;
     if(wcFilter && t.wc_type!==wcFilter)return false;
     if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+    if(engFilter && t.assigned_to!==engFilter)return false;
     return true;
   });
   var actionable=all.filter(function(t){return t.status!=='Repaired';});
@@ -27401,6 +27435,7 @@ function pendingListRender(){
     if(wcFilter && t.wc_type!==wcFilter)return false;
     if(serviceFilter && t.service_type!==serviceFilter)return false;
     if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
+    if(engFilter && t.assigned_to!==engFilter)return false;
     if(searchQ){
       var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
       if(!txt.includes(searchQ))return false;
@@ -27476,7 +27511,7 @@ function pendingListRender(){
     readyForPickup.forEach(function(t){
       var repairedDate=t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'—';
       pickupRows+='<tr style="border-bottom:1px solid #e9d5ff;">'
-        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#7c3aed;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#7c3aed;font-size:13px;cursor:pointer;" onclick="plQuickView(\''+t.id+'\')" title="Click for quick details">'+escHtml(t.id||'—')+'</div>'
         +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">Repaired: '+repairedDate+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;color:#1f2937;font-size:13px;">'+escHtml(t.cname||'—')+'</div>'
         +'<div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
@@ -27541,7 +27576,7 @@ function pendingListRender(){
       var _plIsW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
       var _plTypeBadge=_plIsW?'<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;">🛡️ WARRANTY</span>':'<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;">💳 NON-WARRANTY</span>';
       rows+='<tr style="'+_plRowStyle+'">'
-        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#1d4ed8;font-size:13px;">'+escHtml(t.id||'—')+'</div>'
+        +'<td style="padding:10px 12px;"><div style="font-weight:700;color:#1d4ed8;font-size:13px;cursor:pointer;" onclick="plQuickView(\''+t.id+'\')" title="Click for quick details">'+escHtml(t.id||'—')+'</div>'
         +'<div style="margin-top:3px;">'+_plTypeBadge+'</div>'
         +'<div style="font-size:11px;color:#9ca3af;margin-top:2px;">'+createdDate+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;color:#1f2937;font-size:13px;">'+escHtml(t.cname||'—')+'</div>'
@@ -27596,7 +27631,11 @@ function pendingListRender(){
     +'<option value="Printer"'+(brandFilter==='Printer'?' selected':'')+'>Printer</option>'
     +'<option value="Scanner"'+(brandFilter==='Scanner'?' selected':'')+'>Scanner</option>'
     +'</select>'
-    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\''+(window._isFullWC?'':'CSP')+'\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';pendingListRender();" '
+    +'<select onchange="window._pendingEngFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;max-width:160px;">'
+    +'<option value="">All Engineers</option>'
+    +(allEngineers||[]).map(function(e){return '<option value="'+escHtml(e.eng_id)+'"'+(engFilter===e.eng_id?' selected':'')+'>'+escHtml(e.name)+'</option>';}).join('')
+    +'</select>'
+    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\''+(window._isFullWC?'':'CSP')+'\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';window._pendingEngFilter=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
     +'<span id="pending-count" style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
