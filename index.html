@@ -9654,6 +9654,7 @@ async function renderReports(){
       <button class="tab" id="rtab-wcdaily" onclick="switchReportTab('wcdaily',this)">🎯 WC Daily Reports</button>
       <button class="tab" id="rtab-import" onclick="switchReportTab('import',this)">📥 Import Calls</button>
       <button class="tab" id="rtab-wrongstock" onclick="switchReportTab('wrongstock',this)">⚠️ Wrong Stock Audit</button>
+      <button class="tab" id="rtab-svcedge" onclick="switchReportTab('svcedge',this)">🏭 Service Edge Export</button>
     </div>
     <div id="report-tab-content"><div class="loading">Loading...</div></div>`;
   await switchReportTab('filter', document.getElementById('rtab-filter'));
@@ -9681,6 +9682,7 @@ async function switchReportTab(tab, el){
   else if(tab==='wcdaily') await renderWCDailyReports(c);
   else if(tab==='import') await renderImportCalls(c);
   else if(tab==='wrongstock') await renderWrongStockAudit(c);
+  else if(tab==='svcedge') await renderServiceEdgeExport(c);
   }catch(e){
     c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }finally{
@@ -9752,6 +9754,97 @@ async function renderWrongStockAudit(c){
   }catch(e){
     c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// SERVICE EDGE EXPORT — for manually mirroring ICP Non-Warranty part usage
+// into the manufacturer's own Service Edge portal (that portal's bulk-upload
+// only takes Part Code + Qty, so parts used across multiple tickets in the
+// range are summed into one row per part). Warranty/AMC calls are excluded —
+// those parts already flow through the manufacturer portal via the warranty
+// claim itself. "Closed" here means the engineer's own completion date
+// (_engCompletionDate — Closed/Repaired/Pending for Delivery/Resolved By
+// Phone), never the later Delivered date.
+// ════════════════════════════════════════════════════════════
+async function renderServiceEdgeExport(c){
+  var today=new Date().toLocaleDateString('en-CA');
+  var monthStart=new Date();monthStart.setDate(1);
+  c.innerHTML='<div class="card" style="margin-bottom:14px;">'
+    +'<div class="section-header"><h2>🏭 Service Edge Export</h2></div>'
+    +'<div class="alert alert-info" style="margin-bottom:12px;">📋 ICP Non-Warranty calls only, closed (repaired) in the selected range — parts used, summed by Part Code + Qty, ready to bulk-upload into Service Edge.</div>'
+    +'<div class="form-grid" style="margin-bottom:12px;">'
+    +'<div class="form-group"><label>Closed From</label><input type="date" id="svcedge-from" value="'+monthStart.toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Closed To</label><input type="date" id="svcedge-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary" onclick="loadServiceEdgeExport()">🔍 Search</button>'
+    +'<button class="btn btn-success" id="svcedge-dl-btn" onclick="downloadServiceEdgeExport()" disabled>📊 Download Excel</button>'
+    +'</div></div>'
+    +'<div id="svcedge-results"></div>';
+  loadServiceEdgeExport();
+}
+async function loadServiceEdgeExport(){
+  var from=document.getElementById('svcedge-from')?.value||'';
+  var to=document.getElementById('svcedge-to')?.value||'';
+  var res=document.getElementById('svcedge-results');
+  var dlBtn=document.getElementById('svcedge-dl-btn');
+  if(!res)return;
+  res.innerHTML='<div class="loading">Loading...</div>';
+  if(dlBtn)dlBtn.disabled=true;
+  try{
+    var q='?wc_type=eq.ICP&status=in.(Closed,Repaired,Pending for Delivery,Resolved By Phone,Delivered)&select=id,cname,call_type,spares,timeline';
+    var tickets=await sbAll('tickets',q);
+    var byPart={}; // code -> {code,name,qty}
+    var matchedTickets=[];
+    tickets.forEach(function(t){
+      var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
+      if(isW)return; // Non-Warranty only — warranty parts already flow via the manufacturer claim
+      var entry=_engCompletionEntry(t);
+      if(!entry||!entry.at)return; // no real completion date on record
+      var closedDateStr=_tlEntryDate(entry);
+      if(!closedDateStr)return;
+      if(from&&closedDateStr<from)return;
+      if(to&&closedDateStr>to)return;
+      var spares=t.spares||[];
+      var usedHere=false;
+      spares.forEach(function(s){
+        if(!s||!s.code)return;
+        var qty=s.qty||1;
+        if(!byPart[s.code])byPart[s.code]={code:s.code,name:s.name||'',qty:0};
+        byPart[s.code].qty+=qty;
+        usedHere=true;
+      });
+      if(usedHere)matchedTickets.push(t.id);
+    });
+    var rows=Object.values(byPart).sort(function(a,b){return b.qty-a.qty;});
+    window._svcEdgeRows=rows;
+    if(!rows.length){
+      res.innerHTML='<div class="alert alert-warning">No ICP Non-Warranty parts found closed in this date range.</div>';
+      return;
+    }
+    var totalQty=rows.reduce(function(a,r){return a+r.qty;},0);
+    var rowsHtml=rows.map(function(r){
+      return '<tr><td style="padding:6px 8px;font-weight:700;">'+escHtml(r.code)+'</td><td style="padding:6px 8px;">'+escHtml(r.name)+'</td><td style="padding:6px 8px;text-align:center;font-weight:700;">'+r.qty+'</td></tr>';
+    }).join('');
+    res.innerHTML='<div class="alert alert-success" style="margin-bottom:12px;">✅ '+matchedTickets.length+' tickets, '+rows.length+' distinct parts, '+totalQty+' total qty — ready to export.</div>'
+      +'<div class="card"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Part Code</th><th style="padding:6px 8px;">Part Name</th><th style="padding:6px 8px;text-align:center;">Qty</th></tr></thead>'
+      +'<tbody>'+rowsHtml+'</tbody></table></div></div>';
+    if(dlBtn)dlBtn.disabled=false;
+  }catch(e){
+    res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
+  }
+}
+function downloadServiceEdgeExport(){
+  var rows=window._svcEdgeRows||[];
+  if(!rows.length)return;
+  var data=rows.map(function(r){return {'Part Code':r.code,'Qty':r.qty};});
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Service Edge Export');
+  var from=document.getElementById('svcedge-from')?.value||'';
+  var to=document.getElementById('svcedge-to')?.value||'';
+  XLSX.writeFile(wb,'service_edge_export_'+from+'_to_'+to+'.xlsx');
 }
 
 // ════════════════════════════════════════════════════════════
