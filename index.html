@@ -1001,6 +1001,15 @@ tr:hover td{background:#f8fafc;}
         </div>
       </div>
 
+      <!-- Printer/Camera Sales (auto-filled from today's Inventory Sales, by this engineer's name) -->
+      <div id="dr-pc-sales-section" style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #1d4ed8;display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <h3 style="font-size:14px;font-weight:700;color:#1d4ed8;">🖨️📷 Printer / Camera Sales Today (Auto)</h3>
+          <span style="font-size:12px;color:#1d4ed8;font-weight:600;">₹<span id="dr-pc-sales-total">0</span></span>
+        </div>
+        <div id="dr-pc-sales-rows" style="font-size:12.5px;color:#1e3a8a;"></div>
+      </div>
+
       <!-- Section 2: Office / Remote Work -->
       <div style="background:#f5f3ff;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #7c3aed;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -2935,6 +2944,7 @@ function setupNav(){
       // (she runs stock/purchase/sales as the accountant) — other plain WCs
       // don't get either.
       sv('nav-payment-collection',window._isAcct);
+      sv('nav-eng-parts',window._isAcct);
       sv('nav-tat-report',true);
       var wcNavRpt=document.getElementById('nav-wc-report');if(wcNavRpt)wcNavRpt.style.display='';
       var wb=document.getElementById('wc-daily-btn');
@@ -8564,7 +8574,11 @@ function invPurchaseRender(){
     <td style="text-align:right;font-weight:700;">₹${((p.qty||0)*(p.unit_cost||0)).toFixed(0)}</td>
     <td>${p.invoice_no||'-'}</td>
     <td>${p.added_by||'-'}</td>
-  </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
+    <td style="text-align:center;white-space:nowrap;">
+      <button onclick="editPurchaseRecord(${p.id})" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
+      <button onclick="deletePurchaseRecord(${p.id})" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
+    </td>
+  </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
 
   c.innerHTML=`<div class="card">
     <div class="section-header" style="flex-wrap:wrap;gap:8px;">
@@ -8584,10 +8598,83 @@ function invPurchaseRender(){
       <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records | Qty: ${totalQty} | Total: ₹${Math.round(totalVal).toLocaleString('en-IN')}</span>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Supplier</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Invoice No</th><th>By</th></tr></thead>
+      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Supplier</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Invoice No</th><th>By</th><th>Actions</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
+}
+// Editing/deleting a purchase record must also reverse/adjust the stock it
+// originally added — otherwise the fix for a wrong entry corrupts stock
+// instead of fixing it. Matched by part_code (these tables never stored
+// part_id — same convention as the original purchase-save flow).
+function editPurchaseRecord(id){
+  const p=(window._invPurchaseData||[]).find(x=>x.id===id);
+  if(!p){alert('Record not found.');return;}
+  const ex=document.getElementById('edit-purchase-modal');if(ex)ex.remove();
+  const ov=document.createElement('div');ov.id='edit-purchase-modal';ov.className='modal-overlay';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">✏️ Edit Purchase — '+escHtml(p.part_code||'')+'</h2><button class="close-btn" onclick="document.getElementById(\'edit-purchase-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Date</label><input type="date" id="epr-date" value="'+(p.purchase_date||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="epr-qty" value="'+(p.qty||0)+'" min="1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Unit Cost ₹</label><input type="number" id="epr-cost" value="'+(p.unit_cost||0)+'" min="0" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Supplier</label><input type="text" id="epr-supplier" value="'+escHtml(p.supplier||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Invoice No</label><input type="text" id="epr-invoice" value="'+escHtml(p.invoice_no||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="epr-remark" placeholder="e.g. Fixed wrong qty — was 5, actually 1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'</div><div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'edit-purchase-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="savePurchaseRecordEdit('+id+')">💾 Save</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+async function savePurchaseRecordEdit(id){
+  const p=(window._invPurchaseData||[]).find(x=>x.id===id);
+  if(!p)return;
+  const newQty=parseInt(document.getElementById('epr-qty')?.value)||0;
+  const newCost=parseFloat(document.getElementById('epr-cost')?.value)||0;
+  const newDate=document.getElementById('epr-date')?.value||p.purchase_date;
+  const newSupplier=document.getElementById('epr-supplier')?.value.trim()||'';
+  const newInvoice=document.getElementById('epr-invoice')?.value.trim()||'';
+  const remark=document.getElementById('epr-remark')?.value.trim()||'';
+  if(newQty<=0){alert('Quantity must be at least 1.');return;}
+  if(!remark){alert('Correction remark is required.');return;}
+  try{
+    const delta=newQty-(p.qty||0);
+    if(delta!==0){
+      const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(p.part_code||'').toUpperCase());
+      if(inv){
+        const newStock=Math.max(0,(inv.qty_in_stock||0)+delta);
+        await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+        inv.qty_in_stock=newStock;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:delta,note:'Purchase record correction: '+remark,done_by:currentUser.name}).catch(()=>{});
+      }
+    }
+    await sb('inventory_purchases','PATCH',{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice,total_cost:newQty*newCost,note:(p.note?p.note+' | ':'')+'Corrected: '+remark},'?id=eq.'+id);
+    Object.assign(p,{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice});
+    document.getElementById('edit-purchase-modal')?.remove();
+    invPurchaseRender();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deletePurchaseRecord(id){
+  const p=(window._invPurchaseData||[]).find(x=>x.id===id);
+  if(!p)return;
+  const remark=prompt('⚠️ Deleting this purchase entry ('+(p.part_code||'')+' x'+(p.qty||0)+') will subtract it back out of stock.\n\nEnter a reason (required):');
+  if(remark===null)return;
+  if(!remark.trim()){alert('A remark is required to delete.');return;}
+  if(!confirm('Confirm delete? This cannot be undone.'))return;
+  try{
+    const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(p.part_code||'').toUpperCase());
+    if(inv){
+      const newStock=Math.max(0,(inv.qty_in_stock||0)-(p.qty||0));
+      await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+      inv.qty_in_stock=newStock;
+      await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:p.qty||0,note:'Purchase entry deleted — '+remark.trim(),done_by:currentUser.name}).catch(()=>{});
+    }
+    await sb('inventory_purchases','DELETE',null,'?id=eq.'+id);
+    window._invPurchaseData=(window._invPurchaseData||[]).filter(x=>x.id!==id);
+    invPurchaseRender();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 window._invSalesData=null;
@@ -8636,8 +8723,12 @@ function invSalesRender(){
       <td style="text-align:right;">₹${s.unit_price||0}</td>
       <td style="text-align:right;font-weight:700;">₹${((s.qty||0)*(s.unit_price||0)).toFixed(0)}</td>
       <td>${s.added_by||'-'}</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button onclick="editSaleRecord(${s.id})" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
+        <button onclick="deleteSaleRecord(${s.id})" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
+      </td>
     </tr>`;
-  }).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
+  }).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
 
   c.innerHTML=`<div class="card">
     <div class="section-header" style="flex-wrap:wrap;gap:8px;">
@@ -8666,10 +8757,84 @@ function invSalesRender(){
       <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records | Qty: ${totalQty} | Total: ₹${Math.round(totalVal).toLocaleString('en-IN')}</span>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Invoice No</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th></tr></thead>
+      <thead><tr><th>Date</th><th>Part Code</th><th>Part Name</th><th>Type</th><th>Reference</th><th>Invoice No</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>By</th><th>Actions</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
+}
+// Same reasoning as the purchase edit/delete above — a sale DEDUCTED stock,
+// so correcting/removing a wrong entry must add that stock back (or adjust
+// by the qty delta on edit), never just touch the sales record alone.
+function editSaleRecord(id){
+  const s=(window._invSalesData||[]).find(x=>x.id===id);
+  if(!s){alert('Record not found.');return;}
+  const ex=document.getElementById('edit-sale-modal');if(ex)ex.remove();
+  const ov=document.createElement('div');ov.id='edit-sale-modal';ov.className='modal-overlay';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">✏️ Edit Sale — '+escHtml(s.part_code||'')+'</h2><button class="close-btn" onclick="document.getElementById(\'edit-sale-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Date</label><input type="date" id="esr-date" value="'+(s.sale_date||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="esr-qty" value="'+(s.qty||0)+'" min="1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Unit Price ₹</label><input type="number" id="esr-price" value="'+(s.unit_price||0)+'" min="0" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Customer / Reference</label><input type="text" id="esr-cust" value="'+escHtml(s.customer_name||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Invoice No</label><input type="text" id="esr-invoice" value="'+escHtml(s.reference||'')+'" '+(s.sale_type==='call'?'disabled title="Linked to a call — invoice not editable here"':'')+' style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="esr-remark" placeholder="e.g. Fixed wrong invoice no." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'</div><div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'edit-sale-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveSaleRecordEdit('+id+')">💾 Save</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+async function saveSaleRecordEdit(id){
+  const s=(window._invSalesData||[]).find(x=>x.id===id);
+  if(!s)return;
+  const newQty=parseInt(document.getElementById('esr-qty')?.value)||0;
+  const newPrice=parseFloat(document.getElementById('esr-price')?.value)||0;
+  const newDate=document.getElementById('esr-date')?.value||s.sale_date;
+  const newCust=document.getElementById('esr-cust')?.value.trim()||'';
+  const newInvoice=document.getElementById('esr-invoice')?.value.trim()||'';
+  const remark=document.getElementById('esr-remark')?.value.trim()||'';
+  if(newQty<=0){alert('Quantity must be at least 1.');return;}
+  if(!remark){alert('Correction remark is required.');return;}
+  try{
+    const delta=newQty-(s.qty||0); // qty increase = more deducted from stock
+    if(delta!==0){
+      const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(s.part_code||'').toUpperCase());
+      if(inv){
+        const newStock=Math.max(0,(inv.qty_in_stock||0)-delta);
+        await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+        inv.qty_in_stock=newStock;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:delta,note:'Sale record correction: '+remark,done_by:currentUser.name}).catch(()=>{});
+      }
+    }
+    const patch={qty:newQty,unit_price:newPrice,sale_date:newDate,customer_name:newCust};
+    if(s.sale_type!=='call')patch.reference=newInvoice;
+    await sb('inventory_sales','PATCH',patch,'?id=eq.'+id);
+    Object.assign(s,patch);
+    document.getElementById('edit-sale-modal')?.remove();
+    invSalesRender();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteSaleRecord(id){
+  const s=(window._invSalesData||[]).find(x=>x.id===id);
+  if(!s)return;
+  const remark=prompt('⚠️ Deleting this sale entry ('+(s.part_code||'')+' x'+(s.qty||0)+') will add it back into stock.\n\nEnter a reason (required):');
+  if(remark===null)return;
+  if(!remark.trim()){alert('A remark is required to delete.');return;}
+  if(!confirm('Confirm delete? This cannot be undone.'))return;
+  try{
+    const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(s.part_code||'').toUpperCase());
+    if(inv){
+      const newStock=(inv.qty_in_stock||0)+(s.qty||0);
+      await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+      inv.qty_in_stock=newStock;
+      await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:s.qty||0,note:'Sale entry deleted — '+remark.trim(),done_by:currentUser.name}).catch(()=>{});
+    }
+    await sb('inventory_sales','DELETE',null,'?id=eq.'+id);
+    window._invSalesData=(window._invSalesData||[]).filter(x=>x.id!==id);
+    invSalesRender();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ── Weekly Stock Tally — physical count vs system count, Office + per-Engineer,
@@ -9679,6 +9844,7 @@ async function renderReports(){
       <button class="tab" id="rtab-import" onclick="switchReportTab('import',this)">📥 Import Calls</button>
       <button class="tab" id="rtab-wrongstock" onclick="switchReportTab('wrongstock',this)">⚠️ Wrong Stock Audit</button>
       <button class="tab" id="rtab-svcedge" onclick="switchReportTab('svcedge',this)">🏭 Service Edge Export</button>
+      <button class="tab" id="rtab-pcsales" onclick="switchReportTab('pcsales',this)">🖨️📷 Printer/Camera Sales</button>
     </div>
     <div id="report-tab-content"><div class="loading">Loading...</div></div>`;
   await switchReportTab('filter', document.getElementById('rtab-filter'));
@@ -9707,6 +9873,7 @@ async function switchReportTab(tab, el){
   else if(tab==='import') await renderImportCalls(c);
   else if(tab==='wrongstock') await renderWrongStockAudit(c);
   else if(tab==='svcedge') await renderServiceEdgeExport(c);
+  else if(tab==='pcsales') await renderPrinterCameraSales(c);
   }catch(e){
     c.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }finally{
@@ -9904,6 +10071,73 @@ function downloadServiceEdgeExport(){
   var from=document.getElementById('svcedge-from')?.value||'';
   var to=document.getElementById('svcedge-to')?.value||'';
   XLSX.writeFile(wb,'service_edge_export_'+from+'_to_'+to+'.xlsx');
+}
+
+// ════════════════════════════════════════════════════════════
+// PRINTER/CAMERA SALES — month-wise, who (added_by on inventory_sales) sold
+// how many Printer-category vs Camera-category parts, classified via each
+// sold part's inventory.category field (case-insensitive "printer"/"camera").
+// Uncategorized parts (most spares) are silently excluded — this is a
+// counter-sales breakdown, not a full sales report (that's the Sales tab).
+// ════════════════════════════════════════════════════════════
+async function renderPrinterCameraSales(c){
+  var monthVal=window._pcSalesMonth||new Date().toISOString().slice(0,7);
+  c.innerHTML='<div class="card" style="margin-bottom:14px;">'
+    +'<div class="section-header"><h2>🖨️📷 Printer / Camera Sales</h2></div>'
+    +'<div class="alert alert-info" style="margin-bottom:12px;">📋 Engineer/staff-wise (Sales History "By" field), classified by the sold part\'s Inventory Category (must contain "Printer" or "Camera").</div>'
+    +'<div class="form-grid" style="margin-bottom:12px;max-width:220px;">'
+    +'<div class="form-group"><label>Month</label><input type="month" id="pcsales-month" value="'+monthVal+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'</div>'
+    +'<button class="btn btn-primary" onclick="loadPrinterCameraSales()">🔍 Search</button>'
+    +'</div>'
+    +'<div id="pcsales-results"></div>';
+  loadPrinterCameraSales();
+}
+async function loadPrinterCameraSales(){
+  var month=document.getElementById('pcsales-month')?.value||new Date().toISOString().slice(0,7);
+  window._pcSalesMonth=month;
+  var res=document.getElementById('pcsales-results');
+  if(!res)return;
+  res.innerHTML='<div class="loading">Loading...</div>';
+  try{
+    var from=month+'-01';
+    var toD=new Date(from);toD.setMonth(toD.getMonth()+1);
+    var to=toD.toISOString().slice(0,10);
+    var sales=await sbAll('inventory_sales','?sale_date=gte.'+from+'&sale_date=lt.'+to+'&select=part_code,part_name,qty,unit_price,added_by');
+    if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name').catch(function(){return[];});
+    var byEng={};
+    sales.forEach(function(s){
+      var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===(s.part_code||'').toUpperCase();});
+      var cat=(inv?.category||'').toLowerCase();
+      var kind=cat.includes('printer')?'printer':cat.includes('camera')?'camera':null;
+      if(!kind)return;
+      var name=s.added_by||'Unknown';
+      if(!byEng[name])byEng[name]={name:name,printerQty:0,printerAmt:0,cameraQty:0,cameraAmt:0};
+      var amt=(s.qty||0)*(s.unit_price||0);
+      if(kind==='printer'){byEng[name].printerQty+=s.qty||0;byEng[name].printerAmt+=amt;}
+      else{byEng[name].cameraQty+=s.qty||0;byEng[name].cameraAmt+=amt;}
+    });
+    var rows=Object.values(byEng).sort(function(a,b){return (b.printerAmt+b.cameraAmt)-(a.printerAmt+a.cameraAmt);});
+    if(!rows.length){
+      res.innerHTML='<div class="alert alert-warning">No Printer/Camera category sales found for this month. (Check that the sold parts have "Printer" or "Camera" set in their Inventory Category field.)</div>';
+      return;
+    }
+    var totPQty=rows.reduce(function(a,r){return a+r.printerQty;},0),totPAmt=rows.reduce(function(a,r){return a+r.printerAmt;},0);
+    var totCQty=rows.reduce(function(a,r){return a+r.cameraQty;},0),totCAmt=rows.reduce(function(a,r){return a+r.cameraAmt;},0);
+    var rowsHtml=rows.map(function(r){
+      return '<tr><td style="padding:6px 8px;font-weight:700;">'+escHtml(r.name)+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;">'+r.printerQty+'</td><td style="padding:6px 8px;text-align:right;">₹'+r.printerAmt.toFixed(0)+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;">'+r.cameraQty+'</td><td style="padding:6px 8px;text-align:right;">₹'+r.cameraAmt.toFixed(0)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-weight:700;">₹'+(r.printerAmt+r.cameraAmt).toFixed(0)+'</td></tr>';
+    }).join('');
+    res.innerHTML='<div class="card"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Engineer / Staff</th><th style="padding:6px 8px;text-align:center;">🖨️ Printer Qty</th><th style="padding:6px 8px;text-align:right;">🖨️ Printer ₹</th><th style="padding:6px 8px;text-align:center;">📷 Camera Qty</th><th style="padding:6px 8px;text-align:right;">📷 Camera ₹</th><th style="padding:6px 8px;text-align:right;">Total ₹</th></tr></thead>'
+      +'<tbody>'+rowsHtml+'</tbody>'
+      +'<tfoot><tr style="background:#f8fafc;font-weight:700;"><td style="padding:6px 8px;">Total</td><td style="padding:6px 8px;text-align:center;">'+totPQty+'</td><td style="padding:6px 8px;text-align:right;">₹'+totPAmt.toFixed(0)+'</td><td style="padding:6px 8px;text-align:center;">'+totCQty+'</td><td style="padding:6px 8px;text-align:right;">₹'+totCAmt.toFixed(0)+'</td><td style="padding:6px 8px;text-align:right;">₹'+(totPAmt+totCAmt).toFixed(0)+'</td></tr></tfoot>'
+      +'</table></div></div>';
+  }catch(e){
+    res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -10771,7 +11005,7 @@ async function renderEngParts(tab){
   // for themselves too (and then approve their own request, same as they
   // can approve anyone else's; the approval history always records who
   // approved it via approved_by).
-  const isFullAccess=isAdmin||isCspMgr;
+  const isFullAccess=isAdmin||isCspMgr||window._isAcct;
   if(!tab) tab=(isEng&&!isCspMgr)?'my-stock':(isFullAccess?'overview':'pending');
   try{
     if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name');
@@ -14950,6 +15184,7 @@ function openDailyReport(){
   updateCallTotals();
   // Auto-fill call counts from CRM
   drAutoFillCalls();
+  drAutoFillPrinterCameraSales();
   // Site Visits section — ENG002 only (Automation)
   var svSection=document.getElementById('dr-sitevisit-section');
   var isSiteVisitEng=currentUser.eng_id==='ENG002'||currentUser.user_id==='ENG002';
@@ -15393,6 +15628,40 @@ async function drAutoFillSiteVisits(){
   }catch(e){console.log('drAutoFillSiteVisits error:',e);}
 }
 
+// Auto-fill "Printer/Camera Sales Today" from Inventory > Sales, matched by
+// this engineer's name in added_by (the same field the manual/bulk sale
+// entry forms already save) and classified via the sold part's inventory
+// category (case-insensitive "printer"/"camera" — set that field on the part
+// in Inventory if a sale isn't showing up here).
+async function drAutoFillPrinterCameraSales(){
+  window._drPCSales=[];
+  var section=document.getElementById('dr-pc-sales-section');
+  var rowsEl=document.getElementById('dr-pc-sales-rows');
+  var totalEl=document.getElementById('dr-pc-sales-total');
+  if(!section||!rowsEl)return;
+  try{
+    var today=document.getElementById('dr-date')?.value||new Date().toLocaleDateString('en-CA');
+    var name=currentUser.name;
+    var sales=await sb('inventory_sales','GET',null,'?sale_date=eq.'+today+'&added_by=eq.'+encodeURIComponent(name)).catch(function(){return[];});
+    if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name').catch(function(){return[];});
+    var rows=(sales||[]).map(function(s){
+      var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===(s.part_code||'').toUpperCase();});
+      var cat=(inv?.category||'').toLowerCase();
+      var kind=cat.includes('printer')?'🖨️ Printer':cat.includes('camera')?'📷 Camera':null;
+      if(!kind)return null;
+      return{kind:kind,part_code:s.part_code,part_name:s.part_name,qty:s.qty||0,amount:(s.qty||0)*(s.unit_price||0)};
+    }).filter(Boolean);
+    window._drPCSales=rows;
+    if(!rows.length){section.style.display='none';return;}
+    section.style.display='block';
+    rowsEl.innerHTML=rows.map(function(r){
+      return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #dbeafe;">'
+        +'<span>'+r.kind+' — '+escHtml(r.part_name||r.part_code)+' ×'+r.qty+'</span>'
+        +'<span style="font-weight:700;">₹'+r.amount.toFixed(0)+'</span></div>';
+    }).join('');
+    if(totalEl)totalEl.textContent=rows.reduce(function(a,r){return a+r.amount;},0).toFixed(0);
+  }catch(e){console.log('drAutoFillPrinterCameraSales error:',e);}
+}
 async function saveDailyReport(){
   var date=document.getElementById('dr-date').value;
   var petrolKm=parseFloat(document.getElementById('dr-petrol-km').value)||0;
@@ -15481,6 +15750,8 @@ async function saveDailyReport(){
       petrol_km:petrolKm,
       google_reviews:googleReviews,
       total_reviews:googleReviews.length,
+      printer_camera_sales:window._drPCSales||[],
+      printer_camera_sales_total:(window._drPCSales||[]).reduce(function(a,r){return a+r.amount;},0),
       remarks:remarks
     });
     // Office Work entries with a time range also create a matching Work Log
