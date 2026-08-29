@@ -12269,14 +12269,18 @@ async function renderEngSelfService(tab){
 function openEngRecordSale(){
   var ex=document.getElementById('eng-sale-modal');if(ex)ex.remove();
   var ov=document.createElement('div');ov.id='eng-sale-modal';ov.className='modal-overlay';
-  var partOpts=(allInventory||[]).filter(function(i){return i.qty_in_stock>0;}).map(function(i){
-    return '<option value="'+escHtml(i.part_code||'')+'" data-name="'+escHtml(i.item_name||'')+'" data-price="'+(i.unit_price||0)+'" data-stock="'+i.qty_in_stock+'">'+escHtml(i.part_code||'')+' — '+escHtml(i.item_name||'')+' (Stock: '+i.qty_in_stock+')</option>';
+  // Searchable datalist instead of a plain <select> — 2000+ parts makes a
+  // dropdown unusable. Value is "CODE — NAME" so typing either the code or
+  // the item name filters matches (same pattern as Bulk Stock Correction's
+  // part search); onEngSalePartInput() parses the code back out on match.
+  var dlOpts=(allInventory||[]).filter(function(i){return i.qty_in_stock>0;}).map(function(i){
+    return '<option value="'+escHtml(i.part_code||'')+' — '+escHtml(i.item_name||'')+'">';
   }).join('');
   ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">'
     +'<div class="modal-header"><h2 style="font-size:15px;">🛒 Record Sale</h2><button class="close-btn" onclick="document.getElementById(\'eng-sale-modal\').remove()">✕</button></div>'
     +'<div class="modal-body">'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Date</label><input type="date" id="es-date" value="'+new Date().toLocaleDateString('en-CA')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Part <span style="color:#ef4444;">*</span></label><select id="es-part" onchange="onEngSalePartChange(this)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"><option value="">-- Select Part --</option>'+partOpts+'</select></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Part <span style="color:#ef4444;">*</span></label><input type="text" id="es-part" list="es-part-dl" placeholder="🔍 Type part code or name..." oninput="onEngSalePartInput(this.value)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;box-sizing:border-box;"><datalist id="es-part-dl">'+dlOpts+'</datalist></div>'
     +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty <span style="color:#ef4444;">*</span></label><input type="number" id="es-qty" min="1" value="1" oninput="updateEngSaleTotal()" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
     +'<div class="form-group"><label>Unit Price ₹ <span style="color:#ef4444;">*</span></label><input type="number" id="es-price" min="0" value="0" oninput="updateEngSaleTotal()" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div></div>'
     +'<div class="form-group" style="margin-bottom:10px;"><label>Customer Name <span style="color:#ef4444;">*</span></label><input type="text" id="es-customer" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
@@ -12287,11 +12291,14 @@ function openEngRecordSale(){
     +'<button class="btn btn-primary" onclick="saveEngRecordSale()">💾 Save Sale</button>'
     +'</div></div>';
   document.body.appendChild(ov);
+  window._esSelectedPart=null;
 }
-function onEngSalePartChange(sel){
-  var opt=sel.options[sel.selectedIndex];
-  if(opt&&opt.dataset.price)document.getElementById('es-price').value=opt.dataset.price;
-  if(opt&&opt.dataset.stock)document.getElementById('es-avail').textContent=opt.dataset.stock;
+function onEngSalePartInput(val){
+  var code=(val.split(' — ')[0]||'').trim();
+  var item=(allInventory||[]).find(function(i){return (i.part_code||'').toUpperCase()===code.toUpperCase();});
+  window._esSelectedPart=item||null;
+  document.getElementById('es-price').value=item?(item.unit_price||0):0;
+  document.getElementById('es-avail').textContent=item?item.qty_in_stock:'-';
   updateEngSaleTotal();
 }
 function updateEngSaleTotal(){
@@ -12301,33 +12308,27 @@ function updateEngSaleTotal(){
 }
 async function saveEngRecordSale(){
   var date=document.getElementById('es-date').value;
-  var partSel=document.getElementById('es-part');
-  var partCode=partSel.value;
-  var partName=partSel.options[partSel.selectedIndex]?.dataset.name||'';
-  var availStock=parseInt(partSel.options[partSel.selectedIndex]?.dataset.stock||0);
+  var inv=window._esSelectedPart;
   var qty=parseInt(document.getElementById('es-qty').value)||0;
   var price=parseFloat(document.getElementById('es-price').value)||0;
   var customer=document.getElementById('es-customer').value.trim();
   var invoiceNo=document.getElementById('es-invoice').value.trim();
-  if(!date||!partCode||!qty||!price){alert('Please fill Date, Part, Qty and Price.');return;}
+  if(!date||!inv||!qty||!price){alert('Please fill Date, select a valid Part from the list, Qty and Price.');return;}
   if(!customer){alert('Customer Name is required.');return;}
   if(!invoiceNo){alert('Invoice / Bill No is required.');return;}
-  if(qty>availStock){alert('Insufficient stock! Available: '+availStock);return;}
+  if(qty>(inv.qty_in_stock||0)){alert('Insufficient stock! Available: '+(inv.qty_in_stock||0));return;}
   try{
     await sb('inventory_sales','POST',{
-      sale_date:date,part_code:partCode,part_name:partName,
+      sale_date:date,part_code:inv.part_code||'',part_name:inv.item_name||'',
       sale_type:'customer',customer_name:customer,
       qty:qty,unit_price:price,total_amount:qty*price,
       reference:invoiceNo,added_by:currentUser.name,
       created_at:new Date().toISOString()
     });
-    var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===partCode.toUpperCase();});
-    if(inv){
-      var newQty=Math.max(0,(inv.qty_in_stock||0)-qty);
-      await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
-      inv.qty_in_stock=newQty;
-      await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:qty,note:'Sale to '+customer+' INV:'+invoiceNo,done_by:currentUser.name}).catch(function(){});
-    }
+    var newQty=Math.max(0,(inv.qty_in_stock||0)-qty);
+    await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+    inv.qty_in_stock=newQty;
+    await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:qty,note:'Sale to '+customer+' INV:'+invoiceNo,done_by:currentUser.name}).catch(function(){});
     document.getElementById('eng-sale-modal')?.remove();
     alert('✅ Sale recorded — ₹'+(qty*price).toFixed(0)+' under your name.');
   }catch(e){alert('Error: '+e.message);}
