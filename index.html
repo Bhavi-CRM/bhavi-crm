@@ -8256,6 +8256,15 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
             const partId=invItem.length?invItem[0].id:null;
             if(partId){
               const trackId=seTrackKey||id; // digits after last slash; fallback to ticket ID
+              // If Canon already dispatched this exact part FOC against this SE Call ID
+              // (Direct Warranty Issue — WITH_ENGINEER/RECEIVED), there is no pending
+              // claim to track: the part arrived first, then got used. Skip creating a
+              // fresh PENDING entry — it would falsely show as awaiting Canon return
+              // when Canon already sent it. The separate AUTO-COMPLETE block just below
+              // still marks that WITH_ENGINEER entry RECEIVED as normal.
+              const directIssue=await sb('eng_movements','GET',null,
+                '?type=eq.WARRANTY_DIRECT_IN&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+              if(directIssue&&directIssue.length){continue;}
               // Check if already logged for this SE call+part (check by trackId+partId)
               const existing=await sb('eng_movements','GET',null,
                 '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
