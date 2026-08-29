@@ -11030,6 +11030,7 @@ async function renderEngParts(tab){
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
           <button class="btn" style="background:#0369a1;color:#fff;" onclick="openDirectWarrantyIssue()">📦 Direct Warranty Issue</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
+          <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
           ${isCspMgr?`<button class="btn" style="background:#0d9488;color:#fff;" onclick="openEngReqReceive()">📥 Request Parts (Self)</button><button class="btn" style="background:#be185d;color:#fff;" onclick="openEngReqReturn()">↩️ Return My Parts</button>`:''}
         </div>
         <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}${isCspMgr?tabHtml('my-requests','📋 My Requests'):''}</div>
