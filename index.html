@@ -5321,7 +5321,7 @@ async function renderMyCalls(){
                 </div>`:''}
                 ${mcHasPrevLoc(t)?`<div onclick="mcConfirmPrevLocation('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;margin-left:6px;">📍 Previous Location</div>`:''}
                 <div onclick="event.stopPropagation();addProductForSameCustomer('${t.id}')" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#065f46;margin-bottom:8px;margin-left:6px;">➕ Add Product (Same Customer)</div>
-                <button onclick="${isClosed?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':'✏️ Update'}</button>
+                <button onclick="${isClosed?`viewTicket('${t.id}')`:t.status==='Pending Visit Charge Approval'?`viewTicket('${t.id}')`:`openEngUpdate('${t.id}')`}" style="width:100%;padding:10px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:${isClosed?'#f1f5f9':t.status==='Pending Visit Charge Approval'?'#7c3aed':'#1d4ed8'};color:${isClosed?'var(--text)':'#fff'};">${isClosed?'👁️ View':t.status==='Pending Visit Charge Approval'?'📞 Confirm Visit Charge':'✏️ Update'}</button>
                 </div>
               </div>`;
             }).join('');
@@ -5747,7 +5747,11 @@ async function saveCall(){
     group_id:window._callGroupId||null,
     phys_js:document.getElementById('call-phys-js').value,
     tat_date:(()=>{const v=document.getElementById('call-tat-date')?.value;return v||null;})(),
-    assigned_to:_needsVisitChargeApproval?null:(engId||null),assigned_name:_needsVisitChargeApproval?null:(engName||null),
+    // If an engineer was already selected at creation, keep the call tied to
+    // them even while it sits in Pending Visit Charge Approval — so it shows
+    // in that engineer's My Calls and THEY can approve/reject the visit
+    // charge directly, instead of it landing unassigned in WC/Admin's queue.
+    assigned_to:engId||null,assigned_name:engName||null,
     status:_needsVisitChargeApproval?'Pending Visit Charge Approval':(engId?'Assigned':'Pending Allocation'),
     warranty_coverage:isW?'Under Coverage':'NA',
     spares:[],timeline:[{action:'Call Logged',by:currentUser.name,at:new Date().toISOString()}],
@@ -6348,6 +6352,13 @@ async function viewTicket(id,autoPrint=false){
     // same way WC/Manager do: it goes to Admin/Manager approval, never
     // applies directly, so wrong data can't silently slip in unreviewed.
     adminActions=`<hr class="divider"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${t.status==='Pending Visit Charge Approval'?`
+        <div style="width:100%;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:10px;padding:10px 14px;margin-bottom:4px;font-size:12px;color:#5b21b6;">
+          📞 <b>Confirm with the customer that they agreed to the visit/service charge before you go.</b>
+        </div>
+        <button class="btn btn-success btn-sm" onclick="approveVisitCharge('${t.id}')">✅ Visit Charges Approved</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectVisitCharge('${t.id}')">❌ Visit Charges Reject</button>
+      `:''}
       ${t.status==='Pending Customer Approval'?`<button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>`:''}
       ${t.pending_edit?'<span style="font-size:12px;color:#92400e;background:#fef3c7;padding:6px 12px;border-radius:8px;font-weight:600;">⏳ Edit request pending approval</span>':`<button class="btn btn-sm" onclick="closeModal('modal-ticket');openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Request Edit</button>`}
     </div>`;
@@ -6742,10 +6753,14 @@ async function approveVisitCharge(id){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t)return;
-  const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Approved',by:currentUser.name,at:new Date().toISOString(),note:'Customer agreed to visit/service charge on call — moved to Pending Allocation.'}];
-  await sb('tickets','PATCH',{status:'Pending Allocation',timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  // An engineer was already picked at creation — approving just confirms the
+  // charge and hands it straight to them, instead of dropping it back into
+  // the unallocated pool for someone else to pick up again.
+  const newStatus=t.assigned_to?'Assigned':'Pending Allocation';
+  const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Approved',by:currentUser.name,at:new Date().toISOString(),note:'Customer agreed to visit/service charge on call — moved to '+newStatus+'.'}];
+  await sb('tickets','PATCH',{status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   closeModal('modal-ticket');
-  if(currentPage==='tickets')renderTickets();else renderDashboard();
+  if(currentPage==='tickets')renderTickets();else if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
 }
 async function rejectVisitCharge(id){
   const reason=prompt('❌ Visit Charges Rejected — reason (optional):')||'';
@@ -6755,7 +6770,7 @@ async function rejectVisitCharge(id){
   const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Rejected',by:currentUser.name,at:new Date().toISOString(),note:'Customer did not agree to visit/service charge — call closed, no charges.'+(reason?' Reason: '+reason:'')}];
   await sb('tickets','PATCH',{status:'Customer Reject',service_charges:0,final_charges:0,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   closeModal('modal-ticket');
-  if(currentPage==='tickets')renderTickets();else renderDashboard();
+  if(currentPage==='tickets')renderTickets();else if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
 }
 // A WC/Engineer's Call Cancel request sits in t.pending_cancel until Admin/
 // Manager decides. Approve makes it permanent (same as today's immediate
