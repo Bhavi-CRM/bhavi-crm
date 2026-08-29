@@ -8575,8 +8575,8 @@ function invPurchaseRender(){
     <td>${p.invoice_no||'-'}</td>
     <td>${p.added_by||'-'}</td>
     <td style="text-align:center;white-space:nowrap;">
-      <button onclick="editPurchaseRecord(${p.id})" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
-      <button onclick="deletePurchaseRecord(${p.id})" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
+      <button onclick="editPurchaseRecord('${p.id}')" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
+      <button onclick="deletePurchaseRecord('${p.id}')" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
     </td>
   </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
 
@@ -8624,7 +8624,7 @@ function editPurchaseRecord(id){
     +'<div class="form-group"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="epr-remark" placeholder="e.g. Fixed wrong qty — was 5, actually 1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
     +'</div><div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'edit-purchase-modal\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="savePurchaseRecordEdit('+id+')">💾 Save</button>'
+    +'<button class="btn btn-primary" onclick="savePurchaseRecordEdit(\''+id+'\')">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(ov);
 }
@@ -8724,8 +8724,8 @@ function invSalesRender(){
       <td style="text-align:right;font-weight:700;">₹${((s.qty||0)*(s.unit_price||0)).toFixed(0)}</td>
       <td>${s.added_by||'-'}</td>
       <td style="text-align:center;white-space:nowrap;">
-        <button onclick="editSaleRecord(${s.id})" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
-        <button onclick="deleteSaleRecord(${s.id})" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
+        <button onclick="editSaleRecord('${s.id}')" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
+        <button onclick="deleteSaleRecord('${s.id}')" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
       </td>
     </tr>`;
   }).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No sales records</td></tr>';
@@ -8782,7 +8782,7 @@ function editSaleRecord(id){
     +'<div class="form-group"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="esr-remark" placeholder="e.g. Fixed wrong invoice no." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
     +'</div><div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'edit-sale-modal\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="saveSaleRecordEdit('+id+')">💾 Save</button>'
+    +'<button class="btn btn-primary" onclick="saveSaleRecordEdit(\''+id+'\')">💾 Save</button>'
     +'</div></div>';
   document.body.appendChild(ov);
 }
@@ -12252,11 +12252,85 @@ async function renderEngSelfService(tab){
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="openEngReqReceive()">📥 Parts Request (Receive)</button>
       <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReqReturn()">↩️ Return Parts to Store</button>
+      <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
     </div>
     <div class="tabs">${tabHtml('my-stock','📦 My Stock')}${tabHtml('my-requests','📋 My Requests')}</div>
     <div id="ep-content"></div>`;
   if(tab==='my-stock')await renderEPMyStockView();
   else await renderEPMyRequests();
+}
+// Counter sale recorded directly by the engineer/staff themselves (e.g. a
+// Printer/Camera counter sale) — same inventory_sales row shape as Admin's
+// Manual Sale, but simplified, deducts straight from OFFICE stock (the part
+// is already in inventory from a purchase — this isn't the engineer's own
+// carried bag), Invoice No is mandatory (so accounting can trace it), and
+// added_by is always this engineer's own name so it correctly attributes to
+// them in the Printer/Camera Sales report and Daily Report.
+function openEngRecordSale(){
+  var ex=document.getElementById('eng-sale-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='eng-sale-modal';ov.className='modal-overlay';
+  var partOpts=(allInventory||[]).filter(function(i){return i.qty_in_stock>0;}).map(function(i){
+    return '<option value="'+escHtml(i.part_code||'')+'" data-name="'+escHtml(i.item_name||'')+'" data-price="'+(i.unit_price||0)+'" data-stock="'+i.qty_in_stock+'">'+escHtml(i.part_code||'')+' — '+escHtml(i.item_name||'')+' (Stock: '+i.qty_in_stock+')</option>';
+  }).join('');
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:440px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">🛒 Record Sale</h2><button class="close-btn" onclick="document.getElementById(\'eng-sale-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Date</label><input type="date" id="es-date" value="'+new Date().toLocaleDateString('en-CA')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Part <span style="color:#ef4444;">*</span></label><select id="es-part" onchange="onEngSalePartChange(this)" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"><option value="">-- Select Part --</option>'+partOpts+'</select></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty <span style="color:#ef4444;">*</span></label><input type="number" id="es-qty" min="1" value="1" oninput="updateEngSaleTotal()" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Unit Price ₹ <span style="color:#ef4444;">*</span></label><input type="number" id="es-price" min="0" value="0" oninput="updateEngSaleTotal()" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Customer Name <span style="color:#ef4444;">*</span></label><input type="text" id="es-customer" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Invoice / Bill No <span style="color:#ef4444;">*</span></label><input type="text" id="es-invoice" placeholder="e.g. 1740/26-27" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div style="background:var(--bg);border-radius:8px;padding:10px;font-size:13px;">Total: <b id="es-total">₹0</b> &nbsp;|&nbsp; Available Stock: <b id="es-avail">-</b></div>'
+    +'</div><div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'eng-sale-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="saveEngRecordSale()">💾 Save Sale</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+function onEngSalePartChange(sel){
+  var opt=sel.options[sel.selectedIndex];
+  if(opt&&opt.dataset.price)document.getElementById('es-price').value=opt.dataset.price;
+  if(opt&&opt.dataset.stock)document.getElementById('es-avail').textContent=opt.dataset.stock;
+  updateEngSaleTotal();
+}
+function updateEngSaleTotal(){
+  var q=parseInt(document.getElementById('es-qty')?.value)||0;
+  var p=parseFloat(document.getElementById('es-price')?.value)||0;
+  var el=document.getElementById('es-total');if(el)el.textContent='₹'+(q*p).toFixed(0);
+}
+async function saveEngRecordSale(){
+  var date=document.getElementById('es-date').value;
+  var partSel=document.getElementById('es-part');
+  var partCode=partSel.value;
+  var partName=partSel.options[partSel.selectedIndex]?.dataset.name||'';
+  var availStock=parseInt(partSel.options[partSel.selectedIndex]?.dataset.stock||0);
+  var qty=parseInt(document.getElementById('es-qty').value)||0;
+  var price=parseFloat(document.getElementById('es-price').value)||0;
+  var customer=document.getElementById('es-customer').value.trim();
+  var invoiceNo=document.getElementById('es-invoice').value.trim();
+  if(!date||!partCode||!qty||!price){alert('Please fill Date, Part, Qty and Price.');return;}
+  if(!customer){alert('Customer Name is required.');return;}
+  if(!invoiceNo){alert('Invoice / Bill No is required.');return;}
+  if(qty>availStock){alert('Insufficient stock! Available: '+availStock);return;}
+  try{
+    await sb('inventory_sales','POST',{
+      sale_date:date,part_code:partCode,part_name:partName,
+      sale_type:'customer',customer_name:customer,
+      qty:qty,unit_price:price,total_amount:qty*price,
+      reference:invoiceNo,added_by:currentUser.name,
+      created_at:new Date().toISOString()
+    });
+    var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===partCode.toUpperCase();});
+    if(inv){
+      var newQty=Math.max(0,(inv.qty_in_stock||0)-qty);
+      await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+      inv.qty_in_stock=newQty;
+      await sb('inventory_log','POST',{inventory_id:inv.id,type:'out',qty:qty,note:'Sale to '+customer+' INV:'+invoiceNo,done_by:currentUser.name}).catch(function(){});
+    }
+    document.getElementById('eng-sale-modal')?.remove();
+    alert('✅ Sale recorded — ₹'+(qty*price).toFixed(0)+' under your name.');
+  }catch(e){alert('Error: '+e.message);}
 }
 // Engineer's own current holdings — how many of each part they're actually
 // carrying right now (eng_stock rows keyed by owner = engineer's name).
