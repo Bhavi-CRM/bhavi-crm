@@ -9767,25 +9767,37 @@ async function renderWrongStockAudit(c){
 // Phone), never the later Delivered date.
 // ════════════════════════════════════════════════════════════
 async function renderServiceEdgeExport(c){
+  // Filter dates persist in window._svcEdge* across tab switches (Reports has
+  // several tabs sharing one page) — re-opening this tab re-uses the last
+  // search instead of silently resetting to month-start/today; only the
+  // explicit "Clear Filter" button resets it.
   var today=new Date().toLocaleDateString('en-CA');
   var monthStart=new Date();monthStart.setDate(1);
+  var fromVal=window._svcEdgeFrom||monthStart.toLocaleDateString('en-CA');
+  var toVal=window._svcEdgeTo||today;
   c.innerHTML='<div class="card" style="margin-bottom:14px;">'
     +'<div class="section-header"><h2>🏭 Service Edge Export</h2></div>'
     +'<div class="alert alert-info" style="margin-bottom:12px;">📋 ICP Non-Warranty calls only, closed (repaired) in the selected range — parts used, summed by Part Code + Qty, ready to bulk-upload into Service Edge.</div>'
     +'<div class="form-grid" style="margin-bottom:12px;">'
-    +'<div class="form-group"><label>Closed From</label><input type="date" id="svcedge-from" value="'+monthStart.toLocaleDateString('en-CA')+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
-    +'<div class="form-group"><label>Closed To</label><input type="date" id="svcedge-to" value="'+today+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Closed From</label><input type="date" id="svcedge-from" value="'+fromVal+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
+    +'<div class="form-group"><label>Closed To</label><input type="date" id="svcedge-to" value="'+toVal+'" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;width:100%;"></div>'
     +'</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
     +'<button class="btn btn-primary" onclick="loadServiceEdgeExport()">🔍 Search</button>'
     +'<button class="btn btn-success" id="svcedge-dl-btn" onclick="downloadServiceEdgeExport()" disabled>📊 Download Excel</button>'
+    +'<button class="btn btn-outline" onclick="clearServiceEdgeExport()">✕ Clear Filter</button>'
     +'</div></div>'
     +'<div id="svcedge-results"></div>';
   loadServiceEdgeExport();
 }
+function clearServiceEdgeExport(){
+  window._svcEdgeFrom=null;window._svcEdgeTo=null;
+  renderServiceEdgeExport(document.getElementById('report-tab-content'));
+}
 async function loadServiceEdgeExport(){
   var from=document.getElementById('svcedge-from')?.value||'';
   var to=document.getElementById('svcedge-to')?.value||'';
+  window._svcEdgeFrom=from;window._svcEdgeTo=to; // persist for this tab's re-opens
   var res=document.getElementById('svcedge-results');
   var dlBtn=document.getElementById('svcedge-dl-btn');
   if(!res)return;
@@ -9794,7 +9806,7 @@ async function loadServiceEdgeExport(){
   try{
     var q='?wc_type=eq.ICP&status=in.(Closed,Repaired,Pending for Delivery,Resolved By Phone,Delivered)&select=id,cname,call_type,spares,timeline';
     var tickets=await sbAll('tickets',q);
-    var byPart={}; // code -> {code,name,qty}
+    var byPart={}; // code -> {code,name,qty,tickets:[{id,cname,qty}]}
     var matchedTickets=[];
     tickets.forEach(function(t){
       var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
@@ -9810,8 +9822,9 @@ async function loadServiceEdgeExport(){
       spares.forEach(function(s){
         if(!s||!s.code)return;
         var qty=s.qty||1;
-        if(!byPart[s.code])byPart[s.code]={code:s.code,name:s.name||'',qty:0};
+        if(!byPart[s.code])byPart[s.code]={code:s.code,name:s.name||'',qty:0,tickets:[]};
         byPart[s.code].qty+=qty;
+        byPart[s.code].tickets.push({id:t.id,cname:t.cname||'',qty:qty,date:closedDateStr});
         usedHere=true;
       });
       if(usedHere)matchedTickets.push(t.id);
@@ -9823,10 +9836,10 @@ async function loadServiceEdgeExport(){
       return;
     }
     var totalQty=rows.reduce(function(a,r){return a+r.qty;},0);
-    var rowsHtml=rows.map(function(r){
-      return '<tr><td style="padding:6px 8px;font-weight:700;">'+escHtml(r.code)+'</td><td style="padding:6px 8px;">'+escHtml(r.name)+'</td><td style="padding:6px 8px;text-align:center;font-weight:700;">'+r.qty+'</td></tr>';
+    var rowsHtml=rows.map(function(r,idx){
+      return '<tr><td style="padding:6px 8px;font-weight:700;color:#1d4ed8;cursor:pointer;" onclick="svcEdgeCheckPart('+idx+')" title="Click to see which tickets used this part">'+escHtml(r.code)+' 🔍</td><td style="padding:6px 8px;">'+escHtml(r.name)+'</td><td style="padding:6px 8px;text-align:center;font-weight:700;">'+r.qty+'</td></tr>';
     }).join('');
-    res.innerHTML='<div class="alert alert-success" style="margin-bottom:12px;">✅ '+matchedTickets.length+' tickets, '+rows.length+' distinct parts, '+totalQty+' total qty — ready to export.</div>'
+    res.innerHTML='<div class="alert alert-success" style="margin-bottom:12px;">✅ '+matchedTickets.length+' tickets, '+rows.length+' distinct parts, '+totalQty+' total qty — ready to export. Click a Part Code to see/validate which tickets it came from.</div>'
       +'<div class="card"><div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
       +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Part Code</th><th style="padding:6px 8px;">Part Name</th><th style="padding:6px 8px;text-align:center;">Qty</th></tr></thead>'
       +'<tbody>'+rowsHtml+'</tbody></table></div></div>';
@@ -9834,6 +9847,28 @@ async function loadServiceEdgeExport(){
   }catch(e){
     res.innerHTML='<div class="alert alert-warning">Error: '+e.message+'</div>';
   }
+}
+function svcEdgeCheckPart(idx){
+  var r=(window._svcEdgeRows||[])[idx];
+  if(!r)return;
+  var ex=document.getElementById('svcedge-check-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='svcedge-check-modal';ov.className='modal-overlay';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  var rowsHtml=r.tickets.map(function(x){
+    return '<tr><td style="padding:6px 8px;"><a href="javascript:void(0)" onclick="document.getElementById(\'svcedge-check-modal\').remove();viewTicket(\''+x.id+'\')" style="color:#1d4ed8;font-weight:700;">'+escHtml(x.id)+'</a></td>'
+      +'<td style="padding:6px 8px;">'+escHtml(x.cname)+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;">'+x.qty+'</td>'
+      +'<td style="padding:6px 8px;">'+escHtml(x.date)+'</td></tr>';
+  }).join('');
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:520px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">🔍 '+escHtml(r.code)+' — '+escHtml(r.name)+'</h2><button class="close-btn" onclick="document.getElementById(\'svcedge-check-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Used in '+r.tickets.length+' ticket(s), total qty '+r.qty+'. Click a Ticket ID to open it and verify.</div>'
+    +'<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:#f8fafc;text-align:left;"><th style="padding:6px 8px;">Ticket</th><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;text-align:center;">Qty</th><th style="padding:6px 8px;">Closed Date</th></tr></thead>'
+    +'<tbody>'+rowsHtml+'</tbody></table></div>'
+    +'</div></div>';
+  document.body.appendChild(ov);
 }
 function downloadServiceEdgeExport(){
   var rows=window._svcEdgeRows||[];
@@ -11246,9 +11281,19 @@ async function renderEPLog(){
   }catch(e){el.innerHTML=`<div class="card"><p>Error: ${e.message}</p></div>`;}
 }
 
-function epLogRender(){
-  const el=document.getElementById('ep-content');
-  if(!el)return;
+// Only rebuilds the results table + count — never the filter bar itself, so
+// typing in the search box never destroys/recreates the focused <input>
+// (that full-rebuild-on-keystroke bug already fixed once in Stock Tally and
+// Pending List; it had crept back in here).
+function epLogRenderRows(){
+  const tbody=document.getElementById('ep-log-tbody');
+  const countEl=document.getElementById('ep-log-count');
+  if(!tbody){epLogRender();return;}
+  const built=_epLogBuildRows();
+  tbody.innerHTML=built.rows;
+  if(countEl)countEl.textContent=built.count+' records';
+}
+function _epLogBuildRows(){
   const movs=window._epLogData||[];
   const q=(document.getElementById('ep-log-search')?.value||'').toLowerCase();
   const typeF=document.getElementById('ep-log-type')?.value||'';
@@ -11293,7 +11338,11 @@ function epLogRender(){
     <td style="padding:8px 12px;font-size:11px;">${m.warranty?'<span style="color:#059669;font-weight:700;">Warranty</span>':m.notes||'—'}</td>
     <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#7c3aed;white-space:nowrap;">${m.created_by||'—'}</td>
   </tr>`).join('')||'<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text-muted);">No movements found</td></tr>';
-
+  return {rows,count:filtered.length};
+}
+function epLogRender(){
+  const el=document.getElementById('ep-content');
+  if(!el)return;
   const savedQ=document.getElementById('ep-log-search')?.value||'';
   const savedType=document.getElementById('ep-log-type')?.value||'';
   const savedFrom=document.getElementById('ep-log-from')?.value||'';
@@ -11302,9 +11351,9 @@ function epLogRender(){
   el.innerHTML=`
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input id="ep-log-search" type="text" placeholder="🔍 Search part, engineer, jobsheet..." value="${escHtml(savedQ)}"
-        oninput="epLogRender()"
+        oninput="epLogRenderRows()"
         style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
-      <select id="ep-log-type" onchange="epLogRender()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
+      <select id="ep-log-type" onchange="epLogRenderRows()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
         <option value="">All Types</option>
         <option value="ISSUE" ${savedType==='ISSUE'?'selected':''}>📤 Issued</option>
         <option value="ENG_RETURN" ${savedType==='ENG_RETURN'?'selected':''}>↩️ Returned</option>
@@ -11313,13 +11362,13 @@ function epLogRender(){
         <option value="ADJUST" ${savedType==='ADJUST'?'selected':''}>⚙️ Adjusted</option>
         <option value="WARRANTY_DIRECT_IN" ${savedType==='WARRANTY_DIRECT_IN'?'selected':''}>🎁 Direct Issue</option>
       </select>
-      <input id="ep-log-from" type="date" value="${savedFrom}" onchange="epLogRender()" title="From date"
+      <input id="ep-log-from" type="date" value="${savedFrom}" onchange="epLogRenderRows()" title="From date"
         style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
-      <input id="ep-log-to" type="date" value="${savedTo}" onchange="epLogRender()" title="To date"
+      <input id="ep-log-to" type="date" value="${savedTo}" onchange="epLogRenderRows()" title="To date"
         style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
-      <button onclick="document.getElementById('ep-log-search').value='';document.getElementById('ep-log-type').value='';document.getElementById('ep-log-from').value='';document.getElementById('ep-log-to').value='';epLogRender();"
+      <button onclick="document.getElementById('ep-log-search').value='';document.getElementById('ep-log-type').value='';document.getElementById('ep-log-from').value='';document.getElementById('ep-log-to').value='';epLogRenderRows();"
         style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Clear</button>
-      <span style="font-size:12px;color:#64748b;font-weight:600;">${filtered.length} records</span>
+      <span id="ep-log-count" style="font-size:12px;color:#64748b;font-weight:600;"></span>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <table style="min-width:700px;border-collapse:collapse;width:100%;">
@@ -11334,9 +11383,10 @@ function epLogRender(){
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">Notes</th>
           <th style="padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;">By</th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody id="ep-log-tbody"></tbody>
       </table>
     </div>`;
+  epLogRenderRows();
 }
 
 // ── Modal openers ─────────────────────────────────────────────
