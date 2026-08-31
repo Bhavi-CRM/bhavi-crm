@@ -9344,7 +9344,7 @@ async function savePurchaseInvoice(){
         // the "New Part" popup when the user filled one in for this row)
         var newInvItem={part_code:r.code,item_name:r.name||r.code,qty_in_stock:r.qty,
           purchase_price:r.dtp||0,unit_price:r.mrp||0,gst_pct:r.gst||18,
-          added_by:currentUser.name,updated_at:new Date().toISOString()};
+          updated_at:new Date().toISOString()};
         if(r.extra){
           if(r.extra.category) newInvItem.category=r.extra.category;
           if(r.extra.brand_id) newInvItem.brand_id=r.extra.brand_id;
@@ -9352,13 +9352,20 @@ async function savePurchaseInvoice(){
           if(r.extra.is_consumable) newInvItem.is_consumable=true;
         }
         var created;
-        try{
-          created=await sb('inventory','POST',newInvItem);
-        }catch(newItemErr){
-          if(String(newItemErr.message||'').indexOf('is_consumable')!==-1){
-            delete newInvItem.is_consumable;
+        for(var attempt=0;attempt<6;attempt++){
+          try{
             created=await sb('inventory','POST',newInvItem);
-          }else{throw newItemErr;}
+            break;
+          }catch(newItemErr){
+            var msg=String(newItemErr.message||'');
+            var m=msg.match(/'([a-z_]+)' column/)||msg.match(/column '([a-z_]+)'/)||msg.match(/column ([a-z_]+) of/);
+            var badCol=m?m[1]:null;
+            if(badCol&&Object.prototype.hasOwnProperty.call(newInvItem,badCol)){
+              delete newInvItem[badCol];
+              continue;
+            }
+            throw newItemErr;
+          }
         }
         if(created&&created[0]){
           allInventory.push(Object.assign(newInvItem,{id:created[0].id}));
