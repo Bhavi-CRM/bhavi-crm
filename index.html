@@ -12656,7 +12656,13 @@ function errAddPartToReturn(partId,label){
   }
   errRenderSelectedParts();
   document.getElementById('err-search').value='';
-  errShowParts();
+  // Close the dropdown instead of reopening it — reopening it here (via
+  // errShowParts) left a tall result list sitting at z-index:9999 on top of
+  // the modal's sticky footer, hiding the Submit button whenever enough
+  // parts were in stock to make the list tall. Re-focusing the search box
+  // opens it again for the next part.
+  const drop=document.getElementById('err-drop');
+  if(drop){drop.style.display='none';drop.innerHTML='';}
 }
 function errRenderSelectedParts(){
   const cont=document.getElementById('err-parts-list');
