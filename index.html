@@ -9151,7 +9151,8 @@ function purAddRow(){
     </td>
     <td style="padding:5px 6px;">
       <input type="number" class="pur-gst" value="" min="0" max="100" placeholder="18" data-row="${idx}"
-        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:center;">
+        style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:center;"
+        oninput="purUpdateTotals()">
     </td>
     <td style="padding:5px 6px;">
       <input type="number" class="pur-mrp" value="" min="0" placeholder="0" data-row="${idx}"
@@ -9271,7 +9272,8 @@ function purUpdateTotals(){
     var code=(tr.querySelector('.pur-code')?.value||'').trim();
     var qty=parseFloat(tr.querySelector('.pur-qty')?.value)||0;
     var dtp=parseFloat(tr.querySelector('.pur-dtp')?.value)||0;
-    var total=qty*dtp;
+    var gst=parseFloat(tr.querySelector('.pur-gst')?.value);if(isNaN(gst))gst=0;
+    var total=qty*dtp*(1+gst/100);
     var span=tr.querySelector('.pur-rowtotal');
     if(span){span.textContent=code&&qty?'₹'+total.toFixed(0):'—';}
     if(code&&qty){grand+=total;count++;}
@@ -9323,7 +9325,7 @@ async function savePurchaseInvoice(){
       await sb('inventory_purchases','POST',{
         purchase_date:date,part_code:r.code,part_name:r.name||inv?.item_name||r.code,
         supplier:supplier,qty:r.qty,unit_cost:r.dtp,
-        invoice_no:invoice,total_cost:r.qty*r.dtp,
+        invoice_no:invoice,total_cost:r.qty*r.dtp*(1+(r.gst||0)/100),
         note:note||null,added_by:currentUser.name,
         created_at:new Date().toISOString()
       });
