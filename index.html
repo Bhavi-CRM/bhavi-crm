@@ -9133,7 +9133,7 @@ function purAddRow(){
     <td style="padding:5px 6px;">
       <input type="text" list="${dlId}" class="pur-code" placeholder="Part code" data-row="${idx}"
         style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;outline:none;"
-        oninput="purCodeInput(this)" onchange="purCodeInput(this)">
+        oninput="purCodeInput(this)" onchange="purCodeInput(this)" onblur="purCodeCheckNew(this)">
     </td>
     <td style="padding:5px 6px;">
       <input type="text" class="pur-name" placeholder="Description" data-row="${idx}"
@@ -9176,7 +9176,91 @@ function purCodeInput(inp){
     tr.querySelector('.pur-dtp').value=inv.purchase_price||inv.unit_price||0;
     tr.querySelector('.pur-gst').value=inv.gst_pct!=null?inv.gst_pct:18;
     tr.querySelector('.pur-mrp').value=inv.unit_price||0;
+    delete tr.dataset.newItemCode;
   }
+  purUpdateTotals();
+}
+
+// Fires on blur — if the typed part code doesn't exist in inventory, pop up a
+// quick "new item" form right here so the user never has to leave the
+// purchase invoice to create it in the Inventory tab first. Whatever they
+// fill in flows back into this row AND becomes the data used to create the
+// inventory record when the invoice is saved — one entry, not two.
+function purCodeCheckNew(inp){
+  var code=(inp.value||'').trim().toUpperCase();
+  if(!code)return;
+  var inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===code;});
+  if(inv)return;
+  var tr=inp.closest('tr');if(!tr)return;
+  if(tr.dataset.newItemCode===code)return; // already filled in for this exact code
+  openPurNewItemPopup(tr,code);
+}
+
+function openPurNewItemPopup(tr,code){
+  var ex=document.getElementById('pur-newitem-modal');if(ex)ex.remove();
+  var prefName=tr.querySelector('.pur-name')?.value||'';
+  var prefDtp=tr.querySelector('.pur-dtp')?.value||'';
+  var prefGst=tr.querySelector('.pur-gst')?.value||'18';
+  var prefMrp=tr.querySelector('.pur-mrp')?.value||'';
+  var brandOpts='<option value="">Select Brand</option>'+((typeof allBrands!=='undefined'&&allBrands)?allBrands:[]).map(function(b){return '<option value="'+b.id+'">'+escHtml(b.name)+'</option>';}).join('');
+  window._purNewItemRow=tr;
+  window._purNewItemCode=code;
+  var ov=document.createElement('div');
+  ov.id='pur-newitem-modal';ov.className='modal-overlay';ov.style.zIndex='1100';
+  ov.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2>🆕 New Part: '+escHtml(code)+'</h2><button class="close-btn" onclick="document.getElementById(\'pur-newitem-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#1d4ed8;">This part code was not found in inventory. Fill the details below — it will be created automatically and added to this purchase invoice.</div>'
+    +'<div class="form-group" style="margin-bottom:10px;"><label>Item Name <span class="req">*</span></label><input type="text" id="pni-name" value="'+escHtml(prefName)+'" placeholder="e.g. 2MP Dome Camera"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Category</label><input type="text" id="pni-cat" placeholder="e.g. Camera, Cable"></div>'
+    +'<div class="form-group"><label>Brand</label><select id="pni-brand">'+brandOpts+'</select></div>'
+    +'</div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Purchase Price (DTP) ₹</label><input type="number" id="pni-dtp" value="'+escHtml(prefDtp)+'" min="0"></div>'
+    +'<div class="form-group"><label>GST %</label><input type="number" id="pni-gst" value="'+escHtml(prefGst)+'" min="0" max="100"></div>'
+    +'</div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>MRP / Selling Price ₹</label><input type="number" id="pni-mrp" value="'+escHtml(prefMrp)+'" min="0"></div>'
+    +'<div class="form-group"><label>Min Stock</label><input type="number" id="pni-min" value="2" min="0"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:6px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;"><input type="checkbox" id="pni-consumable" style="width:16px;height:16px;"> Consumable item</label></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn btn-outline" onclick="document.getElementById(\'pur-newitem-modal\').remove()">Cancel</button>'
+    +'<button class="btn btn-primary" onclick="savePurNewItemPopup()">💾 Add &amp; Continue</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){document.getElementById('pni-name')?.focus();},50);
+}
+
+function savePurNewItemPopup(){
+  var tr=window._purNewItemRow;
+  var modal=document.getElementById('pur-newitem-modal');
+  if(!tr||!tr.parentNode){if(modal)modal.remove();return;}
+  var name=(document.getElementById('pni-name').value||'').trim();
+  if(!name){alert('Item name is required.');return;}
+  var cat=(document.getElementById('pni-cat').value||'').trim();
+  var brandId=document.getElementById('pni-brand').value||'';
+  var dtp=parseFloat(document.getElementById('pni-dtp').value)||0;
+  var gst=parseFloat(document.getElementById('pni-gst').value);if(isNaN(gst))gst=18;
+  var mrp=parseFloat(document.getElementById('pni-mrp').value)||0;
+  var minStock=parseInt(document.getElementById('pni-min').value);if(isNaN(minStock))minStock=2;
+  var consumable=document.getElementById('pni-consumable').checked;
+  // Fill the details straight back into this purchase row
+  var nameEl=tr.querySelector('.pur-name');if(nameEl)nameEl.value=name;
+  var dtpEl=tr.querySelector('.pur-dtp');if(dtpEl)dtpEl.value=dtp;
+  var gstEl=tr.querySelector('.pur-gst');if(gstEl)gstEl.value=gst;
+  var mrpEl=tr.querySelector('.pur-mrp');if(mrpEl)mrpEl.value=mrp;
+  // Stash the extra new-item fields on the row — read back when the invoice
+  // is saved so the inventory record is created with full detail, not just
+  // the columns visible in the purchase table.
+  tr.dataset.newItemCode=window._purNewItemCode||'';
+  tr.dataset.newCat=cat;
+  tr.dataset.newBrand=brandId;
+  tr.dataset.newMinStock=String(minStock);
+  tr.dataset.newConsumable=consumable?'1':'0';
+  if(modal)modal.remove();
   purUpdateTotals();
 }
 
@@ -9225,7 +9309,8 @@ async function savePurchaseInvoice(){
     var dtp=parseFloat(tr.querySelector('.pur-dtp')?.value)||0;
     var gst=parseFloat(tr.querySelector('.pur-gst')?.value);if(isNaN(gst))gst=18;
     var mrp=parseFloat(tr.querySelector('.pur-mrp')?.value)||0;
-    if(code&&qty>0) rows.push({code,name,qty,dtp,gst,mrp});
+    var extra=(tr.dataset.newItemCode&&tr.dataset.newItemCode===code)?{category:tr.dataset.newCat||'',brand_id:tr.dataset.newBrand||'',min_stock:tr.dataset.newMinStock?parseInt(tr.dataset.newMinStock):null,is_consumable:tr.dataset.newConsumable==='1'}:null;
+    if(code&&qty>0) rows.push({code,name,qty,dtp,gst,mrp,extra});
   });
   if(!rows.length){alert('Please enter at least one part with a part code and quantity.');return;}
   try{
@@ -9255,11 +9340,26 @@ async function savePurchaseInvoice(){
         if(r.gst>=0) inv.gst_pct=r.gst;
         await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:r.qty,note:'Purchase INV:'+invoice+' | '+supplier,done_by:currentUser.name}).catch(()=>{});
       }else{
-        // New part not in inventory — create it
+        // New part not in inventory — create it (using the full details from
+        // the "New Part" popup when the user filled one in for this row)
         var newInvItem={part_code:r.code,item_name:r.name||r.code,qty_in_stock:r.qty,
           purchase_price:r.dtp||0,unit_price:r.mrp||0,gst_pct:r.gst||18,
           added_by:currentUser.name,updated_at:new Date().toISOString()};
-        var created=await sb('inventory','POST',newInvItem);
+        if(r.extra){
+          if(r.extra.category) newInvItem.category=r.extra.category;
+          if(r.extra.brand_id) newInvItem.brand_id=r.extra.brand_id;
+          if(r.extra.min_stock!=null) newInvItem.min_stock=r.extra.min_stock;
+          if(r.extra.is_consumable) newInvItem.is_consumable=true;
+        }
+        var created;
+        try{
+          created=await sb('inventory','POST',newInvItem);
+        }catch(newItemErr){
+          if(String(newItemErr.message||'').indexOf('is_consumable')!==-1){
+            delete newInvItem.is_consumable;
+            created=await sb('inventory','POST',newInvItem);
+          }else{throw newItemErr;}
+        }
         if(created&&created[0]){
           allInventory.push(Object.assign(newInvItem,{id:created[0].id}));
           await sb('inventory_log','POST',{inventory_id:created[0].id,type:'in',qty:r.qty,note:'New item — Purchase INV:'+invoice+' | '+supplier,done_by:currentUser.name}).catch(()=>{});
