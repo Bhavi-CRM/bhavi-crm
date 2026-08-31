@@ -11030,7 +11030,6 @@ async function renderEngParts(tab){
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
           <button class="btn" style="background:#0369a1;color:#fff;" onclick="openDirectWarrantyIssue()">📦 Direct Warranty Issue</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
-          <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
           ${isCspMgr?`<button class="btn" style="background:#0d9488;color:#fff;" onclick="openEngReqReceive()">📥 Request Parts (Self)</button><button class="btn" style="background:#be185d;color:#fff;" onclick="openEngReqReturn()">↩️ Return My Parts</button>`:''}
         </div>
         <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}${isCspMgr?tabHtml('my-requests','📋 My Requests'):''}</div>
@@ -11042,10 +11041,13 @@ async function renderEngParts(tab){
       else if(tab==='my-requests') await renderEPMyRequests();
       else await renderEPLog();
     }else{
-      // WC: only approve Returns
+      // WC: approve Returns and can record sales
       c.innerHTML=`
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
+        </div>
         <div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-          ℹ️ You can only approve Engineer Return Requests. Stock details are visible to Admin only.
+          ℹ️ You can record sales and approve Engineer Return Requests. Stock details are visible to Admin only.
         </div>
         <div class="tabs">${tabHtml('pending','⏳ Pending Returns')}</div>
         <div id="ep-content"></div>`;
