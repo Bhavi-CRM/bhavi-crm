@@ -8464,8 +8464,13 @@ async function renderInventory(tab){
     allInventory=await sbAll('inventory','?order=item_name');
     // Fetch purchase and sales logs
     let purchases=[],salesLogs=[];
-    try{purchases=await sb('inventory_purchases','GET',null,'?order=purchase_date.desc&limit=500');}catch(e){}
-    try{salesLogs=await sb('inventory_sales','GET',null,'?order=sale_date.desc&limit=500');}catch(e){}
+    // Sort by created_at (exact insert time), not just the date field — every
+    // row of one invoice shares the same purchase_date/sale_date, so sorting
+    // by date alone left ties in whatever arbitrary order the DB returned
+    // them, scattering one invoice's items instead of keeping them together
+    // with the newest entry on top.
+    try{purchases=await sb('inventory_purchases','GET',null,'?order=created_at.desc,purchase_date.desc&limit=500');}catch(e){}
+    try{salesLogs=await sb('inventory_sales','GET',null,'?order=created_at.desc,sale_date.desc&limit=500');}catch(e){}
 
     const low=allInventory.filter(i=>i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock).length;
     const out=allInventory.filter(i=>i.qty_in_stock<=0).length;
@@ -8542,6 +8547,13 @@ function renderInvPurchaseTab(purchases){
 function invPurchaseRender(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
+  // This function rebuilds the whole section (search bar included) on every
+  // keystroke, which recreates the search input and drops focus — forcing
+  // the user to click back into the box after each letter. Capture/restore
+  // focus + cursor position around the re-render to fix that.
+  const _activeId=document.activeElement&&document.activeElement.id;
+  const _selStart=_activeId&&typeof document.activeElement.selectionStart==='number'?document.activeElement.selectionStart:null;
+  const _selEnd=_activeId&&typeof document.activeElement.selectionEnd==='number'?document.activeElement.selectionEnd:null;
   const all=window._invPurchaseData||[];
   const q=(document.getElementById('inv-pur-search')?.value||'').toLowerCase();
   const fromD=document.getElementById('inv-pur-from')?.value||'';
@@ -8575,8 +8587,8 @@ function invPurchaseRender(){
     <td>${p.invoice_no||'-'}</td>
     <td>${p.added_by||'-'}</td>
     <td style="text-align:center;white-space:nowrap;">
-      <button onclick="editPurchaseRecord('${p.id}')" title="Edit" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
-      <button onclick="deletePurchaseRecord('${p.id}')" title="Delete" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
+      <button onclick="editPurchaseInvoice('${encodeURIComponent(p.invoice_no||'')}','${p.id}')" title="Edit whole invoice" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>
+      <button onclick="deletePurchaseRecord('${p.id}')" title="Delete this item" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">🗑️</button>
     </td>
   </tr>`).join('')||'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No purchase records</td></tr>';
 
@@ -8587,7 +8599,7 @@ function invPurchaseRender(){
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input id="inv-pur-search" type="text" placeholder="🔍 Part code, name, supplier, invoice..." value="${escHtml(savedQ)}"
-        oninput="invPurchaseRender()"
+        oninput="invPurchaseRender()" autocomplete="off"
         style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
       <input id="inv-pur-from" type="date" value="${savedFrom}" onchange="invPurchaseRender()" title="From date"
         style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
@@ -8602,59 +8614,110 @@ function invPurchaseRender(){
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
+  if(_activeId){const _el=document.getElementById(_activeId);if(_el){_el.focus();if(_selStart!=null&&_el.setSelectionRange){try{_el.setSelectionRange(_selStart,_selEnd);}catch(e){}}}}
 }
 // Editing/deleting a purchase record must also reverse/adjust the stock it
 // originally added — otherwise the fix for a wrong entry corrupts stock
 // instead of fixing it. Matched by part_code (these tables never stored
 // part_id — same convention as the original purchase-save flow).
-function editPurchaseRecord(id){
-  const p=(window._invPurchaseData||[]).find(x=>x.id===id);
-  if(!p){alert('Record not found.');return;}
+// Edit opens the WHOLE invoice (every purchase row sharing this invoice_no),
+// not just the one item clicked — an invoice usually has many parts, and
+// fixing one wrong qty shouldn't force opening each row's edit separately.
+// Falls back to editing just the clicked row when the invoice has no
+// invoice_no on file (would otherwise incorrectly group every no-invoice
+// row together under one blank invoice).
+function editPurchaseInvoice(invoiceNoEnc,clickedId){
+  const invoiceNo=decodeURIComponent(invoiceNoEnc||'');
+  const all=window._invPurchaseData||[];
+  const items=invoiceNo?all.filter(x=>(x.invoice_no||'')===invoiceNo):all.filter(x=>x.id===clickedId);
+  if(!items.length){alert('Record not found.');return;}
+  const first=items[0];
   const ex=document.getElementById('edit-purchase-modal');if(ex)ex.remove();
+  const rowsHtml=items.map(function(p){
+    const rowTotal=(p.qty||0)*(p.unit_cost||0);
+    return '<tr data-id="'+p.id+'" data-orig-qty="'+(p.qty||0)+'" data-code="'+escHtml(p.part_code||'').replace(/"/g,'&quot;')+'">'
+      +'<td style="padding:6px 8px;"><b style="color:var(--primary);">'+escHtml(p.part_code||'-')+'</b></td>'
+      +'<td style="padding:6px 8px;font-size:12px;">'+escHtml(p.part_name||'-')+'</td>'
+      +'<td style="padding:6px 8px;"><input type="number" class="epi-qty" value="'+(p.qty||0)+'" min="1" oninput="epiUpdateTotals()" style="width:70px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:center;"></td>'
+      +'<td style="padding:6px 8px;"><input type="number" class="epi-cost" value="'+(p.unit_cost||0)+'" min="0" oninput="epiUpdateTotals()" style="width:90px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;outline:none;text-align:right;"></td>'
+      +'<td class="epi-rowtotal" style="padding:6px 8px;text-align:right;font-weight:700;color:#1d4ed8;">₹'+rowTotal.toFixed(0)+'</td>'
+      +'</tr>';
+  }).join('');
+  const grandTotal=items.reduce(function(a,p){return a+(p.qty||0)*(p.unit_cost||0);},0);
   const ov=document.createElement('div');ov.id='edit-purchase-modal';ov.className='modal-overlay';
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
-  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
-    +'<div class="modal-header"><h2 style="font-size:15px;">✏️ Edit Purchase — '+escHtml(p.part_code||'')+'</h2><button class="close-btn" onclick="document.getElementById(\'edit-purchase-modal\').remove()">✕</button></div>'
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:680px;">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">✏️ Edit Invoice'+(invoiceNo?' — '+escHtml(invoiceNo):'')+'</h2><button class="close-btn" onclick="document.getElementById(\'edit-purchase-modal\').remove()">✕</button></div>'
     +'<div class="modal-body">'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Date</label><input type="date" id="epr-date" value="'+(p.purchase_date||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-grid" style="margin-bottom:10px;"><div class="form-group"><label>Qty</label><input type="number" id="epr-qty" value="'+(p.qty||0)+'" min="1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-group"><label>Unit Cost ₹</label><input type="number" id="epr-cost" value="'+(p.unit_cost||0)+'" min="0" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Supplier</label><input type="text" id="epr-supplier" value="'+escHtml(p.supplier||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-group" style="margin-bottom:10px;"><label>Invoice No</label><input type="text" id="epr-invoice" value="'+escHtml(p.invoice_no||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
-    +'<div class="form-group"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="epr-remark" placeholder="e.g. Fixed wrong qty — was 5, actually 1" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-grid" style="margin-bottom:10px;">'
+    +'<div class="form-group"><label>Date</label><input type="date" id="epi-date" value="'+(first.purchase_date||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div class="form-group"><label>Supplier</label><input type="text" id="epi-supplier" value="'+escHtml(first.supplier||'')+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'</div>'
+    +'<div class="form-group" style="margin-bottom:12px;"><label>Invoice No</label><input type="text" id="epi-invoice" value="'+escHtml(invoiceNo)+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
+    +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    +'<thead><tr style="background:#f8fafc;"><th style="padding:6px 8px;text-align:left;font-size:10px;color:#64748b;">PART CODE</th><th style="padding:6px 8px;text-align:left;font-size:10px;color:#64748b;">NAME</th><th style="padding:6px 8px;text-align:center;font-size:10px;color:#64748b;">QTY</th><th style="padding:6px 8px;text-align:right;font-size:10px;color:#64748b;">UNIT COST ₹</th><th style="padding:6px 8px;text-align:right;font-size:10px;color:#64748b;">TOTAL</th></tr></thead>'
+    +'<tbody id="epi-rows-body">'+rowsHtml+'</tbody></table></div>'
+    +'<div style="text-align:right;margin-top:8px;font-size:13px;font-weight:700;">Grand Total: <span id="epi-grand-total" style="color:#1d4ed8;">₹'+grandTotal.toFixed(0)+'</span></div>'
+    +'<div class="form-group" style="margin-top:12px;"><label>Correction Remark <span style="color:#ef4444;">*</span></label><input type="text" id="epi-remark" placeholder="e.g. Fixed wrong qty on 2 items" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;"></div>'
     +'</div><div class="modal-footer">'
     +'<button class="btn btn-outline" onclick="document.getElementById(\'edit-purchase-modal\').remove()">Cancel</button>'
-    +'<button class="btn btn-primary" onclick="savePurchaseRecordEdit(\''+id+'\')">💾 Save</button>'
+    +'<button class="btn btn-primary" onclick="saveEditPurchaseInvoice()">💾 Save All</button>'
     +'</div></div>';
   document.body.appendChild(ov);
 }
-async function savePurchaseRecordEdit(id){
-  const p=(window._invPurchaseData||[]).find(x=>x.id===id);
-  if(!p)return;
-  const newQty=parseInt(document.getElementById('epr-qty')?.value)||0;
-  const newCost=parseFloat(document.getElementById('epr-cost')?.value)||0;
-  const newDate=document.getElementById('epr-date')?.value||p.purchase_date;
-  const newSupplier=document.getElementById('epr-supplier')?.value.trim()||'';
-  const newInvoice=document.getElementById('epr-invoice')?.value.trim()||'';
-  const remark=document.getElementById('epr-remark')?.value.trim()||'';
-  if(newQty<=0){alert('Quantity must be at least 1.');return;}
+function epiUpdateTotals(){
+  var grand=0;
+  document.querySelectorAll('#epi-rows-body tr').forEach(function(tr){
+    var qty=parseFloat(tr.querySelector('.epi-qty')?.value)||0;
+    var cost=parseFloat(tr.querySelector('.epi-cost')?.value)||0;
+    var total=qty*cost;
+    grand+=total;
+    var cell=tr.querySelector('.epi-rowtotal');if(cell)cell.textContent='₹'+total.toFixed(0);
+  });
+  var gt=document.getElementById('epi-grand-total');if(gt)gt.textContent='₹'+grand.toFixed(0);
+}
+async function saveEditPurchaseInvoice(){
+  const remark=(document.getElementById('epi-remark')?.value||'').trim();
   if(!remark){alert('Correction remark is required.');return;}
-  try{
-    const delta=newQty-(p.qty||0);
-    if(delta!==0){
-      const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(p.part_code||'').toUpperCase());
-      if(inv){
-        const newStock=Math.max(0,(inv.qty_in_stock||0)+delta);
-        await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
-        inv.qty_in_stock=newStock;
-        await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:delta,note:'Purchase record correction: '+remark,done_by:currentUser.name}).catch(()=>{});
-      }
+  const newDate=document.getElementById('epi-date')?.value||'';
+  const newSupplier=(document.getElementById('epi-supplier')?.value||'').trim();
+  const newInvoice=(document.getElementById('epi-invoice')?.value||'').trim();
+  if(!newDate||!newSupplier){alert('Date and Supplier are required.');return;}
+  const rows=Array.from(document.querySelectorAll('#epi-rows-body tr'));
+  for(const tr of rows){
+    if((parseInt(tr.querySelector('.epi-qty')?.value)||0)<=0){
+      alert('Quantity must be at least 1 for part '+(tr.dataset.code||''));return;
     }
-    await sb('inventory_purchases','PATCH',{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice,total_cost:newQty*newCost,note:(p.note?p.note+' | ':'')+'Corrected: '+remark},'?id=eq.'+id);
-    Object.assign(p,{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice});
+  }
+  const btn=document.querySelector('#edit-purchase-modal button[onclick="saveEditPurchaseInvoice()"]');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    for(const tr of rows){
+      const id=tr.dataset.id;
+      const code=tr.dataset.code||'';
+      const origQty=parseFloat(tr.dataset.origQty)||0;
+      const newQty=parseInt(tr.querySelector('.epi-qty')?.value)||0;
+      const newCost=parseFloat(tr.querySelector('.epi-cost')?.value)||0;
+      const p=(window._invPurchaseData||[]).find(function(x){return x.id===id;});
+      const delta=newQty-origQty;
+      if(delta!==0){
+        const inv=allInventory.find(function(i){return (i.part_code||'').toUpperCase()===code.toUpperCase();});
+        if(inv){
+          const newStock=Math.max(0,(inv.qty_in_stock||0)+delta);
+          await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+          inv.qty_in_stock=newStock;
+          await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:delta,note:'Purchase invoice correction: '+remark,done_by:currentUser.name}).catch(()=>{});
+        }
+      }
+      await sb('inventory_purchases','PATCH',{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice,total_cost:newQty*newCost*1,note:(p&&p.note?p.note+' | ':'')+'Corrected: '+remark},'?id=eq.'+id);
+      if(p)Object.assign(p,{qty:newQty,unit_cost:newCost,purchase_date:newDate,supplier:newSupplier,invoice_no:newInvoice});
+    }
     document.getElementById('edit-purchase-modal')?.remove();
     invPurchaseRender();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){
+    alert('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='💾 Save All';}
+  }
 }
 async function deletePurchaseRecord(id){
   const p=(window._invPurchaseData||[]).find(x=>x.id===id);
@@ -8685,6 +8748,12 @@ function renderInvSalesTab(salesLogs){
 function invSalesRender(){
   const c=document.getElementById('inv-tab-content');
   if(!c)return;
+  // Same focus-loss issue as invPurchaseRender — rebuilding the whole
+  // section on every keystroke recreates the search input, so capture and
+  // restore focus + cursor position around the re-render.
+  const _activeId=document.activeElement&&document.activeElement.id;
+  const _selStart=_activeId&&typeof document.activeElement.selectionStart==='number'?document.activeElement.selectionStart:null;
+  const _selEnd=_activeId&&typeof document.activeElement.selectionEnd==='number'?document.activeElement.selectionEnd:null;
   const all=window._invSalesData||[];
   const q=(document.getElementById('inv-sal-search')?.value||'').toLowerCase();
   const typeF=document.getElementById('inv-sal-type')?.value||'';
@@ -8740,7 +8809,7 @@ function invSalesRender(){
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <input id="inv-sal-search" type="text" placeholder="🔍 Part code, name, customer, invoice no..." value="${escHtml(savedQ)}"
-        oninput="invSalesRender()"
+        oninput="invSalesRender()" autocomplete="off"
         style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
       <select id="inv-sal-type" onchange="invSalesRender()" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">
         <option value="">All Types</option>
@@ -8761,6 +8830,7 @@ function invSalesRender(){
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
+  if(_activeId){const _el=document.getElementById(_activeId);if(_el){_el.focus();if(_selStart!=null&&_el.setSelectionRange){try{_el.setSelectionRange(_selStart,_selEnd);}catch(e){}}}}
 }
 // Same reasoning as the purchase edit/delete above — a sale DEDUCTED stock,
 // so correcting/removing a wrong entry must add that stock back (or adjust
