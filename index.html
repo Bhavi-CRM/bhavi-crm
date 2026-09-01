@@ -7745,9 +7745,15 @@ async function savePartRequest(addAnother){
   }
 }
 async function _savePartRequestInner(addAnother){
-  const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const code=document.getElementById('req-part-code').value;
   const name=document.getElementById('req-part-name').value;
+  // Without an actual part picked from search, code/name stay blank — but
+  // the rest of this function still ran, saving a spare with a blank code
+  // and (since the Stock field also never got filled in by selectReqPart)
+  // silently landing the ticket on "Pending Parts" for a part that was
+  // never really requested. Block that here instead.
+  if(!code||!code.trim()||!name||!name.trim()){alert('⚠️ Please search and select a part first (click it from the search results) before adding.');return;}
+  const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const qty=parseInt(document.getElementById('req-part-qty').value)||1;
   const note=document.getElementById('req-part-note').value;
   const stockText=document.getElementById('req-part-stock').value;
