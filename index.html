@@ -15924,7 +15924,7 @@ async function saveDailyReport(){
   });
 
   try{
-    await sb('daily_reports','POST',{
+    var _drPayload={
       eng_id:currentUser.eng_id||currentUser.user_id,
       eng_name:currentUser.name,
       report_date:date,
@@ -15947,7 +15947,26 @@ async function saveDailyReport(){
       printer_camera_sales:window._drPCSales||[],
       printer_camera_sales_total:(window._drPCSales||[]).reduce(function(a,r){return a+r.amount;},0),
       remarks:remarks
-    });
+    };
+    // The daily_reports table may be missing newer optional columns (e.g.
+    // printer_camera_sales on installs that haven't run that migration yet)
+    // — rather than block the whole day's report on that, strip whatever
+    // column Postgrest reports as unknown and retry, up to a few times.
+    for(var _drAttempt=0;_drAttempt<6;_drAttempt++){
+      try{
+        await sb('daily_reports','POST',_drPayload);
+        break;
+      }catch(_drErr){
+        var _drMsg=String(_drErr.message||'');
+        var _drM=_drMsg.match(/'([a-z_]+)' column/)||_drMsg.match(/column '([a-z_]+)'/)||_drMsg.match(/column ([a-z_]+) of/);
+        var _drBadCol=_drM?_drM[1]:null;
+        if(_drBadCol&&Object.prototype.hasOwnProperty.call(_drPayload,_drBadCol)){
+          delete _drPayload[_drBadCol];
+          continue;
+        }
+        throw _drErr;
+      }
+    }
     // Office Work entries with a time range also create a matching Work Log
     // row, so the day's full picture (travel/ticket work/office work) shows
     // up in one place — same table + rendering Work Log already has, no
