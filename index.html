@@ -6779,6 +6779,7 @@ async function rejectVisitCharge(id){
   if(!t)return;
   const tl=[...(await _freshTimeline(id,t)),{action:'Visit Charges Rejected',by:currentUser.name,at:new Date().toISOString(),note:'Customer did not agree to visit/service charge — call closed, no charges.'+(reason?' Reason: '+reason:'')}];
   await sb('tickets','PATCH',{status:'Customer Reject',service_charges:0,final_charges:0,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  checkPendingPartsAuto();
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else if(currentPage==='my-calls')renderMyCalls();else renderDashboard();
 }
@@ -6793,6 +6794,7 @@ async function approveCancelRequest(id){
   if(!confirm('Approve this cancellation? This is PERMANENT.'))return;
   const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled (Approved)',by:currentUser.name,at:new Date().toISOString(),note:'Cancel requested by '+t.pending_cancel.requested_by+'. Reason: '+t.pending_cancel.reason}];
   await sb('tickets','PATCH',{status:'Call Cancel',pending_cancel:null,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+  checkPendingPartsAuto();
   closeModal('modal-ticket');
   if(currentPage==='tickets')renderTickets();else renderDashboard();
 }
@@ -6873,6 +6875,10 @@ async function quickStatusChange(id,status){
     }
     const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+reason}];
     await sb('tickets','PATCH',{status:'Call Cancel',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
+    // Cancelling releases any part-stock this call had staked a claim on —
+    // re-check whether another still-waiting Pending Parts call can now
+    // move forward with it.
+    checkPendingPartsAuto();
     closeModal('modal-ticket');
     if(currentPage==='tickets')renderTickets();else renderDashboard();
     return;
@@ -7195,7 +7201,13 @@ async function processApproval(decision){
   
   try{
     await sb('tickets','PATCH',updateData,`?id=eq.${approvalTicketId}`);
-    
+    if(decision!=='approve'){
+      // Customer rejected the estimate — this call will never consume the
+      // part(s) it had indented, releasing any claim on stock for whichever
+      // other open call is waiting on the same part.
+      checkPendingPartsAuto();
+    }
+
     // If approved - auto check stock and set next status. Same 3-way rule as
     // the mid-repair "Request Part" flow (savePartRequest), so it behaves
     // identically whether Admin/WC or the Engineer themselves clicks Approve:
@@ -7212,7 +7224,11 @@ async function processApproval(decision){
         try{
           const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
           const invItem=inv&&inv[0];
-          const companyQty=invItem?(invItem.qty_in_stock||0):0;
+          // Effective qty excludes THIS ticket's own claim but includes any
+          // other still-open ticket's claim on the same part — otherwise
+          // two tickets needing the same last unit could both get waved
+          // through to "ready to repair".
+          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
           if(t.service_type==='On Site'){
             let bagQty=0;
             if(t.assigned_name&&invItem){
@@ -7728,6 +7744,43 @@ function askWarrantyOrChargeable(label){
     document.getElementById('wty-choice-paid').onclick=function(){ov.remove();resolve(true);};
   });
 }
+// ── Stock reservation awareness ──────────────────────────────────────
+// A part isn't physically deducted from inventory until the ticket that
+// needed it actually Closes / goes Resolved By Phone / Pending for
+// Delivery — everywhere else (Pending Repair, Pending Customer Approval,
+// Customer Approved, etc.) it's just an unfulfilled promise sitting in
+// spares with stock_deducted:false. If two open tickets both need the
+// same part and only 1 is physically in stock, checking raw
+// inventory.qty_in_stock at each site let the SECOND ticket also get
+// waved through as "ready to repair" — the shortage would only surface
+// for real when someone finally tried to close it. This computes what
+// other still-open tickets have already staked a claim on, so a new
+// check sees the TRUE remaining qty. Call Cancel and Customer Reject
+// release the claim (that ticket will never consume the part); Closed /
+// Resolved By Phone / Pending for Delivery are excluded because those
+// already physically deducted it (baked into qty_in_stock already).
+const _PART_RESERVE_EXCLUDE='(Closed,Call Cancel,Customer Reject,Resolved By Phone,Pending for Delivery)';
+async function getPartClaims(code){
+  if(!code)return[];
+  const openTickets=await sb('tickets','GET',null,`?status=not.in.${_PART_RESERVE_EXCLUDE}&select=id,ticket_id,spares,created_at&order=created_at.asc`).catch(()=>[]);
+  const claims=[];
+  for(const t of openTickets){
+    for(const s of (t.spares||[])){
+      if(s.code&&(s.code||'').toUpperCase()===(code||'').toUpperCase()&&!s.stock_deducted){
+        claims.push({ticketId:t.id,ticketLabel:t.ticket_id||t.id,qty:s.qty||1});
+      }
+    }
+  }
+  return claims; // oldest ticket's claim first — first come, first priority
+}
+// companyQty = raw inventory.qty_in_stock. excludeTicketId = the ticket
+// currently being evaluated, so its OWN existing claim on this part (if
+// any) doesn't count against itself.
+async function getEffectivePartQty(code,companyQty,excludeTicketId){
+  const claims=await getPartClaims(code);
+  const reservedByOthers=claims.filter(c=>c.ticketId!==excludeTicketId).reduce((a,c)=>a+c.qty,0);
+  return Math.max(0,(companyQty||0)-reservedByOthers);
+}
 var _savingPartRequest=false;
 async function savePartRequest(addAnother){
   // Guards against a fast double-click on "Save & Add Another"/"Done" firing
@@ -7756,23 +7809,25 @@ async function _savePartRequestInner(addAnother){
   const t=(await sb('tickets','GET',null,`?id=eq.${partReqTicketId}`))[0];if(!t)return;
   const qty=parseInt(document.getElementById('req-part-qty').value)||1;
   const note=document.getElementById('req-part-note').value;
-  const stockText=document.getElementById('req-part-stock').value;
-  const hasStock=stockText&&!stockText.startsWith('0');
   const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   // On Site engineer calls: check bag stock — allow indent if not in bag
   let _pendingEngStock=false; // true = company has it, needs to be issued to engineer
   let _pendingNoParts=false;  // true = company also out of stock
+  let _effectiveCompanyQty=0; // company stock left AFTER other open tickets' claims on this same part
+  const _invForStock=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`).catch(()=>[]);
+  const _invItemForStock=_invForStock&&_invForStock[0];
+  if(_invItemForStock){
+    _effectiveCompanyQty=await getEffectivePartQty(code,_invItemForStock.qty_in_stock||0,partReqTicketId);
+  }
   if(currentUser.role==='engineer' && t.service_type==='On Site'){
-    const invItem=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`).catch(()=>[]);
-    if(invItem.length){
-      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(currentUser.name)}&part_id=eq.${invItem[0].id}`).catch(()=>[]);
+    if(_invItemForStock){
+      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(currentUser.name)}&part_id=eq.${_invItemForStock.id}`).catch(()=>[]);
       const bagQty=esCheck.length?esCheck[0].qty:0;
       if(bagQty<qty){
-        const companyQty=invItem[0].qty_in_stock||0;
-        if(companyQty>0){
-          _pendingEngStock=true; // company has stock, admin needs to issue to engineer
+        if(_effectiveCompanyQty>0){
+          _pendingEngStock=true; // company has stock left, admin needs to issue to engineer
         }else{
-          _pendingNoParts=true;  // no stock anywhere, need to order
+          _pendingNoParts=true;  // no stock left anywhere (or already claimed by another ticket) — need to order
         }
       }
     }
@@ -7836,8 +7891,9 @@ async function _savePartRequestInner(addAnother){
     // Nobody has it — need to order
     newStatus='Pending Parts';
   }else{
-    // WARRANTY, free part: No charges - check stock
-    if(hasStock){
+    // WARRANTY, free part: No charges - check stock left AFTER other open
+    // tickets' claims on this same part (not just raw inventory qty).
+    if(_effectiveCompanyQty>0){
       newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
     }else{
       newStatus='Pending Parts';
@@ -7859,7 +7915,13 @@ async function _savePartRequestInner(addAnother){
   // requested.
   const baseSpares=(typeof currentSpares!=='undefined'&&Array.isArray(currentSpares))?currentSpares:(t.spares||[]);
   const spares=[...baseSpares,newSpare];
-  const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered | ${note}`:`Part: ${code} ${name} × ${qty}${isChargeableHere?' (Chargeable)':skipsApprovalHere?' (Warranty — Free)':''} | ${note}`;
+  // If this landed on Pending Parts/Pending Engineer Stock while the raw
+  // inventory qty is actually non-zero, it's because another still-open
+  // ticket already has first claim on it — say so, so staff don't wonder
+  // why the Inventory page shows stock but this call is still waiting.
+  const _rawQty=_invItemForStock?(_invItemForStock.qty_in_stock||0):0;
+  const _reservedNote=(newStatus==='Pending Parts'||newStatus==='Pending Engineer Stock')&&_rawQty>0&&_rawQty>_effectiveCompanyQty?` (Stock shows ${_rawQty} in system, but already reserved by another open call — ${_effectiveCompanyQty} left for this one)`:'';
+  const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer${_reservedNote} | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered${_reservedNote} | ${note}`:`Part: ${code} ${name} × ${qty}${isChargeableHere?' (Chargeable)':skipsApprovalHere?' (Warranty — Free)':''}${_reservedNote} | ${note}`;
   const tl=[...(t.timeline||[]),{action:'Part Indented — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:tlNote}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
   // Keep the Update Call form's local state in sync so the spares list
@@ -8255,6 +8317,11 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
         console.log('column(s) missing — run the relevant setup SQL in Supabase');
       }else throw pe;
+    }
+    if(data.status==='Call Cancel'||data.status==='Customer Reject'){
+      // Releases this call's claim on any part it had indented — let a
+      // waiting Pending Parts call take it.
+      checkPendingPartsAuto();
     }
     // Deduct inventory when call is Closed — all parts (requested + manual), only if not already deducted
     // (Resolved By Phone included: harmless no-op if no spares were added, since there was no visit.
@@ -9682,7 +9749,12 @@ async function applyBulkSale(){
 }
 async function checkPendingPartsAuto(){
   try{
-    const pendingParts=await sb('tickets','GET',null,'?status=eq.Pending Parts');
+    // Oldest ticket first — when freshly-arrived stock isn't enough for
+    // every waiting call, the one that's been waiting longest gets it,
+    // matching how getEffectivePartQty below re-reads live reservations
+    // after each promotion in this same loop (so a ticket promoted moments
+    // ago immediately counts as a claim against the next one checked).
+    const pendingParts=await sb('tickets','GET',null,'?status=eq.Pending Parts&order=created_at.asc');
     for(const t of pendingParts){
       // BUG (fixed): this used to only check spares with requested===true —
       // but the moment a customer approves an estimate, EVERY spare on it
@@ -9708,7 +9780,13 @@ async function checkPendingPartsAuto(){
         try{
           const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
           const invItem=inv&&inv[0];
-          const companyQty=invItem?(invItem.qty_in_stock||0):0;
+          // Effective qty excludes THIS ticket's own claim (already
+          // stock_deducted:false on it) but includes every other still-open
+          // ticket's claim — so a part already promised to an earlier
+          // Pending Parts call in this same run doesn't ALSO get promised
+          // here; the FIFO order this loop runs in makes that earlier
+          // promotion visible before this ticket is checked.
+          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
           if(t.service_type==='On Site'){
             let bagQty=0;
             if(t.assigned_name&&invItem){
