@@ -6227,6 +6227,12 @@ async function viewTicket(id,autoPrint=false){
   const isOOC=t.warranty_coverage==='Out of Coverage';
   const isCustReject=t.status==='Customer Reject';
   const spares=t.spares||[];
+  // Admin/WC/CSP Manager can correct a spare directly on ANY ticket by ID —
+  // same edit/remove ability an engineer already has on their own call
+  // while filling Update Call, for the case where the engineer never
+  // circled back to fix a wrong entry themselves. Always requires its own
+  // mandatory remark, independent of whatever else is being edited here.
+  const isAdminOrWC=currentUser&&(currentUser.role==='admin'||currentUser.role==='work_controller'||currentUser.role_type==='work_controller'||window._isCspMgr);
   // Customer Reject: the part(s) were only requested/estimated — customer
   // never approved them, so nothing was actually fitted. Only the final
   // inspection/visit charge (set when rejecting) applies; parts must not
@@ -6316,6 +6322,7 @@ async function viewTicket(id,autoPrint=false){
       ${!isPendingArrival&&!isPendingApproval&&!isPendingVisitCharge&&!isRepaired&&!isClosed?`
         <select onchange="if(this.value&&confirm('Change status to: '+this.value+'?')){quickStatusChange('${t.id}',this.value);this.value='';}" style="border:1.5px solid #f59e0b;border-radius:8px;padding:6px 10px;font-size:13px;background:#fffbeb;color:#92400e;font-weight:600;">
           <option value="">⚙️ Force Status...</option>
+          <option>Pending Allocation</option>
           <option>Assigned</option><option>In Progress</option>
           <option>Pending Parts</option><option>Pending Engineer Stock</option>
           <option>Pending Repair On Site</option><option>Pending Repair Carry In</option>
@@ -6401,8 +6408,8 @@ async function viewTicket(id,autoPrint=false){
     ${(()=>{let cph=t.condition_photos;if(typeof cph==='string'){try{cph=JSON.parse(cph);}catch(e){cph=[];}}if(!t.condition_type&&(!Array.isArray(cph)||!cph.length))return'';return `<hr class="divider"><div style="margin-bottom:10px;"><b style="font-size:12px;color:var(--text-muted);">📦 PRODUCT CONDITION</b>`+(t.condition_type?`<div style="font-size:13px;margin-top:4px;"><b>${escHtml(t.condition_type)}</b></div>`:'')+(Array.isArray(cph)&&cph.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">`+cph.map(u=>`<img src="${u}" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'100px':'none'" style="max-height:100px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;">`).join('')+`</div>`:'')+`</div>`;})()}
     ${spares.length?`<hr class="divider"><h3 style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">SPARES${isCustReject?' <span style="color:#991b1b;font-weight:700;">(Estimate Rejected — Not Fitted, Not Billed)</span>':''}</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
-      <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th></tr></thead>
-      <tbody>${spares.map(s=>{const isCons=isChargeableSpare(s);const freeOnWarranty=isWarranty&&!isOOC&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      <thead><tr style="background:#f8fafc;"><th style="padding:6px;border-bottom:1px solid var(--border);">Code</th><th style="padding:6px;border-bottom:1px solid var(--border);">Item</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Qty</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Price</th><th style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">Amt</th>${isAdminOrWC?'<th style="padding:6px;text-align:center;border-bottom:1px solid var(--border);">Actions</th>':''}</tr></thead>
+      <tbody>${spares.map((s,si)=>{const isCons=isChargeableSpare(s);const freeOnWarranty=isWarranty&&!isOOC&&!isCons;const sp=(freeOnWarranty||isCustReject)?0:(s.price||0);const sa=(freeOnWarranty||isCustReject)?0:(s.qty*(s.price||0));return`<tr><td style="padding:6px;border-bottom:1px solid var(--border);">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="padding:6px;border-bottom:1px solid var(--border);">${s.name}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${s.qty}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':isCustReject?'<span style="color:#991b1b;">₹0 (Rejected)</span>':'₹'+sp}</td><td style="padding:6px;text-align:right;border-bottom:1px solid var(--border);">${freeOnWarranty?'<span style="color:#059669;">₹0</span>':isCustReject?'<span style="color:#991b1b;">₹0</span>':'₹'+sa.toFixed(2)}</td>${isAdminOrWC?`<td style="padding:6px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap;"><button class="btn-icon" onclick="managerEditSpare('${t.id}',${si})" title="Edit qty/price">✏️</button><button class="btn-icon" onclick="managerRemoveSpare('${t.id}',${si})" title="Remove" style="color:var(--danger);">🗑️</button></td>`:''}</tr>`;}).join('')}</tbody>
     </table>
     <div style="font-size:13px;background:${isCustReject?'#fef2f2':'#f0fdf4'};padding:10px;border-radius:8px;">
     ${isWarranty?(total>0?`<span style="color:#059669;font-weight:700;">✅ Warranty — Service: ₹0</span> <span>+ Consumable Parts: <b>₹${total.toFixed(0)}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Consumables are not covered under warranty — customer pays for these.</span>`:(isOOC?`<span style="color:#dc2626;font-weight:700;">⚠️ Out of Coverage — Service: <b>₹${svcCharge}</b></span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Warranty void — billed like Non-Warranty.</span>`:(grand>svcCharge?`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0</span> <span style="font-size:15px;font-weight:700;color:#065f46;"> = Total: ₹${grand.toFixed(0)}</span><br><span style="font-size:11px;color:#92400e;">Charges recorded on this call don't match the current parts list below — check Final Charges / re-run Approve-Reject if this looks wrong.</span>`:`<span style="color:#059669;font-weight:700;">✅ Warranty — Parts: ₹0 | Service: ₹0 | Total: ₹0</span>`))):isCustReject?`<span style="color:#991b1b;font-weight:700;">❌ Estimate Rejected — Part(s) not fitted, not billed</span><br><b style="color:#991b1b;font-size:15px;">Final Inspection Charges: ₹${grand.toFixed(0)}</b>`:`${svcCharge>0?`<span>Service: <b>₹${svcCharge}</b></span>`:''} ${svcCharge>0&&total>0?'+':''} ${total>0?`<span>Parts: <b>₹${total.toFixed(0)}</b></span>`:''} ${(svcCharge+total)>0?`= <b style="color:#065f46;font-size:15px;">Total: ₹${grand.toFixed(0)}</b>`:''}`}
@@ -6419,6 +6426,79 @@ async function viewTicket(id,autoPrint=false){
     ${adminActions}`;
   openModal('modal-ticket');if(autoPrint)setTimeout(printJobSheet,500);
   loadLinkedProducts(t);
+}
+
+// Admin/WC/CSP Manager direct spare correction — same edit/remove ability
+// an engineer has on their OWN call while it's open in Update Call, but
+// usable on ANY ticket by ID (the engineer may never come back to fix a
+// wrong entry themselves), and always gated by its own mandatory remark
+// regardless of what else is being changed.
+async function managerRemoveSpare(ticketId,idx){
+  const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];if(!t)return;
+  const spares=t.spares||[];
+  const sp=spares[idx];if(!sp){alert('Part not found — the list may have changed. Re-open the ticket and try again.');return;}
+  const remark=prompt('🗑️ Remove part "'+(sp.code||'')+' — '+(sp.name||'')+' × '+(sp.qty||1)+'" from this call.\n\nReason (mandatory):');
+  if(remark===null)return;
+  if(!remark.trim()){alert('A reason is required.');return;}
+  if(!confirm('Confirm removal? This cannot be undone.'))return;
+  try{
+    // If this part had already been physically deducted from inventory,
+    // removing it here must give that stock back — same convention as
+    // editing/deleting a purchase record.
+    if(sp.stock_deducted&&sp.code){
+      const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(sp.code||'').toUpperCase());
+      if(inv){
+        const newStock=(inv.qty_in_stock||0)+(sp.qty||1);
+        await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+        inv.qty_in_stock=newStock;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:'in',qty:sp.qty||1,note:'Part removed from '+ticketId+' by Manager: '+remark.trim(),done_by:currentUser.name}).catch(()=>{});
+      }
+    }
+    const newSpares=spares.filter((_,i)=>i!==idx);
+    const tl=[...(await _freshTimeline(ticketId,t)),{action:'Part Removed by Manager',by:currentUser.name,at:new Date().toISOString(),note:(sp.code||'')+' '+(sp.name||'')+' × '+(sp.qty||1)+' | Reason: '+remark.trim()}];
+    await sb('tickets','PATCH',{spares:newSpares,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${ticketId}`);
+    checkPendingPartsAuto();
+    viewTicket(ticketId);
+    if(currentPage==='tickets')renderTickets();else renderDashboard();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function managerEditSpare(ticketId,idx){
+  const t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];if(!t)return;
+  const spares=t.spares||[];
+  const sp=spares[idx];if(!sp){alert('Part not found — the list may have changed. Re-open the ticket and try again.');return;}
+  const qtyInput=prompt('Edit "'+(sp.code||'')+' — '+(sp.name||'')+'"\n\nQty (current: '+(sp.qty||1)+'):',sp.qty||1);
+  if(qtyInput===null)return;
+  const newQty=parseInt(qtyInput);
+  if(!newQty||newQty<=0){alert('Quantity must be a number greater than 0.');return;}
+  const priceInput=prompt('Price ₹ (current: '+(sp.price||0)+'):',sp.price||0);
+  if(priceInput===null)return;
+  const newPrice=parseFloat(priceInput);
+  const finalPrice=isNaN(newPrice)?(sp.price||0):newPrice;
+  const remark=prompt('Reason for this correction (mandatory):');
+  if(remark===null)return;
+  if(!remark.trim()){alert('A reason is required.');return;}
+  try{
+    const oldQty=sp.qty||1;
+    const delta=newQty-oldQty;
+    if(sp.stock_deducted&&sp.code&&delta!==0){
+      const inv=allInventory.find(i=>(i.part_code||'').toUpperCase()===(sp.code||'').toUpperCase());
+      if(inv){
+        // qty went UP → more must come OUT of stock; qty went DOWN → give
+        // the difference back — same inverse-delta convention used for
+        // editing a purchase or sale record.
+        const newStock=Math.max(0,(inv.qty_in_stock||0)-delta);
+        await sb('inventory','PATCH',{qty_in_stock:newStock,updated_at:new Date().toISOString()},'?id=eq.'+inv.id);
+        inv.qty_in_stock=newStock;
+        await sb('inventory_log','POST',{inventory_id:inv.id,type:delta>0?'out':'in',qty:Math.abs(delta),note:'Part qty corrected on '+ticketId+' by Manager: '+remark.trim(),done_by:currentUser.name}).catch(()=>{});
+      }
+    }
+    const newSpares=spares.map((s,i)=>i===idx?{...s,qty:newQty,price:finalPrice}:s);
+    const tl=[...(await _freshTimeline(ticketId,t)),{action:'Part Corrected by Manager',by:currentUser.name,at:new Date().toISOString(),note:(sp.code||'')+' '+(sp.name||'')+' — Qty '+oldQty+'→'+newQty+', Price ₹'+(sp.price||0)+'→₹'+finalPrice+' | Reason: '+remark.trim()}];
+    await sb('tickets','PATCH',{spares:newSpares,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${ticketId}`);
+    checkPendingPartsAuto();
+    viewTicket(ticketId);
+    if(currentPage==='tickets')renderTickets();else renderDashboard();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ── MULTI-PRODUCT / SAME-CUSTOMER LINKED CALLS ─────────────────────────
@@ -6983,7 +7063,14 @@ async function doForceStatusChange(id,newStatus){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id));t=r[0];}
   const tl=[...(await _freshTimeline(id,t)),{action:'Force Status → '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+remark}];
-  await sb('tickets','PATCH',{status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(id));
+  const _fsData={status:newStatus,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()};
+  // Forcing back to Pending Allocation means this call needs a fresh
+  // assignment decision — leaving the old engineer attached would keep it
+  // hidden from that engineer's own list while still silently "belonging"
+  // to them, and it wouldn't actually show up in the Pending Allocation
+  // queue everyone expects to find it in.
+  if(newStatus==='Pending Allocation'){_fsData.assigned_to=null;_fsData.assigned_name=null;}
+  await sb('tickets','PATCH',_fsData,'?id=eq.'+encodeURIComponent(id));
   // Force-changing a call straight to a terminal status bypasses the normal
   // engineer close flow entirely — without this, any spares on the ticket
   // would just never get deducted from stock (the actual bug reported: an
@@ -7309,6 +7396,9 @@ function _wsIsPauseAction(a){
 // ENG UPDATE - Points 4, 6, 7, 8
 async function openEngUpdate(id){
   const t=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];if(!t)return;
+  // Needed so spareRow's stock badge is accurate — My Calls never loads
+  // Inventory otherwise, so allInventory could be empty here.
+  if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name').catch(function(){return[];});
   window._currentUpdateTicket=t;
   viewingTicketId=id;currentSpares=[...(t.spares||[])];
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
@@ -7968,7 +8058,26 @@ function _spareHidesPrice(s){
   var isOOC=t.warranty_coverage==='Out of Coverage';
   return isW&&!isOOC;
 }
-function spareRow(s,i){const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice(s);const isCons=isChargeableSpare(s);const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span><span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;}
+function spareRow(s,i){
+  const gp=s.gst_pct!=null?s.gst_pct:18;const hidePrice=_spareHidesPrice(s);const isCons=isChargeableSpare(s);
+  const priceHtml=hidePrice?'<span style="color:#059669;font-weight:700;">₹0 (W)</span>':'₹'+(s.qty*(s.price||0)).toFixed(2);
+  // Stock indicator — with several parts on one call, some in stock and
+  // some not, there was no way to tell which was which without leaving
+  // this modal and checking Inventory separately for each code.
+  const invLoaded=typeof allInventory!=='undefined'&&allInventory&&allInventory.length;
+  const invItem=invLoaded?allInventory.find(function(x){return (x.part_code||'').toUpperCase()===(s.code||'').toUpperCase();}):null;
+  let stockBadge='';
+  if(s.code&&invLoaded){
+    if(!invItem){stockBadge='<span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:4px;white-space:nowrap;">✗ Not Found</span>';}
+    else{
+      const sq=invItem.qty_in_stock||0;
+      stockBadge=sq<=0?'<span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:4px;white-space:nowrap;">✗ Out of Stock</span>'
+        :sq<(s.qty||1)?'<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;white-space:nowrap;">⚠ Only '+sq+'</span>'
+        :'<span style="font-size:9px;font-weight:700;color:#065f46;background:#dcfce7;padding:1px 5px;border-radius:4px;white-space:nowrap;">✓ Stock: '+sq+'</span>';
+    }
+  }
+  return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;flex-wrap:wrap;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span>${stockBadge}<span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;
+}
 function removeSpare(i){currentSpares.splice(i,1);document.getElementById('spares-list').innerHTML=currentSpares.map((s,i)=>spareRow(s,i)).join('');refreshEstimateTotal();}
 function refreshEstimateTotal(){
   var parts=currentSpares.reduce(function(a,s){return a+(_spareHidesPrice(s)?0:(s.qty||1)*(s.price||0));},0);
