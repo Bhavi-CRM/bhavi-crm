@@ -7400,6 +7400,18 @@ async function openEngUpdate(id){
   // Inventory otherwise, so allInventory could be empty here.
   if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name').catch(function(){return[];});
   window._currentUpdateTicket=t;
+  // On Site: the part can be sitting in the assigned engineer's OWN bag
+  // even if company inventory shows 0 — a part fully in the bag is ready to
+  // fit, not "out of stock". Prefetch it (keyed by inventory part_id) so
+  // spareRow's badge checks the bag before ever calling something out of
+  // stock.
+  window._spareRowBagStock={};
+  if(t.service_type==='On Site'&&t.assigned_name){
+    try{
+      var _bagRows=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(t.assigned_name));
+      (_bagRows||[]).forEach(function(r){window._spareRowBagStock[r.part_id]=r.qty||0;});
+    }catch(e){}
+  }
   viewingTicketId=id;currentSpares=[...(t.spares||[])];
   const isClosed=['Closed','Customer Reject','Call Cancel'].includes(t.status);
   const isRepeatCall = t.call_type==='Warranty Repeat'||t.call_type==='Non-Warranty Repeat';
@@ -8071,9 +8083,25 @@ function spareRow(s,i){
     if(!invItem){stockBadge='<span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:4px;white-space:nowrap;">✗ Not Found</span>';}
     else{
       const sq=invItem.qty_in_stock||0;
-      stockBadge=sq<=0?'<span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:4px;white-space:nowrap;">✗ Out of Stock</span>'
-        :sq<(s.qty||1)?'<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;white-space:nowrap;">⚠ Only '+sq+'</span>'
-        :'<span style="font-size:9px;font-weight:700;color:#065f46;background:#dcfce7;padding:1px 5px;border-radius:4px;white-space:nowrap;">✓ Stock: '+sq+'</span>';
+      const need=s.qty||1;
+      // On Site: the part can be sitting fully in the assigned engineer's OWN
+      // bag even when company inventory shows 0 — that's ready-to-fit, not
+      // "out of stock". Check the bag FIRST; only fall through to company
+      // stock (and then truly-out-of-stock) if the bag doesn't have enough.
+      const _ct=(typeof window!=='undefined')?window._currentUpdateTicket:null;
+      const isOnSiteCall=_ct&&_ct.service_type==='On Site';
+      const bagQty=(isOnSiteCall&&window._spareRowBagStock)?(window._spareRowBagStock[invItem.id]||0):0;
+      if(isOnSiteCall&&bagQty>=need){
+        stockBadge='<span style="font-size:9px;font-weight:700;color:#065f46;background:#dcfce7;padding:1px 5px;border-radius:4px;white-space:nowrap;">✓ In Your Bag: '+bagQty+'</span>';
+      }else if(sq>=need){
+        stockBadge=isOnSiteCall
+          ?'<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;white-space:nowrap;">📦 Company Stock: '+sq+' (not in bag)</span>'
+          :'<span style="font-size:9px;font-weight:700;color:#065f46;background:#dcfce7;padding:1px 5px;border-radius:4px;white-space:nowrap;">✓ Stock: '+sq+'</span>';
+      }else if(sq>0||bagQty>0){
+        stockBadge='<span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;white-space:nowrap;">⚠ Only '+(bagQty+sq)+'</span>';
+      }else{
+        stockBadge='<span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:4px;white-space:nowrap;">✗ Out of Stock</span>';
+      }
     }
   }
   return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px;flex-wrap:wrap;"><span style="flex:1;color:var(--primary);font-weight:600;">${s.code||'-'}${isCons?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 4px;border-radius:4px;">CONS</span>':''}</span><span style="flex:2;">${s.name}</span><span style="flex:0.5;">×${s.qty}</span><span style="flex:0.7;text-align:center;color:#7c3aed;font-size:11px;">GST ${gp}%</span>${stockBadge}<span style="flex:1;text-align:right;"><b>${priceHtml}</b></span><button class="btn-icon" onclick="removeSpare(${i})" style="color:var(--danger);">✕</button></div>`;
