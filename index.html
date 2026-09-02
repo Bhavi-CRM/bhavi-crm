@@ -12362,7 +12362,22 @@ async function saveEngReturn(){
 // behalf must still deduct from THAT engineer's bag, not their own, or a
 // different person's, or (worse) nobody's if the deduction only ran for
 // role==='engineer' callers. Returns the fresh ticket row fetched inside.
-async function _deductTicketParts(id){
+// A double-click (or two separate call sites — Save + a force-status change
+// firing close together) could call this for the SAME ticket twice before
+// the first run's PATCH(stock_deducted:true) lands. Both runs would then
+// fetch the ticket while its spares still read stock_deducted:false, and
+// both would deduct — exactly the double Movement Log entries / double
+// stock-out this was reported as. Cache the in-flight promise per ticket id
+// so a second call for the same id just awaits the first run's result
+// instead of starting an independent, racing deduction.
+var _deductInProgress={};
+function _deductTicketParts(id){
+  if(_deductInProgress[id])return _deductInProgress[id];
+  var p=_deductTicketPartsInner(id).finally(function(){delete _deductInProgress[id];});
+  _deductInProgress[id]=p;
+  return p;
+}
+async function _deductTicketPartsInner(id){
   const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
   const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
   if(!sparesToDeduct.length)return freshT;
