@@ -27313,6 +27313,7 @@ async function loadKmReport(){
     Object.keys(groups).sort().forEach(function(k){
       var g=groups[k];dayCount++;
       var opening=null,closing=null,prev=null,dayKm=0,maxRead=null,rowsHtml='';
+      var prevLoc=null; // previous row's {lat,lng} — lets the 📍 link jump straight to directions FROM there TO this row, instead of just dropping a single pin
       var excelDayRows=[];
       var openingLoc=null,closingLoc=null;
       g.entries.forEach(function(l){
@@ -27332,7 +27333,12 @@ async function loadKmReport(){
         var _isFt=l.ticket_id&&String(l.ticket_id).indexOf('FT')===0;
         var ticketCell=_isFt?'<span style="color:#7c3aed;font-weight:700;">🚚 Other Work</span>':(l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—');
         var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
-        var gpsCell=(l.lat&&l.lng)?'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>':'—';
+        // If there's a previous point in this day's trail, jump straight to
+        // turn-by-turn directions FROM that point TO this one — no more
+        // opening two separate single-pin maps and copying lat/lng by hand.
+        // The very first row of the day (no previous point yet) still just
+        // drops a single pin, since there's nothing to route from.
+        var gpsCell=(l.lat&&l.lng)?(prevLoc?'<a href="https://www.google.com/maps/dir/?api=1&origin='+prevLoc.lat+','+prevLoc.lng+'&destination='+l.lat+','+l.lng+'&travelmode=driving" target="_blank" title="Directions from previous point to here">📍➡️</a>':'<a href="https://maps.google.com/?q='+l.lat+','+l.lng+'" target="_blank" title="Open in Google Maps">📍</a>'):'—';
         var _kmEdited=l.edit_remark?' <span title="Edited: '+escHtml(l.edit_remark)+(l.corrected_by?' — '+escHtml(l.corrected_by):'')+'" style="color:#d97706;cursor:help;">✎</span>':'';
         var _kmEditBtn=_kmIsAdmin?' <button class="btn-icon" title="Edit reading (with remark)" onclick="editKmReading('+l.id+','+(isNaN(kmN)?0:kmN)+')" style="font-size:12px;">✏️</button>':'';
         rowsHtml+='<tr><td>'+tm+'</td><td>'+(typeLabel[l.entry_type]||l.entry_type)+'</td><td>'+ticketCell+'</td>'
@@ -27342,6 +27348,7 @@ async function loadKmReport(){
         excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg});
         excelDayRows.push([tm,(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),_isFt?'Other Work':(l.ticket_id||''),_kArea,isNaN(kmN)?'':kmN,seg===''?'':seg]);
         if(!isNaN(kmN))prev=kmN;
+        if(l.lat&&l.lng)prevLoc={lat:l.lat,lng:l.lng};
       });
       // Live-aware day total: highest reading so far minus opening. This counts
       // an in-progress afternoon trip (arrivals recorded, not yet closed) too —
