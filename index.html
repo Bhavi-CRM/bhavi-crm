@@ -5561,6 +5561,38 @@ function applyModelServiceFields(){
   if(hint)hint.textContent='Parts will appear here once added above';
 }
 
+// Forces an explicit yes/no decision on visit charges the moment a repeat
+// call is detected, instead of relying on the inline form leaving FOC
+// pre-selected by default (easy to miss/skip past). Written so a phone-
+// based CSP/WC agent can read it straight to the customer while logging
+// the call. Mirrors the choice into the existing rr-charges radio buttons
+// so saveCall's logic (which reads that radio) needs no separate wiring.
+function openRepeatCallDecisionModal(lastCall,daysDiff,prevType){
+  var ex=document.getElementById('modal-repeat-decision');if(ex)ex.remove();
+  var lastDateStr=lastCall.created_at?new Date(lastCall.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'-';
+  var ov=document.createElement('div');
+  ov.id='modal-repeat-decision';ov.className='modal-overlay';ov.style.zIndex='10060';
+  ov.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header" style="background:#fffbeb;"><h2 style="font-size:15px;">🔁 Repeat Call Detected</h2></div>'
+    +'<div class="modal-body">'
+    +'<p style="font-size:13px;line-height:1.6;color:#374151;margin-bottom:12px;">This device (same serial number) was serviced previously on <b>'+lastDateStr+'</b> ('+daysDiff+' day(s) ago) under ticket <b>'+escHtml(lastCall.id||'')+'</b> ('+escHtml(prevType||'')+'), for customer <b>'+escHtml(lastCall.cname||'-')+'</b>.</p>'
+    +'<p style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:14px;">Should visit/service charges be collected for this repeat visit?</p>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;">'
+    +'<button id="rc-charge-no" style="padding:12px;background:#f0fdf4;border:1.5px solid #059669;border-radius:10px;color:#059669;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">No — Free of Charge (repeat visit within 15 days)</button>'
+    +'<button id="rc-charge-yes" style="padding:12px;background:#fef2f2;border:1.5px solid #dc2626;border-radius:10px;color:#dc2626;font-weight:700;font-size:14px;cursor:pointer;text-align:left;">Yes — Charges Apply</button>'
+    +'</div>'
+    +'<p style="font-size:11px;color:#9ca3af;margin-top:12px;">If Free of Charge is selected, this call goes straight to the allocation queue — no visit-charge approval needed. Parts or additional service charges can still be added later if found necessary during the visit.</p>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('rc-charge-no').onclick=function(){
+    ov.remove();setReRepairCharges('foc');
+    var r=document.querySelector('input[name="rr-charges"][value="foc"]');if(r)r.checked=true;
+  };
+  document.getElementById('rc-charge-yes').onclick=function(){
+    ov.remove();setReRepairCharges('charge');
+    var r=document.querySelector('input[name="rr-charges"][value="charge"]');if(r)r.checked=true;
+  };
+}
 async function checkReRepair(serial){
   if(!serial||serial.length<3) return;
   // Skip repeat check for auto-generated serials (no S/N available)
@@ -5605,7 +5637,7 @@ async function checkReRepair(serial){
       return;
     }
 
-    // Found previous calls within 30 days
+    // Found a previous call on the same serial within the 15-day repeat window
     const lastCall=prev[0];
     const daysDiff=Math.floor((new Date()-new Date(lastCall.created_at))/(1000*60*60*24));
     const prevType=lastCall.call_type||'';
@@ -5618,25 +5650,31 @@ async function checkReRepair(serial){
     handleCallTypeChange();
 
     alertDiv.innerHTML=`<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px;margin-top:4px;">
-      <div style="font-weight:700;font-size:13px;color:#92400e;">🔁 Re-Repair Detected!</div>
+      <div style="font-weight:700;font-size:13px;color:#92400e;">🔁 Repeat Call Detected</div>
       <div style="font-size:12px;color:#92400e;margin-top:4px;">
-        Same serial — ${daysDiff} days ago: <b>${lastCall.id}</b> (${prevType})<br>
+        Same serial number — previous visit ${daysDiff} day(s) ago: <b>${lastCall.id}</b> (${prevType})<br>
         Customer: ${lastCall.cname||'-'} | Status: ${lastCall.status||'-'}
       </div>
       <div style="margin-top:8px;font-size:12px;">
-        <b>Service Charges:</b>
+        <b>Visit/Service Charges:</b>
         <label style="margin-left:8px;cursor:pointer;">
-          <input type="radio" name="rr-charges" value="foc" checked onchange="setReRepairCharges('foc')"> FOC (Free — within 15 days)
+          <input type="radio" name="rr-charges" value="foc" checked onchange="setReRepairCharges('foc')"> Free of Charge (repeat within 15 days)
         </label>
         <label style="margin-left:12px;cursor:pointer;">
-          <input type="radio" name="rr-charges" value="charge" onchange="setReRepairCharges('charge')"> Charges apply
+          <input type="radio" name="rr-charges" value="charge" onchange="setReRepairCharges('charge')"> Charges Apply
         </label>
       </div>
-      <div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ If parts need replacement, an estimate will be provided — service charges will be decided on top</div>
+      <div style="font-size:11px;color:#92400e;margin-top:4px;">⚠️ If parts are found necessary during the visit, an estimate can still be raised — this only decides the visit/service charge.</div>
     </div>`;
 
     // Default FOC
     setReRepairCharges('foc');
+    // A quiet default pre-selection is too easy to miss — this needs an
+    // explicit decision from whoever is logging the call, made right when
+    // the repeat is detected (not silently assumed at save time), and
+    // stated clearly enough that a phone-based CSP/WC agent can read it
+    // straight to the customer.
+    openRepeatCallDecisionModal(lastCall,daysDiff,prevType);
 
   }catch(e){
     alertDiv.innerHTML='';
@@ -5738,7 +5776,15 @@ async function saveCall(){
   // must confirm that FIRST. Until then it must sit in a separate gate, not
   // in the normal Pending Allocation queue where it could get an engineer
   // assigned before the customer even agreed to pay anything.
-  const _needsVisitChargeApproval=_wcTypeVal==='CSP'&&(ct==='Non-Warranty'||ct==='Non-Warranty Repeat')&&_svcTypeVal==='On Site';
+  // EXCEPTION: a Repeat call where the FOC (free re-repair) option was
+  // explicitly chosen in the repeat-detection prompt already has that
+  // decision made — there is no charge to get customer agreement on, so it
+  // must skip straight to Pending Allocation instead of sitting in this
+  // gate for a charge nobody is going to collect. It previously ignored the
+  // FOC choice entirely and routed here anyway.
+  const _isRepeatCt=(ct==='Warranty Repeat'||ct==='Non-Warranty Repeat');
+  const _repeatIsFoc=_isRepeatCt&&(()=>{const el=document.querySelector('input[name="rr-charges"]:checked');return el?el.value==='foc':false;})();
+  const _needsVisitChargeApproval=_wcTypeVal==='CSP'&&(ct==='Non-Warranty'||ct==='Non-Warranty Repeat')&&_svcTypeVal==='On Site'&&!_repeatIsFoc;
   const data={
     call_type:ct,service_type:_svcTypeVal,
     service_charges:serviceCharges,
@@ -8358,7 +8404,13 @@ async function saveEngUpdate(){
   // Job Sheet Photo is mandatory to close a CSP call — On Site or Carry In,
   // doesn't matter. ICP calls stay optional (still governed by the Field
   // Rules admin override if set explicitly).
-  if(status==='Closed'&&t.wc_type==='CSP'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
+  // Checking origStatus==='Repaired' too — Carry In's actual finish-the-job
+  // moment is selecting "Repaired", but by this point `status` has already
+  // been silently rewritten to 'Pending for Delivery' a few lines up, so a
+  // status==='Closed'-only check here NEVER fires for Carry In at all (it
+  // never literally reaches "Closed") — this requirement was effectively
+  // dead for every Carry In call.
+  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
     alert('📄 Job Sheet Photo is required to close a CSP call!\n\nUpar "Attachments" ma Job Sheet no photo (camera ke gallery) attach karo, pachhi Save karo.');
     return;
   }
@@ -8376,7 +8428,7 @@ async function saveEngUpdate(){
   var pageCountSkip=document.getElementById('upd-page-count-skip')?.checked;
   var pageCountReason=(document.getElementById('upd-page-count-skip-reason')?.value||'').trim();
   var pageCountVal=(document.getElementById('upd-page-count')?.value||'').trim();
-  if(status==='Closed'&&t.wc_type==='CSP'){
+  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'){
     if(pageCountSkip&&!pageCountReason){alert('📄 Page Count skip karvu hoy to reason lakhvo farjiyat chhe.');document.getElementById('upd-page-count-skip-reason')?.focus();return;}
     if(!pageCountSkip&&!pageCountVal){alert('📄 Page Count required chhe (CSP call) — ya to lakho, ya "Skip" tick kari ne reason aapo.');document.getElementById('upd-page-count')?.focus();return;}
     data.page_count=pageCountSkip?null:parseInt(pageCountVal,10);
@@ -17066,8 +17118,13 @@ async function loadMyTargetWidget(tickets){
     var tgt=rows[0];
     var targetCalls=parseInt(tgt.target_calls)||0;
     if(!targetCalls){card.innerHTML='';return;}
+    // Was checking status==='Closed' literally — but this app treats
+    // Delivered/Repaired/Pending for Delivery/Resolved By Phone/Customer
+    // Reject as done too (isTicketClosed, same as the "Closed" KPI up top),
+    // so an engineer whose completed calls landed in any of those other
+    // terminal statuses always saw 0/target here despite real closures.
     var closedThisMonth=tickets.filter(function(t){
-      return t.status==='Closed'&&t.updated_at&&t.updated_at.substring(0,7)===month;
+      return isTicketClosed(t)&&t.updated_at&&t.updated_at.substring(0,7)===month;
     }).length;
     var pct=Math.min(100,Math.round(closedThisMonth/targetCalls*100));
     var barColor=pct>=80?'#0e9f6e':pct>=50?'#f59e0b':'#f05252';
