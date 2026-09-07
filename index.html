@@ -7134,6 +7134,7 @@ async function quickStatusChange(id,status){
       const data={
         status:'Delivered',last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString(),
         payment_mode:paymentData.payment_mode,
+        payment_splits:paymentData.payment_splits,
         service_charges:paymentData.service_charges,
         final_charges:paymentData.parts_cost+paymentData.service_charges,
         // Payment Collection groups pending-to-clear amounts by whoever
@@ -7149,7 +7150,8 @@ async function quickStatusChange(id,status){
         await sb('tickets','PATCH',data,`?id=eq.${id}`);
       }catch(pe){
         const _msg=String(pe&&pe.message);
-        if(_msg.indexOf('payment_collected_by_id')!==-1){delete data.payment_collected_by_id;delete data.payment_collected_by;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        if(_msg.indexOf('payment_splits')!==-1){delete data.payment_splits;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
+        else if(_msg.indexOf('payment_collected_by_id')!==-1){delete data.payment_collected_by_id;delete data.payment_collected_by;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
         else if(_msg.indexOf('payment_collected_by')!==-1){delete data.payment_collected_by;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
         else if(data.payment_mode&&_msg.indexOf('payment_mode')!==-1){delete data.payment_mode;await sb('tickets','PATCH',data,`?id=eq.${id}`);}
         else throw pe;
@@ -8571,6 +8573,7 @@ async function saveEngUpdate(){
       showPaymentConfirmation(Object.assign({},t,{service_charges:data.service_charges}),async function(paymentData){
         if(paymentData.cname)data.cname=paymentData.cname;
         data.payment_mode=paymentData.payment_mode;
+        data.payment_splits=paymentData.payment_splits;
         data.service_charges=paymentData.service_charges;
         if(paymentData.payment_notes){
           data.charges_note=(data.charges_note||'')+(paymentData.payment_notes?'\nPayment notes: '+paymentData.payment_notes:'');
@@ -8595,10 +8598,11 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
       // (setup SQL not run) — don't brick call closing: retry without the
       // missing field(s).
       var _msg=String(pe&&pe.message);
-      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)||(data.page_count!==undefined&&_msg.indexOf('page_count')!==-1)||(data.condition_type&&_msg.indexOf('condition_type')!==-1)||(data.condition_photos&&_msg.indexOf('condition_photos')!==-1)){
+      if((data.jobsheet_photo&&_msg.indexOf('jobsheet_photo')!==-1)||(data.attachments&&_msg.indexOf('attachments')!==-1)||(data.payment_mode&&_msg.indexOf('payment_mode')!==-1)||(data.payment_splits&&_msg.indexOf('payment_splits')!==-1)||(data.page_count!==undefined&&_msg.indexOf('page_count')!==-1)||(data.condition_type&&_msg.indexOf('condition_type')!==-1)||(data.condition_photos&&_msg.indexOf('condition_photos')!==-1)){
         if(_msg.indexOf('jobsheet_photo')!==-1)delete data.jobsheet_photo;
         if(_msg.indexOf('attachments')!==-1)delete data.attachments;
         if(_msg.indexOf('payment_mode')!==-1)delete data.payment_mode;
+        if(_msg.indexOf('payment_splits')!==-1)delete data.payment_splits;
         if(_msg.indexOf('page_count')!==-1){delete data.page_count;delete data.page_count_skip_reason;}
         if(_msg.indexOf('condition_type')!==-1)delete data.condition_type;
         if(_msg.indexOf('condition_photos')!==-1)delete data.condition_photos;
@@ -11354,6 +11358,29 @@ async function renderPaymentCollection(view){
         return;
       }else throw qe;
     }
+    // Other Work (Cart Delivery etc.) that collected payment in the field —
+    // exactly like a Non-Warranty call's Delivered handover, this is real
+    // money that needs the same Pending/Received tracking, not just a
+    // silently-marked-Done task with no record of how it was paid.
+    try{
+      let ftQ='?payment_mode=not.is.null&select=id,customer_name,mobile,task_type,amount,payment_mode,payment_splits,payment_received,payment_received_at,payment_received_by,payment_collected_by,payment_collected_by_id,assigned_to,assigned_name,updated_at&order=updated_at.desc';
+      if(!canManage){
+        const myId=currentUser.eng_id||currentUser.user_id;
+        ftQ+='&or=(assigned_to.eq.'+encodeURIComponent(myId)+',payment_collected_by_id.eq.'+encodeURIComponent(myId)+')';
+      }
+      const ftRows=await sb('field_tasks','GET',null,ftQ).catch(()=>[]);
+      (ftRows||[]).forEach(function(ft){
+        tickets.push({
+          id:'FT-'+ft.id,_isFt:true,_ftRealId:ft.id,
+          cname:ft.customer_name,mobile:ft.mobile,area:'-',model:'🚚 '+(ft.task_type||'Other Work'),
+          final_charges:ft.amount||0,spares:[],labor:0,other_charge:0,
+          payment_mode:ft.payment_mode,payment_splits:ft.payment_splits,
+          payment_received:ft.payment_received,payment_received_at:ft.payment_received_at,payment_received_by:ft.payment_received_by,
+          payment_collected_by:ft.payment_collected_by,payment_collected_by_id:ft.payment_collected_by_id,
+          assigned_to:ft.assigned_to,assigned_name:ft.assigned_name,updated_at:ft.updated_at,
+        });
+      });
+    }catch(e){}
     window._pcTickets=tickets;
     if(!tickets.length){
       pc.innerHTML='<div class="alert alert-info">No payment-confirmed calls found'+(canManage?'.':' for you yet.')+'</div>';
@@ -11416,7 +11443,9 @@ async function renderPaymentCollection(view){
             recvCell='<span style="color:#d97706;font-weight:700;font-size:12px;">☐ Pending</span>';
           }
           let invCell;
-          if(t.invoice_done){
+          if(t._isFt){
+            invCell='<span style="color:var(--text-muted);">— N/A</span>';
+          }else if(t.invoice_done){
             invCell='<div style="color:#0e9f6e;font-weight:700;font-size:12px;">✅ #'+escHtml(t.invoice_no||'')+'</div>'
               +(canManage?'<button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="pcOpenInvoice(\''+t.id+'\')">✏️ Edit</button>':'');
           }else if(canManage){
@@ -11426,13 +11455,21 @@ async function renderPaymentCollection(view){
           }
           return '<tr>'
             +'<td>'+(t.updated_at?new Date(t.updated_at).toLocaleDateString('en-IN'):'-')+'</td>'
-            +'<td>'+(canManage?'<a href="javascript:void(0)" onclick="viewTicket(\''+t.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(t.id)+'</a>':'<b>'+escHtml(t.id)+'</b>')+'</td>'
+            +'<td>'+(t._isFt?'<b style="color:#7c3aed;">'+escHtml(t.id)+'</b>':(canManage?'<a href="javascript:void(0)" onclick="viewTicket(\''+t.id+'\')" style="color:var(--primary);font-weight:700;">'+escHtml(t.id)+'</a>':'<b>'+escHtml(t.id)+'</b>'))+'</td>'
             +'<td>'+escHtml(t.cname||'-')+'</td>'
             +'<td>'+escHtml(t.mobile||'-')+'</td>'
             +'<td>'+escHtml(t.area||'-')+'</td>'
             +'<td>'+escHtml(t.model||'-')+'</td>'
             +'<td><a href="javascript:void(0)" onclick="pcShowBreakdown(\''+t.id+'\')" style="font-weight:700;color:var(--primary);text-decoration:underline dotted;" title="Click for Labor/Parts breakdown">₹'+amt.toFixed(0)+'</a></td>'
-            +'<td>'+escHtml(t.payment_mode||'-')+'</td>'
+            +'<td>'+(function(){
+              var splits=t.payment_splits;
+              if(typeof splits==='string'){try{splits=JSON.parse(splits);}catch(e){splits=null;}}
+              if(Array.isArray(splits)&&splits.length>1){
+                var tip=splits.map(function(s){return s.mode+': ₹'+s.amount;}).join(' | ');
+                return '<span title="'+escHtml(tip)+'" style="text-decoration:underline dotted;cursor:help;">'+escHtml(t.payment_mode||'-')+'</span>';
+              }
+              return escHtml(t.payment_mode||'-');
+            })()+'</td>'
             +'<td style="white-space:nowrap;">'+invCell+'</td>'
             +'<td style="white-space:nowrap;">'+recvCell+'</td>'
             +'</tr>';
@@ -11445,8 +11482,8 @@ async function renderPaymentCollection(view){
 }
 async function pcToggleReceived(ticketId,received){
   if(!_pcCanManage())return;
+  const t=(window._pcTickets||[]).find(function(x){return x.id===ticketId;});
   if(received){
-    const t=(window._pcTickets||[]).find(function(x){return x.id===ticketId;});
     const amt=t?_pcAmount(t).toFixed(0):'?';
     const who=t?(t.cname||''):'';
     if(!confirm('Confirm payment received?\n\nTicket: '+ticketId+(who?'\nCustomer: '+who:'')+'\nAmount: ₹'+amt+'\n\nThis marks it as collected/handed over to office.'))return;
@@ -11455,11 +11492,15 @@ async function pcToggleReceived(ticketId,received){
     const patch=received
       ?{payment_received:true,payment_received_at:new Date().toISOString(),payment_received_by:currentUser.name}
       :{payment_received:false,payment_received_at:null,payment_received_by:null};
-    await sb('tickets','PATCH',patch,'?id=eq.'+ticketId);
+    // A Cart Delivery/Other Work row is merged in from field_tasks (id
+    // prefixed 'FT-' for display) — its real row lives in field_tasks under
+    // _ftRealId, not the tickets table.
+    if(t&&t._isFt){await sb('field_tasks','PATCH',patch,'?id=eq.'+t._ftRealId);}
+    else{await sb('tickets','PATCH',patch,'?id=eq.'+ticketId);}
     renderPaymentCollection(window._pcView||'pending');
   }catch(e){
     if(String(e.message||'').indexOf('payment_received')!==-1){
-      alert('⚠️ Setup needed: the payment_received columns don\'t exist on the tickets table yet. Run the Payment Collection setup SQL in Supabase first.');
+      alert('⚠️ Setup needed: the payment_received columns don\'t exist on the '+(t&&t._isFt?'field_tasks':'tickets')+' table yet. Run the Payment Collection setup SQL, then reload.');
     }else{
       alert('Error: '+e.message);
     }
@@ -12310,6 +12351,23 @@ async function saveEngUse(){
   const notes=document.getElementById('eu-notes').value.trim();
   if(!partId||!engineer||qty<=0){alert('Fill engineer, part and qty.');return;}
   if(warranty&&!jobSheet){alert('SE Call ID is required for warranty parts.\n\nThis is needed to track the part return from company.');document.getElementById('eu-jobsheet').focus();return;}
+  // The "Warranty" checkbox here is a manual judgment call, not something the
+  // app derives on its own — so if this SE Call ID belongs to a ticket
+  // that's been Voided (Out of Coverage), warn before it gets logged as a
+  // genuine Canon warranty claim. A voided call bills the customer exactly
+  // like Non-Warranty, so Canon isn't going to replace this part — marking
+  // it warranty:true here is exactly what left OOC parts sitting in
+  // Warranty Returns as "pending Canon" indefinitely.
+  if(warranty&&jobSheet){
+    try{
+      var _euTrackKey=jobSheet.split('/').pop().trim().toUpperCase();
+      var _euMatches=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(_euTrackKey)+'*&select=id,se_call_id,warranty_coverage&limit=10').catch(function(){return[];});
+      var _euOOC=(_euMatches||[]).find(function(t){var raw=(t.se_call_id||'').trim().toUpperCase();return(raw===_euTrackKey||raw.endsWith('/'+_euTrackKey)||raw.endsWith(_euTrackKey))&&t.warranty_coverage==='Out of Coverage';});
+      if(_euOOC&&!confirm('⚠️ This SE Call ID belongs to ticket '+_euOOC.id+', which is marked Out of Coverage (voided warranty) — billed to the customer, not a genuine Canon claim.\n\nMark this as Warranty anyway?')){
+        return;
+      }
+    }catch(_euErr){}
+  }
   try{
     await engStockAdjust(engineer,partId,-qty);
     await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jobSheet,warranty,notes,created_by:currentUser?.name||'Admin',warranty_status:warranty?'PENDING':null});
@@ -12356,6 +12414,16 @@ async function saveDirectWarrantyIssue(){
   if(!jobSheetRaw){alert('SE Call ID is required for warranty tracking.');document.getElementById('dwi-jobsheet').focus();return;}
   // Extract tracking key: last segment after /
   const trackKey=jobSheetRaw.split('/').pop().trim();
+  // Same OOC safeguard as Record Usage — this SE Call ID shouldn't belong to
+  // a Voided/Out of Coverage ticket, since Canon isn't sending a warranty
+  // replacement for a call that's billed to the customer.
+  try{
+    var _dwiMatches=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,se_call_id,warranty_coverage&limit=10').catch(function(){return[];});
+    var _dwiOOC=(_dwiMatches||[]).find(function(t){var raw=(t.se_call_id||'').trim().toUpperCase();return(raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey))&&t.warranty_coverage==='Out of Coverage';});
+    if(_dwiOOC&&!confirm('⚠️ This SE Call ID belongs to ticket '+_dwiOOC.id+', which is marked Out of Coverage (voided warranty) — billed to the customer, not a genuine Canon claim.\n\nContinue anyway?')){
+      return;
+    }
+  }catch(_dwiErr){}
   try{
     // Check duplicate
     const existing=await sb('eng_movements','GET',null,
@@ -18123,6 +18191,10 @@ document.addEventListener('mouseup',function(e){
 },true);
 
 // Payment Confirmation Popup (Non-Warranty Onsite calls only)
+// ticketData: the usual ticket-shaped object with cname/call_type/service_charges,
+// OR pass {cname, service_charges: <total to collect>, partsCost: 0, noParts:true}
+// for a non-ticket payment (e.g. a Cart Delivery) where the whole amount is
+// just one flat figure with nothing to break into parts vs service.
 async function showPaymentConfirmation(ticketData,onConfirm){
   var ex=document.getElementById('modal-payment-confirm');if(ex)ex.remove();
   // On a Warranty/AMC call, only a Consumable part is billable — a normal
@@ -18130,7 +18202,7 @@ async function showPaymentConfirmation(ticketData,onConfirm){
   // inventory price is nonzero (that price is real, it's just not charged
   // to the customer). Non-warranty calls bill every spare as before.
   var _pcIsWarranty=ticketData.call_type&&(ticketData.call_type==='Warranty'||ticketData.call_type==='Warranty Repeat'||ticketData.call_type==='AMC');
-  var partsCost=(currentSpares||[]).filter(function(s){return !_pcIsWarranty||isChargeableSpare(s);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
+  var partsCost=ticketData.noParts?0:(currentSpares||[]).filter(function(s){return !_pcIsWarranty||isChargeableSpare(s);}).reduce(function(sum,s){return sum+(parseFloat(s.price||0)*parseInt(s.qty||1));},0);
   var serviceCost=parseFloat(ticketData.service_charges)||0;
   var totalCost=partsCost+serviceCost;
   var ov=document.createElement('div');ov.id='modal-payment-confirm';ov.className='modal-overlay';
@@ -18138,10 +18210,19 @@ async function showPaymentConfirmation(ticketData,onConfirm){
     +'<div class="modal-header"><h2>💳 Payment Confirmation</h2><button class="close-btn" onclick="document.getElementById(\'modal-payment-confirm\').remove()">✕</button></div>'
     +'<div class="modal-body" style="padding:16px;display:flex;flex-direction:column;gap:12px;">'
     +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Customer Name</label><input type="text" id="pconf-cname" value="'+escHtml(ticketData.cname||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"></div>'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Service Charges (₹)</label><input type="number" id="pconf-service" value="'+serviceCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Parts Cost (₹)</label><input type="number" id="pconf-parts" value="'+partsCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>'
+    +(ticketData.noParts?'<div><label style="font-size:12px;font-weight:700;color:#374151;">Amount (₹)</label><input type="number" id="pconf-service" value="'+serviceCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div><input type="hidden" id="pconf-parts" value="0">'
+      :'<div><label style="font-size:12px;font-weight:700;color:#374151;">Service Charges (₹)</label><input type="number" id="pconf-service" value="'+serviceCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>'
+      +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Parts Cost (₹)</label><input type="number" id="pconf-parts" value="'+partsCost.toFixed(0)+'" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;" oninput="updatePconfTotal()"></div>')
     +'<div style="background:#f0fdf4;border-radius:8px;padding:12px;border-left:4px solid #15803d;"><div style="font-size:12px;color:#15803d;font-weight:700;">Total Amount (₹)</div><div style="font-size:24px;font-weight:800;color:#15803d;" id="pconf-total">'+totalCost.toFixed(0)+'</div></div>'
-    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Payment Mode</label><select id="pconf-mode" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;"><option value="">— Select —</option><option value="Cash">💵 Cash</option><option value="Online">💻 Online</option><option value="Check">📋 Cheque</option><option value="Card">💳 Card</option></select></div>'
+    // Split payment — one or more (mode, amount) rows that must add up to the
+    // total above. Starts with a single row pre-filled with the full amount
+    // (the common case, no split needed); "+ Add Payment Mode" lets a
+    // customer split e.g. ₹5569 as ₹5000 Cash + ₹569 Online.
+    +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Payment Mode(s)</label>'
+    +'<div id="pconf-splits"></div>'
+    +'<button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="pconfAddSplitRow()">➕ Add Payment Mode (Split)</button>'
+    +'<div id="pconf-split-warn" style="display:none;font-size:11px;color:#dc2626;font-weight:700;margin-top:6px;"></div>'
+    +'</div>'
     +'<div><label style="font-size:12px;font-weight:700;color:#374151;">Additional Notes</label><textarea id="pconf-notes" rows="2" placeholder="Optional notes..." style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;width:100%;outline:none;box-sizing:border-box;resize:vertical;"></textarea></div>'
     +'</div>'
     +'<div class="modal-footer" style="display:flex;gap:8px;">'
@@ -18152,6 +18233,33 @@ async function showPaymentConfirmation(ticketData,onConfirm){
   document.body.appendChild(ov);
   window._paymentConfirmCallback=onConfirm;
   window._paymentConfirmTicket=ticketData;
+  window._pconfSplitCount=0;
+  pconfAddSplitRow(totalCost);
+}
+function pconfAddSplitRow(prefillAmt){
+  var wrap=document.getElementById('pconf-splits');if(!wrap)return;
+  var idx=window._pconfSplitCount++;
+  var row=document.createElement('div');
+  row.className='pconf-split-row';row.dataset.idx=idx;
+  row.style.cssText='display:flex;gap:6px;margin-top:6px;align-items:center;';
+  row.innerHTML='<select class="pconf-split-mode" style="flex:1.2;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"><option value="">— Mode —</option><option value="Cash">💵 Cash</option><option value="Online">💻 Online</option><option value="Check">📋 Cheque</option><option value="Card">💳 Card</option></select>'
+    +'<input type="number" class="pconf-split-amt" placeholder="Amount" value="'+(prefillAmt!=null?prefillAmt.toFixed(0):'')+'" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;" oninput="pconfValidateSplits()">'
+    +(idx>0?'<button type="button" class="btn-icon" onclick="this.closest(\'.pconf-split-row\').remove();pconfValidateSplits();" style="color:var(--danger);">✕</button>':'<span style="width:28px;"></span>');
+  wrap.appendChild(row);
+  pconfValidateSplits();
+}
+function pconfValidateSplits(){
+  var total=parseFloat(document.getElementById('pconf-total')?.textContent||0)||0;
+  var rows=document.querySelectorAll('.pconf-split-row');
+  var sum=0;
+  rows.forEach(function(r){sum+=parseFloat(r.querySelector('.pconf-split-amt')?.value)||0;});
+  var warn=document.getElementById('pconf-split-warn');
+  var mismatch=Math.round(total-sum);
+  if(warn){
+    if(mismatch!==0){warn.style.display='block';warn.textContent=mismatch>0?'⚠️ ₹'+mismatch+' still unaccounted for.':'⚠️ ₹'+Math.abs(mismatch)+' over the total.';}
+    else{warn.style.display='none';}
+  }
+  return mismatch===0;
 }
 function updatePconfTotal(){
   var service=parseFloat(document.getElementById('pconf-service')?.value||0);
@@ -18159,14 +18267,41 @@ function updatePconfTotal(){
   var total=(isNaN(service)?0:service)+(isNaN(parts)?0:parts);
   var totalEl=document.getElementById('pconf-total');
   if(totalEl)totalEl.textContent=total.toFixed(0);
+  // Single-row case: keep that one row's amount in sync with the total as
+  // the user edits service/parts, so they don't have to also manually
+  // re-type the amount for the common (non-split) case.
+  var rows=document.querySelectorAll('.pconf-split-row');
+  if(rows.length===1){
+    var amtInput=rows[0].querySelector('.pconf-split-amt');
+    if(amtInput)amtInput.value=total.toFixed(0);
+  }
+  pconfValidateSplits();
 }
 async function confirmPayment(){
-  var mode=(document.getElementById('pconf-mode')?.value||'').trim();
-  if(!mode){alert('Please select a payment mode.');return;}
+  var rows=document.querySelectorAll('.pconf-split-row');
+  var splits=[];
+  var missingMode=false;
+  rows.forEach(function(r){
+    var mode=(r.querySelector('.pconf-split-mode')?.value||'').trim();
+    var amt=parseFloat(r.querySelector('.pconf-split-amt')?.value)||0;
+    if(amt<=0)return; // ignore a blank/zero extra row
+    if(!mode)missingMode=true;
+    splits.push({mode:mode,amount:amt});
+  });
+  if(!splits.length){alert('Please enter at least one payment amount and mode.');return;}
+  if(missingMode){alert('Please select a payment mode for every amount entered.');return;}
+  if(!pconfValidateSplits()){alert('The split amounts must add up to the Total Amount shown.');return;}
   var mEl=document.getElementById('modal-payment-confirm');if(mEl)mEl.remove();
+  // payment_mode stays a single readable string for backward compatibility
+  // with everywhere else in the app that already filters/displays on it —
+  // "Cash" for the common single-mode case, "Split (Cash + Online)" when
+  // more than one mode was used. payment_splits carries the exact breakdown
+  // for Payment Collection / reporting to show in full.
+  var modeSummary=splits.length===1?splits[0].mode:'Split ('+splits.map(function(s){return s.mode;}).join(' + ')+')';
   var data={
     cname:(document.getElementById('pconf-cname')?.value||'').trim(),
-    payment_mode:mode,
+    payment_mode:modeSummary,
+    payment_splits:splits,
     service_charges:parseFloat(document.getElementById('pconf-service')?.value||0)||0,
     parts_cost:parseFloat(document.getElementById('pconf-parts')?.value||0)||0,
     payment_notes:(document.getElementById('pconf-notes')?.value||'').trim()
@@ -25514,8 +25649,41 @@ async function doFtDone(id){
   var now=new Date();
   var t=(window._ftCache||[]).find(function(x){return String(x.id)===String(id);});
   if(!t){try{t=(await sb('field_tasks','GET',null,'?id=eq.'+id))[0];}catch(e){}}
+  // Cart Delivery (or any Other Work with a real amount attached — Payment
+  // Collection, Cheque Collection etc.) is money changing hands in the
+  // field, exactly like a Non-Warranty call's delivery — it needs the same
+  // Payment Confirmation popup and needs to show up in Payment Collection,
+  // not just get silently marked Done with no record of how it was paid.
+  var amt=parseFloat(t&&t.amount)||0;
+  if(amt>0&&!(t&&t.payment_mode)){
+    currentSpares=[]; // showPaymentConfirmation's noParts mode ignores this, but keep it clean
+    showPaymentConfirmation({cname:t.customer_name,service_charges:amt,noParts:true},async function(paymentData){
+      await _ftFinishDone(id,t,now,paymentData);
+    });
+    return;
+  }
+  await _ftFinishDone(id,t,now,null);
+}
+async function _ftFinishDone(id,t,now,paymentData){
   try{
-    await sb('field_tasks','PATCH',{status:'Done',done_at:now.toISOString(),done_date:now.toLocaleDateString('en-CA'),updated_at:now.toISOString()},'?id=eq.'+id);
+    var patch={status:'Done',done_at:now.toISOString(),done_date:now.toLocaleDateString('en-CA'),updated_at:now.toISOString()};
+    if(paymentData){
+      patch.payment_mode=paymentData.payment_mode;
+      patch.payment_splits=paymentData.payment_splits;
+      patch.payment_collected_by=currentUser.name;
+      patch.payment_collected_by_id=currentUser.eng_id||currentUser.user_id||'';
+      if(paymentData.payment_notes)patch.notes=(t&&t.notes?t.notes+'\n':'')+'Payment notes: '+paymentData.payment_notes;
+    }
+    try{
+      await sb('field_tasks','PATCH',patch,'?id=eq.'+id);
+    }catch(pe){
+      var _msg=String(pe&&pe.message||'');
+      if(_msg.indexOf('payment_splits')!==-1){delete patch.payment_splits;await sb('field_tasks','PATCH',patch,'?id=eq.'+id);}
+      else if(_msg.indexOf('payment_collected_by_id')!==-1){delete patch.payment_collected_by_id;delete patch.payment_collected_by;await sb('field_tasks','PATCH',patch,'?id=eq.'+id);}
+      else if(_msg.indexOf('payment_collected_by')!==-1){delete patch.payment_collected_by;await sb('field_tasks','PATCH',patch,'?id=eq.'+id);}
+      else if(patch.payment_mode&&_msg.indexOf('payment_mode')!==-1){delete patch.payment_mode;delete patch.payment_splits;await sb('field_tasks','PATCH',patch,'?id=eq.'+id);}
+      else throw pe;
+    }
     await _ftAutoWorkLog(id,t,'done','✅ Task Done',now);
     alert('✅ Task Done — '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
     renderFieldTasks();
