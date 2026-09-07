@@ -11945,9 +11945,16 @@ async function renderWarrantyPending(showAll){
       // even Pending Customer Approval) already showed up here as if the
       // part had been used and Canon owed a replacement.
       var CLOSED_FOR_WARRANTY=['Closed','Delivered','Pending for Delivery','Resolved By Phone'];
-      const wTickets=await sbAll('tickets','?call_type=in.(Warranty,Warranty Repeat,AMC)&status=in.(Closed,Delivered,Pending for Delivery,Resolved By Phone)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at,timeline&order=created_at.desc');
+      const wTickets=await sbAll('tickets','?call_type=in.(Warranty,Warranty Repeat,AMC)&status=in.(Closed,Delivered,Pending for Delivery,Resolved By Phone)&select=id,cname,model,call_type,assigned_name,se_call_id,spares,status,created_at,timeline,warranty_coverage&order=created_at.desc');
       wTickets.forEach(function(t){
         if(!CLOSED_FOR_WARRANTY.includes(t.status))return;
+        // Voided (Out of Coverage) keeps its original call_type — Warranty/
+        // Warranty Repeat/AMC never gets rewritten — but from the moment it's
+        // voided the call is billed to the customer exactly like Non-
+        // Warranty, so Canon owes nothing back for its parts. Was matching
+        // on call_type alone, so a voided call's chargeable part still
+        // showed up here as "sent out on warranty, pending return".
+        if(t.warranty_coverage==='Out of Coverage')return;
         var spares=t.spares||[];
         if(typeof spares==='string'){try{spares=JSON.parse(spares);}catch(e){spares=[];}}
         // The date this part actually left the shelf — the call's real
@@ -12532,7 +12539,15 @@ async function _deductTicketPartsInner(id){
   const freshT=(await sb('tickets','GET',null,`?id=eq.${id}`))[0];
   const sparesToDeduct=(freshT?.spares||[]).filter(s=>s.code&&!s.stock_deducted);
   if(!sparesToDeduct.length)return freshT;
-  const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'');
+  // A call whose warranty was voided (Out of Coverage) keeps its ORIGINAL
+  // call_type (Warranty/Warranty Repeat/AMC never gets rewritten) even
+  // though it's billed to the customer exactly like Non-Warranty from that
+  // point on — same rule _spareHidesPrice/savePartRequest already use. Was
+  // checking call_type alone, so a voided call's chargeable part still got
+  // logged as warranty:true — showing up in Warranty Returns as "pending
+  // back from Canon" even though the customer paid for it outright and
+  // Canon was never going to replace it.
+  const isWarrantyForDeduct=['Warranty','Warranty Repeat','AMC'].includes(freshT?.call_type||'')&&freshT?.warranty_coverage!=='Out of Coverage';
   // Some tickets have a blank/missing service_type (older data, before the
   // field existed on every row) — the app's OWN edit-form fallback elsewhere
   // (`t.service_type||'On Site'`) already treats that as On Site, but this
