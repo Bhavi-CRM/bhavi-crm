@@ -12897,6 +12897,11 @@ function openBulkStockAdj(){
     +'<div class="modal-header"><h2>🛠️ Bulk Stock Correction</h2><button class="close-btn" onclick="document.getElementById(\'bulk-adj-modal\').remove()">✕</button></div>'
     +'<div class="modal-body">'
     +'<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#5b21b6;">📋 Enter each mismatched part code and the difference vs CRM stock (+ if physical count is higher, − if lower), then apply all at once — e.g. YH1-2401-000: CRM 5, physical 7 → enter <b>+2</b>. YG2-3114-000: CRM 10, physical 5 → enter <b>-5</b>.</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadBulkAdjTemplate()">📄 Download Template (Excel)</button>'
+    +'<input type="file" id="bulk-adj-upload" accept=".xlsx,.xls,.csv" style="display:none;" onchange="uploadBulkAdjFile(this)">'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'bulk-adj-upload\').click()">📥 Upload Filled Template</button>'
+    +'</div>'
     +'<datalist id="bulk-adj-parts-dl">'+(allInventory||[]).map(function(i){return '<option value="'+escHtml(i.part_code||'')+'">';}).join('')+'</datalist>'
     +'<div style="display:grid;grid-template-columns:1.3fr 0.8fr 0.8fr 0.8fr auto;gap:8px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;padding:0 8px;"><div>Part Code</div><div style="text-align:center;">CRM Stock</div><div style="text-align:center;">Adjust (+/-)</div><div style="text-align:center;">New Stock</div><div></div></div>'
     +'<div id="bulk-adj-rows"></div>'
@@ -12909,6 +12914,49 @@ function openBulkStockAdj(){
   // an accidental outside click must never wipe out a long list of typed rows.
   document.body.appendChild(ov);
   bulkAdjRenderRows();
+}
+// Excel round-trip for bulk correction: a BLANK template (headers + one
+// example row only) — only the mismatched parts get typed in, same as
+// manually adding rows in this modal, just done offline in Excel instead of
+// one row at a time in-browser. Deliberately NOT pre-filled with all 1800+
+// inventory rows — that would force scrolling/searching through the whole
+// catalog to find the ~50 that actually need correcting. Upload reads it
+// back into the SAME editable rows table (Current / Adjust / New Stock,
+// live-computed) so the admin still reviews and can tweak anything before
+// actually applying, instead of the upload silently committing changes.
+function downloadBulkAdjTemplate(){
+  var data=[{'Part Code':'e.g. YH1-2401-000','Adjust (+/-)':'e.g. +2 or -5'}];
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Stock Correction');
+  XLSX.writeFile(wb,'bulk_stock_correction_template.xlsx');
+}
+function uploadBulkAdjFile(input){
+  var file=input.files&&input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      var rows=[];
+      data.forEach(function(r){
+        var code=String(r['Part Code']||r['part code']||r['Part code']||'').trim();
+        var deltaRaw=r['Adjust (+/-)']!=null?r['Adjust (+/-)']:(r['Adjust']!=null?r['Adjust']:r['adjust']);
+        if(!code||deltaRaw===''||deltaRaw==null)return; // skip rows the user didn't actually mark
+        var delta=parseInt(deltaRaw);
+        if(isNaN(delta)||delta===0)return;
+        var match=(allInventory||[]).find(function(i){return (i.part_code||'').toLowerCase()===code.toLowerCase();});
+        rows.push({code:code,partId:match?match.id:null,curQty:match?(match.qty_in_stock||0):null,delta:String(delta),itemName:match?match.item_name:''});
+      });
+      if(!rows.length){alert('No rows with a non-zero Adjust value found in this file. Check the "Adjust (+/-)" column is filled in.');input.value='';return;}
+      window._bulkAdjRows=rows;
+      bulkAdjRenderRows();
+      var notFound=rows.filter(function(r){return !r.partId;}).length;
+      alert('✅ Loaded '+rows.length+' row(s) from the file.'+(notFound?'\n\n⚠️ '+notFound+' part code(s) not found in inventory — check them below before applying.':'')+'\n\nReview Current/Adjust/New Stock below, edit if needed, then Apply.');
+    }catch(err){alert('Could not read this file: '+err.message);}
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
 }
 function bulkAdjAddRow(){
   window._bulkAdjRows.push({code:'',partId:null,curQty:null,delta:'',itemName:''});
