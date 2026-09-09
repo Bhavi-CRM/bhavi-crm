@@ -5321,7 +5321,7 @@ async function renderMyCalls(){
                     <div style="font-weight:800;font-size:14px;color:#1d4ed8;">${t.id} &nbsp;${priorityBadge(t.priority||'Normal')}${(()=>{const isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');return isW?` <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">🛡️ WARRANTY</span>`:` <span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">💳 NON-WARRANTY</span>`;})()}${t.se_call_id?` <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:700;">SE: ${t.se_call_id}</span>`:''}</div>
                     <div style="font-size:15px;font-weight:700;margin-top:2px;">${t.cname||'-'}</div>
                     ${t.problem?`<div style="font-size:12px;font-weight:700;color:#b45309;margin-top:2px;">🔧 ${t.problem}</div>`:''}
-                    ${t.remarks?`<div style="font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:6px;padding:3px 8px;margin-top:4px;">📝 WC Remark: ${t.remarks}</div>`:''}
+                    ${t.remarks?`<div onclick="event.stopPropagation();showRemarkHistory('${t.id}')" style="cursor:pointer;font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:6px;padding:3px 8px;margin-top:4px;" title="Click to see remark history">📝 WC Remark: ${t.remarks}</div>`:''}
                   </div>
                   <div style="flex-shrink:0;">${statusBadge(t.status)}</div>
                 </div>
@@ -5825,6 +5825,23 @@ async function saveCall(){
   if(!ct){alert('⚠️ Call Type is required! Please select Warranty / Non-Warranty / AMC etc.');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   if((ct==='Non-Warranty'||ct==='Non-Warranty Repeat'||ct==='Other')&&!serviceCharges&&serviceCharges!==0&&!(document.getElementById('call-service-charges')?.value)){alert('⚠️ Service Charge is required for Non-Warranty calls!');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
   if(!data.model||!data.serial||!data.cname||!data.mobile||!data.problem){alert('Fill: Model, Serial, Customer, Mobile, Problem');_savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}return;}
+  // Hard block on save — checkReRepair only shows a warning box on blur
+  // (window._serialHasOpenCall), which is easy to miss or click past
+  // (esp. if Save gets clicked before that async check even finishes). This
+  // re-checks fresh against the DB right at save time so a genuine
+  // duplicate — same serial, an existing call still open — can't slip
+  // through no matter how the form was filled.
+  if(data.serial&&!data.serial.startsWith('NO-SN-')){
+    try{
+      const _dupCheck=await sb('tickets','GET',null,'?serial=eq.'+encodeURIComponent(data.serial)+'&order=created_at.desc&limit=10');
+      const _dupOpen=(_dupCheck||[]).find(isTicketActive);
+      if(_dupOpen){
+        alert('🚫 Cannot save — an OPEN call already exists for this serial number:\n\n'+_dupOpen.id+' — '+(_dupOpen.status||'')+'\nCustomer: '+(_dupOpen.cname||'-')+' | Engineer: '+(_dupOpen.assigned_name||'Unassigned')+'\n\nClose that call first, or double-check the serial number before logging a new one.');
+        _savingCall=false;if(_saveBtn){_saveBtn.disabled=false;_saveBtn.textContent='💾 Save Call';}
+        return;
+      }
+    }catch(_dupErr){/* if the check itself fails, don't block a genuine save on a network hiccup */}
+  }
   // Sub-Category is mandatory whenever the selected brand actually has
   // sub-categories to pick from (not left on "-- All / General --") — a
   // missing sub-category previously caused a call to not show under the
@@ -5916,6 +5933,36 @@ async function generateTicketNo(){
 }
 
 // Point 13: Admin edit — only remark
+// Remarks (t.remarks) is a single field that gets fully OVERWRITTEN every
+// time someone adds a new one via openAdminEdit — the previous text
+// disappears from view even though it's still preserved in the timeline as
+// its own "Admin Remark Added" entry. This surfaces that history on click
+// instead of it only being findable by scrolling the whole timeline.
+async function showRemarkHistory(id){
+  var ex=document.getElementById('modal-remark-history');if(ex)ex.remove();
+  var t;
+  try{t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(id)+'&select=id,remarks,timeline'))[0];}catch(e){}
+  if(!t){alert('Could not load remark history.');return;}
+  var tl=t.timeline;
+  if(typeof tl==='string'){try{tl=JSON.parse(tl);}catch(e){tl=[];}}
+  if(!Array.isArray(tl))tl=[];
+  var remarkEntries=tl.filter(function(e){return e.action&&e.action.indexOf('Remark')!==-1&&e.note;}).slice().reverse();
+  var ov=document.createElement('div');ov.id='modal-remark-history';ov.className='modal-overlay';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  var rowsHtml=remarkEntries.length
+    ?remarkEntries.map(function(e,i){
+      return '<div style="background:'+(i===0?'#fef3c7':'var(--bg)')+';border-radius:8px;padding:10px 12px;margin-bottom:8px;'+(i===0?'border:1.5px solid #f59e0b;':'')+'">'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">'+(i===0?'📝 <b style="color:#92400e;">Latest</b> — ':'')+escHtml(e.by||'')+' | '+(e.at?new Date(e.at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'')+'</div>'
+        +'<div style="font-size:13px;">'+escHtml(e.note||'')+'</div></div>';
+    }).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--text-muted);">No remark history found.</div>';
+  ov.innerHTML='<div class="modal modal-sm" onclick="event.stopPropagation()">'
+    +'<div class="modal-header"><h2 style="font-size:15px;">📝 Remark History — '+escHtml(id)+'</h2><button class="close-btn" onclick="document.getElementById(\'modal-remark-history\').remove()">✕</button></div>'
+    +'<div class="modal-body">'+rowsHtml+'</div>'
+    +'<div class="modal-footer"><button class="btn btn-outline" onclick="document.getElementById(\'modal-remark-history\').remove()">Close</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
 async function openAdminEdit(id){
   const t=allTickets.find(x=>x.id===id);if(!t)return;
   const remark=prompt(`Add remark for ${t.id}:\n(Note: Customer & product details cannot be changed after job sheet creation)`);
@@ -28698,7 +28745,7 @@ function plQuickView(ticketId){
     +row('🖨️','Model / Serial',escHtml(t.model||'—')+' — S/N: '+escHtml(t.serial||'—'))
     +row('🏷️','Call Type',escHtml(t.call_type||'—')+' · '+escHtml(t.service_type||'—')+' · '+escHtml(t.wc_type||'—'))
     +row('🛠️','Problem',escHtml(t.problem||'—'),'font-weight:500;white-space:normal;')
-    +(t.remarks?row('📝','WC Remark','<span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:3px 7px;display:inline-block;">'+escHtml(t.remarks)+'</span>','white-space:normal;'):'')
+    +(t.remarks?row('📝','WC Remark','<span onclick="showRemarkHistory(\''+t.id+'\')" style="cursor:pointer;background:#fef3c7;color:#92400e;border-radius:4px;padding:3px 7px;display:inline-block;" title="Click to see remark history">'+escHtml(t.remarks)+'</span>','white-space:normal;'):'')
     +row('🧑‍🔧','Assigned Engineer',escHtml(t.assigned_name||'Unassigned'))
     +row('🕒','Created',createdDate)
     +'</div>'
@@ -28916,7 +28963,7 @@ function pendingListRender(){
         +'<div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'—')+'</div></td>'
         +'<td style="padding:10px 12px;max-width:160px;font-size:12px;color:#374151;">'
         +'<div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</div>'
-        +(t.remarks?'<div style="margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="'+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
+        +(t.remarks?'<div onclick="event.stopPropagation();showRemarkHistory(\''+t.id+'\')" style="cursor:pointer;margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="Click to see remark history — '+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
         +'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge(t.status)+_plHoldBadge
         +'<div style="font-size:11px;color:#9ca3af;margin-top:3px;">'+escHtml(t.assigned_name||'Unassigned')+'</div></td>'
@@ -29020,13 +29067,13 @@ function pendingListRenderResults(){
       var tatB=tatBadge(t.tat_date);
       var statusColor={'Pending Allocation':'#f59e0b','Assigned':'#3b82f6','In Progress':'#8b5cf6','Pending Parts':'#ef4444','Pending Engineer Stock':'#f97316','Pending Customer Approval':'#f59e0b','Pending Repair Carry In':'#6366f1','Pending Repair On Site':'#6366f1'}[t.status]||'#6b7280';
       rows+='<tr style="border-bottom:1px solid #f1f5f9;">'
-        +'<td style="padding:10px 12px;"><a href="#" onclick="viewTicket(\''+t.id+'\');return false;" style="font-weight:700;color:#1d4ed8;text-decoration:none;">'+t.id+'</a><br><span style="font-size:11px;color:#6b7280;">'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'')+'</span></td>'
+        +'<td style="padding:10px 12px;"><a href="#" onclick="viewTicket(\''+t.id+'\');return false;" style="font-weight:700;color:#1d4ed8;text-decoration:none;">'+t.id+'</a><br><span style="font-size:11px;color:#6b7280;">'+(t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'Asia/Kolkata'}):'')+'</span></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.cname||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.mobile||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div>'+escHtml(t.area||'-')+'</div><div style="font-size:11px;color:#6b7280;">'+escHtml(t.pin||'')+'</div></td>'
         +'<td style="padding:10px 12px;"><div style="font-weight:600;">'+escHtml(t.model||'-')+'</div><div style="font-size:11px;color:#6b7280;">S/N: '+escHtml(t.serial||'MISSING')+'</div></td>'
         +'<td style="padding:10px 12px;max-width:160px;font-size:12px;color:#374151;">'
         +'<div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escHtml(t.problem||'')+'">'+escHtml(t.problem||'—')+'</div>'
-        +(t.remarks?'<div style="margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="'+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
+        +(t.remarks?'<div onclick="event.stopPropagation();showRemarkHistory(\''+t.id+'\')" style="cursor:pointer;margin-top:3px;font-size:11px;color:#92400e;background:#fef3c7;border-radius:4px;padding:2px 6px;white-space:normal;" title="Click to see remark history — '+escHtml(t.remarks)+'">📝 '+escHtml(t.remarks)+'</div>':'')
         +'</td>'
         +'<td style="padding:10px 12px;"><span style="background:'+statusColor+'22;color:'+statusColor+';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">'+escHtml(t.status||'')+'</span><br><span style="font-size:11px;color:#6b7280;">'+escHtml(t.assigned_name||'UNASSIGNED')+'</span></td>'
         +'<td style="padding:10px 12px;">'+tatB+'</td>'
