@@ -10411,7 +10411,13 @@ function importInv(){const input=document.createElement('input');input.type='fil
 async function renderCustomers(){
   document.getElementById('page-content').innerHTML='<div class="loading">Loading...</div>';
   try{
-    const customers=await sb('customers','GET',null,'?order=cname');window._allCust=customers;
+    // sb() is capped at Supabase's server-side max-rows (commonly 1000)
+    // regardless of the Range header requested — with 1000+ real customers
+    // that silently truncated the list at exactly 1000 with no indication
+    // anything was missing. sbAll() pages through in batches to get all of
+    // them, same as every other bulk-list page in the app.
+    const customers=await sbAll('customers','?order=cname');window._allCust=customers;
+    window._custPage=1;
     document.getElementById('page-content').innerHTML=`
       <div class="card">
         <div class="section-header"><h2>Customers (${customers.length})</h2>
@@ -10424,12 +10430,50 @@ async function renderCustomers(){
         <div class="filter-bar"><input type="text" id="cust-search" placeholder="Name, mobile, serial, city..." oninput="filterCustomers()" style="flex:1;"></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Name</th><th>Mobile</th><th>Serial</th><th>Model</th><th>City</th><th>Address</th><th>Pin</th></tr></thead>
-          <tbody id="cust-tbody">${customers.map(c=>`<tr><td><b>${c.cname||'-'}</b></td><td><a href="tel:${c.mobile}" class="clickable-phone">📞 ${c.mobile||'-'}</a> <a href="https://wa.me/91${(c.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td><td>${c.serial||'-'}</td><td>${c.model||'-'}</td><td>${c.city||'-'}</td><td>${c.address||'-'}</td><td>${c.pin||'-'}</td></tr>`).join('')}</tbody>
+          <tbody id="cust-tbody"></tbody>
         </table></div>
+        <div id="cust-pager"></div>
       </div>`;
+    custRenderPage();
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
-function filterCustomers(){const q=(document.getElementById('cust-search')?.value||'').toLowerCase();const f=(window._allCust||[]).filter(c=>[c.cname,c.mobile,c.serial,c.model,c.city,c.address].some(v=>(v||'').toLowerCase().includes(q)));document.getElementById('cust-tbody').innerHTML=f.map(c=>`<tr><td><b>${c.cname||'-'}</b></td><td><a href="tel:${c.mobile}" class="clickable-phone">📞 ${c.mobile||'-'}</a> <a href="https://wa.me/91${(c.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td><td>${c.serial||'-'}</td><td>${c.model||'-'}</td><td>${c.city||'-'}</td><td>${c.address||'-'}</td><td>${c.pin||'-'}</td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';}
+function _custRowHtml(c){return `<tr><td><b>${c.cname||'-'}</b></td><td><a href="tel:${c.mobile}" class="clickable-phone">📞 ${c.mobile||'-'}</a> <a href="https://wa.me/91${(c.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td><td>${c.serial||'-'}</td><td>${c.model||'-'}</td><td>${c.city||'-'}</td><td>${c.address||'-'}</td><td>${c.pin||'-'}</td></tr>`;}
+// Client-side pagination (same pattern as All Tickets) — search/filter runs
+// over the whole fetched list, only the rendered table is paged so the DOM
+// never has to hold thousands of rows at once.
+function _custPageSlice(arr){
+  var size=window._custPageSize||50;
+  var totalPages=Math.max(1,Math.ceil(arr.length/size));
+  if(window._custPage>totalPages)window._custPage=totalPages;
+  if(window._custPage<1)window._custPage=1;
+  var start=(window._custPage-1)*size;
+  return {slice:arr.slice(start,start+size),totalPages:totalPages,page:window._custPage,total:arr.length};
+}
+function custPagerHtml(info){
+  if(!info.total)return'';
+  var size=window._custPageSize||50;
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 4px;font-size:13px;">'
+    +'<div style="color:var(--text-muted);">Showing '+((info.page-1)*size+1)+'–'+Math.min(info.page*size,info.total)+' of '+info.total+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<label style="color:var(--text-muted);">Page size</label>'
+    +'<select onchange="window._custPageSize=parseInt(this.value);window._custPage=1;custRenderPage();" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;">'
+    +[30,50,100,200].map(function(n){return '<option value="'+n+'"'+(size===n?' selected':'')+'>'+n+'</option>';}).join('')
+    +'</select>'
+    +'<button class="btn btn-outline btn-sm" '+(info.page<=1?'disabled':'')+' onclick="window._custPage--;custRenderPage();">‹ Prev</button>'
+    +'<span>Page '+info.page+' / '+info.totalPages+'</span>'
+    +'<button class="btn btn-outline btn-sm" '+(info.page>=info.totalPages?'disabled':'')+' onclick="window._custPage++;custRenderPage();">Next ›</button>'
+    +'</div></div>';
+}
+function custRenderPage(){
+  var q=(document.getElementById('cust-search')?.value||'').toLowerCase();
+  var f=q?(window._allCust||[]).filter(c=>[c.cname,c.mobile,c.serial,c.model,c.city,c.address].some(v=>(v||'').toLowerCase().includes(q))):(window._allCust||[]);
+  var info=_custPageSlice(f);
+  var tb=document.getElementById('cust-tbody');
+  if(tb)tb.innerHTML=info.slice.map(_custRowHtml).join('')||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  var pg=document.getElementById('cust-pager');
+  if(pg)pg.innerHTML=custPagerHtml(info);
+}
+function filterCustomers(){window._custPage=1;custRenderPage();}
 function downloadCustTemplate(){const data=[{'Name':'Ramesh Shah','Mobile':'9876543210','Alternate Mobile':'','Serial':'SN123456','Model':'MF3010','Address':'123 Street','City':'Ahmedabad','Pin':'380015','Area':'Ambawadi'}];const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Customers');XLSX.writeFile(wb,'customer_template.xlsx');}
 function importCustomers(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';input.onchange=async e=>{const file=e.target.files[0];const r=new FileReader();r.onload=async ev=>{const wb=XLSX.read(ev.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let count=0,err=0;for(const row of data){const name=row['Name']||row['name']||'';const mobile=String(row['Mobile']||row['mobile']||'');const serial=String(row['Serial']||row['serial']||'IMP-'+Date.now()+'-'+count);const model=row['Model']||row['model']||'';const address=row['Address']||row['address']||'';const city=row['City']||row['city']||'';const pin=String(row['Pin']||row['pin']||'');const area=row['Area']||row['area']||'';const alt=String(row['Alternate Mobile']||'');if(!name&&!mobile){err++;continue;}try{await sb('customers','POST',{serial,model,cname:name,mobile,alt_mobile:alt,address,city,pin,area,updated_at:new Date().toISOString()});count++;}catch(e){try{await sb('customers','PATCH',{model,cname:name,mobile,alt_mobile:alt,address,city,pin,area,updated_at:new Date().toISOString()},`?serial=eq.${serial}`);count++;}catch(e2){err++;}}}alert(`Imported: ${count} | Errors: ${err}`);renderCustomers();};r.readAsBinaryString(file);};input.click();}
 function exportCustomers(){const data=(window._allCust||[]).map(c=>({'Name':c.cname||'','Mobile':c.mobile||'','Alternate Mobile':c.alt_mobile||'','Serial No':c.serial||'','Model':c.model||'','Address':c.address||'','Area':c.area||'','City':c.city||'','State':c.state||'','Pin':c.pin||''}));const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Customers');XLSX.writeFile(wb,'customers_export_'+new Date().toLocaleDateString('en-CA')+'.xlsx');}
@@ -26036,6 +26080,10 @@ async function saveSvTask(id){
   }catch(e){alert('Error saving: '+e.message);}
 }
 
+// ENG008 (Nachiket Joshi) uses his own vehicle for site visits — travel
+// start/reached odometer+meter-photo capture doesn't apply to him, he just
+// needs to log that he went and what was done, not track KM/meter readings.
+function _svSkipsKm(){var eid=currentUser&&(currentUser.eng_id||currentUser.user_id);return eid==='ENG008';}
 async function doSvTravelStart(id){
   var t=(window._svCache||[]).find(function(x){return String(x.id)===String(id);});
   if(!t){try{t=(await sb('site_visits','GET',null,'?id=eq.'+id))[0];}catch(e){}}
@@ -26043,7 +26091,7 @@ async function doSvTravelStart(id){
   var now=new Date();
   var isEng=currentUser&&currentUser.role==='engineer';
   var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
-  if(isEng){
+  if(isEng&&!_svSkipsKm()){
     var dateNow=now.toLocaleDateString('en-CA');
     var skipKey='kmSkip_'+engId+'_'+dateNow;
     openKmCapture({type:'opening',ticketId:'SV'+id,allowSkip:true,onDone:function(skipped){
@@ -26066,8 +26114,7 @@ async function doSvReached(id){
   if(!t)return;
   var now=new Date();
   var isEng=currentUser&&currentUser.role==='engineer';
-  var engId=(currentUser&&(currentUser.eng_id||currentUser.user_id))||'';
-  if(isEng){
+  if(isEng&&!_svSkipsKm()){
     openKmCapture({type:'arrival',ticketId:'SV'+id,allowSkip:true,onDone:function(skipped){
       var _finish=function(){
         try{sb('site_visits','PATCH',{status:'Reached',reached_at:now.toISOString(),updated_at:now.toISOString()},'?id=eq.'+id);}catch(e){}
