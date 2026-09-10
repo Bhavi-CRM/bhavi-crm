@@ -584,6 +584,12 @@ tr:hover td{background:#f8fafc;}
         <div class="form-group"><label>Required Qty</label><input type="number" id="req-part-qty" value="1" min="1"></div>
       </div>
       <div class="form-group"><label>Note</label><input type="text" id="req-part-note" placeholder="Reason/note"></div>
+      <div class="form-group" id="req-part-predispatch-wrap" style="display:none;margin-top:4px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:10px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;font-weight:600;color:#0d9488;font-size:12.5px;cursor:pointer;">
+          <input type="checkbox" id="req-part-predispatch" style="width:16px;height:16px;margin-top:1px;">
+          <span>📥 Received from Canon — company already sent this part in advance specifically for THIS call (special order, not our own stock). No return will be tracked.</span>
+        </label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-part-req')">Cancel</button>
@@ -7987,6 +7993,15 @@ async function openPartRequest(ticketId,callType,serviceType){
   document.getElementById('req-part-code').value='';document.getElementById('req-part-name').value='';
   document.getElementById('req-part-stock').value='';document.getElementById('req-part-qty').value='1';
   document.getElementById('req-part-note').value='';
+  // The "Received from Canon — Pre-Dispatched" checkbox only makes sense on
+  // a genuine (not voided) warranty-type call — a Non-Warranty/Out-of-
+  // Coverage part is always customer-billed stock, nothing is ever owed
+  // back by the company for it, so there's nothing to opt out of tracking.
+  const _isWtyForPD=t&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC')&&t.warranty_coverage!=='Out of Coverage';
+  const _pdWrap=document.getElementById('req-part-predispatch-wrap');
+  if(_pdWrap)_pdWrap.style.display=_isWtyForPD?'':'none';
+  const _pdChk=document.getElementById('req-part-predispatch');
+  if(_pdChk)_pdChk.checked=false;
   openModal('modal-part-req');
 }
 async function searchPartsAC(q){
@@ -8112,7 +8127,28 @@ async function _savePartRequestInner(addAnother){
   let _pendingNoParts=false;  // true = company also out of stock
   let _effectiveCompanyQty=0; // company stock left AFTER other open tickets' claims on this same part
   const _invForStock=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}&limit=1`).catch(()=>[]);
-  const _invItemForStock=_invForStock&&_invForStock[0];
+  let _invItemForStock=_invForStock&&_invForStock[0];
+  // "Received from Canon — Pre-Dispatched": the company sent this part to us
+  // IN ADVANCE, specifically for this one call (a special order, not our own
+  // shelf stock) — so unlike a normal warranty part pulled from company
+  // stock, nothing is owed back once it's fitted. Physically receiving it
+  // is done right here (same effect as a Purchase Entry — bump real stock
+  // so the routing logic below sees it as available), and the resulting
+  // spare gets flagged so it never lands on the Warranty Pending list.
+  const isPreDispatched=isW&&!!document.getElementById('req-part-predispatch')?.checked;
+  if(isPreDispatched){
+    if(_invItemForStock){
+      const newQty=(_invItemForStock.qty_in_stock||0)+qty;
+      await sb('inventory','PATCH',{qty_in_stock:newQty,updated_at:new Date().toISOString()},`?id=eq.${_invItemForStock.id}`).catch(()=>{});
+      _invItemForStock={..._invItemForStock,qty_in_stock:newQty};
+    }else{
+      const created=await sb('inventory','POST',{part_code:code,item_name:name,qty_in_stock:qty,min_stock:0,unit_price:0,gst_pct:18,updated_at:new Date().toISOString()}).catch(()=>null);
+      if(created&&created[0])_invItemForStock=created[0];
+    }
+    if(_invItemForStock){
+      await sb('inventory_log','POST',{inventory_id:_invItemForStock.id,type:'in',qty,note:'Canon Warranty Pre-Dispatch — received specifically for call '+partReqTicketId,done_by:currentUser.name,created_at:new Date().toISOString(),txn_date:new Date().toISOString().slice(0,10)}).catch(()=>{});
+    }
+  }
   if(_invItemForStock){
     _effectiveCompanyQty=await getEffectivePartQty(code,_invItemForStock.qty_in_stock||0,partReqTicketId);
   }
@@ -8210,7 +8246,7 @@ async function _savePartRequestInner(addAnother){
   // just an estimate) until Approve/Reject clears it — same convention used
   // everywhere else. Only a free-and-already-decided warranty part (never
   // needed approval to begin with) gets requested:false immediately.
-  const newSpare={code,name,qty,price:partPrice,gst_pct:partGst,requested:needsApprovalHere,stock_deducted:false,warranty_chargeable:isChargeableHere};
+  const newSpare={code,name,qty,price:partPrice,gst_pct:partGst,requested:needsApprovalHere,stock_deducted:false,warranty_chargeable:isChargeableHere,warranty_return_na:isPreDispatched,warranty_predispatched:isPreDispatched};
   // Build off the LOCAL currentSpares (which already reflects any spare the
   // user just removed with the ✕ button in the Update Call form), NOT a
   // fresh DB fetch of t.spares — that fetch reflects the ticket as it was
@@ -8220,14 +8256,20 @@ async function _savePartRequestInner(addAnother){
   // resurrected every previously-removed spare the moment a new part was
   // requested.
   const baseSpares=(typeof currentSpares!=='undefined'&&Array.isArray(currentSpares))?currentSpares:(t.spares||[]);
-  const spares=[...baseSpares,newSpare];
+  // Pre-Dispatched receiving is usually the SECOND step for a part that was
+  // already indented earlier (added while stock was 0, sitting in Pending
+  // Parts with stock_deducted:false) — not a brand-new request. Update that
+  // same line instead of appending a duplicate, or the ticket would show
+  // the part twice and double its price/qty once it's fitted.
+  const _existingIdx=isPreDispatched?baseSpares.findIndex(s=>s.code&&(s.code||'').toUpperCase()===(code||'').toUpperCase()&&!s.stock_deducted):-1;
+  const spares=_existingIdx>=0?baseSpares.map((s,i)=>i===_existingIdx?{...s,...newSpare}:s):[...baseSpares,newSpare];
   // If this landed on Pending Parts/Pending Engineer Stock while the raw
   // inventory qty is actually non-zero, it's because another still-open
   // ticket already has first claim on it — say so, so staff don't wonder
   // why the Inventory page shows stock but this call is still waiting.
   const _rawQty=_invItemForStock?(_invItemForStock.qty_in_stock||0):0;
   const _reservedNote=(newStatus==='Pending Parts'||newStatus==='Pending Engineer Stock')&&_rawQty>0&&_rawQty>_effectiveCompanyQty?` (Stock shows ${_rawQty} in system, but already reserved by another open call — ${_effectiveCompanyQty} left for this one)`:'';
-  const tlNote=_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer${_reservedNote} | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered${_reservedNote} | ${note}`:`Part: ${code} ${name} × ${qty}${isChargeableHere?' (Chargeable)':skipsApprovalHere?' (Warranty — Free)':''}${_reservedNote} | ${note}`;
+  const tlNote=isPreDispatched?`Part: ${code} ${name} × ${qty} — Received from Canon, Pre-Dispatched specifically for this call. No return will be tracked. | ${note}`:_pendingEngStock?`Part: ${code} ${name} × ${qty} — In company stock, needs to be issued to engineer${_reservedNote} | ${note}`:_pendingNoParts?`Part: ${code} ${name} × ${qty} — Not in company stock, needs to be ordered${_reservedNote} | ${note}`:`Part: ${code} ${name} × ${qty}${isChargeableHere?' (Chargeable)':skipsApprovalHere?' (Warranty — Free)':''}${_reservedNote} | ${note}`;
   const tl=[...(t.timeline||[]),{action:'Part Indented — '+newStatus,by:currentUser.name,at:new Date().toISOString(),note:tlNote}];
   await sb('tickets','PATCH',{spares,status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${partReqTicketId}`);
   // Keep the Update Call form's local state in sync so the spares list
@@ -12059,6 +12101,33 @@ async function reclassifyWarrantyTicketSpare(ticketId,spareCode){
     renderWarrantyPending();
   }catch(e){alert('Error: '+e.message);}
 }
+// Separate reason from "wrong part logged": the company sometimes ships a
+// part to us IN ADVANCE, specifically earmarked for one call (special order,
+// not our own stock) — the engineer fits it, but nothing is owed back to the
+// company since they already gave it to us for exactly this purpose. That
+// must also drop off Warranty Pending, but for audit history it should read
+// as "Company pre-dispatched" rather than "wrong part logged", so a manager
+// looking back later can tell the two reasons apart.
+async function markWarrantyPreDispatchedMovement(movId){
+  if(!confirm('Mark this as Company Pre-Dispatched (company already sent this part to us in advance for this specific call — nothing owed back)?\n\nIt will be removed from Warranty Pending.'))return;
+  try{
+    const m=(await sb('eng_movements','GET',null,'?id=eq.'+movId))[0];
+    const note=((m&&m.notes)?m.notes+' | ':'')+'Company Pre-Dispatched — part sent in advance by company for this call, no return owed ('+(currentUser?.name||'')+', '+new Date().toLocaleDateString('en-IN')+')';
+    await sb('eng_movements','PATCH',{warranty:false,notes:note},'?id=eq.'+movId);
+    renderWarrantyPending();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function markTicketPartPreDispatched(ticketId,spareCode){
+  if(!confirm('Mark this as Company Pre-Dispatched (company already sent this part to us in advance for this specific call — nothing owed back)?\n\nIt will be removed from Warranty Pending.'))return;
+  try{
+    const t=(await sb('tickets','GET',null,'?id=eq.'+encodeURIComponent(ticketId)))[0];
+    if(!t){alert('Ticket not found.');return;}
+    const spares=(t.spares||[]).map(function(s){return s.code===spareCode?Object.assign({},s,{warranty_return_na:true,warranty_predispatched:true}):s;});
+    const tl=[...(t.timeline||[]),{action:'Warranty Part — Company Pre-Dispatched',by:currentUser?.name||'',at:new Date().toISOString(),note:'Part '+spareCode+' was sent in advance by the company specifically for this call — no return tracking needed.'}];
+    await sb('tickets','PATCH',{spares,timeline:tl,updated_at:new Date().toISOString()},'?id=eq.'+encodeURIComponent(ticketId));
+    renderWarrantyPending();
+  }catch(e){alert('Error: '+e.message);}
+}
 async function renderWarrantyPending(showAll){
   const el=document.getElementById('ep-content');
   el.innerHTML='<div class="loading">Loading...</div>';
@@ -12173,7 +12242,7 @@ async function renderWarrantyPending(showAll){
         +'<td style="padding:10px 12px;font-size:12px;">'+(m.from_owner||'—')+engineerLabel+'</td>'
         +'<td style="padding:10px 12px;">'+statusBadge+'</td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#64748b;">'+receivedAt+'</td>'
-        +'<td style="padding:10px 12px;text-align:center;">'+(status==='RECEIVED'?'':'<button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyMovement(\''+m.id+'\')">🔀</button>')+'</td>'
+        +'<td style="padding:10px 12px;text-align:center;white-space:nowrap;">'+(status==='RECEIVED'?'':'<button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyMovement(\''+m.id+'\')">🔀</button><button class="btn-icon" title="Company Pre-Dispatched — company already sent this part in advance for this call, nothing owed back" onclick="markWarrantyPreDispatchedMovement(\''+m.id+'\')">📦</button>')+'</td>'
         +'</tr>';
     }).join('');
 
@@ -12191,7 +12260,7 @@ async function renderWarrantyPending(showAll){
         +'<td style="padding:10px 12px;font-size:12px;">'+(r.assigned_name||'—')+'</td>'
         +'<td style="padding:10px 12px;"><span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">'+(isOverdue?'🚨':'⏳')+' From Ticket'+(isOverdue?' ('+diffDays+'d)':'')+'</span></td>'
         +'<td style="padding:10px 12px;font-size:11px;color:#94a3b8;">—</td>'
-        +'<td style="padding:10px 12px;text-align:center;"><button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyTicketSpare(\''+r.ticket_id+'\',\''+String(r.spare_code).replace(/'/g,"\\'")+'\')">🔀</button></td>'
+        +'<td style="padding:10px 12px;text-align:center;white-space:nowrap;"><button class="btn-icon" title="Not actually a warranty return (wrong part logged) — remove from this list" onclick="reclassifyWarrantyTicketSpare(\''+r.ticket_id+'\',\''+String(r.spare_code).replace(/'/g,"\\'")+'\')">🔀</button><button class="btn-icon" title="Company Pre-Dispatched — company already sent this part in advance for this call, nothing owed back" onclick="markTicketPartPreDispatched(\''+r.ticket_id+'\',\''+String(r.spare_code).replace(/'/g,"\\'")+'\')">📦</button></td>'
         +'</tr>';
     }).join('');
 
@@ -12526,59 +12595,107 @@ async function saveDirectWarrantyIssue(){
     }
   }catch(_dwiErr){}
   try{
-    // Check duplicate
+    const invItem=allInventory.find(x=>x.id===partId)||
+      (await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
+    // Find the call this SE Call ID belongs to — its status decides
+    // everything below. Same suffix-match rule used everywhere else this
+    // tracking key is matched against a ticket's se_call_id.
+    const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline,status,service_type,assigned_name&limit=10').catch(()=>[]);
+    const matchTkt=matchTickets&&matchTickets.find(t=>{
+      const raw=(t.se_call_id||'').trim().toUpperCase();
+      return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
+    });
+
+    if(matchTkt&&isTicketClosed(matchTkt)){
+      // ── CASE 1: The call already closed (part was used and a Warranty
+      // Pending entry was created back then) — this Canon part physically
+      // arriving now is a RETURN, not a fresh issue. Same effect as the
+      // Warranty Return tool: add it back to company stock and clear the
+      // matching pending entry. No engineer bag, no ticket status change —
+      // the call is already done.
+      const dupCheck=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+      if(dupCheck&&dupCheck.length&&!confirm('A warranty return entry already exists for this SE Call ID + part.\n\nAdd another return entry anyway?'))return;
+      await invQtyAdjust(partId,qty);
+      await sb('eng_movements','POST',{type:'WARRANTY_RETURN',part_id:partId,qty,from_owner:'COMPANY',to_owner:'MAIN',job_sheet:trackKey,se_call_id_full:jobSheetRaw,warranty:true,notes:notes||'Via Direct Warranty Issue — call already closed',created_by:currentUser?.name||'Admin'});
+      const useEntries=await sb('eng_movements','GET',null,'?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+      const retEntries=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+      const usedQty=(useEntries||[]).reduce((a,m)=>a+(m.qty||1),0);
+      const totalReceived=(retEntries||[]).reduce((a,m)=>a+(m.qty||1),0);
+      const pendingUse=(useEntries||[]).filter(m=>['PENDING','PARTIAL'].includes(m.warranty_status));
+      if(pendingUse.length){
+        const newStatus=totalReceived>=usedQty?'RECEIVED':'PARTIAL';
+        const patchData={warranty_status:newStatus,warranty_received_qty:totalReceived};
+        if(newStatus==='RECEIVED')patchData.warranty_received_at=new Date().toISOString();
+        for(const pu of pendingUse)await sb('eng_movements','PATCH',patchData,'?id=eq.'+pu.id).catch(()=>{});
+      }
+      closeModal('modal-direct-warranty-issue');
+      renderEngParts('warranty-pending');
+      showToastWI('✅ Call '+matchTkt.id+' was already closed — part marked Received in Warranty Returns, stock added back.');
+      return;
+    }
+
+    // ── CASE 2 (matched, still open) / CASE 3 (no matching call found yet) ──
+    // Check duplicate WITH_ENGINEER issue
     const existing=await sb('eng_movements','GET',null,
-      '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+      '?type=eq.WARRANTY_DIRECT_IN&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
     if(existing&&existing.length){
       if(!confirm('A warranty entry already exists for this SE Call ID + Part. Add another entry?'))return;
     }
-    // Add to inventory stock (Canon part arrives → stock +qty)
-    const invItem=allInventory.find(x=>x.id===partId)||
-      (await sb('inventory','GET',null,'?id=eq.'+partId).catch(()=>[]))[0];
-    if(invItem){
-      const newQty=(invItem.qty_in_stock||0)+qty;
-      const newWarrantyQty=(invItem.warranty_qty||0)+qty;
-      await sb('inventory','PATCH',{
-        qty_in_stock:newQty,
-        warranty_qty:newWarrantyQty,
-        updated_at:new Date().toISOString()
-      },'?id=eq.'+partId);
-      if(allInventory){const idx=allInventory.findIndex(x=>x.id===partId);if(idx>=0){allInventory[idx].qty_in_stock=newQty;allInventory[idx].warranty_qty=newWarrantyQty;}}
+    // Destination for the physical part: the ticket's ACTUAL assigned
+    // engineer for an On Site call (never whoever picked in the dropdown —
+    // that field is only a fallback when no call is matched yet), company
+    // stock for a Carry In call (no bags involved in-house), or the
+    // manually-picked engineer as a last resort when no call matched at all.
+    const isOnSiteMatch=matchTkt&&matchTkt.service_type==='On Site';
+    const destEngineer=isOnSiteMatch?(matchTkt.assigned_name||engineer):engineer;
+    const goesToCompanyStock=!matchTkt||matchTkt.service_type==='Carry In';
+    if(goesToCompanyStock){
+      // warranty_qty is tracked alongside qty_in_stock purely for the
+      // Inventory page's "🛒 purchased + 🏭 warranty" stock breakdown —
+      // invQtyAdjust alone doesn't touch it.
+      await invQtyAdjust(partId,qty);
+      if(invItem){
+        const newWQty=(invItem.warranty_qty||0)+qty;
+        await sb('inventory','PATCH',{warranty_qty:newWQty,updated_at:new Date().toISOString()},'?id=eq.'+partId).catch(()=>{});
+        const idx2=allInventory?allInventory.findIndex(x=>x.id===partId):-1;
+        if(idx2>=0)allInventory[idx2].warranty_qty=newWQty;
+      }
+    }else{
+      await engStockAdjust(destEngineer,partId,qty);
     }
     await sb('eng_movements','POST',{
       type:'WARRANTY_DIRECT_IN',
       part_id:partId,
       qty,
       from_owner:'COMPANY (Canon Warranty)',
-      to_owner:engineer,
+      to_owner:goesToCompanyStock?'COMPANY STOCK':destEngineer,
       job_sheet:trackKey,
       warranty:true,
       warranty_status:'WITH_ENGINEER',
-      notes:'Direct Canon dispatch to '+engineer+(notes?' | '+notes:''),
+      notes:'Direct Canon dispatch'+(matchTkt?' for call '+matchTkt.id:' — no matching call found yet')+(notes?' | '+notes:''),
       created_by:currentUser?.name||'Admin'
     });
-    // Auto-link part to the matching ticket (by SE call ID)
-    try{
-      const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline&limit=10').catch(()=>[]);
-      const matchTkt=matchTickets&&matchTickets.find(t=>{
-        const raw=(t.se_call_id||'').trim().toUpperCase();
-        return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
-      });
-      if(matchTkt){
-        const existingSpares=matchTkt.spares||[];
-        const alreadyHas=existingSpares.some(s=>s.code&&s.code===invItem?.part_code);
-        if(!alreadyHas){
-          const newSpare={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:true,stock_deducted:false,warranty_supplied:true};
-          let dwiTl=matchTkt.timeline;if(typeof dwiTl==='string'){try{dwiTl=JSON.parse(dwiTl);}catch(e){dwiTl=[];}}
-          if(!Array.isArray(dwiTl))dwiTl=[];
-          dwiTl=[...dwiTl,{action:'Part Auto-Linked (Direct Warranty Issue)',by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part: '+(newSpare.code||'')+' '+(newSpare.name||'')+' × '+qty+' | SE Call ID: '+jobSheetRaw}];
-          await sb('tickets','PATCH',{spares:[...existingSpares,newSpare],timeline:dwiTl,updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
-        }
-      }
-    }catch(autoErr){console.log('Auto-link to ticket failed:',autoErr);}
+
+    if(matchTkt){
+      // Update the existing indented spare line for this part (added earlier
+      // via Request Part while stock was 0) instead of appending a duplicate.
+      // If it was never indented at all, add it fresh.
+      const existingSpares=matchTkt.spares||[];
+      const idx=existingSpares.findIndex(s=>s.code&&s.code===invItem?.part_code&&!s.stock_deducted);
+      const spareData={code:invItem?.part_code||partId,name:invItem?.name||'Part',qty,price:parseFloat(invItem?.unit_price)||0,gst_pct:invItem?.gst_pct!=null?parseFloat(invItem.gst_pct):0,requested:false,stock_deducted:false,warranty_supplied:true};
+      const spares=idx>=0?existingSpares.map((s,i)=>i===idx?{...s,...spareData}:s):[...existingSpares,spareData];
+      let dwiTl=matchTkt.timeline;if(typeof dwiTl==='string'){try{dwiTl=JSON.parse(dwiTl);}catch(e){dwiTl=[];}}
+      if(!Array.isArray(dwiTl))dwiTl=[];
+      dwiTl=[...dwiTl,{action:'Part Received from Canon (Direct Warranty Issue)',by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part: '+(spareData.code||'')+' '+(spareData.name||'')+' × '+qty+' | SE Call ID: '+jobSheetRaw+(isOnSiteMatch?' | Added to '+destEngineer+'\'s bag':' | Added to company stock')}];
+      await sb('tickets','PATCH',{spares,timeline:dwiTl,updated_at:new Date().toISOString()},'?id=eq.'+matchTkt.id).catch(()=>{});
+      // Only promote the call's status once EVERY part it's waiting on is
+      // actually available — a 3-part call with only this one arrived must
+      // stay in Pending Parts, just showing the rest still outstanding.
+      if(matchTkt.status==='Pending Parts')await checkPendingPartsAuto();
+    }
     closeModal('modal-direct-warranty-issue');
     renderEngParts('warranty-pending');
-    showToastWI('✅ Part received & auto-linked to matching call — engineer can now close it.');
+    showToastWI(matchTkt?'✅ Part received — assigned to call '+matchTkt.id+'. Will auto-complete the warranty return when that call closes.':'✅ Part received — no matching call found for this SE Call ID yet, added to company stock for manual tracking.');
   }catch(e){alert('Error: '+e.message);}
 }
 async function markSelectedWarrantyDone(){
@@ -26738,7 +26855,7 @@ async function saveInquiry(editId){
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">
     <div class="modal-header" style="background:#e0f2fe;"><h2>📦 Direct Warranty Issue to Engineer</h2><button class="close-btn" onclick="closeModal('modal-direct-warranty-issue')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Part ordered from Canon under warranty — issuing directly to engineer (not going through office stock). Will auto-complete when engineer closes the call.</p>
+      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Use this for EVERY warranty part Canon sends — whether it's arriving for a call that's still open (gets assigned to that call automatically) or one that's already closed (gets marked Received in Warranty Returns automatically). Just enter the SE Call ID — the system finds the call and does the right thing.</p>
       <div class="form-group"><label>Part <span style="color:#ef4444;">*</span></label>
         <input type="text" id="dwi-search" placeholder="Search by part code or name..." oninput="epPartSearch('dwi',this.value)">
         <div id="dwi-results" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
