@@ -11762,7 +11762,6 @@ async function renderEngParts(tab){
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
           <button class="btn btn-primary" onclick="openEngIssue()">📤 Issue to Engineer</button>
           <button class="btn" style="background:#d97706;color:#fff;" onclick="openEngUse()">🔧 Record Usage</button>
-          <button class="btn" style="background:#059669;color:#fff;" onclick="openEngWarranty()">🔄 Warranty Return</button>
           <button class="btn" style="background:#0369a1;color:#fff;" onclick="openDirectWarrantyIssue()">📦 Direct Warranty Issue</button>
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
@@ -12565,7 +12564,6 @@ async function saveEngUse(){
 }
 
 function openDirectWarrantyIssue(){
-  document.getElementById('dwi-engineer').innerHTML=epEngOpts();
   epClearPartSearch('dwi');
   document.getElementById('dwi-qty').value=1;
   document.getElementById('dwi-jobsheet').value='';
@@ -12574,12 +12572,10 @@ function openDirectWarrantyIssue(){
 }
 async function saveDirectWarrantyIssue(){
   const partId=document.getElementById('dwi-part').value;
-  const engineer=document.getElementById('dwi-engineer').value;
   const qty=parseInt(document.getElementById('dwi-qty').value)||0;
   const jobSheetRaw=(document.getElementById('dwi-jobsheet').value||'').trim().toUpperCase();
   const notes=document.getElementById('dwi-notes').value.trim();
   if(!partId){alert('Please select a part.');return;}
-  if(!engineer){alert('Please select an engineer.');return;}
   if(qty<=0){alert('Quantity must be at least 1.');return;}
   if(!jobSheetRaw){alert('SE Call ID is required for warranty tracking.');document.getElementById('dwi-jobsheet').focus();return;}
   // Extract tracking key: last segment after /
@@ -12628,9 +12624,20 @@ async function saveDirectWarrantyIssue(){
         if(newStatus==='RECEIVED')patchData.warranty_received_at=new Date().toISOString();
         for(const pu of pendingUse)await sb('eng_movements','PATCH',patchData,'?id=eq.'+pu.id).catch(()=>{});
       }
+      // Canon sometimes sends more than this one call actually used — the
+      // extra beyond what's owed back for THIS call goes into the general
+      // warranty_qty pool for future warranty calls, same as the old
+      // Warranty Return tool did.
+      const extraQty=qty-usedQty;
+      if(extraQty>0&&invItem){
+        const newWQty=(invItem.warranty_qty||0)+extraQty;
+        await sb('inventory','PATCH',{warranty_qty:newWQty,updated_at:new Date().toISOString()},'?id=eq.'+partId).catch(()=>{});
+        const idxW=allInventory?allInventory.findIndex(x=>x.id===partId):-1;
+        if(idxW>=0)allInventory[idxW].warranty_qty=newWQty;
+      }
       closeModal('modal-direct-warranty-issue');
       renderEngParts('warranty-pending');
-      showToastWI('✅ Call '+matchTkt.id+' was already closed — part marked Received in Warranty Returns, stock added back.');
+      showToastWI(extraQty>0?'✅ Call '+matchTkt.id+' already closed — '+usedQty+' matched & marked Received, '+extraQty+' extra added to Warranty Stock pool.':'✅ Call '+matchTkt.id+' was already closed — part marked Received in Warranty Returns, stock added back.');
       return;
     }
 
@@ -12641,14 +12648,15 @@ async function saveDirectWarrantyIssue(){
     if(existing&&existing.length){
       if(!confirm('A warranty entry already exists for this SE Call ID + Part. Add another entry?'))return;
     }
-    // Destination for the physical part: the ticket's ACTUAL assigned
-    // engineer for an On Site call (never whoever picked in the dropdown —
-    // that field is only a fallback when no call is matched yet), company
-    // stock for a Carry In call (no bags involved in-house), or the
-    // manually-picked engineer as a last resort when no call matched at all.
-    const isOnSiteMatch=matchTkt&&matchTkt.service_type==='On Site';
-    const destEngineer=isOnSiteMatch?(matchTkt.assigned_name||engineer):engineer;
-    const goesToCompanyStock=!matchTkt||matchTkt.service_type==='Carry In';
+    // Destination for the physical part is decided entirely by the matched
+    // call — never a manually-picked engineer, which is exactly what could
+    // send it to the wrong person's bag. On Site → the ticket's ACTUAL
+    // assigned engineer. Carry In (no bags involved in-house), no call
+    // matched yet, or an On Site call somehow missing an assigned engineer
+    // → company stock.
+    const isOnSiteMatch=matchTkt&&matchTkt.service_type==='On Site'&&!!matchTkt.assigned_name;
+    const destEngineer=isOnSiteMatch?matchTkt.assigned_name:null;
+    const goesToCompanyStock=!isOnSiteMatch;
     if(goesToCompanyStock){
       // warranty_qty is tracked alongside qty_in_stock purely for the
       // Inventory page's "🛒 purchased + 🏭 warranty" stock breakdown —
@@ -12713,66 +12721,6 @@ async function markSelectedWarrantyDone(){
     showToastWI('✅ '+checked.length+' entry/entries marked as received. Stock unchanged.');
   }catch(e){alert('Error: '+e.message);}
 }
-function openEngWarranty(){
-  epClearPartSearch('ew');
-  document.getElementById('ew-qty').value=1;
-  document.getElementById('ew-jobsheet').value='';
-  document.getElementById('ew-notes').value='';
-  showModal('modal-eng-warranty');
-}
-async function saveEngWarranty(){
-  const partId=document.getElementById('ew-part').value;
-  const qty=parseInt(document.getElementById('ew-qty').value)||0;
-  const jobSheetRaw=document.getElementById('ew-jobsheet').value.trim().toUpperCase();
-  const notes=document.getElementById('ew-notes').value.trim();
-  if(!partId||qty<=0){alert('Select part and enter qty.');return;}
-  if(!jobSheetRaw){alert('SE Call ID is required to match the warranty return.');document.getElementById('ew-jobsheet').focus();return;}
-  // Use last-segment as matching key; store full ID for display
-  const trackKey=jobSheetRaw.split('/').pop().trim();
-  // Duplicate check: warn if WARRANTY_RETURN already exists for same SE Call ID + part
-  try{
-    const dupCheck=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId));
-    if(dupCheck&&dupCheck.length){
-      const d=dupCheck[0];
-      if(!confirm('A warranty return entry already exists for this SE Call ID ('+jobSheetRaw+') and part.\n\nExisting: Qty '+d.qty+' on '+(d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'-')+'.\n\nAdd another return entry anyway?'))return;
-    }
-  }catch(ex){}
-  try{
-    // Add full received qty to inventory stock
-    await invQtyAdjust(partId,qty);
-    await sb('eng_movements','POST',{type:'WARRANTY_RETURN',part_id:partId,qty,from_owner:'COMPANY',to_owner:'MAIN',job_sheet:trackKey,se_call_id_full:jobSheetRaw,warranty:true,notes,created_by:currentUser?.name||'Admin'});
-    // Auto-match pending USE entry for this call
-    try{
-      const useEntries=await sb('eng_movements','GET',null,'?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId));
-      const retEntries=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&job_sheet=eq.'+encodeURIComponent(trackKey)+'&part_id=eq.'+encodeURIComponent(partId));
-      const usedQty=(useEntries||[]).reduce((a,m)=>a+(m.qty||1),0);
-      const totalReceived=(retEntries||[]).reduce((a,m)=>a+(m.qty||1),0);
-      const pendingEntries=(useEntries||[]).filter(m=>['PENDING','PARTIAL'].includes(m.warranty_status));
-      if(pendingEntries.length){
-        const newStatus=totalReceived>=usedQty?'RECEIVED':'PARTIAL';
-        const patchData={warranty_status:newStatus,warranty_received_qty:totalReceived};
-        if(newStatus==='RECEIVED') patchData.warranty_received_at=new Date().toISOString();
-        for(const ue of pendingEntries) await sb('eng_movements','PATCH',patchData,'?id=eq.'+ue.id).catch(()=>{});
-      }
-      // Extra qty beyond what was used → add to warranty_qty pool for future warranty calls
-      const extraQty=qty-usedQty;
-      if(extraQty>0){
-        const invRow=(await sb('inventory','GET',null,'?id=eq.'+partId))[0];
-        if(invRow){
-          const newWQty=(invRow.warranty_qty||0)+extraQty;
-          await sb('inventory','PATCH',{warranty_qty:newWQty,updated_at:new Date().toISOString()},'?id=eq.'+partId);
-          const idx=(allInventory||[]).findIndex(x=>x.id===partId);
-          if(idx>=0) allInventory[idx].warranty_qty=newWQty;
-        }
-        showToastWI('✅ Received '+qty+' — '+usedQty+' matched to call, '+extraQty+' added to Warranty Stock pool.');
-      }else{
-        showToastWI('✅ Part received from company and stock updated!');
-      }
-    }catch(ex){console.log('Auto-match err',ex);}
-    closeModal('modal-eng-warranty');renderEngParts('warranty-pending');
-  }catch(e){alert('Error: '+e.message);}
-}
-
 function openEngReturn(){
   document.getElementById('er-engineer').innerHTML=epEngOpts();
   epClearPartSearch('er');
@@ -26853,17 +26801,13 @@ async function saveInquiry(editId){
 <!-- Warranty return -->
 <div class="modal-overlay hidden" id="modal-direct-warranty-issue" onclick="if(event.target===this)closeModal('modal-direct-warranty-issue')">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px;">
-    <div class="modal-header" style="background:#e0f2fe;"><h2>📦 Direct Warranty Issue to Engineer</h2><button class="close-btn" onclick="closeModal('modal-direct-warranty-issue')">✕</button></div>
+    <div class="modal-header" style="background:#e0f2fe;"><h2>📦 Direct Warranty Issue</h2><button class="close-btn" onclick="closeModal('modal-direct-warranty-issue')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Use this for EVERY warranty part Canon sends — whether it's arriving for a call that's still open (gets assigned to that call automatically) or one that's already closed (gets marked Received in Warranty Returns automatically). Just enter the SE Call ID — the system finds the call and does the right thing.</p>
-      <div class="form-group"><label>Part <span style="color:#ef4444;">*</span></label>
-        <input type="text" id="dwi-search" placeholder="Search by part code or name..." oninput="epPartSearch('dwi',this.value)">
-        <div id="dwi-results" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:4px;display:none;"></div>
+      <p style="font-size:12px;color:#0369a1;background:#e0f2fe;padding:8px 12px;border-radius:8px;margin-bottom:14px;">Use this for EVERY warranty part Canon sends — whether it's arriving for a call that's still open (gets assigned to that call's engineer automatically) or one that's already closed (gets marked Received in Warranty Returns automatically). Just enter the SE Call ID — the system finds the call and does the right thing.</p>
+      <div class="form-group" style="position:relative;"><label>Part <span style="color:#ef4444;">*</span></label>
+        <input type="text" id="dwi-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('dwi')" onfocus="epFilterParts('dwi')" onblur="setTimeout(()=>epHideDrop('dwi'),200)" autocomplete="off">
+        <div id="dwi-part-drop" class="ep-drop"></div>
         <input type="hidden" id="dwi-part">
-        <div id="dwi-selected" style="font-size:12px;color:#059669;margin-top:4px;font-weight:600;"></div>
-      </div>
-      <div class="form-group"><label>Engineer <span style="color:#ef4444;">*</span></label>
-        <select id="dwi-engineer"></select>
       </div>
       <div class="form-grid">
         <div class="form-group"><label>Qty <span style="color:#ef4444;">*</span></label><input type="number" id="dwi-qty" value="1" min="1"></div>
@@ -26891,29 +26835,6 @@ async function saveInquiry(editId){
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-warranty-claim')">Cancel</button>
       <button class="btn" style="background:#0369a1;color:#fff;" onclick="submitWarrantyClaim()">📤 Submit Claim</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="modal-eng-warranty" onclick="if(event.target===this)closeModal('modal-eng-warranty')">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
-    <div class="modal-header" style="background:#f0fdf4;"><h2>🔄 Warranty Part Received</h2><button class="close-btn" onclick="closeModal('modal-eng-warranty')">✕</button></div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:#059669;background:#f0fdf4;padding:8px 12px;border-radius:8px;margin-bottom:12px;">Part received back from company — will be added to Office stock.</p>
-      <div class="form-group"><label>Part</label>
-        <div style="position:relative;">
-          <input type="text" id="ew-part-q" class="form-control" placeholder="🔍 Type part code or name..." oninput="epFilterParts('ew')" onfocus="epFilterParts('ew')" onblur="setTimeout(()=>epHideDrop('ew'),200)" autocomplete="off">
-          <div id="ew-part-drop" class="ep-drop"></div>
-          <input type="hidden" id="ew-part">
-        </div>
-      </div>
-      <div class="form-group"><label>Quantity Received</label><input type="number" id="ew-qty" class="form-control" min="1" value="1"></div>
-      <div class="form-group"><label>SE Call ID <span style="color:#dc2626;">*</span></label><input type="text" id="ew-jobsheet" class="form-control" placeholder="e.g. BH-2025-001" required></div>
-      <div class="form-group"><label>Notes</label><input type="text" id="ew-notes" class="form-control" placeholder="Optional"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-eng-warranty')">Cancel</button>
-      <button class="btn" style="background:#059669;color:#fff;" onclick="saveEngWarranty()">Add to Stock</button>
     </div>
   </div>
 </div>
