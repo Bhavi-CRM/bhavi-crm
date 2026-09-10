@@ -10167,6 +10167,13 @@ async function checkPendingPartsAuto(){
       // alone only gets it to "Pending Engineer Stock" (admin still has to
       // hand it over). Carry In only cares about company stock.
       let anyPendingEngStock=false,anyPendingNoParts=false;
+      // Records WHERE each part was actually found (company stock vs which
+      // engineer's bag) — the old generic "ready to repair" note gave no way
+      // to tell a genuine bag-stock promotion apart from a bogus one caused
+      // by a stray/incorrect eng_stock row, which made a real false-positive
+      // promotion invisible until someone tried to close the call and the
+      // part physically wasn't there.
+      const sourceNotes=[];
       for(const s of spares){
         try{
           const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
@@ -10185,16 +10192,20 @@ async function checkPendingPartsAuto(){
               bagQty=esCheck.length?esCheck[0].qty:0;
             }
             if(bagQty<(s.qty||1)){
-              if(companyQty>=(s.qty||1))anyPendingEngStock=true;else anyPendingNoParts=true;
+              if(companyQty>=(s.qty||1)){anyPendingEngStock=true;sourceNotes.push(s.code+': in company stock, not yet issued to '+(t.assigned_name||'engineer'));}
+              else{anyPendingNoParts=true;}
+            }else{
+              sourceNotes.push(s.code+': found in '+(t.assigned_name||'engineer')+"'s bag (qty "+bagQty+')');
             }
           }else{
             if(companyQty<(s.qty||1))anyPendingNoParts=true;
+            else sourceNotes.push(s.code+': found in company stock (qty '+companyQty+')');
           }
         }catch(e){anyPendingNoParts=true;}
       }
       if(anyPendingNoParts)continue; // still missing at least one part — stay in Pending Parts
       const newStatus=anyPendingEngStock?'Pending Engineer Stock':(t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site');
-      const tl=[...(t.timeline||[]),{action:'Parts Available — Auto Status Update',by:'System',at:new Date().toISOString(),note:anyPendingEngStock?'All parts now in company stock — waiting to be issued to engineer.':'All required parts now available — ready to repair.'}];
+      const tl=[...(t.timeline||[]),{action:'Parts Available — Auto Status Update',by:'System',at:new Date().toISOString(),note:(anyPendingEngStock?'All parts now in company stock — waiting to be issued to engineer.':'All required parts now available — ready to repair.')+(sourceNotes.length?' | '+sourceNotes.join('; '):'')}];
       await sb('tickets','PATCH',{status:newStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
     }
   }catch(e){}
@@ -12596,11 +12607,23 @@ async function saveDirectWarrantyIssue(){
     // Find the call this SE Call ID belongs to — its status decides
     // everything below. Same suffix-match rule used everywhere else this
     // tracking key is matched against a ticket's se_call_id.
-    const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline,status,service_type,assigned_name&limit=10').catch(()=>[]);
-    const matchTkt=matchTickets&&matchTickets.find(t=>{
+    const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,cname,model,spares,se_call_id,timeline,status,service_type,assigned_name&limit=10').catch(()=>[]);
+    const exactMatches=(matchTickets||[]).filter(t=>{
       const raw=(t.se_call_id||'').trim().toUpperCase();
       return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
     });
+    // A short/generic tracking key can match more than one call's SE Call
+    // ID — silently taking the first result risked moving stock/status on
+    // the WRONG ticket with no way to notice until much later. Ambiguous?
+    // Stop and make the admin re-enter the full ID instead of guessing.
+    if(exactMatches.length>1){
+      alert('⚠️ This SE Call ID matches '+exactMatches.length+' different calls:\n\n'+exactMatches.map(t=>'• '+t.id+' — '+(t.cname||'')+' — '+(t.se_call_id||'')).join('\n')+'\n\nPlease enter the FULL SE Call ID (not just the tracking digits) so the right call can be identified, then try again.');
+      return;
+    }
+    const matchTkt=exactMatches[0];
+    if(matchTkt&&!confirm('Found matching call:\n\n'+matchTkt.id+' — '+(matchTkt.cname||'')+' ('+(matchTkt.model||'')+')'+'\nStatus: '+matchTkt.status+' | '+matchTkt.service_type+(matchTkt.assigned_name?' | Engineer: '+matchTkt.assigned_name:'')+'\n\nProceed with this call?')){
+      return;
+    }
 
     if(matchTkt&&isTicketClosed(matchTkt)){
       // ── CASE 1: The call already closed (part was used and a Warranty
