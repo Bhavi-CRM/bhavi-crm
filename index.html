@@ -6437,6 +6437,7 @@ async function viewTicket(id,autoPrint=false){
       <select onchange="quickEngChange('${t.id}',this.value)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;" id="eng-assign-drop">
         <option value="">${t.assigned_name?'Reassign':'Assign'} Engineer...</option>${(allEngineers&&allEngineers.length?allEngineers:[]).map(e=>`<option value="${e.eng_id}|${e.name}">${e.name}</option>`).join('')}
       </select>
+      ${isAdminOrWC&&!isClosed?`<button class="btn btn-sm" onclick="closeModal('modal-ticket');openPartRequest('${t.id}','${t.call_type}','${t.service_type}')" style="background:#0d9488;color:#fff;border:none;">📦 Request Part</button>`:''}
       ${!isClosed?`<button class="btn btn-outline btn-sm" onclick="closeModal('modal-ticket');openAdminEdit('${t.id}')">📝 Add Remark</button>`:''}
       ${isWarranty&&t.warranty_coverage!=='Out of Coverage'?`<button class="btn btn-danger btn-sm" onclick="voidWarranty('${t.id}')">⚠️ Void Warranty</button>`:''}
       ${t.wc_type==='CSP'&&!['Closed','Customer Reject','Call Cancel','Delivered'].includes(t.status)?`<button class="btn btn-sm btn-outline" onclick="openSetTAT('${t.id}','${t.tat_date||''}')">⏱ Set TAT</button>`:''}
@@ -8115,9 +8116,18 @@ async function _savePartRequestInner(addAnother){
   if(_invItemForStock){
     _effectiveCompanyQty=await getEffectivePartQty(code,_invItemForStock.qty_in_stock||0,partReqTicketId);
   }
-  if(currentUser.role==='engineer' && t.service_type==='On Site'){
+  // Check the ASSIGNED engineer's own bag, not whoever is currently adding
+  // this part — a Manager/Admin adding a part on behalf of an engineer
+  // who's already left the site (e.g. they weren't sure which part was
+  // needed) must get the exact same stock routing the engineer would have
+  // gotten adding it themselves. This used to only run when the person
+  // adding the part WAS an engineer (and checked THEIR OWN bag) — a
+  // manager's add always fell through to the company-stock-only branch,
+  // silently ignoring whatever was already sitting in the assigned
+  // engineer's bag.
+  if(t.service_type==='On Site' && t.assigned_name){
     if(_invItemForStock){
-      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(currentUser.name)}&part_id=eq.${_invItemForStock.id}`).catch(()=>[]);
+      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${_invItemForStock.id}`).catch(()=>[]);
       const bagQty=esCheck.length?esCheck[0].qty:0;
       if(bagQty<qty){
         if(_effectiveCompanyQty>0){
