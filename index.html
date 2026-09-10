@@ -12280,7 +12280,7 @@ function _epLogBuildRows(){
   });
 
   const rows=filtered.map(m=>`<tr>
-    <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+    <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);white-space:nowrap;">${new Date(m.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'})}</td>
     <td style="padding:8px 12px;">${typeLabel[m.type]||m.type}</td>
     <td style="padding:8px 12px;font-size:12px;font-weight:600;">${getPartHtml(m.part_id)}</td>
     <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:700;">${m.qty}</td>
@@ -13165,7 +13165,7 @@ async function renderEPMyRequests(){
     const rows=(reqs||[]).map(r=>{
       const partsList=(r.parts||[]).map(p=>`${getPartName(p.part_id)} × ${p.qty}`).join('<br>');
       return`<tr>
-        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'})}</td>
         <td style="padding:8px 12px;">${r.type==='RECEIVE'?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📥 Receive</span>':'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Return</span>'}</td>
         <td style="padding:8px 12px;font-size:12px;">${partsList||'—'}</td>
         <td style="padding:8px 12px;font-size:12px;color:#475569;">${r.notes||'—'}</td>
@@ -13201,7 +13201,7 @@ async function renderEPPending(typeFilter){
       const partsList=(r.parts||[]).map(p=>`${getPartName(p.part_id)} × <b>${p.qty}</b>`).join('<br>');
       const canApprove=!isWC||r.type==='RETURN';
       return`<tr data-req-id="${r.id}" data-req-data='${JSON.stringify(r).replace(/'/g,'&apos;')}'>
-        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;white-space:nowrap;">${new Date(r.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'})}</td>
         <td style="padding:8px 12px;">${r.type==='RECEIVE'?'<span style="background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">📥 Receive</span>':'<span style="background:#fdf4ff;color:#7c3aed;padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;">↩️ Return</span>'}</td>
         <td style="padding:8px 12px;font-size:12px;font-weight:600;">${r.engineer_name||r.engineer_id||'—'}</td>
         <td style="padding:8px 12px;font-size:12px;">${partsList||'—'}</td>
@@ -28816,7 +28816,7 @@ function plQuickView(ticketId){
   var ex=document.getElementById('pl-quickview-modal');if(ex)ex.remove();
   var ov=document.createElement('div');ov.id='pl-quickview-modal';ov.className='modal-overlay';
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
-  var createdDate=t.created_at?new Date(t.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}):'—';
+  var createdDate=t.created_at?new Date(t.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}):'—';
   var fullAddr=[t.address,t.area,t.city,t.state,t.pin].filter(Boolean).join(', ')||'—';
   var isW=t.call_type&&(t.call_type==='Warranty'||t.call_type==='Warranty Repeat'||t.call_type==='AMC');
   var typeBadge=isW?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;">🛡️ WARRANTY</span>':'<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;">💳 NON-WARRANTY</span>';
