@@ -8758,17 +8758,31 @@ async function _doSaveEngUpdate(data,id,tl,origStatus,currentSpares,isManualTime
               const existing=await sb('eng_movements','GET',null,
                 '?type=eq.USE&warranty=eq.true&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
               if(!existing||!existing.length){
+                // Canon can send the replacement BEFORE the engineer's actual
+                // usage ever gets logged here (e.g. an admin ran Direct
+                // Warranty Issue against this SE Call ID early, so a
+                // WARRANTY_RETURN already exists) — a fresh entry defaulting
+                // to PENDING would then sit on Warranty Pending forever with
+                // no future event left to ever mark it Received. Check for
+                // that upfront and log it already-settled instead.
+                const priorReturns=await sb('eng_movements','GET',null,
+                  '?type=eq.WARRANTY_RETURN&job_sheet=eq.'+encodeURIComponent(trackId)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+                const priorReceivedQty=(priorReturns||[]).reduce((a,m)=>a+(m.qty||1),0);
+                const usedQtyNow=s.qty||1;
+                const initStatus=priorReceivedQty>=usedQtyNow?'RECEIVED':priorReceivedQty>0?'PARTIAL':'PENDING';
                 try{
                   await sb('eng_movements','POST',{
                     type:'USE',
                     part_id:partId,
-                    qty:s.qty||1,
+                    qty:usedQtyNow,
                     from_owner:currentUser.name||currentUser.user_id,
                     to_owner:null,
                     job_sheet:trackId,
                     warranty:true,
-                    warranty_status:'PENDING',
-                    notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallIdRaw?' | SE: '+seCallIdRaw:''),
+                    warranty_status:initStatus,
+                    warranty_received_qty:priorReceivedQty>0?Math.min(priorReceivedQty,usedQtyNow):undefined,
+                    warranty_received_at:initStatus==='RECEIVED'?new Date().toISOString():undefined,
+                    notes:'Auto — '+(freshT?.call_type||'Warranty')+' | Ticket: '+id+(seCallIdRaw?' | SE: '+seCallIdRaw:'')+(priorReceivedQty>0?' | Company already returned this part before usage was logged':''),
                     created_by:currentUser.name||'System'
                   });
                 }catch(postErr){console.error('Warranty eng_movements POST failed:',postErr);}
@@ -12557,11 +12571,29 @@ async function saveEngUse(){
     }catch(_euErr){}
   }
   try{
+    // Store job_sheet as just the tracking digits (last segment after the
+    // final '/'), same normalization every other warranty path uses — this
+    // used to store the raw full SE Call ID as typed here, so a return later
+    // logged against the same call (keyed by trackKey, e.g. via Direct
+    // Warranty Issue) could never match this entry at all.
+    const jsTrackKey=jobSheet?jobSheet.split('/').pop().trim().toUpperCase():jobSheet;
+    // Canon can ship the replacement before this usage ever gets recorded
+    // here (e.g. an earlier Direct Warranty Issue against this SE Call ID
+    // already logged a WARRANTY_RETURN) — defaulting to PENDING in that case
+    // left it stuck on Warranty Pending forever with nothing left to ever
+    // mark it Received.
+    let initWStatus=warranty?'PENDING':null,priorRecvQty,priorRecvAt;
+    if(warranty&&jsTrackKey){
+      const priorReturns=await sb('eng_movements','GET',null,'?type=eq.WARRANTY_RETURN&job_sheet=eq.'+encodeURIComponent(jsTrackKey)+'&part_id=eq.'+encodeURIComponent(partId)).catch(()=>[]);
+      const priorReceivedQty=(priorReturns||[]).reduce((a,m)=>a+(m.qty||1),0);
+      if(priorReceivedQty>=qty){initWStatus='RECEIVED';priorRecvQty=qty;priorRecvAt=new Date().toISOString();}
+      else if(priorReceivedQty>0){initWStatus='PARTIAL';priorRecvQty=priorReceivedQty;}
+    }
     await engStockAdjust(engineer,partId,-qty);
-    await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jobSheet,warranty,notes,created_by:currentUser?.name||'Admin',warranty_status:warranty?'PENDING':null});
+    await sb('eng_movements','POST',{type:'USE',part_id:partId,qty,from_owner:engineer,to_owner:null,job_sheet:jsTrackKey,se_call_id_full:jobSheet,warranty,notes:notes+(priorRecvQty?' | Company already returned this part before usage was logged':''),created_by:currentUser?.name||'Admin',warranty_status:initWStatus,warranty_received_qty:priorRecvQty,warranty_received_at:priorRecvAt});
     if(warranty&&jobSheet){
       try{
-        const trackKey=jobSheet.split('/').pop().trim().toUpperCase();
+        const trackKey=jsTrackKey;
         const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,spares,se_call_id,timeline&limit=10').catch(()=>[]);
         const matchTkt=matchTickets&&matchTickets.find(t=>{const raw=(t.se_call_id||'').trim().toUpperCase();return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);});
         if(matchTkt){
