@@ -30291,6 +30291,14 @@ function applyJobsheetFields(f){
   setText('call-mobile',mob,true);
   setText('call-alt',alt,true);
   setText('call-serial',f.serial_no||f.serial);
+  // Scan-filled fields are set directly via .value — that never fires the
+  // Serial No field's onblur, which is what normally triggers the repeat-
+  // call check (same serial serviced again within 15 days auto-flips the
+  // call type to Warranty/Non-Warranty Repeat). Without this, every
+  // jobsheet-scanned call for a repeat visit silently stayed a fresh
+  // Warranty/Non-Warranty call instead of Repeat.
+  var scannedSerial=document.getElementById('call-serial')?.value;
+  if(scannedSerial)setTimeout(function(){checkReRepair(scannedSerial);},300);
   // SE Call ID — normalize case/spacing. Canon jobsheet IDs follow
   // CSP/YYYYMMDD/###### (or ICP/...); flag with a warning colour instead of
   // silently accepting when the scanned text doesn't look like that, since a
