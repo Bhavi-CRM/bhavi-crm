@@ -3172,7 +3172,12 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
     switch(current){
       case 'Assigned': {
         const isCarryIn=(serviceType||'').toLowerCase().includes('carry');
-        // Carry In: no Closed (must go Repaired → Delivered). On-Site: engineer goes to repair, no MSC.
+        // Carry In: no Closed (must go Repaired → Delivered). On-Site can also
+        // need MSC — e.g. a CSP Fujifilm on-site call where the machine turns
+        // out to need factory repair, not just a stock/part issue. This used
+        // to only be reachable for On-Site from "Pending Repair On Site" (a
+        // parts-shortage status), leaving a call that needed MSC from the very
+        // first visit with no path there at all — it just sat open.
         // Call Cancel is always available to the engineer directly — e.g. customer not
         // available at site, or charges not approved — no admin approval needed, just a
         // mandatory reason (enforced via the required Action Taken field).
@@ -3181,14 +3186,15 @@ function getAllowedStatuses(current, role, serviceType, callType, warrantyStatus
         // Customer Reject: customer had agreed earlier but backs out later (won't approve
         // charges / doesn't want the repair anymore) — engineer sets it directly with
         // amount + remark, no admin approval hop needed.
-        return isCarryIn?['In Progress','Repaired','Sent to MSC','Customer Reject','Call Cancel']:['In Progress','Closed','Resolved By Phone','Customer Reject','Call Cancel'];
+        return isCarryIn?['In Progress','Repaired','Sent to MSC','Customer Reject','Call Cancel']:['In Progress','Closed','Sent to MSC','Resolved By Phone','Customer Reject','Call Cancel'];
       }
 
       case 'In Progress': {
         const isCarryIn = (serviceType||'').toLowerCase().includes('carry');
         if(isRepeat) return isCarryIn?['Closed','Customer Reject','Call Cancel']:['Closed','Resolved By Phone','Customer Reject','Call Cancel'];
-        // Carry In: Repaired + Sent to MSC. On-Site: only Closed (engineer repairs on location).
-        return isCarryIn?['Repaired','Sent to MSC','Customer Reject','Call Cancel']:['Closed','Resolved By Phone','Customer Reject','Call Cancel'];
+        // Carry In: Repaired + Sent to MSC. On-Site: Closed, or Sent to MSC when
+        // it turns out to need factory/MSC repair instead of an on-site fix.
+        return isCarryIn?['Repaired','Sent to MSC','Customer Reject','Call Cancel']:['Closed','Sent to MSC','Resolved By Phone','Customer Reject','Call Cancel'];
       }
 
       case 'Pending Parts':
@@ -10735,6 +10741,14 @@ async function loadServiceEdgeExport(){
       var usedHere=false;
       spares.forEach(function(s){
         if(!s||!s.code)return;
+        // The whole TICKET being Non-Warranty doesn't mean every part on it
+        // was actually bought/held as our own stock — Direct Warranty Issue
+        // (or the Request Part "Company Pre-Dispatched" checkbox) can supply
+        // a specific part straight from Canon onto ANY ticket regardless of
+        // its call_type. That part was never our purchase and is already
+        // tracked separately via the warranty return flow — counting it here
+        // too would mean claiming/logging it to Service Edge a second time.
+        if(s.warranty_supplied||s.warranty_predispatched||s.warranty_return_na)return;
         var qty=s.qty||1;
         if(!byPart[s.code])byPart[s.code]={code:s.code,name:s.name||'',qty:0,tickets:[]};
         byPart[s.code].qty+=qty;
