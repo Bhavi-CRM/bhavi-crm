@@ -7527,7 +7527,8 @@ async function processApproval(decision){
             let bagQty=0;
             if(t.assigned_name&&invItem){
               const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
-              bagQty=esCheck.length?esCheck[0].qty:0;
+              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+              bagQty=await getEffectiveBagQty(t.assigned_name,s.code,rawBagQty,t.id);
             }
             if(bagQty<(s.qty||1)){
               if(companyQty>=(s.qty||1))anyPendingEngStock=true;else anyPendingNoParts=true;
@@ -8099,6 +8100,32 @@ async function getEffectivePartQty(code,companyQty,excludeTicketId){
   const reservedByOthers=claims.filter(c=>c.ticketId!==excludeTicketId).reduce((a,c)=>a+c.qty,0);
   return Math.max(0,(companyQty||0)-reservedByOthers);
 }
+// Same double-booking risk as company stock, but for an ENGINEER'S OWN BAG —
+// this was missing entirely until now. If an engineer is assigned 3 different
+// On Site tickets all still waiting on the same part code, and their bag has
+// only 1 unit, every one of those 3 tickets independently saw "bag has
+// enough" and all got auto-promoted to Pending Repair at once — the exact
+// mass false-promotion this was built to catch. Scoped to claims from OTHER
+// tickets assigned to that SAME engineer only (a different engineer's need
+// for the same code is irrelevant to what's sitting in THIS bag).
+async function getEngBagClaims(engineerName,code){
+  if(!engineerName||!code)return[];
+  const openTickets=await sb('tickets','GET',null,`?status=not.in.${_PART_RESERVE_EXCLUDE}&assigned_name=eq.${encodeURIComponent(engineerName)}&select=id,spares,created_at&order=created_at.asc`).catch(()=>[]);
+  const claims=[];
+  for(const t of openTickets){
+    for(const s of (t.spares||[])){
+      if(s.code&&(s.code||'').toUpperCase()===(code||'').toUpperCase()&&!s.stock_deducted){
+        claims.push({ticketId:t.id,qty:s.qty||1});
+      }
+    }
+  }
+  return claims; // oldest ticket's claim first — first come, first priority
+}
+async function getEffectiveBagQty(engineerName,code,rawBagQty,excludeTicketId){
+  const claims=await getEngBagClaims(engineerName,code);
+  const reservedByOthers=claims.filter(c=>c.ticketId!==excludeTicketId).reduce((a,c)=>a+c.qty,0);
+  return Math.max(0,(rawBagQty||0)-reservedByOthers);
+}
 var _savingPartRequest=false;
 async function savePartRequest(addAnother){
   // Guards against a fast double-click on "Save & Add Another"/"Done" firing
@@ -8170,7 +8197,8 @@ async function _savePartRequestInner(addAnother){
   if(t.service_type==='On Site' && t.assigned_name){
     if(_invItemForStock){
       const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${_invItemForStock.id}`).catch(()=>[]);
-      const bagQty=esCheck.length?esCheck[0].qty:0;
+      const rawBagQty=esCheck.length?esCheck[0].qty:0;
+      const bagQty=await getEffectiveBagQty(t.assigned_name,code,rawBagQty,partReqTicketId);
       if(bagQty<qty){
         if(_effectiveCompanyQty>0){
           _pendingEngStock=true; // company has stock left, admin needs to issue to engineer
@@ -8517,7 +8545,7 @@ async function saveEngUpdate(){
   if(currentUser.role==='engineer'&&status!==t.status&&((t.service_type==='On Site'&&status==='Closed')||(t.service_type==='Carry In'&&status==='Repaired'))){
     const physicalSpares=(currentSpares||[]).filter(function(s){return s.code&&!s.requested;});
     if(physicalSpares.length){
-      const missing=t.service_type==='On Site'?await _missingBagParts(currentUser.name,physicalSpares):await _missingCompanyStockParts(physicalSpares);
+      const missing=t.service_type==='On Site'?await _missingBagParts(currentUser.name,physicalSpares,id):await _missingCompanyStockParts(physicalSpares);
       if(missing.length){
         alert('❌ Aa part(s) stock ma nathi, call '+(t.service_type==='On Site'?'close':'Repaired')+' kari shakay nahi:\n\n'+missing.join('\n')+'\n\nEng. Parts ma thi part request karo athva Admin/Office ne part issue/order karva janavo, pachi j aagad vadho.');
         return;
@@ -10209,7 +10237,13 @@ async function checkPendingPartsAuto(){
             let bagQty=0;
             if(t.assigned_name&&invItem){
               const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
-              bagQty=esCheck.length?esCheck[0].qty:0;
+              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+              // Same reservation logic as company stock, but scoped to this
+              // one engineer's bag — otherwise 3 different tickets assigned
+              // to the same engineer, all needing the same part, all saw
+              // "bag has 1" independently and all got promoted off a single
+              // physical unit.
+              bagQty=await getEffectiveBagQty(t.assigned_name,s.code,rawBagQty,t.id);
             }
             if(bagQty<(s.qty||1)){
               if(companyQty>=(s.qty||1)){anyPendingEngStock=true;sourceNotes.push(s.code+': in company stock, not yet issued to '+(t.assigned_name||'engineer'));}
@@ -12536,7 +12570,7 @@ async function saveEngIssue(){
           // exactly how a call ended up "ready to repair" with the actual
           // part nowhere in stock. Same check already used by the engineer
           // self-service Request/Receive approval flow (_missingBagParts).
-          const missing=await _missingBagParts(engineer,spares);
+          const missing=await _missingBagParts(engineer,spares,t.id);
           if(missing.length)continue;
           const newStatus=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
           const tl=[...(t.timeline||[]),{action:'Parts Issued by Admin → '+newStatus,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag. All required parts now in bag.'}];
@@ -13565,7 +13599,7 @@ window._epApproving=window._epApproving||{};
 // still can't do the job without the rest. Checks the engineer's CURRENT bag
 // (fresh from DB) against every spare the ticket needs; returns the list of
 // still-missing part codes (empty = fully stocked, safe to move to repair).
-async function _missingBagParts(engineerName,spares){
+async function _missingBagParts(engineerName,spares,excludeTicketId){
   const needed=(spares||[]).filter(function(s){return s.code;});
   if(!needed.length)return[];
   let stock=[];
@@ -13574,7 +13608,12 @@ async function _missingBagParts(engineerName,spares){
   for(const s of needed){
     const invItem=await sb('inventory','GET',null,'?part_code=eq.'+encodeURIComponent(s.code)+'&select=id&limit=1').catch(function(){return[];});
     const pid=invItem&&invItem[0]&&invItem[0].id;
-    const have=pid?((stock.find(function(x){return x.part_id===pid;})||{}).qty||0):0;
+    const rawHave=pid?((stock.find(function(x){return x.part_id===pid;})||{}).qty||0):0;
+    // Same cross-ticket reservation as everywhere else the bag is checked —
+    // without excludeTicketId, two different tickets assigned to this same
+    // engineer both needing this same code both saw the SAME raw bag qty as
+    // "enough" and both got promoted off one physical unit.
+    const have=excludeTicketId?await getEffectiveBagQty(engineerName,s.code,rawHave,excludeTicketId):rawHave;
     if(have<(s.qty||1))missing.push(s.code+' '+(s.name||''));
   }
   return missing;
@@ -13634,7 +13673,7 @@ async function approveEngReq(reqId,req){
                 // Repair" anyway. No admin alert needed here (that's noisy) —
                 // the engineer gets stopped with a clear message at close-call
                 // time instead, see the bag-check inside _doSaveEngUpdate.
-                const missing=await _missingBagParts(req.engineer_name,t.spares);
+                const missing=await _missingBagParts(req.engineer_name,t.spares,t.id);
                 if(missing.length)continue;
                 const ns=t.service_type==='Carry In'?'Pending Repair Carry In':'Pending Repair On Site';
                 const tl=[...(t.timeline||[]),{action:'Parts Approved → '+ns,by:currentUser?.name||'Admin',at:new Date().toISOString(),note:'Part '+partCode+' issued to engineer bag via approved request. All required parts now in bag.'}];
