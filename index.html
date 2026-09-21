@@ -10264,6 +10264,59 @@ async function checkPendingPartsAuto(){
     }
   }catch(e){}
 }
+// One-time cleanup tool for calls that were WRONGLY auto-promoted to "ready
+// to repair" before the per-ticket bag/company reservation fix existed (or
+// before it covered every promotion path) — e.g. 3 tickets on the same
+// engineer all needing the same part, with only 1 physical unit, all got
+// waved through together. Re-checks every currently "Pending Repair
+// Carry In / On Site / Pending Engineer Stock" call with the SAME correct,
+// reservation-aware logic checkPendingPartsAuto uses, oldest ticket first —
+// whichever one genuinely has first claim on the real stock stays Ready;
+// every other one that doesn't actually have its part(s) gets reverted back
+// to Pending Parts (or Pending Engineer Stock) with a timeline note, instead
+// of an admin having to hunt them down and Force Status each one manually.
+async function auditPendingRepairClaims(){
+  if(!(currentUser.role==='admin'&&!window._isCspMgr)){alert('⛔ Admin only.');return;}
+  if(!confirm('This re-checks every "Pending Repair"/"Pending Engineer Stock" call against real reserved stock (oldest call keeps priority) and reverts any that don\'t actually have their part(s) back to Pending Parts.\n\nProceed?'))return;
+  try{
+    const tickets=await sb('tickets','GET',null,"?status=in.(Pending Repair Carry In,Pending Repair On Site,Pending Engineer Stock)&order=created_at.asc");
+    const reverted=[];
+    for(const t of (tickets||[])){
+      const spares=(t.spares||[]).filter(s=>s.code&&!s.stock_deducted);
+      if(!spares.length)continue;
+      let anyPendingEngStock=false,anyPendingNoParts=false;
+      const missingNotes=[];
+      for(const s of spares){
+        try{
+          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
+          const invItem=inv&&inv[0];
+          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
+          if(t.service_type==='On Site'){
+            let bagQty=0;
+            if(t.assigned_name&&invItem){
+              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
+              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+              bagQty=await getEffectiveBagQty(t.assigned_name,s.code,rawBagQty,t.id);
+            }
+            if(bagQty<(s.qty||1)){
+              if(companyQty>=(s.qty||1))anyPendingEngStock=true;else{anyPendingNoParts=true;missingNotes.push(s.code+' — not actually in '+(t.assigned_name||'engineer')+"'s bag anymore (claimed by an earlier call)");}
+            }
+          }else{
+            if(companyQty<(s.qty||1)){anyPendingNoParts=true;missingNotes.push(s.code+' — not actually in company stock anymore (claimed by an earlier call)');}
+          }
+        }catch(e){anyPendingNoParts=true;}
+      }
+      if(!anyPendingNoParts&&!anyPendingEngStock)continue; // genuinely still fine, leave as-is
+      const correctStatus=anyPendingNoParts?'Pending Parts':'Pending Engineer Stock';
+      if(correctStatus===t.status)continue; // already sitting in the right place
+      const tl=[...(t.timeline||[]),{action:'Auto-Correction — Reverted to '+correctStatus,by:'System',at:new Date().toISOString(),note:'Re-validated against real reserved stock: '+missingNotes.join('; ')+'. This call was wrongly marked ready earlier — reverted so a part that\'s actually missing isn\'t skipped at close time.'}];
+      await sb('tickets','PATCH',{status:correctStatus,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${t.id}`);
+      reverted.push(t.id+' → '+correctStatus);
+    }
+    alert(reverted.length?'✅ Checked '+tickets.length+' call(s). Reverted '+reverted.length+':\n\n'+reverted.join('\n'):'✅ Checked '+tickets.length+' call(s) — all genuinely have their parts, nothing to revert.');
+    renderEngParts('overview');
+  }catch(e){alert('Error: '+e.message);}
+}
 function renderInvRows(items){return items.map(i=>{const st=i.qty_in_stock<=0?'color:var(--danger);font-weight:700;':i.qty_in_stock<=i.min_stock?'color:var(--warning);font-weight:700;':'color:var(--success);font-weight:700;';const bn=allBrands.find(b=>b.id===i.brand_id)?.name||'-';const gp=i.gst_pct!=null?i.gst_pct+'%':'18%';const wQty=i.warranty_qty||0;const purQty=Math.max(0,(i.qty_in_stock||0)-wQty);const stockCell=wQty>0?`<span style="${st}">${i.qty_in_stock}</span><br><span style="font-size:10px;color:#64748b;">🛒 ${purQty} + 🏭 ${wQty}</span>`:`<span style="${st}">${i.qty_in_stock}</span>`;const dtp=i.purchase_price||0;const mrp=i.unit_price||0;const stockVal=(i.qty_in_stock||0)*dtp*(1+((i.gst_pct||0)/100));const cat=i.category||'';const catShort=cat.length>28?cat.slice(0,26)+'…':cat;const catCell=cat.length>28?`<span style="cursor:pointer;color:#6b7280;font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(cat)}" onclick="this.style.whiteSpace=this.style.whiteSpace==='normal'?'nowrap':'normal';this.textContent=this.style.whiteSpace==='normal'?'${escHtml(cat).replace(/'/g,"\\'")}':'${escHtml(catShort).replace(/'/g,"\\'")}'">${catShort}</span>`:`<span style="color:#6b7280;font-size:12px;">${cat||'-'}</span>`;return `<tr id="inv-row-${i.id}"><td><input type="checkbox" class="inv-checkbox" value="${i.id}" onchange="updateInvSelection()"></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b style="color:var(--primary);">${i.part_code||'-'}</b></td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="cursor:pointer;color:var(--primary);font-weight:600;" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="${escHtml(i.item_name)}">${i.item_name}</span>${i.is_consumable?' <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 5px;border-radius:4px;">CONSUMABLE</span>':''}</td><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${bn}</td><td style="overflow:hidden;">${catCell}</td><td>${stockCell}</td><td>${i.min_stock}</td><td style="color:#0369a1;font-weight:600;">${dtp>0?'₹'+dtp:'-'}</td><td style="color:#065f46;font-weight:600;">₹${mrp}</td><td style="font-weight:600;color:#7c3aed;">${gp}</td><td style="font-weight:600;">₹${dtp>0?stockVal.toFixed(0):((i.qty_in_stock||0)*mrp).toFixed(0)}</td><td style="white-space:nowrap;"><button class="btn-icon" onclick="openStockAdjust('${i.id}')">📦</button><button class="btn-icon" onclick="openPartHistory('${i.part_code||''}','${escQ(i.item_name)}','${i.id}')" title="IN/OUT History">📋</button><button class="btn-icon" onclick="editInv('${i.id}')">✏️</button><button class="btn-icon" onclick="deleteInv('${i.id}')" style="color:var(--danger);">🗑️</button></td></tr>`;}  ).join('')||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted);">No parts</td></tr>';}
 function filterInv(){const q=(document.getElementById('inv-search')?.value||'').toLowerCase();const sf=document.getElementById('inv-stock-f')?.value||'';filterInventoryBy(sf,q);}
 function filterInventoryBy(sf,q){const query=q||(document.getElementById('inv-search')?.value||'').toLowerCase();const f=allInventory.filter(i=>{const mQ=!query||[(i.part_code||''),i.item_name,(i.category||'')].some(v=>v.toLowerCase().includes(query));const mS=!sf||(sf==='low'&&i.qty_in_stock>0&&i.qty_in_stock<=i.min_stock)||(sf==='out'&&i.qty_in_stock<=0);return mQ&&mS;});const tb=document.getElementById('inv-tbody');if(tb)tb.innerHTML=renderInvRows(f);}
@@ -11839,6 +11892,7 @@ async function renderEngParts(tab){
           <button class="btn" style="background:#7c3aed;color:#fff;" onclick="openEngReturn()">↩️ Engineer Return</button>
           <button class="btn" style="background:#059669;color:#fff;" onclick="openEngRecordSale()">🛒 Record Sale</button>
           ${isCspMgr?`<button class="btn" style="background:#0d9488;color:#fff;" onclick="openEngReqReceive()">📥 Request Parts (Self)</button><button class="btn" style="background:#be185d;color:#fff;" onclick="openEngReqReturn()">↩️ Return My Parts</button>`:''}
+          ${(currentUser.role==='admin'&&!isCspMgr)?`<button class="btn" style="background:#b91c1c;color:#fff;" onclick="auditPendingRepairClaims()" title="Re-checks every 'Pending Repair'/'Pending Engineer Stock' call against real reserved stock, and reverts any that were wrongly promoted back to Pending Parts">🩹 Fix Wrongly-Ready Calls</button>`:''}
         </div>
         <div class="tabs">${tabHtml('overview','📊 Stock Overview')}${tabHtml('analysis','📈 Engineer Analysis')}${tabHtml('pending','⏳ Pending Requests')}${tabHtml('warranty-pending','⚠️ Warranty Returns')}${tabHtml('log','📋 Movement Log')}${isCspMgr?tabHtml('my-requests','📋 My Requests'):''}</div>
         <div id="ep-content"></div>`;
