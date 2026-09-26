@@ -28128,6 +28128,7 @@ async function loadKmReport(){
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:700;">'
         +'<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:4px 10px;">Opening: '+(opening!==null?opening:'—')+'</span>'
         +'<span style="background:#fef3c7;color:#92400e;border-radius:8px;padding:4px 10px;">Closing: '+(closing!==null?closing:'—')+'</span>'
+        +(closing===null&&_kmIsAdmin?'<button class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:11px;" title="Engineer forgot to punch out with a live photo — add the day-end reading manually so their KM/petrol isn\'t lost" onclick="addMissingKmClosing(\''+g.eng_id+'\',\''+escQ(g.eng_name)+'\',\''+g.date+'\')">➕ Add Missing Closing KM</button>':'')
         +'<span style="background:#f0fdf4;color:#15803d;border-radius:8px;padding:4px 10px;">Total: '+totalKm+' km</span>'
         +(openingLoc?'<a href="'+startMapsUrl+'" target="_blank" style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s Opening KM was captured">Start: '+startLabel+'</a>':'')
         +(closingLoc?'<a href="'+endMapsUrl+'" target="_blank" style="background:#fdf2f8;color:#be185d;border-radius:8px;padding:4px 10px;text-decoration:none;" title="Where the day\'s last Closing KM was captured">End: '+endLabel+'</a>':'')
@@ -28183,6 +28184,41 @@ async function editKmReading(id,curKm){
     }else alert('Error: '+e.message);
   }
 }
+// Admin-only backfill for a day that's missing its Day End (closing) KM
+// entirely — e.g. the engineer drove straight home from the last call and
+// forgot to punch out with the live camera+GPS capture. Without this, that
+// day's final home-bound distance never gets recorded at all (not "wrong",
+// just MISSING), so the engineer quietly loses that KM/petrol reimbursement
+// even though the time itself can already be corrected in Attendance. No
+// photo/GPS is asked for here on purpose — this is a backdated correction,
+// not a live capture, so faking either would be dishonest; the mandatory
+// remark plus corrected_by/edited_at keep it fully auditable instead.
+async function addMissingKmClosing(engId,engName,logDate){
+  var nv=prompt('Final odometer reading when '+engName+' reached home on '+logDate+' (KM):','');
+  if(nv===null)return;
+  var num=parseFloat(nv);
+  if(isNaN(num)||num<0){alert('⚠️ Barabar number nakho.');return;}
+  var remark=prompt('Karan / remark (farjiyat) — jem ke "Punch out vakhte bhulai gayu, direct ghare gaya":','');
+  if(remark===null)return;
+  if(!remark.trim()){alert('⚠️ Remark farjiyat chhe.');return;}
+  try{
+    await sb('km_logs','POST',{
+      eng_id:engId,eng_name:engName,log_date:logDate,entry_type:'closing',
+      odometer_km:num,captured_at:new Date(logDate+'T23:59:00').toISOString(),
+      edit_remark:remark.trim(),corrected_by:currentUser.name,edited_at:new Date().toISOString()
+    });
+    loadKmReport();
+  }catch(e){
+    if(String(e&&e.message).indexOf('edit_remark')!==-1||String(e&&e.message).indexOf('edited_at')!==-1){
+      try{
+        await sb('km_logs','POST',{eng_id:engId,eng_name:engName,log_date:logDate,entry_type:'closing',odometer_km:num,captured_at:new Date(logDate+'T23:59:00').toISOString(),corrected_by:currentUser.name});
+        loadKmReport();
+        alert('Entry add thai gayu — pan remark save mate Supabase ma aa run karo:\nALTER TABLE public.km_logs ADD COLUMN IF NOT EXISTS edit_remark TEXT;\nALTER TABLE public.km_logs ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;');
+      }catch(e2){alert('Error: '+e2.message);}
+    }else alert('Error: '+e.message);
+  }
+}
+
 // Builds one sheet: Engineer/Date/Total-KM merged down each day's rows
 // (matching the CRM's own day-card layout), plus a FINAL TOTAL row at the end.
 function _buildKmSheet(groups){
