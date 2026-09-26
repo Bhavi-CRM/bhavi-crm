@@ -9020,6 +9020,7 @@ function renderInvStockTab(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" onclick="downloadInvTemplate()">📄 Template</button>
         <button class="btn btn-outline btn-sm" onclick="importInv()">📥 Import</button>
+        ${currentUser.role==='admin'&&!window._isCspMgr?'<button class="btn btn-outline btn-sm" style="border-color:#c2410c;color:#c2410c;" onclick="openBulkPriceUpdate()">💲 Bulk Price/MRP Update</button>':''}
         <button class="btn btn-success btn-sm" onclick="exportInvExcel()">⬇️ Export Excel</button>
         <button class="btn btn-danger btn-sm" onclick="deleteSelectedInv()">🗑️ Delete</button>
         <button class="btn btn-primary btn-sm" onclick="openAddInv()">+ Add Part</button>
@@ -10576,6 +10577,155 @@ function exportInvExcel(){
 }
 function downloadInvTemplate(){const data=[{'Part Code':'CG2-6007-000','Item Name':'LCD ASSY','Brand':'Canon','Model No':'MF3010','Stock':5,'Min Stock':2,'DTP Price ₹':4200,'MRP Price ₹':5399,'GST%':18}];const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Inventory');XLSX.writeFile(wb,'inventory_template.xlsx');}
 function importInv(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';input.onchange=async e=>{const file=e.target.files[0];const r=new FileReader();r.onload=async ev=>{const wb=XLSX.read(ev.target.result,{type:'binary'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let c=0,errs=0;for(const row of data){try{const b=allBrands.find(x=>x.name.toLowerCase()===(row['Brand']||'').toLowerCase());const gstVal=row['GST%']!=null?parseFloat(row['GST%']):(row['GST %']!=null?parseFloat(row['GST %']):18);const dtp=parseFloat(row['DTP Price ₹']||row['DTP Price'||'DTP']||row['Purchase Price']||row['Price'])||0;const mrp=parseFloat(row['MRP Price ₹']||row['MRP Price']||row['MRP']||row['Selling Price']||row['Price'])||0;await sb('inventory','POST',{part_code:row['Part Code']||null,item_name:row['Item Name']||'',brand_id:b?.id||null,category:row['Model No']||'',qty_in_stock:parseInt(row['Stock'])||0,min_stock:parseInt(row['Min Stock'])||2,purchase_price:dtp,unit_price:mrp,gst_pct:gstVal});c++;}catch(e2){errs++;}}alert(`✅ Imported ${c} parts${errs>0?' | ⚠️ '+errs+' skipped (duplicate code?)':''}`);renderInventory();};r.readAsBinaryString(file);};input.click();}
+
+// ════════════════════════════════════════════════════════════
+// BULK PRICE / MRP UPDATE — the "Import" button above only ever INSERTS
+// (POST), so re-uploading the same file for parts that already exist just
+// fails silently as "duplicate code, skipped" — it can never actually
+// UPDATE an existing part's price. Canon periodically sends a full
+// price-list of 10,000-20,000 codes (often as a PDF); this matches that
+// list against OUR existing inventory by part_code and PATCHes only the
+// parts we actually stock — the other however-many-thousand codes we don't
+// carry are simply irrelevant and skipped, so only a few hundred/thousand
+// real updates ever happen despite the huge input file.
+// PDF NOTE: this tool takes Excel/CSV, not PDF — a 10-20k row price table
+// inside a PDF has no reliable column structure once parsed as text, so
+// building a bespoke PDF-table parser here would silently misalign
+// price/MRP columns on an unpredictable fraction of rows with no visible
+// error. Convert the PDF to Excel first (Adobe Acrobat "Export PDF",
+// ilovepdf.com/smallpdf's PDF-to-Excel, or simply ask Canon for the same
+// list as an Excel/CSV attachment instead of a PDF) — Canon's own price
+// list is virtually certainly generated FROM a spreadsheet before being
+// exported to PDF, so asking for that original file is usually the fastest
+// path, and this Excel upload has been reliable throughout the CRM.
+// ════════════════════════════════════════════════════════════
+window._bulkPriceRows=[];
+function openBulkPriceUpdate(){
+  if(!(currentUser.role==='admin'&&!window._isCspMgr)){alert('⛔ Bulk Price/MRP update is Admin only.');return;}
+  window._bulkPriceRows=[];
+  var ex=document.getElementById('bulk-price-modal');if(ex)ex.remove();
+  var ov=document.createElement('div');ov.id='bulk-price-modal';ov.className='modal-overlay';
+  ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:720px;max-height:90vh;overflow-y:auto;">'
+    +'<div class="modal-header"><h2>💲 Bulk Price / MRP Update</h2><button class="close-btn" onclick="document.getElementById(\'bulk-price-modal\').remove()">✕</button></div>'
+    +'<div class="modal-body">'
+    +'<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:#9a3412;">📋 Upload Canon\'s (or any) price list as <b>Excel/CSV</b> — even 10,000-20,000 rows is fine. Only the codes that match a part already in OUR inventory get updated; everything else is ignored, so it\'s safe to upload the FULL list every time. Got a <b>PDF</b> from Canon? Convert it to Excel first (Acrobat "Export PDF", ilovepdf.com, or just ask Canon for the Excel version) — a PDF table can\'t be parsed reliably here.</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    +'<button class="btn btn-outline btn-sm" onclick="downloadBulkPriceTemplate()">📄 Download Template (Excel)</button>'
+    +'<input type="file" id="bulk-price-upload" accept=".xlsx,.xls,.csv" style="display:none;" onchange="uploadBulkPriceFile(this)">'
+    +'<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'bulk-price-upload\').click()">📥 Upload Price List</button>'
+    +'</div>'
+    +'<div id="bulk-price-summary"></div>'
+    +'<div id="bulk-price-preview"></div>'
+    +'<div style="margin-top:16px;"><label style="font-weight:700;font-size:13px;display:block;margin-bottom:6px;">Remark (mandatory, applies to all updated parts) <span style="color:#ef4444;">*</span></label>'
+    +'<input type="text" id="bulk-price-remark" placeholder="e.g. Canon price list update — Sept 2026" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;"></div>'
+    +'<button class="btn btn-primary" id="bulk-price-apply-btn" style="width:100%;margin-top:16px;" onclick="applyBulkPriceUpdate()" disabled>✅ Apply Price/MRP Updates</button>'
+    +'<div id="bulk-price-progress" style="margin-top:10px;font-size:13px;font-weight:600;color:#c2410c;"></div>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+function downloadBulkPriceTemplate(){
+  var data=[{'Part Code':'e.g. YH1-2401-000','New DTP Price':4200,'New MRP':5399}];
+  var ws=XLSX.utils.json_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Price Update');
+  XLSX.writeFile(wb,'bulk_price_update_template.xlsx');
+}
+function uploadBulkPriceFile(input){
+  var file=input.files&&input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      // Map lookup instead of .find() per row — a 20,000-row price list
+      // against a ~2,000-item inventory would otherwise be ~40 million
+      // comparisons; this makes it instant regardless of file size.
+      var byCode={};
+      (allInventory||[]).forEach(function(i){if(i.part_code)byCode[i.part_code.trim().toLowerCase()]=i;});
+      var matched=[],notFoundCount=0;
+      data.forEach(function(r){
+        var code=String(r['Part Code']||r['part code']||r['Part code']||'').trim();
+        if(!code)return;
+        var dtpRaw=r['New DTP Price']!=null?r['New DTP Price']:(r['DTP Price']!=null?r['DTP Price']:(r['Purchase Price']!=null?r['Purchase Price']:r['Price']));
+        var mrpRaw=r['New MRP']!=null?r['New MRP']:(r['MRP']!=null?r['MRP']:r['MRP Price']);
+        var newDtp=dtpRaw!=null&&dtpRaw!==''?parseFloat(dtpRaw):null;
+        var newMrp=mrpRaw!=null&&mrpRaw!==''?parseFloat(mrpRaw):null;
+        if((newDtp===null||isNaN(newDtp))&&(newMrp===null||isNaN(newMrp)))return; // nothing to update on this row
+        var inv=byCode[code.toLowerCase()];
+        if(!inv){notFoundCount++;return;}
+        matched.push({partId:inv.id,code:inv.part_code,itemName:inv.item_name,oldDtp:inv.purchase_price||0,newDtp:(newDtp!==null&&!isNaN(newDtp))?newDtp:null,oldMrp:inv.unit_price||0,newMrp:(newMrp!==null&&!isNaN(newMrp))?newMrp:null});
+      });
+      window._bulkPriceRows=matched;
+      var sumEl=document.getElementById('bulk-price-summary');
+      if(sumEl)sumEl.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+        +'<div style="background:#f0fdf4;border-radius:8px;padding:8px 14px;font-size:13px;"><b style="color:#15803d;">'+matched.length+'</b> matched — will be updated</div>'
+        +'<div style="background:#fef2f2;border-radius:8px;padding:8px 14px;font-size:13px;"><b style="color:#dc2626;">'+notFoundCount+'</b> not in our inventory — ignored</div>'
+        +'<div style="background:#eff6ff;border-radius:8px;padding:8px 14px;font-size:13px;"><b style="color:#1d4ed8;">'+data.length+'</b> rows in the file</div>'
+        +'</div>';
+      var prevEl=document.getElementById('bulk-price-preview');
+      if(prevEl){
+        var previewRows=matched.slice(0,50);
+        prevEl.innerHTML=matched.length?('<div style="font-size:11px;color:#64748b;margin-bottom:6px;">Preview (first '+previewRows.length+' of '+matched.length+'):</div>'
+          +'<div class="table-wrap" style="max-height:280px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+          +'<thead><tr style="background:#f8fafc;text-align:left;position:sticky;top:0;"><th style="padding:5px 8px;">Part Code</th><th style="padding:5px 8px;">Name</th><th style="padding:5px 8px;text-align:right;">DTP Price</th><th style="padding:5px 8px;text-align:right;">MRP</th></tr></thead>'
+          +'<tbody>'+previewRows.map(function(r){
+            return '<tr><td style="padding:5px 8px;font-weight:700;">'+escHtml(r.code)+'</td><td style="padding:5px 8px;">'+escHtml(r.itemName||'')+'</td>'
+              +'<td style="padding:5px 8px;text-align:right;">'+(r.newDtp!=null?('₹'+r.oldDtp+' → <b style="color:#c2410c;">₹'+r.newDtp+'</b>'):'—')+'</td>'
+              +'<td style="padding:5px 8px;text-align:right;">'+(r.newMrp!=null?('₹'+r.oldMrp+' → <b style="color:#c2410c;">₹'+r.newMrp+'</b>'):'—')+'</td></tr>';
+          }).join('')+'</tbody></table></div>'):'<div style="color:#dc2626;font-size:13px;">No matching part codes found in this file — check the "Part Code" column matches your Inventory exactly.</div>';
+      }
+      var applyBtn=document.getElementById('bulk-price-apply-btn');
+      if(applyBtn)applyBtn.disabled=!matched.length;
+    }catch(err){alert('Could not read this file: '+err.message);}
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+// Small concurrency-limited runner — thousands of individual PATCH requests
+// run sequentially would take far too long (network round-trip per row),
+// but firing all of them at once would flood the browser/API. A handful
+// running at a time strikes the balance and reports live progress.
+async function _runWithConcurrency(items,worker,concurrency,onProgress){
+  var idx=0,done=0;
+  async function next(){
+    while(idx<items.length){
+      var i=idx++;
+      try{await worker(items[i]);}catch(e){}
+      done++;
+      if(onProgress)onProgress(done,items.length);
+    }
+  }
+  var pool=[];for(var k=0;k<Math.min(concurrency,items.length);k++)pool.push(next());
+  await Promise.all(pool);
+}
+async function applyBulkPriceUpdate(){
+  var remark=(document.getElementById('bulk-price-remark')?.value||'').trim();
+  if(!remark){alert('⚠️ Remark is mandatory.');document.getElementById('bulk-price-remark')?.focus();return;}
+  var rows=window._bulkPriceRows||[];
+  if(!rows.length){alert('No matched rows to apply.');return;}
+  if(!confirm('Apply price/MRP updates to '+rows.length+' part(s) already in inventory? This updates CRM prices immediately.'))return;
+  var applyBtn=document.getElementById('bulk-price-apply-btn');if(applyBtn)applyBtn.disabled=true;
+  var progEl=document.getElementById('bulk-price-progress');
+  var failed=[];
+  await _runWithConcurrency(rows,async function(row){
+    var patch={updated_at:new Date().toISOString()};
+    if(row.newDtp!=null)patch.purchase_price=row.newDtp;
+    if(row.newMrp!=null)patch.unit_price=row.newMrp;
+    try{
+      await sb('inventory','PATCH',patch,'?id=eq.'+row.partId);
+      var inv=allInventory.find(function(i){return i.id===row.partId;});
+      if(inv){if(patch.purchase_price!=null)inv.purchase_price=patch.purchase_price;if(patch.unit_price!=null)inv.unit_price=patch.unit_price;}
+    }catch(e){failed.push(row.code+': '+e.message);}
+  },15,function(done,total){
+    if(progEl)progEl.textContent='Updating… '+done+' / '+total;
+  });
+  if(progEl)progEl.textContent='';
+  var msg='✅ Updated '+(rows.length-failed.length)+' of '+rows.length+' part(s).';
+  if(failed.length)msg+='\n\n❌ Failed ('+failed.length+'):\n'+failed.slice(0,20).join('\n')+(failed.length>20?'\n…and '+(failed.length-20)+' more':'');
+  alert(msg);
+  var m=document.getElementById('bulk-price-modal');if(m)m.remove();
+  renderInventory();
+}
 
 // CUSTOMERS
 async function renderCustomers(){
