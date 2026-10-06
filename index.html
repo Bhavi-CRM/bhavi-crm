@@ -12105,11 +12105,11 @@ async function renderEngParts(tab){
   // can approve anyone else's; the approval history always records who
   // approved it via approved_by).
   const isFullAccess=isAdmin||isCspMgr||window._isAcct||window._isPartsAcct;
-  if(!tab) tab=(isEng&&!isCspMgr)?'my-stock':(isFullAccess?'overview':'pending');
+  if(!tab) tab=(isEng&&!isCspMgr&&!window._isPartsAcct)?'my-stock':(isFullAccess?'overview':'pending');
   try{
     if(!allInventory||!allInventory.length) allInventory=await sbAll('inventory','?order=item_name');
     if(!allEngineers||!allEngineers.length) await loadMasterData();
-    if(isEng&&!isCspMgr){await renderEngSelfService(tab);return;}
+    if(isEng&&!isCspMgr&&!window._isPartsAcct){await renderEngSelfService(tab);return;}
     allEngStock=await sb('eng_stock','GET',null,'?order=owner');
     const engineers=[...new Set(allEngStock.map(s=>s.owner))].sort();
     const totalEngVal=allEngStock.reduce((a,s)=>{const p=allInventory.find(x=>x.id===s.part_id);return a+(s.qty||0)*(p?.unit_price||0);},0);
