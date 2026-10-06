@@ -2946,11 +2946,17 @@ function setupNav(){
       // Reports, Work Log Report, AMC) since only parts/inventory work was
       // asked for.
       window._isPartsAcct=isCspMgr||['ENG007'].includes(currentUser.user_id)||['ENG007'].includes(currentUser.eng_id);
-      if(window._isPartsAcct){sv('nav-inventory',true);sv('nav-eng-parts',true);}
       // Apply per-employee nav permissions
       var _uid=currentUser.eng_id||currentUser.user_id;
       var _up=window._navPerms&&window._navPerms.users&&window._navPerms.users[_uid]||null;
       if(_up&&typeof _NAV_ALL_ITEMS!=='undefined'){_NAV_ALL_ITEMS.forEach(function(item){if(_up[item.id]===true)sv(item.id,true);else if(_up[item.id]===false)sv(item.id,false);});}
+      // Applied AFTER the per-employee nav-perms override on purpose — this
+      // is a deliberate, broader grant (full Inventory + Eng Parts), not a
+      // toggle meant to be silently overridden by whatever was last saved
+      // in Settings → Nav Permissions for this person (e.g. ENG007's Eng
+      // Parts Stock checkbox was saved unchecked there before this flag
+      // existed, which kept hiding the menu even after this code shipped).
+      if(window._isPartsAcct){sv('nav-inventory',true);sv('nav-eng-parts',true);}
     }else if(isWC){
       sv('nav-tickets',true);sv('nav-my-calls',false);sv('nav-my-report',false);sv('nav-km-report',true);sv('nav-payment-qr',true);sv('nav-eng-daily-report',false);sv('nav-work-log',true);sv('nav-walk-in',true);sv('nav-courier',true);
       sv('btn-new-call',true);if(as)as.style.display='';
@@ -7528,18 +7534,19 @@ async function processApproval(decision){
       let anyPendingEngStock=false,anyPendingNoParts=false;
       for(const s of spares){
         try{
-          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
-          const invItem=inv&&inv[0];
+          // Aggregated by CODE across every inventory row sharing it — a
+          // single `limit=1` row pick is not safe if a duplicate part_code
+          // row exists (see getCompanyQtyByCode/getBagQtyByCode above).
+          const rawCompanyQty=await getCompanyQtyByCode(s.code);
           // Effective qty excludes THIS ticket's own claim but includes any
           // other still-open ticket's claim on the same part — otherwise
           // two tickets needing the same last unit could both get waved
           // through to "ready to repair".
-          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
+          const companyQty=await getEffectivePartQty(s.code,rawCompanyQty,t.id);
           if(t.service_type==='On Site'){
             let bagQty=0;
-            if(t.assigned_name&&invItem){
-              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
-              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+            if(t.assigned_name){
+              const rawBagQty=await getBagQtyByCode(t.assigned_name,s.code);
               bagQty=await getEffectiveBagQty(t.assigned_name,s.code,rawBagQty,t.id);
             }
             if(bagQty<(s.qty||1)){
@@ -7831,13 +7838,17 @@ async function openEngUpdate(id){
     </div>`:''}
     ${t.wc_type==='CSP'?`<div class="form-group" style="margin-bottom:12px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;padding:10px 12px;">
       <label style="font-weight:700;color:#5b21b6;font-size:12px;">📄 Page Count <span style="color:#ef4444;">*</span> <span style="font-size:11px;font-weight:400;color:#6d28d9;">(CSP call — required to close)</span></label>
-      <input type="number" id="upd-page-count" min="0" value="${t.page_count!=null?t.page_count:''}" placeholder="e.g. 1250" style="margin-top:4px;border-color:#c4b5fd;">
+      <input type="number" id="upd-page-count" min="0" value="${t.page_count!=null?t.page_count:''}" placeholder="e.g. 1250" autocomplete="off" inputmode="numeric" style="margin-top:4px;border-color:#c4b5fd;">
       <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6d28d9;cursor:pointer;">
-        <input type="checkbox" id="upd-page-count-skip" onchange="document.getElementById('upd-page-count-skip-reason-box').style.display=this.checked?'block':'none';document.getElementById('upd-page-count').disabled=this.checked;">
+        <input type="checkbox" id="upd-page-count-blank" onchange="var pc=document.getElementById('upd-page-count');if(this.checked){pc.value='0';pc.disabled=true;}else{pc.disabled=document.getElementById('upd-page-count-skip')?.checked;if(!pc.disabled)pc.value='';}">
+        Total Blank machine (0 pages — new/unused, no counter reading needed)
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6d28d9;cursor:pointer;">
+        <input type="checkbox" id="upd-page-count-skip" onchange="document.getElementById('upd-page-count-skip-reason-box').style.display=this.checked?'block':'none';document.getElementById('upd-page-count').disabled=this.checked||document.getElementById('upd-page-count-blank').checked;">
         Page Count skip karvo chhe (specific remark aapo)
       </label>
       <div id="upd-page-count-skip-reason-box" style="display:none;margin-top:6px;">
-        <input type="text" id="upd-page-count-skip-reason" placeholder="Reason — e.g. counter not accessible, device not powering on" style="border-color:#c4b5fd;">
+        <input type="text" id="upd-page-count-skip-reason" placeholder="Reason — e.g. counter not accessible, device not powering on" autocomplete="off" style="border-color:#c4b5fd;">
       </div>
     </div>`:''}
     <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">🔩 Spares / Part Request</h3>
@@ -8091,6 +8102,37 @@ function askWarrantyOrChargeable(label){
 // Resolved By Phone / Pending for Delivery are excluded because those
 // already physically deducted it (baked into qty_in_stock already).
 const _PART_RESERVE_EXCLUDE='(Closed,Call Cancel,Customer Reject,Resolved By Phone,Pending for Delivery)';
+// A part_code can exist as MORE THAN ONE row in inventory (a duplicate
+// created by a past import, a manual re-add, etc. — part_code isn't
+// enforced unique in this schema). Every stock check used to fetch just
+// `?part_code=eq....&limit=1` and trust whichever single row Postgres
+// happened to return — with no ORDER BY, that pick isn't guaranteed
+// consistent between calls. If one duplicate row sits at qty 0 and
+// another (older, orphaned) row still has eng_stock linked to ITS id with
+// leftover qty, then which row `limit=1` returns determines whether a
+// check sees "nothing anywhere" or "stock in the bag" — explaining a call
+// that kept flip-flopping between Pending Parts and wrongly-Ready for the
+// exact same part code (BEA-20260912-2272 / FM3-J843-020: Eng Parts
+// Overview shows 0 total everywhere, confirming no real stock exists, yet
+// the auto-check still occasionally found "stock" through a stale
+// duplicate row). These helpers reason in terms of the CODE, aggregating
+// across every row that shares it, so a duplicate can never hide stock
+// from one check while another check sees it.
+async function getInvRowsByCode(code){
+  if(!code)return[];
+  return await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(code)}`).catch(()=>[]);
+}
+async function getCompanyQtyByCode(code){
+  const rows=await getInvRowsByCode(code);
+  return rows.reduce((a,r)=>a+(r.qty_in_stock||0),0);
+}
+async function getBagQtyByCode(engineerName,code){
+  const rows=await getInvRowsByCode(code);
+  if(!rows.length||!engineerName)return 0;
+  const ids=rows.map(r=>r.id);
+  const esRows=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(engineerName)}&part_id=in.(${ids.join(',')})`).catch(()=>[]);
+  return esRows.reduce((a,e)=>a+(e.qty||0),0);
+}
 async function getPartClaims(code){
   if(!code)return[];
   const openTickets=await sb('tickets','GET',null,`?status=not.in.${_PART_RESERVE_EXCLUDE}&select=id,ticket_id,spares,created_at&order=created_at.asc`).catch(()=>[]);
@@ -8195,9 +8237,13 @@ async function _savePartRequestInner(addAnother){
       await sb('inventory_log','POST',{inventory_id:_invItemForStock.id,type:'in',qty,note:'Canon Warranty Pre-Dispatch — received specifically for call '+partReqTicketId,done_by:currentUser.name,created_at:new Date().toISOString(),txn_date:new Date().toISOString().slice(0,10)}).catch(()=>{});
     }
   }
-  if(_invItemForStock){
-    _effectiveCompanyQty=await getEffectivePartQty(code,_invItemForStock.qty_in_stock||0,partReqTicketId);
-  }
+  // Aggregated by CODE across every inventory row sharing it, not just
+  // whichever single row _invItemForStock happens to be (that row is
+  // still used below for the pre-dispatch stock-add, which legitimately
+  // needs one specific row id — but the AVAILABILITY check must never
+  // trust a single arbitrarily-picked duplicate row).
+  const _rawCompanyQtyForCheck=await getCompanyQtyByCode(code);
+  _effectiveCompanyQty=await getEffectivePartQty(code,_rawCompanyQtyForCheck,partReqTicketId);
   // Check the ASSIGNED engineer's own bag, not whoever is currently adding
   // this part — a Manager/Admin adding a part on behalf of an engineer
   // who's already left the site (e.g. they weren't sure which part was
@@ -8208,17 +8254,14 @@ async function _savePartRequestInner(addAnother){
   // silently ignoring whatever was already sitting in the assigned
   // engineer's bag.
   if(t.service_type==='On Site' && t.assigned_name){
-    if(_invItemForStock){
-      const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${_invItemForStock.id}`).catch(()=>[]);
-      const rawBagQty=esCheck.length?esCheck[0].qty:0;
-      const bagQty=await getEffectiveBagQty(t.assigned_name,code,rawBagQty,partReqTicketId);
-      _rawBagQty=rawBagQty;_effectiveBagQty=bagQty;
-      if(bagQty<qty){
-        if(_effectiveCompanyQty>0){
-          _pendingEngStock=true; // company has stock left, admin needs to issue to engineer
-        }else{
-          _pendingNoParts=true;  // no stock left anywhere (or already claimed by another ticket) — need to order
-        }
+    const rawBagQty=await getBagQtyByCode(t.assigned_name,code);
+    const bagQty=await getEffectiveBagQty(t.assigned_name,code,rawBagQty,partReqTicketId);
+    _rawBagQty=rawBagQty;_effectiveBagQty=bagQty;
+    if(bagQty<qty){
+      if(_effectiveCompanyQty>0){
+        _pendingEngStock=true; // company has stock left, admin needs to issue to engineer
+      }else{
+        _pendingNoParts=true;  // no stock left anywhere (or already claimed by another ticket) — need to order
       }
     }
   }
@@ -8315,7 +8358,7 @@ async function _savePartRequestInner(addAnother){
   // inventory qty is actually non-zero, it's because another still-open
   // ticket already has first claim on it — say so, so staff don't wonder
   // why the Inventory page shows stock but this call is still waiting.
-  const _rawQty=_invItemForStock?(_invItemForStock.qty_in_stock||0):0;
+  const _rawQty=_rawCompanyQtyForCheck;
   const _reservedNote=(newStatus==='Pending Parts'||newStatus==='Pending Engineer Stock')&&_rawQty>0&&_rawQty>_effectiveCompanyQty?` (Stock shows ${_rawQty} in system, but already reserved by another open call — ${_effectiveCompanyQty} left for this one)`:'';
   // Same idea as _reservedNote above, but for the engineer's BAG — this is
   // exactly the case that looked like a bug: the part is visibly sitting in
@@ -10211,7 +10254,29 @@ async function applyBulkSale(){
   var m=document.getElementById('bulk-sale-modal');if(m)m.remove();
   renderInventory('sales');
 }
+// Automatic promotion — checks BOTH company stock and the assigned
+// engineer's bag (with per-ticket/per-engineer reservations, see
+// getEffectivePartQty/getEffectiveBagQty) before ever moving a call out of
+// Pending Parts. This is the correct, desired behavior — a call should
+// advance automatically the moment its part is genuinely available (in
+// stock, issued to the engineer, or received from Canon against that exact
+// SE Call ID) and should NOT need a human to push every single call
+// through by hand. Was briefly disabled after a stubborn repeat case
+// (BEA-20260915-2294 / FM3-J839-010) kept getting wrongly promoted and had
+// to be reverted twice — but disabling the whole mechanism just turns the
+// CRM back into manual work for every call, which defeats the purpose.
+// Re-enabled. If a specific call keeps wrongly showing ready while company
+// stock for that part is genuinely 0, the real culprit is almost certainly
+// a stale/incorrect eng_stock balance for the assigned engineer (the bag
+// shows qty > 0 in the database even though it isn't physically true
+// anymore) — check Eng Parts → Engineer Analysis for that engineer + part
+// code against the real physical count, and correct it there if it's
+// wrong. Both this function and the "🩹 Fix Wrongly-Ready Calls" audit
+// trust whatever eng_stock says, so a bad balance there will look
+// "correct" to both until the underlying number itself is fixed.
+const AUTO_PROMOTE_PENDING_PARTS=true;
 async function checkPendingPartsAuto(){
+  if(!AUTO_PROMOTE_PENDING_PARTS)return;
   try{
     // Oldest ticket first — when freshly-arrived stock isn't enough for
     // every waiting call, the one that's been waiting longest gets it,
@@ -10249,20 +10314,21 @@ async function checkPendingPartsAuto(){
       const sourceNotes=[];
       for(const s of spares){
         try{
-          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
-          const invItem=inv&&inv[0];
+          // Aggregated by CODE across every inventory row sharing it — see
+          // getCompanyQtyByCode/getBagQtyByCode above for why a single
+          // `limit=1` row pick is not safe here.
+          const rawCompanyQty=await getCompanyQtyByCode(s.code);
           // Effective qty excludes THIS ticket's own claim (already
           // stock_deducted:false on it) but includes every other still-open
           // ticket's claim — so a part already promised to an earlier
           // Pending Parts call in this same run doesn't ALSO get promised
           // here; the FIFO order this loop runs in makes that earlier
           // promotion visible before this ticket is checked.
-          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
+          const companyQty=await getEffectivePartQty(s.code,rawCompanyQty,t.id);
           if(t.service_type==='On Site'){
             let bagQty=0;
-            if(t.assigned_name&&invItem){
-              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
-              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+            if(t.assigned_name){
+              const rawBagQty=await getBagQtyByCode(t.assigned_name,s.code);
               // Same reservation logic as company stock, but scoped to this
               // one engineer's bag — otherwise 3 different tickets assigned
               // to the same engineer, all needing the same part, all saw
@@ -10313,14 +10379,12 @@ async function auditPendingRepairClaims(){
       const missingNotes=[];
       for(const s of spares){
         try{
-          const inv=await sb('inventory','GET',null,`?part_code=eq.${encodeURIComponent(s.code)}&limit=1`);
-          const invItem=inv&&inv[0];
-          const companyQty=invItem?await getEffectivePartQty(s.code,invItem.qty_in_stock||0,t.id):0;
+          const rawCompanyQty=await getCompanyQtyByCode(s.code);
+          const companyQty=await getEffectivePartQty(s.code,rawCompanyQty,t.id);
           if(t.service_type==='On Site'){
             let bagQty=0;
-            if(t.assigned_name&&invItem){
-              const esCheck=await sb('eng_stock','GET',null,`?owner=eq.${encodeURIComponent(t.assigned_name)}&part_id=eq.${invItem.id}`).catch(()=>[]);
-              const rawBagQty=esCheck.length?esCheck[0].qty:0;
+            if(t.assigned_name){
+              const rawBagQty=await getBagQtyByCode(t.assigned_name,s.code);
               bagQty=await getEffectiveBagQty(t.assigned_name,s.code,rawBagQty,t.id);
             }
             if(bagQty<(s.qty||1)){
@@ -13830,13 +13894,12 @@ window._epApproving=window._epApproving||{};
 async function _missingBagParts(engineerName,spares,excludeTicketId){
   const needed=(spares||[]).filter(function(s){return s.code;});
   if(!needed.length)return[];
-  let stock=[];
-  try{stock=await sb('eng_stock','GET',null,'?owner=eq.'+encodeURIComponent(engineerName));}catch(e){stock=[];}
   const missing=[];
   for(const s of needed){
-    const invItem=await sb('inventory','GET',null,'?part_code=eq.'+encodeURIComponent(s.code)+'&select=id&limit=1').catch(function(){return[];});
-    const pid=invItem&&invItem[0]&&invItem[0].id;
-    const rawHave=pid?((stock.find(function(x){return x.part_id===pid;})||{}).qty||0):0;
+    // Aggregated by CODE across every inventory row sharing it (see
+    // getCompanyQtyByCode/getBagQtyByCode) — a single arbitrary row pick
+    // here is what let a duplicate part_code row hide or fake bag stock.
+    const rawHave=await getBagQtyByCode(engineerName,s.code);
     // Same cross-ticket reservation as everywhere else the bag is checked —
     // without excludeTicketId, two different tickets assigned to this same
     // engineer both needing this same code both saw the SAME raw bag qty as
@@ -13854,8 +13917,7 @@ async function _missingCompanyStockParts(spares){
   if(!needed.length)return[];
   const missing=[];
   for(const s of needed){
-    const invItem=await sb('inventory','GET',null,'?part_code=eq.'+encodeURIComponent(s.code)+'&select=qty_in_stock&limit=1').catch(function(){return[];});
-    const have=(invItem&&invItem[0]&&invItem[0].qty_in_stock)||0;
+    const have=await getCompanyQtyByCode(s.code);
     if(have<(s.qty||1))missing.push(s.code+' '+(s.name||''));
   }
   return missing;
@@ -17578,8 +17640,12 @@ function _showGpsBlockedWarning(){
 }
 
 // ===== WORK LOG REMINDER =====
+// Disabled at user's request — the recurring 30-minute "add a work log"
+// popup was unwanted. Left as a no-op (not deleted) so it's a one-line
+// revert if ever wanted back.
 var _wlReminderInterval=null;
 function startWorkLogReminder(){
+  return;
   if(_wlReminderInterval)return;
   // Check every 30 minutes if a work log was added
   _wlReminderInterval=setInterval(function(){
