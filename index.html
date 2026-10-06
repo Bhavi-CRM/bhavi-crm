@@ -17478,7 +17478,7 @@ var _gpsWatchdog=null;
 // combination is one of the heaviest battery drains a phone can sustain,
 // and it ran the whole day regardless of whether the engineer was actually
 // travelling. Switched to periodic single reads (getCurrentPosition) every
-// 3 minutes instead: same accuracy per reading, but the GPS chip is free to
+// 5 minutes instead: same accuracy per reading, but the GPS chip is free to
 // idle in between reads rather than being held on continuously.
 function startLocationTracking(){
   if(_locInterval)return;
@@ -17502,10 +17502,10 @@ function startLocationTracking(){
     );
   }
 
-  // Immediate fix on start (app open / punch-in / resume), then every 3
+  // Immediate fix on start (app open / punch-in / resume), then every 5
   // minutes — each call is a single short GPS burst, not a continuous hold.
   _takeReading();
-  _locInterval=setInterval(_takeReading,3*60*1000);
+  _locInterval=setInterval(_takeReading,5*60*1000);
 
   // Warn when tab goes hidden — browsers throttle/stop GPS when minimized
   document.addEventListener('visibilitychange',_handleVisibility);
@@ -17523,9 +17523,15 @@ function _restartTrackingIfPunched(){
   var pKey='punch_'+(currentUser.user_id||currentUser.eng_id||'');
   var pData=JSON.parse(localStorage.getItem(pKey)||'null');
   if(pData&&pData.punched_in&&(window._appIsEng||window._appIsWC)){
-    // Stop any stale interval (it was frozen by the browser anyway)
+    // This fires on every tab-focus/resume — switching to WhatsApp and back
+    // a dozen times a day must NOT mean a dozen extra GPS bursts. Only force
+    // a fresh immediate read + restart when tracking is actually dead
+    // (interval missing, or no successful save in over 5 minutes — i.e. the
+    // browser genuinely froze it while backgrounded). Otherwise it's still
+    // on schedule — leave it alone and let the normal 5-minute tick continue.
+    var staleFor=Date.now()-_lastLocSaveTime;
+    if(_locInterval&&staleFor<5*60*1000)return;
     if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
-    // Restart fresh — gets a new GPS fix immediately
     startLocationTracking();
   }
 }
@@ -17552,7 +17558,7 @@ function _startGpsWatchdog(){
     if(!pData||!pData.punched_in)return;
     if(document.hidden)return; // nothing we can do while backgrounded; catch it on resume instead
     var staleFor=Date.now()-_lastLocSaveTime;
-    if(!_locInterval||staleFor>8*60*1000){
+    if(!_locInterval||staleFor>13*60*1000){
       console.log('GPS watchdog: tracking stale ('+Math.round(staleFor/1000)+'s) — restarting');
       if(_locInterval){clearInterval(_locInterval);_locInterval=null;}
       startLocationTracking();
