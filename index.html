@@ -345,7 +345,6 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('fault-finder')" id="nav-fault-finder"><span class="icon">🔍</span><span>Fault Finder</span></div>
     <div class="nav-item hidden" onclick="navigate('pending-list')" id="nav-pending-list"><span class="icon">📋</span><span>Pending List</span></div>
     <div class="nav-item hidden" onclick="navigate('followups')" id="nav-followups"><span class="icon">📅</span><span>Follow-Ups</span></div>
-    <div class="nav-item hidden" onclick="navigate('route-planning')" id="nav-route-planning"><span class="icon">🗺️</span><span>Route Planning</span></div>
     <div class="nav-item" onclick="navigate('master')" id="nav-master"><span class="icon">🗂️</span><span>Master Data</span></div>
     <div class="nav-item" onclick="navigate('settings')" id="nav-settings"><span class="icon">⚙️</span><span>Settings</span></div>
     <div class="nav-item" onclick="showPortalQR()" id="nav-customer-portal"><span class="icon">📱</span><span>Customer Portal</span></div>
@@ -14413,7 +14412,6 @@ var _NAV_ALL_ITEMS=[
   {id:'nav-sales',         label:'Sales',              engDef:false, wcDef:true},
   {id:'nav-pending-list',  label:'Pending List',       engDef:false, wcDef:true},
   {id:'nav-followups',     label:'Follow-Ups',         engDef:false, wcDef:true},
-  {id:'nav-route-planning',label:'Route Planning',     engDef:false, wcDef:true},
   {id:'nav-auto-inventory',label:'Auto Inventory',     engDef:false, wcDef:false},
   {id:'nav-auto-sites',    label:'Auto Sites',         engDef:false, wcDef:false},
   {id:'nav-auto-visits-report',label:'Site Visit Report',engDef:false,wcDef:false},
@@ -29401,6 +29399,9 @@ function pendingListRender(){
   var serviceFilter=window._pendingServiceFilter!=null?window._pendingServiceFilter:'On Site';
   var engFilter=window._pendingEngFilter||'';
   var searchQ=(window._pendingSearch||'').toLowerCase();
+  var callTypeFilter=window._pendingCallTypeFilter||'';
+  var dateFrom=window._pendingDateFrom||'';
+  var dateTo=window._pendingDateTo||'';
 
   // Split: Ready for Pickup (Repaired) vs actionable (all other statuses)
   var readyForPickup=all.filter(function(t){
@@ -29417,6 +29418,9 @@ function pendingListRender(){
     if(serviceFilter && t.service_type!==serviceFilter)return false;
     if(brandFilter && (t.brand_name||'').toLowerCase().indexOf(brandFilter.toLowerCase())<0)return false;
     if(engFilter && t.assigned_to!==engFilter)return false;
+    if(callTypeFilter && t.call_type!==callTypeFilter)return false;
+    if(dateFrom && (!t.created_at||t.created_at.slice(0,10)<dateFrom))return false;
+    if(dateTo && (!t.created_at||t.created_at.slice(0,10)>dateTo))return false;
     if(searchQ){
       var txt=((t.cname||'')+' '+(t.mobile||'')+' '+(t.pin||'')+' '+(t.area||'')+' '+(t.model||'')+' '+(t.serial||'')+' '+(t.id||'')+' '+(t.assigned_name||'')).toLowerCase();
       if(!txt.includes(searchQ))return false;
@@ -29616,7 +29620,17 @@ function pendingListRender(){
     +'<option value="">All Engineers</option>'
     +(allEngineers||[]).map(function(e){return '<option value="'+escHtml(e.eng_id)+'"'+(engFilter===e.eng_id?' selected':'')+'>'+escHtml(e.name)+'</option>';}).join('')
     +'</select>'
-    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\''+(window._isFullWC?'':'CSP')+'\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';window._pendingEngFilter=\'\';pendingListRender();" '
+    +'<select onchange="window._pendingCallTypeFilter=this.value;pendingListRender();" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<option value="">All Call Types</option>'
+    +'<option value="Warranty"'+(callTypeFilter==='Warranty'?' selected':'')+'>Warranty</option>'
+    +'<option value="Non-Warranty"'+(callTypeFilter==='Non-Warranty'?' selected':'')+'>Non-Warranty</option>'
+    +'<option value="AMC"'+(callTypeFilter==='AMC'?' selected':'')+'>AMC</option>'
+    +'<option value="Warranty Repeat"'+(callTypeFilter==='Warranty Repeat'?' selected':'')+'>Warranty Repeat</option>'
+    +'<option value="Non-Warranty Repeat"'+(callTypeFilter==='Non-Warranty Repeat'?' selected':'')+'>Non-Warranty Repeat</option>'
+    +'</select>'
+    +'<input type="date" title="Created From" value="'+escHtml(dateFrom)+'" onchange="window._pendingDateFrom=this.value;pendingListRender();" style="padding:7px 8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<input type="date" title="Created To" value="'+escHtml(dateTo)+'" onchange="window._pendingDateTo=this.value;pendingListRender();" style="padding:7px 8px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;">'
+    +'<button onclick="window._pendingSearch=\'\';window._pendingWCFilter=\''+(window._isFullWC?'':'CSP')+'\';window._pendingServiceFilter=\'On Site\';window._pendingBrandFilter=\'\';window._pendingEngFilter=\'\';window._pendingCallTypeFilter=\'\';window._pendingDateFrom=\'\';window._pendingDateTo=\'\';pendingListRender();" '
     +'style="padding:8px 12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;cursor:pointer;">✕ Reset</button>'
     +'<span id="pending-count" style="font-size:12px;color:#64748b;font-weight:600;white-space:nowrap;">'+filtered.length+' actionable calls</span>'
     +'</div>'
