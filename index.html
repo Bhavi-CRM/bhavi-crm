@@ -4887,8 +4887,14 @@ function ticketProblemFilterOptions(){
   return Array.from(set).filter(Boolean).sort(function(a,b){return a.localeCompare(b);});
 }
 window._ticketPage=1;window._ticketPageSize=50;
+// Persists across renderTicketTable() rebuilds (e.g. after opening a ticket
+// and assigning an engineer navigates back to this page) so the filter bar
+// doesn't silently reset — see _tkF usages below for where it's read back.
+window._tkF=window._tkF||{search:'',status:'',type:'',wc:'',svc:'',brand:'',eng:'',problem:'',inv:''};
 function renderTicketTable(filtered){
   const tickets=filtered||allTickets.filter(t=>!TERMINAL_TICKET_STATUSES.includes(t.status));
+  const F=window._tkF;
+  const selOpt=(val,label)=>`<option value="${val}"${F.status===val?' selected':''}>${label}</option>`;
   document.getElementById('page-content').innerHTML=`
     <div class="card">
       <div class="section-header"><h2>All Tickets (${tickets.length})</h2>
@@ -4898,44 +4904,47 @@ function renderTicketTable(filtered){
         </div>
       </div>
       <div class="filter-bar" style="flex-wrap:wrap;gap:8px;">
-        <input type="text" id="ticket-search" placeholder="Search..." oninput="filterTickets()" style="flex:1;min-width:180px;">
+        <input type="text" id="ticket-search" placeholder="Search..." value="${F.search.replace(/"/g,'&quot;')}" oninput="filterTickets()" style="flex:1;min-width:180px;">
         <select id="ticket-status-filter" onchange="filterTickets()">
           <option value="">All Status</option>
-          <option>Pending Visit Charge Approval</option><option>Pending Customer Arrival</option><option>Pending Allocation</option><option>Assigned</option><option>In Progress</option>
-          <option>Pending Customer Approval</option><option>Customer Approved</option>
-          <option>Customer Reject</option><option>Pending Parts</option><option>Pending Engineer Stock</option>
-          <option>Pending Repair Carry In</option><option>Pending Repair On Site</option>
-          <option>Repaired</option><option>Delivered</option><option>Sent to MSC</option><option>Pending for Delivery</option>
-          <option>Resolved By Phone</option><option>Call Cancel</option><option>Closed</option>
+          ${selOpt('Pending Visit Charge Approval','Pending Visit Charge Approval')}${selOpt('Pending Customer Arrival','Pending Customer Arrival')}${selOpt('Pending Allocation','Pending Allocation')}${selOpt('Assigned','Assigned')}${selOpt('In Progress','In Progress')}
+          ${selOpt('Pending Customer Approval','Pending Customer Approval')}${selOpt('Customer Approved','Customer Approved')}
+          ${selOpt('Customer Reject','Customer Reject')}${selOpt('Pending Parts','Pending Parts')}${selOpt('Pending Engineer Stock','Pending Engineer Stock')}
+          ${selOpt('Pending Repair Carry In','Pending Repair Carry In')}${selOpt('Pending Repair On Site','Pending Repair On Site')}
+          ${selOpt('Repaired','Repaired')}${selOpt('Delivered','Delivered')}${selOpt('Sent to MSC','Sent to MSC')}${selOpt('Pending for Delivery','Pending for Delivery')}
+          ${selOpt('Resolved By Phone','Resolved By Phone')}${selOpt('Call Cancel','Call Cancel')}${selOpt('Closed','Closed')}
         </select>
         <select id="ticket-type-filter" onchange="filterTickets()">
-          <option value="">All Types</option><option>Warranty</option><option>Non-Warranty</option><option>AMC</option>
+          <option value="">All Types</option><option${F.type==='Warranty'?' selected':''}>Warranty</option><option${F.type==='Non-Warranty'?' selected':''}>Non-Warranty</option><option${F.type==='AMC'?' selected':''}>AMC</option>
         </select>
         <select id="ticket-wc-filter" onchange="filterTickets()">
-          <option value="">All WC Type</option><option>ICP</option><option>CSP</option>
+          <option value="">All WC Type</option><option${F.wc==='ICP'?' selected':''}>ICP</option><option${F.wc==='CSP'?' selected':''}>CSP</option>
         </select>
         <select id="ticket-service-filter" onchange="filterTickets()">
-          <option value="">Carry In / On Site</option><option>Carry In</option><option>On Site</option>
+          <option value="">Carry In / On Site</option><option${F.svc==='Carry In'?' selected':''}>Carry In</option><option${F.svc==='On Site'?' selected':''}>On Site</option>
         </select>
         <select id="ticket-brand-filter" onchange="filterTickets()" style="min-width:140px;">
-          <option value="">All Brands</option><option>Printer</option><option>Scanner</option>
+          <option value="">All Brands</option><option${F.brand==='Printer'?' selected':''}>Printer</option><option${F.brand==='Scanner'?' selected':''}>Scanner</option>
         </select>
         <select id="ticket-eng-filter" onchange="filterTickets()">
-          <option value="">All Engineers</option>${allEngineers.map(e=>`<option value="${e.eng_id}">${e.name}</option>`).join('')}
+          <option value="">All Engineers</option>${allEngineers.map(e=>`<option value="${e.eng_id}"${F.eng===e.eng_id?' selected':''}>${e.name}</option>`).join('')}
         </select>
-        <input type="text" id="ticket-problem-filter" list="ticket-problem-list" placeholder="All Problems" oninput="filterTickets()" style="min-width:160px;">
+        <input type="text" id="ticket-problem-filter" list="ticket-problem-list" placeholder="All Problems" value="${F.problem.replace(/"/g,'&quot;')}" oninput="filterTickets()" style="min-width:160px;">
         <datalist id="ticket-problem-list">${ticketProblemFilterOptions().map(p=>`<option value="${p}">`).join('')}</datalist>
         <select id="ticket-invoice-filter" onchange="filterTickets()">
-          <option value="">All Invoice</option><option value="pending">🧾 Invoice Pending</option><option value="done">✅ Invoice Done</option>
+          <option value="">All Invoice</option><option value="pending"${F.inv==='pending'?' selected':''}>🧾 Invoice Pending</option><option value="done"${F.inv==='done'?' selected':''}>✅ Invoice Done</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="exportFilteredTickets()">📥 Excel Export</button>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Sr. No.</th><th>Problem</th><th>Type</th><th>Engineer</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Ticket</th><th>Customer</th><th>Mobile</th><th>Area</th><th>Model</th><th>Sr. No.</th><th>Problem</th><th>Type</th><th>Engineer</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="ticket-tbody">${_ticketPageSlice(tickets).slice.map(t=>ticketRow(t)).join('')}</tbody>
       </table></div>
       <div id="ticket-pager">${ticketPagerHtml(_ticketPageSlice(tickets))}</div>
     </div>`;
+  // Re-apply the restored filters to the freshly built table so the visible
+  // rows match the filter bar instead of showing the unfiltered default.
+  filterTickets(true);
 }
 // Client-side pagination — keeps the DOM from having to render hundreds of
 // rows at once (search/filter still runs across the full fetched dataset,
@@ -4968,6 +4977,7 @@ function ticketRow(t){
   const rowStyle=isCarryIn?'background:#ffedd5;':'';
   return `<tr style="${rowStyle}"><td onclick="viewTicket('${t.id}')" style="cursor:pointer;"><b style="color:#1d4ed8;">${t.id}</b></td><td onclick="viewTicket('${t.id}')" style="cursor:pointer;">${t.cname||'-'}</td>
     <td><a href="tel:${t.mobile}" class="clickable-phone">📞 ${t.mobile||'-'}</a> <a href="https://wa.me/91${(t.mobile||'').replace(/\D/g,'')}" target="_blank" style="color:#25D366;font-size:13px;text-decoration:none;" title="WhatsApp">💬</a></td>
+    <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.area||''}${t.pin?(' - '+t.pin):''}">${t.area||'-'}${t.pin?` <span style="color:var(--text-muted);font-size:11px;">(${t.pin})</span>`:''}</td>
     <td>${t.model||'-'}</td><td>${t.serial||'-'}</td>
     <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.problem||''}">${t.problem||'-'}</td>
     <td><span class="badge badge-warranty">${t.call_type||'-'}</span> <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;${isCarryIn?'background:#fed7aa;color:#9a3412;':'background:#bfdbfe;color:#1e40af;'}">${isCarryIn?'🏠 CARRY IN':'📍 ON SITE'}</span></td>
@@ -4989,7 +4999,8 @@ var INVOICE_ELIGIBLE_STATUSES=['Closed','Delivered','Customer Reject'];
 function filterTickets(keepPage){
   if(!keepPage)window._ticketPage=1;
   if(window._pendingInvFilter){window._pendingInvFilter=false;var inf=document.getElementById('ticket-invoice-filter');var stf=document.getElementById('ticket-status-filter');if(inf)inf.value='pending';if(stf)stf.value='';}
-  const q=(document.getElementById('ticket-search')?.value||'').toLowerCase();
+  const qRaw=document.getElementById('ticket-search')?.value||'';
+  const q=qRaw.toLowerCase();
   const s=document.getElementById('ticket-status-filter')?.value||'';
   const tp=document.getElementById('ticket-type-filter')?.value||'';
   const wc=document.getElementById('ticket-wc-filter')?.value||'';
@@ -4998,6 +5009,7 @@ function filterTickets(keepPage){
   const eng=document.getElementById('ticket-eng-filter')?.value||'';
   const problem=document.getElementById('ticket-problem-filter')?.value||'';
   const inv=document.getElementById('ticket-invoice-filter')?.value||'';
+  window._tkF={search:qRaw,status:s,type:tp,wc:wc,svc:svc,brand:brand,eng:eng,problem:problem,inv:inv};
   const showAll=!!(q||s||inv||problem);
   const f=allTickets.filter(t=>{
     const mQ=!q||[t.id,t.cname,t.serial,t.model,t.mobile,t.assigned_name,t.city].some(v=>(v||'').toLowerCase().includes(q));
@@ -5009,7 +5021,7 @@ function filterTickets(keepPage){
     return mQ&&mOpen&&(!s||t.status===s)&&(!tp||t.call_type===tp)&&(!wc||t.wc_type===wc)&&(!svc||t.service_type===svc)&&mBrand&&(!eng||t.assigned_to===eng)&&mInv&&mProblem;
   });
   const pageInfo=_ticketPageSlice(f);
-  document.getElementById('ticket-tbody').innerHTML=pageInfo.slice.map(t=>ticketRow(t)).join('')||'<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  document.getElementById('ticket-tbody').innerHTML=pageInfo.slice.map(t=>ticketRow(t)).join('')||'<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
   const pagerEl=document.getElementById('ticket-pager');if(pagerEl)pagerEl.innerHTML=ticketPagerHtml(pageInfo);
 }
 async function exportFilteredTickets(){
