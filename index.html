@@ -3082,6 +3082,11 @@ async function navigate(page){
   }
   // Clear live map auto-refresh when leaving the page
   if(page!=='live-map'&&window._liveMapRefresh){clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
+  // Entering All Tickets from a DIFFERENT tab = fresh visit, clear old filters.
+  // Actions that just refresh the tickets list in place (assign/update/etc.,
+  // which call renderTickets() directly without going through navigate()) must
+  // NOT hit this, so the filter bar survives those — only an actual tab change does.
+  if(page==='tickets'&&currentPage!=='tickets'){window._tkF={search:'',status:'',type:'',wc:'',svc:'',brand:'',eng:'',problem:'',inv:''};window._ticketPage=1;}
   currentPage=page;
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
