@@ -6499,8 +6499,12 @@ async function viewTicket(id,autoPrint=false){
   // approve an edit) must still be findable there.
   {const _idx=allTickets.findIndex(x=>x.id===t.id);if(_idx>=0)allTickets[_idx]=t;else allTickets.push(t);}
   // Regular engineers cannot view closed/cancelled call details — only their
-  // open calls. CSP managers and admin/WC are exempt.
-  if(currentUser&&currentUser.role==='engineer'&&!window._isCspMgr&&(isTicketClosed(t)||isTicketCancelled(t))){
+  // open calls. CSP managers and admin/WC are exempt. ENG007 is also exempt
+  // specifically when this ticket has a pending edit/cancel request waiting
+  // on his approval — those requests are often raised on already-closed
+  // calls (e.g. WC adding a missing serial number after close), so blocking
+  // him here would make his Approvals widget unusable for exactly those.
+  if(currentUser&&currentUser.role==='engineer'&&!window._isCspMgr&&(isTicketClosed(t)||isTicketCancelled(t))&&!(window._isEditApprover&&(t.pending_edit||t.pending_cancel))){
     alert('🔒 Closed call ni details engineer ne available nathi.\nFakt open (active) calls j joi shakay.');
     return;
   }
@@ -7275,12 +7279,14 @@ async function approveCancelRequest(id){
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
   if(!t||!t.pending_cancel)return;
-  if(!confirm('Approve this cancellation? This is PERMANENT.'))return;
-  const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled (Approved)',by:currentUser.name,at:new Date().toISOString(),note:'Cancel requested by '+t.pending_cancel.requested_by+'. Reason: '+t.pending_cancel.reason}];
+  const approveRemark=prompt('Approve this cancellation? This is PERMANENT.\n\nRemark (mandatory):');
+  if(approveRemark===null)return;
+  if(!approveRemark.trim()){alert('Remark is mandatory.');return;}
+  const tl=[...(await _freshTimeline(id,t)),{action:'Call Cancelled (Approved)',by:currentUser.name,at:new Date().toISOString(),note:'Cancel requested by '+t.pending_cancel.requested_by+'. Reason: '+t.pending_cancel.reason+'. Approval remark: '+approveRemark.trim()}];
   await sb('tickets','PATCH',{status:'Call Cancel',pending_cancel:null,last_status_by:currentUser.name,timeline:tl,updated_at:new Date().toISOString()},`?id=eq.${id}`);
   checkPendingPartsAuto();
   closeModal('modal-ticket');
-  if(currentPage==='tickets')renderTickets();else renderDashboard();
+  if(currentPage==='tickets')renderTickets();else if(currentPage==='my-calls')loadMyApprovalsWidget();else renderDashboard();
 }
 function rejectCancelRequest(id){
   var ex=document.getElementById('cancel-reject-modal');if(ex)ex.remove();
@@ -7288,7 +7294,8 @@ function rejectCancelRequest(id){
   ov.innerHTML='<div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">'
     +'<div style="padding:20px;">'
     +'<div style="font-size:16px;font-weight:800;color:#991b1b;margin-bottom:10px;">❌ Reject Cancel Request</div>'
-    +'<div style="font-size:13px;color:#374151;margin-bottom:16px;">Aa call have kai rite raakhvo chhe?</div>'
+    +'<div style="font-size:13px;color:#374151;margin-bottom:10px;">Aa call have kai rite raakhvo chhe?</div>'
+    +'<textarea id="cancel-reject-remark" placeholder="Remark (mandatory)" style="width:100%;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;resize:vertical;"></textarea>'
     +'<div style="display:flex;flex-direction:column;gap:8px;">'
     +'<button class="btn btn-outline" onclick="_doRejectCancel(\''+id+'\',\'unallocate\')">📤 Unallocate (Pending Allocation)</button>'
     +'<button class="btn btn-success" onclick="_doRejectCancel(\''+id+'\',\'keep\')">👤 Same Engineer sathe rakho</button>'
@@ -7299,6 +7306,9 @@ function rejectCancelRequest(id){
   document.body.appendChild(ov);
 }
 async function _doRejectCancel(id,choice){
+  var remarkEl=document.getElementById('cancel-reject-remark');
+  var remark=(remarkEl&&remarkEl.value||'').trim();
+  if(!remark){alert('Remark is mandatory.');return;}
   var overlay=document.getElementById('cancel-reject-modal');if(overlay)overlay.remove();
   let t=allTickets.find(x=>x.id===id);
   if(!t){const r=await sb('tickets','GET',null,`?id=eq.${id}`);t=r[0];}
@@ -7308,15 +7318,15 @@ async function _doRejectCancel(id,choice){
   let note;
   if(choice==='unallocate'){
     patch.status='Pending Allocation';patch.assigned_to=null;patch.assigned_name=null;
-    note='Cancel request rejected by '+currentUser.name+' — call unallocated, needs re-assignment.';
+    note='Cancel request rejected by '+currentUser.name+' — call unallocated, needs re-assignment. Remark: '+remark;
   }else{
-    note='Cancel request rejected by '+currentUser.name+' — kept with '+(pc.prev_assigned_name||'the same engineer')+', call continues as-is.';
+    note='Cancel request rejected by '+currentUser.name+' — kept with '+(pc.prev_assigned_name||'the same engineer')+', call continues as-is. Remark: '+remark;
   }
   const tl=[...(await _freshTimeline(id,t)),{action:'Cancel Request Rejected',by:currentUser.name,at:new Date().toISOString(),note}];
   patch.timeline=tl;
   await sb('tickets','PATCH',patch,`?id=eq.${id}`);
   closeModal('modal-ticket');
-  if(currentPage==='tickets')renderTickets();else renderDashboard();
+  if(currentPage==='tickets')renderTickets();else if(currentPage==='my-calls')loadMyApprovalsWidget();else renderDashboard();
 }
 async function quickStatusChange(id,status){
   if(!status)return;
@@ -15816,7 +15826,9 @@ async function approveReportEdit(ticketId){
   let t=allTickets.find(x=>x.id===ticketId);
   if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
   if(!t||!t.pending_edit){alert('No pending edit found.');return;}
-  if(!confirm(`Approve report edit for ${t.id} — ${t.cname}?`))return;
+  const approveRemark=prompt(`Approve report edit for ${t.id} — ${t.cname}?\n\nRemark (mandatory):`);
+  if(approveRemark===null)return;
+  if(!approveRemark.trim()){alert('Remark is mandatory.');return;}
   const pe=t.pending_edit;const ch=pe.changes||{};const now=new Date().toISOString();
   const patch={pending_edit:null,updated_at:now};
   // NOTE: this whitelist must cover every field the two edit-request flows
@@ -15829,7 +15841,7 @@ async function approveReportEdit(ticketId){
   ['cname','mobile','alt_mobile','city','state','address','area','pin','call_type','service_type','problem','description','work_done','fault_code','remarks','visit_date','visit_in','visit_out','meter_start','meter_end','labor','other_charge','model','serial','se_call_id','brand_name'].forEach(f=>{if(ch[f])patch[f]=ch[f].new;});
   let tl=await _freshTimeline(ticketId,t);
   const summary=Object.entries(ch).map(([k,v])=>`${k}: "${v.old}"→"${v.new}"`).join(' | ');
-  tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. ${summary}`}];
+  tl=[...tl,{action:'Report Edit Approved',by:currentUser.name||'Admin',at:now,note:`Edited by ${pe.requested_by}. Reason: ${pe.reason}. Approval remark: ${approveRemark.trim()}. ${summary}`}];
   // If this edit just changed call_type/service_type so the ticket now
   // matches "CSP + Non-Warranty + On Site" (same rule saveNewCall uses to
   // route a brand-new call to the visit-charge gate), it must go through
@@ -15855,24 +15867,27 @@ async function approveReportEdit(ticketId){
     try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'approved',cname:t.cname,model:t.model||'',wc_id:pe.wc_id,pe})});}catch(e){}
     alert('✅ Edit approved! Report has been updated.');
     closeModal('modal-ticket');
+    if(currentPage==='my-calls')loadMyApprovalsWidget();
   }catch(e){alert('Error: '+e.message);}
 }
 
 async function rejectReportEdit(ticketId){
-  const rejectReason=prompt('Reason for rejection (will be added to history):');
+  const rejectReason=prompt('Reason for rejection (mandatory — will be added to history):');
   if(rejectReason===null)return;
+  if(!rejectReason.trim()){alert('Reason is mandatory.');return;}
   let t=allTickets.find(x=>x.id===ticketId);
   if(!t){try{t=(await sb('tickets','GET',null,`?id=eq.${ticketId}`))[0];}catch(e){}}
   if(!t||!t.pending_edit){alert('No pending edit found.');return;}
   const pe=t.pending_edit;const now=new Date().toISOString();
   let tl=await _freshTimeline(ticketId,t);
-  tl=[...tl,{action:'Report Edit Rejected',by:currentUser.name||'Admin',at:now,note:`Edit by ${pe.requested_by} rejected. Reason: ${rejectReason||'No reason given'}`}];
+  tl=[...tl,{action:'Report Edit Rejected',by:currentUser.name||'Admin',at:now,note:`Edit by ${pe.requested_by} rejected. Reason: ${rejectReason.trim()}`}];
   try{
     await sb('tickets','PATCH',{pending_edit:null,timeline:tl,updated_at:now},`?id=eq.${ticketId}`);
     const idx=allTickets.findIndex(x=>x.id===ticketId);if(idx>=0){allTickets[idx].pending_edit=null;allTickets[idx].timeline=tl;}
     try{await fetch(SB_URL+'/functions/v1/bright-action',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},body:JSON.stringify({type:'report_edit_result',ticketId,result:'rejected',rejectReason,cname:t.cname,wc_id:pe.wc_id,pe})});}catch(e){}
     alert('❌ Edit request rejected. Original report remains unchanged.');
     closeModal('modal-ticket');
+    if(currentPage==='my-calls')loadMyApprovalsWidget();
   }catch(e){alert('Error: '+e.message);}
 }
 // ──── INVOICE DONE ────────────────────────────────────────────
