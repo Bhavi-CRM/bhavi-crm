@@ -2948,11 +2948,12 @@ function setupNav(){
       // Reports, Work Log Report, AMC) since only parts/inventory work was
       // asked for.
       window._isPartsAcct=isCspMgr||['ENG007'].includes(currentUser.user_id)||['ENG007'].includes(currentUser.eng_id);
-      // ENG007 can also approve/reject WC report-edit requests, for ANY
-      // ticket (CSP+ICP, Carry In+On Site) — he's usually in office, so this
-      // approval doesn't have to wait on admin/manager. Scoped to just the
-      // pending-edit block inside the ticket-detail modal, not the full
-      // CSP-Manager suite — see the ticket modal's adminActions assembly.
+      // ENG007 can also approve/reject WC report-edit AND call-cancel
+      // requests, for ANY ticket (CSP+ICP, Carry In+On Site) — he's usually
+      // in office, so this approval doesn't have to wait on admin/manager.
+      // Scoped to just the pending-edit/pending-cancel blocks inside the
+      // ticket-detail modal, not the full CSP-Manager suite — see the
+      // ticket modal's adminActions assembly.
       window._isEditApprover=isCspMgr||['ENG007'].includes(currentUser.user_id)||['ENG007'].includes(currentUser.eng_id);
       // Apply per-employee nav permissions
       var _uid=currentUser.eng_id||currentUser.user_id;
@@ -3089,6 +3090,18 @@ async function navigate(page){
     if(ls)ls.style.display='flex';
     return;
   }
+  // Punch-in gate — everyone except ADMIN001/ENG001/ENG002 must punch in
+  // before seeing any data or starting any call work/visit. Checked on every
+  // navigation (not just login) so it also catches someone who punches out
+  // mid-session and tries to keep working. The overlay itself (position:fixed,
+  // full-screen, high z-index) blocks all clicks underneath, so skipping the
+  // render below isn't strictly required for the "can't start work" part, but
+  // avoids wasting a fetch the user can't see anyway.
+  if(!_punchGateExempt()){
+    var _punched=await engPunchedInToday();
+    if(!_punched){showEngPunchGate();return;}
+    hideEngPunchGate();
+  }
   // Clear live map auto-refresh when leaving the page
   if(page!=='live-map'&&window._liveMapRefresh){clearInterval(window._liveMapRefresh);window._liveMapRefresh=null;}
   // Entering All Tickets from a DIFFERENT tab = fresh visit, clear old filters.
@@ -3137,6 +3150,20 @@ function showEngPunchGate(){
   document.body.appendChild(g);
 }
 function hideEngPunchGate(){var g=document.getElementById('eng-punch-gate');if(g)g.remove();}
+// ADMIN001/ENG001/ENG002 are exempt from the punch-gate — everyone else
+// (every other engineer, every WC, accountant, ENG007, etc.) must punch in
+// before they can see any data or start any call work/visit. Also exempts:
+// - ATT_EXCLUDED_IDS (WC001/WC002/ENG008) — already blocked from ever
+//   punching in at all (see doPunchIn/doPunchOut), so gating them on
+//   punch-in would lock them out of the CRM permanently.
+// - peon role — has its own separate task-log workflow with no punch_logs
+//   concept at all, would otherwise never be able to pass this gate.
+function _punchGateExempt(){
+  if(!currentUser)return true;
+  if(currentUser.role==='peon')return true;
+  var ids=['ADMIN001','ENG001','ENG002'].concat(typeof ATT_EXCLUDED_IDS!=='undefined'?ATT_EXCLUDED_IDS:[]);
+  return ids.includes(currentUser.user_id)||ids.includes(currentUser.eng_id);
+}
 
 // STATUS SYSTEM
 const STATUS_FLOW=['Pending Visit Charge Approval','Pending Customer Arrival','Pending Allocation','Assigned','In Progress','Pending Repair Carry In','Pending Repair On Site','Pending Parts','Pending Engineer Stock','Pending Customer Approval','Customer Approved','Customer Reject','Call Cancel','Closed','Repaired','Sent to MSC','Pending for Delivery','Resolved By Phone'];
@@ -5414,6 +5441,7 @@ async function renderMyCalls(){
     document.getElementById('page-content').innerHTML=`
       ${punchHtml}
       ${rtoHtml}
+      <div id="my-approvals-card"></div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Total</div><div class="kpi-value">${tickets.length}</div></div>
         <div class="kpi-card" style="border-color:#d97706"><div class="kpi-label">Active</div><div class="kpi-value">${tickets.filter(isTicketActive).length}</div></div>
@@ -5491,6 +5519,11 @@ async function renderMyCalls(){
       </div>`;
     // Load target widget async (non-blocking)
     loadMyTargetWidget(tickets);
+    // ENG007-only: he can approve edit/cancel requests for ANY ticket (see
+    // _isEditApprover in setupNav), but his own call list above is still
+    // just HIS assigned calls — without this he'd have no way to find the
+    // tickets waiting on his approval at all.
+    if(window._isEditApprover&&!(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr))loadMyApprovalsWidget();
     filterMyCalls();
   }catch(e){document.getElementById('page-content').innerHTML=`<div class="alert alert-warning">Error: ${e.message}</div>`;}
 }
@@ -6639,10 +6672,10 @@ async function viewTicket(id,autoPrint=false){
     </div>`;
   }
 
-  // ENG007 (_isEditApprover): same edit-approval controls admin/WC/CSP
-  // Manager get above, but added here independently of which branch ran —
-  // works on ANY ticket (not just his own), since he's not admin/WC/CspMgr
-  // and wouldn't otherwise hit that branch at all.
+  // ENG007 (_isEditApprover): same edit-approval AND cancel-approval controls
+  // admin/WC/CSP Manager get above, but added here independently of which
+  // branch ran — works on ANY ticket (not just his own), since he's not
+  // admin/WC/CspMgr and wouldn't otherwise hit that branch at all.
   if(t.pending_edit&&window._isEditApprover&&!(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)){
     adminActions+=`<hr class="divider"><div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
       ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
@@ -6651,6 +6684,16 @@ async function viewTicket(id,autoPrint=false){
         <button class="btn btn-success btn-sm" onclick="approveReportEdit('${t.id}')">✅ Approve</button>
         <button class="btn btn-danger btn-sm" onclick="rejectReportEdit('${t.id}')">❌ Reject</button>
         <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
+      </div>
+    </div>`;
+  }
+  if(t.pending_cancel&&window._isEditApprover&&!(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)){
+    adminActions+=`<hr class="divider"><div style="width:100%;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
+      🚫 <b>Cancel Requested — Pending Approval</b> — Requested by <b>${t.pending_cancel.requested_by}</b> (${t.pending_cancel.requested_by_role||''})<br>
+      <span style="font-size:12px;color:#991b1b;">Reason: ${t.pending_cancel.reason}</span><br>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-danger btn-sm" onclick="approveCancelRequest('${t.id}')">✅ Approve Cancel (Permanent)</button>
+        <button class="btn btn-outline btn-sm" onclick="rejectCancelRequest('${t.id}')">❌ Reject — Keep Call Active</button>
       </div>
     </div>`;
   }
@@ -18058,6 +18101,32 @@ async function renderLiveMap(){
   document.getElementById('lm-route-info').innerHTML=summaryHtml;
 }
 
+// ENG007's entry point to find tickets waiting on his edit/cancel approval —
+// his own call list is scoped to just his assigned calls, so without this
+// card he'd have no way to discover a pending_edit/pending_cancel request
+// on someone else's ticket. Clicking a row opens the normal ticket modal,
+// where the actual Approve/Reject controls live (see _isEditApprover).
+async function loadMyApprovalsWidget(){
+  var card=document.getElementById('my-approvals-card');if(!card)return;
+  try{
+    var edits=await sb('tickets','GET',null,'?pending_edit=not.is.null&select=id,cname,model,wc_type,service_type,pending_edit').catch(function(){return[];});
+    var cancels=await sb('tickets','GET',null,'?pending_cancel=not.is.null&select=id,cname,model,wc_type,service_type,pending_cancel').catch(function(){return[];});
+    var rows=[].concat(
+      (edits||[]).map(function(t){return{t:t,kind:'edit',by:t.pending_edit&&t.pending_edit.requested_by,reason:t.pending_edit&&t.pending_edit.reason};}),
+      (cancels||[]).map(function(t){return{t:t,kind:'cancel',by:t.pending_cancel&&t.pending_cancel.requested_by,reason:t.pending_cancel&&t.pending_cancel.reason};})
+    );
+    if(!rows.length){card.innerHTML='';return;}
+    var itemsHtml=rows.map(function(r){
+      var badge=r.kind==='edit'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">✏️ Edit</span>':'<span style="background:#fef2f2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">🚫 Cancel</span>';
+      return '<div onclick="viewTicket(\''+r.t.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #f1f5f9;">'
+        +badge
+        +'<div style="flex:1;min-width:0;"><b style="color:#1d4ed8;font-size:13px;">'+escHtml(r.t.id)+'</b> — '+escHtml(r.t.cname||'')+'<div style="font-size:11px;color:#6b7280;">Requested by '+escHtml(r.by||'')+(r.reason?' · '+escHtml(r.reason):'')+'</div></div>'
+        +'</div>';
+    }).join('');
+    card.innerHTML='<div class="card" style="margin-bottom:14px;border-color:#fbbf24;"><div class="section-header" style="margin-bottom:4px;"><h2>⏳ Approvals Waiting On You ('+rows.length+')</h2></div>'+itemsHtml+'</div>';
+  }catch(e){card.innerHTML='';}
+}
+
 // ===== TARGET MODULE =====
 async function loadMyTargetWidget(tickets){
   var card=document.getElementById('my-target-card');if(!card)return;
@@ -24450,7 +24519,7 @@ function downloadVisitExcel(){
   };});
   var ws=XLSX.utils.json_to_sheet(data);
   ws['!cols']=[{wch:20},{wch:18},{wch:14},{wch:10},{wch:18},{wch:40},{wch:35}];
-  XLSX.utils.book_append_sheet(wb,'All Visits',ws);
+  XLSX.utils.book_append_sheet(wb,ws,'All Visits');
   // Per site sheets
   var bySite={};
   visits.forEach(function(v){
@@ -24462,7 +24531,7 @@ function downloadVisitExcel(){
     var sd=svs.map(function(v){return{'Date':fmtDate(v.visit_date),'Time':v.visit_time||'','Work Done':v.work_done||'','Material':v.material_delivered||''};});
     var sw=XLSX.utils.json_to_sheet(sd);
     sw['!cols']=[{wch:14},{wch:10},{wch:45},{wch:35}];
-    XLSX.utils.book_append_sheet(wb,sn.replace(/[:\\\/\?\*\[\]]/g,'').slice(0,31),sw);
+    XLSX.utils.book_append_sheet(wb,sw,sn.replace(/[:\\\/\?\*\[\]]/g,'').slice(0,31));
   });
   XLSX.writeFile(wb,'site_visits_'+new Date().toLocaleDateString('en-CA')+'.xlsx');
 }
