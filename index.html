@@ -18132,15 +18132,19 @@ async function loadMyApprovalsWidget(){
     var edits=await sb('tickets','GET',null,'?pending_edit=not.is.null&select=id,cname,model,wc_type,service_type,pending_edit').catch(function(){return[];});
     var cancels=await sb('tickets','GET',null,'?pending_cancel=not.is.null&select=id,cname,model,wc_type,service_type,pending_cancel').catch(function(){return[];});
     var rows=[].concat(
-      (edits||[]).map(function(t){return{t:t,kind:'edit',by:t.pending_edit&&t.pending_edit.requested_by,reason:t.pending_edit&&t.pending_edit.reason};}),
-      (cancels||[]).map(function(t){return{t:t,kind:'cancel',by:t.pending_cancel&&t.pending_cancel.requested_by,reason:t.pending_cancel&&t.pending_cancel.reason};})
+      (edits||[]).map(function(t){return{t:t,kind:'edit',by:t.pending_edit&&t.pending_edit.requested_by,reason:t.pending_edit&&t.pending_edit.reason,at:t.pending_edit&&t.pending_edit.requested_at};}),
+      (cancels||[]).map(function(t){return{t:t,kind:'cancel',by:t.pending_cancel&&t.pending_cancel.requested_by,reason:t.pending_cancel&&t.pending_cancel.reason,at:t.pending_cancel&&t.pending_cancel.at};})
     );
     if(!rows.length){card.innerHTML='';return;}
+    // Newest request first — a request made just now should surface above
+    // one sitting since months ago, so the newest work is always what's
+    // immediately visible instead of buried under old backlog.
+    rows.sort(function(a,b){return new Date(b.at||0)-new Date(a.at||0);});
     var itemsHtml=rows.map(function(r){
       var badge=r.kind==='edit'?'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">✏️ Edit</span>':'<span style="background:#fef2f2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">🚫 Cancel</span>';
       return '<div onclick="viewTicket(\''+r.t.id+'\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #f1f5f9;">'
         +badge
-        +'<div style="flex:1;min-width:0;"><b style="color:#1d4ed8;font-size:13px;">'+escHtml(r.t.id)+'</b> — '+escHtml(r.t.cname||'')+'<div style="font-size:11px;color:#6b7280;">Requested by '+escHtml(r.by||'')+(r.reason?' · '+escHtml(r.reason):'')+'</div></div>'
+        +'<div style="flex:1;min-width:0;"><b style="color:#1d4ed8;font-size:13px;">'+escHtml(r.t.id)+'</b> — '+escHtml(r.t.cname||'')+'<div style="font-size:11px;color:#6b7280;">Requested by '+escHtml(r.by||'')+(r.reason?' · '+escHtml(r.reason):'')+(r.at?' · '+new Date(r.at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}):'')+'</div></div>'
         +'</div>';
     }).join('');
     card.innerHTML='<div class="card" style="margin-bottom:14px;border-color:#fbbf24;"><div class="section-header" style="margin-bottom:4px;"><h2>⏳ Approvals Waiting On You ('+rows.length+')</h2></div>'+itemsHtml+'</div>';
