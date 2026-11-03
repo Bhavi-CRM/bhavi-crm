@@ -2890,6 +2890,7 @@ function setupNav(){
     // login; only the Engineer branch below can turn it back on.
     window._isCspMgr=false;
     window._isPartsAcct=false;
+    window._isEditApprover=false;
 
     // Debug log
     console.log('setupNav:', {role, roleType, isEng, isWC, isAdmin, user: currentUser.user_id});
@@ -2947,6 +2948,12 @@ function setupNav(){
       // Reports, Work Log Report, AMC) since only parts/inventory work was
       // asked for.
       window._isPartsAcct=isCspMgr||['ENG007'].includes(currentUser.user_id)||['ENG007'].includes(currentUser.eng_id);
+      // ENG007 can also approve/reject WC report-edit requests, for ANY
+      // ticket (CSP+ICP, Carry In+On Site) — he's usually in office, so this
+      // approval doesn't have to wait on admin/manager. Scoped to just the
+      // pending-edit block inside the ticket-detail modal, not the full
+      // CSP-Manager suite — see the ticket modal's adminActions assembly.
+      window._isEditApprover=isCspMgr||['ENG007'].includes(currentUser.user_id)||['ENG007'].includes(currentUser.eng_id);
       // Apply per-employee nav permissions
       var _uid=currentUser.eng_id||currentUser.user_id;
       var _up=window._navPerms&&window._navPerms.users&&window._navPerms.users[_uid]||null;
@@ -6454,6 +6461,12 @@ async function viewTicket(id,autoPrint=false){
     t=allTickets.find(x=>x.id===id);
   }
   if(!t)return;
+  // Keep allTickets in sync with whatever was just fetched — some consumers
+  // (e.g. viewEditDiff for the edit-approval block) read straight from
+  // allTickets rather than re-fetching, so a ticket outside this user's
+  // normally-loaded scope (e.g. ENG007 opening another engineer's call to
+  // approve an edit) must still be findable there.
+  {const _idx=allTickets.findIndex(x=>x.id===t.id);if(_idx>=0)allTickets[_idx]=t;else allTickets.push(t);}
   // Regular engineers cannot view closed/cancelled call details — only their
   // open calls. CSP managers and admin/WC are exempt.
   if(currentUser&&currentUser.role==='engineer'&&!window._isCspMgr&&(isTicketClosed(t)||isTicketCancelled(t))){
@@ -6623,6 +6636,22 @@ async function viewTicket(id,autoPrint=false){
       `:''}
       ${t.status==='Pending Customer Approval'?`<button class="btn btn-success btn-sm" onclick="closeModal('modal-ticket');openApproval('${t.id}')">✅ Approve / Reject Estimate</button>`:''}
       ${t.pending_edit?'<span style="font-size:12px;color:#92400e;background:#fef3c7;padding:6px 12px;border-radius:8px;font-weight:600;">⏳ Edit request pending approval</span>':`<button class="btn btn-sm" onclick="closeModal('modal-ticket');openReportEditModal('${t.id}')" style="background:#0ea5e9;color:#fff;border:none;">✏️ Request Edit</button>`}
+    </div>`;
+  }
+
+  // ENG007 (_isEditApprover): same edit-approval controls admin/WC/CSP
+  // Manager get above, but added here independently of which branch ran —
+  // works on ANY ticket (not just his own), since he's not admin/WC/CspMgr
+  // and wouldn't otherwise hit that branch at all.
+  if(t.pending_edit&&window._isEditApprover&&!(currentUser.role==='admin'||currentUser.role_type==='work_controller'||window._isCspMgr)){
+    adminActions+=`<hr class="divider"><div style="width:100%;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px;margin-top:6px;font-size:13px;">
+      ⏳ <b>Edit Pending Approval</b> — Requested by <b>${t.pending_edit.requested_by}</b><br>
+      <span style="font-size:12px;color:#92400e;">Reason: ${t.pending_edit.reason}</span><br>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-success btn-sm" onclick="approveReportEdit('${t.id}')">✅ Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectReportEdit('${t.id}')">❌ Reject</button>
+        <button class="btn btn-outline btn-sm" onclick="viewEditDiff('${t.id}')">🔍 View Changes</button>
+      </div>
     </div>`;
   }
 
@@ -24340,15 +24369,25 @@ async function loadAutoVisitReport(){
     if(from)q+='&visit_date=gte.'+from;
     if(to)q+='&visit_date=lte.'+to;
     if(siteFilter)q+='&site_id=eq.'+siteFilter;
-    var visits=await sb('auto_site_visits','GET',null,q);
+    // A wide date range here can time out as a single request (57014) — these
+    // rows carry embedded photo data, so a few months of visits can be large
+    // enough that Postgres cancels the query before it finishes. sbAll breaks
+    // it into small paginated requests instead, same fix used elsewhere in
+    // this app for heavy queries (see sbAll's own comment).
+    var visits=await sbAll('auto_site_visits',q,200);
     var sites=window._avrSites||[];
     var siteMap={};sites.forEach(function(s){siteMap[s.id]=s;});
     window._avrVisits=visits.map(function(v){
       var s=siteMap[v.site_id]||{};
       var isAdhoc=!v.site_id;
+      // A site_id that doesn't resolve in siteMap means the site was deleted
+      // from Master Data since this visit was logged — the visit itself must
+      // still show up (grouped under its own card) when pulling "All Sites",
+      // not silently vanish just because its parent site record is gone.
+      var isDeletedSite=!isAdhoc&&!s.site_name;
       return Object.assign({},v,{
-        site_name:isAdhoc?('🔧 '+(v.adhoc_label||'One-off Visit')+(v.adhoc_address||v.adhoc_area?' — '+[v.adhoc_address,v.adhoc_area].filter(Boolean).join(', '):'')):(s.site_name||'-'),
-        client_name:isAdhoc?(v.adhoc_client_name||'—'):(s.client_name||'-')
+        site_name:isAdhoc?('🔧 '+(v.adhoc_label||'One-off Visit')+(v.adhoc_address||v.adhoc_area?' — '+[v.adhoc_address,v.adhoc_area].filter(Boolean).join(', '):'')):(isDeletedSite?'🗑️ Deleted Site (was: '+v.site_id+')':s.site_name),
+        client_name:isAdhoc?(v.adhoc_client_name||'—'):(s.client_name||(isDeletedSite?'—':'-'))
       });
     });
     if(!window._avrVisits.length){res.innerHTML='<div class="alert alert-info">No visits found for the selected filter.</div>';return;}
