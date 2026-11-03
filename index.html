@@ -3036,7 +3036,6 @@ function setupNav(){
     if(pData&&pData.punched_in){
       startLocationTracking();
       startWorkLogReminder();
-      setTimeout(function(){saveLocationEvent('track');},2000);
     } else {
       // Check DB in case localStorage is missing (e.g. fresh login on another device)
       var todayCheck=new Date().toLocaleDateString('en-CA');
@@ -3047,7 +3046,6 @@ function setupNav(){
           localStorage.setItem(pKey,JSON.stringify(ps));
           startLocationTracking();
           startWorkLogReminder();
-          setTimeout(function(){saveLocationEvent('track');},2000);
         }
       }).catch(function(){});
     }
@@ -17725,6 +17723,13 @@ var _gpsWatchdog=null;
 // 5 minutes instead: same accuracy per reading, but the GPS chip is free to
 // idle in between reads rather than being held on continuously.
 function startLocationTracking(){
+  // DISABLED per request — the periodic every-5-minute background tracking
+  // (plus its visibility/pageshow listeners and 15s watchdog) was pure
+  // battery drain and extra CRM load for no real benefit. Location is now
+  // captured ONLY at the specific mandatory action points that already call
+  // saveLocationEvent()/getLocation() directly: Punch In/Out, Visit Start,
+  // Work Start, and Call Closed. Left intact below as a one-line revert.
+  return;
   if(_locInterval)return;
   if(currentUser&&LIVE_TRACKING_EXCLUDED_IDS.includes(currentUser.eng_id||currentUser.user_id))return;
 
