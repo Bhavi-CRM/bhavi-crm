@@ -2623,6 +2623,17 @@ function getDeviceLabel(){
   if(/Edg\//.test(ua))br='Edge';else if(/OPR\/|Opera/.test(ua))br='Opera';else if(/Firefox\/|FxiOS/.test(ua))br='Firefox';else if(/Chrome\/|CriOS/.test(ua))br='Chrome';else if(/Safari\//.test(ua))br='Safari';
   return br+' on '+os;
 }
+// Browser GPS (asks permission once; 6s timeout). Resolves null if denied/unavailable — server falls back to IP location.
+function getDeviceGeo(){
+  return new Promise(function(res){
+    try{
+      if(!navigator.geolocation)return res(null);
+      var done=false,t=setTimeout(function(){if(!done){done=true;res(null);}},6000);
+      navigator.geolocation.getCurrentPosition(function(p){if(done)return;done=true;clearTimeout(t);res({lat:p.coords.latitude,lng:p.coords.longitude,acc:Math.round(p.coords.accuracy||0)});},
+        function(){if(done)return;done=true;clearTimeout(t);res(null);},{enableHighAccuracy:true,timeout:5500,maximumAge:60000});
+    }catch(e){res(null);}
+  });
+}
 // Fail-open: if the function is unreachable/not deployed, login still works (returns null).
 async function deviceCall(body,ms){
   var ctl=new AbortController(),t=setTimeout(function(){ctl.abort();},ms||6000);
@@ -2634,7 +2645,7 @@ async function deviceCall(body,ms){
 function forceDeviceBlockedLogout(){
   clearInterval(_devWatchTimer);
   try{localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');}catch(e){}
-  alert('🚫 Aa device block karvama aavyu chhe.\n\nJo aa tame j hata to Admin ne contact karo.');
+  alert('🚫 This device has been blocked.\n\nIf this was you, please contact your administrator.');
   location.reload();
 }
 async function _devWatchTick(){
@@ -2656,29 +2667,31 @@ function handleDeviceActionLink(){
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;z-index:100000;background:linear-gradient(135deg,#1e2a3a,#1d4ed8);display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit;';
   ov.innerHTML='<div style="background:#fff;border-radius:20px;padding:30px;width:380px;max-width:100%;box-shadow:0 30px 80px rgba(0,0,0,.3);text-align:center">'
-    +'<div style="font-size:38px">🔐</div><div style="font-size:18px;font-weight:800;margin:6px 0 14px">New device login</div>'
+    +'<div style="font-size:38px">🔐</div><div style="font-size:18px;font-weight:800;margin:6px 0 14px">New Device Sign-in</div>'
     +'<div id="dv-body" style="font-size:14px;color:#374151;line-height:1.7">Loading...</div>'
     +'<div id="dv-btns" style="margin-top:18px;display:none">'
-    +'<button id="dv-allow" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">✅ Ha, me j chhu — chalu rakho</button>'
-    +'<button id="dv-block" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">🚫 Aa device Block karo</button></div>'
+    +'<button id="dv-allow" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">✅ Yes, it was me</button>'
+    +'<button id="dv-block" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">🚫 Block this device</button></div>'
     +'<button id="dv-close" style="display:none;margin-top:14px;background:none;border:none;color:#1d4ed8;font-weight:700;cursor:pointer;font-size:14px">Open CRM →</button></div>';
   document.body.appendChild(ov);
   var body=ov.querySelector('#dv-body'),btns=ov.querySelector('#dv-btns'),cl=ov.querySelector('#dv-close');
   cl.onclick=function(){ov.remove();};
   (async function(){
     var r=await deviceCall({action:'preview',token:tok},10000);
-    if(!r||r.error){body.textContent=(r&&r.error)||'Server ma problem — thodi var pachhi try karo.';cl.style.display='inline-block';return;}
+    if(!r||r.error){body.textContent=(r&&r.error)||'Server error. Please try again later.';cl.style.display='inline-block';return;}
     body.innerHTML='';
     var l1=document.createElement('div');l1.innerHTML='<b></b>';l1.firstChild.textContent=r.name;body.appendChild(l1);
     var l2=document.createElement('div');l2.textContent='Device: '+(r.label||'Unknown')+'  |  IP: '+(r.ip||'-');body.appendChild(l2);
+    if(r.location){var lc=document.createElement('div');lc.textContent='Location: '+r.location+(r.loc_source==='IP'?' (approx.)':'');body.appendChild(lc);}
+    if(r.map){var mp=document.createElement('a');mp.href=r.map;mp.target='_blank';mp.rel='noopener';mp.textContent='📍 View on map';mp.style.cssText='color:#1d4ed8;font-weight:700';body.appendChild(mp);}
     var l3=document.createElement('div');l3.style.cssText='color:#6b7280;font-size:12px';l3.textContent=new Date(r.when).toLocaleString('en-IN');body.appendChild(l3);
     var st=document.createElement('div');st.style.cssText='margin-top:8px;font-weight:700';
-    st.textContent=r.status==='blocked'?'Current status: 🚫 Blocked':r.status==='trusted'?'Current status: ✅ Allowed':'Current status: ⏳ Awaiting your decision';
+    st.textContent=r.status==='blocked'?'Status: 🚫 Blocked':r.status==='trusted'?'Status: ✅ Allowed':'Status: ⏳ Awaiting your decision';
     body.appendChild(st);btns.style.display='block';
     async function decide(d){
       btns.style.display='none';body.textContent='Please wait...';
       var x=await deviceCall({action:'respond',token:tok,decision:d},10000);
-      body.textContent=(x&&x.status==='blocked')?'🚫 Device blocked — te turant logout thai jase.':(x&&x.status==='trusted')?'✅ Device allowed — te chalu rahese.':((x&&x.error)||'Failed — fari try karo.');
+      body.textContent=(x&&x.status==='blocked')?'🚫 Device blocked. It will be signed out immediately.':(x&&x.status==='trusted')?'✅ Device allowed. Thank you for confirming.':((x&&x.error)||'Action failed. Please try again.');
       cl.style.display='inline-block';
     }
     ov.querySelector('#dv-allow').onclick=function(){decide('allow');};
@@ -2744,7 +2757,7 @@ async function doLogin(){
     }
     // NEW-DEVICE ALERT: a device that was blocked via the email link cannot log in.
     var _dvChk=await deviceCall({action:'status',user_id:user.user_id,device_id:getDeviceId()},5000);
-    if(_dvChk&&_dvChk.status==='blocked'){currentUser=null;showLoginError('🚫 Aa device block chhe. Admin ne contact karo.');return;}
+    if(_dvChk&&_dvChk.status==='blocked'){currentUser=null;showLoginError('🚫 This device has been blocked. Please contact your administrator.');return;}
     const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
     // Up to 2 concurrent device sessions per account (FIFO) — logging in on a
     // 3rd device kicks the OLDEST of the previous two out; the two most
@@ -2762,7 +2775,9 @@ async function doLogin(){
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     // NEW-DEVICE ALERT: register this device; server emails Allow/Block links if it is new. Non-blocking.
-    deviceCall({action:'register',user_id:user.user_id,device_id:getDeviceId(),label:getDeviceLabel(),ua:navigator.userAgent,session_token:_stok,app_url:location.origin+location.pathname},10000).then(function(r){console.log('device-alert register:',r);});
+    getDeviceGeo().then(function(_geo){
+      return deviceCall({action:'register',user_id:user.user_id,device_id:getDeviceId(),label:getDeviceLabel(),ua:navigator.userAgent,session_token:_stok,app_url:location.origin+location.pathname,geo:_geo},15000);
+    }).then(function(r){console.log('device-alert register:',r);});
     startDeviceWatch();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
@@ -2908,7 +2923,7 @@ async function tryAutoLogin(){
   if(_dvAuto&&_dvAuto.status==='blocked'){
     localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
     currentUser=null;
-    alert('🚫 Aa device block karvama aavyu chhe. Admin ne contact karo.');
+    alert('🚫 This device has been blocked. Please contact your administrator.');
     restoreLoginFormHTML();
     return;
   }
