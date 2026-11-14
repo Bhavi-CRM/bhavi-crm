@@ -314,6 +314,7 @@ tr:hover td{background:#f8fafc;}
     <div class="nav-item hidden" onclick="navigate('km-report')" id="nav-km-report"><span class="icon">🛣️</span><span>KM Tracking</span></div>
     <div class="nav-item hidden" onclick="showPaymentQR()" id="nav-payment-qr"><span class="icon">💳</span><span>Payment QR</span></div>
     <div class="nav-item hidden" onclick="navigate('payment-collection')" id="nav-payment-collection"><span class="icon">💰</span><span>Payment Collection</span></div>
+    <div class="nav-item hidden" onclick="navigate('cash-book')" id="nav-cash-book"><span class="icon">💵</span><span>Cash Book</span></div>
     <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="icon">📊</span><span>Dashboard</span></div>
     <div class="nav-item" onclick="navigate('tickets')" id="nav-tickets"><span class="icon">🎫</span><span>All Tickets</span></div>
     <div class="nav-item hidden" onclick="navigate('field-tasks')" id="nav-field-tasks"><span class="icon">🚚</span><span>Other Work</span></div>
@@ -2638,7 +2639,7 @@ function getDeviceGeo(){
 async function deviceCall(body,ms){
   var ctl=new AbortController(),t=setTimeout(function(){ctl.abort();},ms||6000);
   try{
-    var r=await fetch(DEVICE_FN,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY},body:JSON.stringify(body),signal:ctl.signal});
+    var r=await fetch(DEVICE_FN,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY},body:JSON.stringify(body),signal:ctl.signal,keepalive:(body.action==='register')});
     if(!r.ok)return null;return await r.json();
   }catch(e){return null;}finally{clearTimeout(t);}
 }
@@ -3113,6 +3114,8 @@ function setupNav(){
       sv('nav-parts-catalog',true);sv('nav-fault-finder',true);sv('nav-peon-activity',true);
       sv('btn-daily-report',true);sv('btn-weekly-report',true);sv('nav-tat-report',false);
     }
+    // Cash Book: Admin, ENG001/ENG002 managers and the two Work Controllers (WC001/WC002) only
+    sv('nav-cash-book',_cbCanView());
     // Position KM Tracking + Payment QR per role:
     // Admin → below Engineer Daily Report (Dashboard, All Tickets, Eng Daily Report first)
     // WC → below Courier | Engineer → below My Report (original spot)
@@ -3165,6 +3168,309 @@ function setupNav(){
   }
   }catch(e){console.error('setupNav:',e);}
 }
+
+// ===== CASH BOOK (WC cash register: customer collections, porter payouts, manager withdrawals) =====
+// Balance (cash in bag / carry forward) = Σ(in + opening) − Σ(out + withdraw), deleted entries ignored.
+var _CB_WC_IDS=['WC001','WC002'];
+function _cbIds(){return [currentUser&&currentUser.user_id,currentUser&&currentUser.eng_id].filter(Boolean);}
+function _cbIsMgr(){return _cbIds().some(function(i){return i==='ENG001'||i==='ENG002';});}
+function _cbIsAdmin(){return !!currentUser&&currentUser.role==='admin'&&currentUser.role_type!=='work_controller';}
+function _cbIsCashWC(){return _cbIds().some(function(i){return _CB_WC_IDS.indexOf(i)!==-1;});}
+function _cbCanView(){return !!currentUser&&(_cbIsAdmin()||_cbIsMgr()||_cbIsCashWC());}
+function _cbIsBoss(){return _cbIsAdmin()||_cbIsMgr();} // withdraw, summary, opening balance, edit withdrawals, restore
+window._cb=window._cb||{rows:[],period:'today',from:'',to:'',tab:'ledger',showDel:false};
+
+function _cbToday(){return new Date().toLocaleDateString('en-CA');}
+function _cbDStr(d){return d.toLocaleDateString('en-CA');}
+function _cbFmt(n){n=Number(n)||0;return (n<0?'-':'')+'₹'+Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:2});}
+function _cbNice(ds){var p=ds.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function _cbSigned(r){var a=Number(r.amount)||0;return (r.entry_type==='in'||r.entry_type==='opening')?a:-a;}
+function _cbE(s){return escHtml(String(s==null?'':s));}
+function _cbRange(){
+  var c=window._cb,t=new Date(),today=_cbToday(),f=today,to=today;
+  if(c.period==='yesterday'){var y=new Date(t);y.setDate(y.getDate()-1);f=to=_cbDStr(y);}
+  else if(c.period==='week'){var d=new Date(t);d.setDate(d.getDate()-((d.getDay()+6)%7));f=_cbDStr(d);}
+  else if(c.period==='month'){f=today.slice(0,8)+'01';}
+  else if(c.period==='lastmonth'){f=_cbDStr(new Date(t.getFullYear(),t.getMonth()-1,1));to=_cbDStr(new Date(t.getFullYear(),t.getMonth(),0));}
+  else if(c.period==='custom'){f=c.from||today;to=c.to||today;}
+  else if(c.period==='all'){f='1900-01-01';to='9999-12-31';}
+  return {from:f,to:to};
+}
+
+async function renderCashBook(){
+  var pc=document.getElementById('page-content');
+  if(!_cbCanView()){pc.innerHTML='<div class="alert alert-warning">You do not have access to Cash Book.</div>';return;}
+  pc.innerHTML='<div class="loading">Loading...</div>';
+  try{await sb('cash_book','GET',null,'?select=id&limit=1');}
+  catch(e){pc.innerHTML='<div class="alert alert-warning">⚠️ Setup needed: the <b>cash_book</b> table does not exist yet. Run <b>cash_book.sql</b> in Supabase → SQL Editor, then reload this page.</div>';return;}
+  try{await _cbReload();}catch(e){pc.innerHTML='<div class="alert alert-danger">Error loading Cash Book: '+_cbE(e.message)+'</div>';}
+}
+async function _cbReload(){
+  window._cb.rows=await sbAll('cash_book','?order=entry_date.asc,id.asc');
+  _cbDraw();
+}
+function _cbSetPeriod(p){window._cb.period=p;_cbDraw();}
+function _cbSetTab(t){window._cb.tab=t;_cbDraw();}
+function _cbSetCustom(){var f=document.getElementById('cb-from'),t=document.getElementById('cb-to');window._cb.period='custom';window._cb.from=f&&f.value||_cbToday();window._cb.to=t&&t.value||_cbToday();_cbDraw();}
+function _cbToggleDel(el){window._cb.showDel=!!el.checked;_cbDraw();}
+
+function _cbDraw(){
+  var pc=document.getElementById('page-content');if(!pc||currentPage!=='cash-book')return;
+  var c=window._cb,boss=_cbIsBoss(),rg=_cbRange();
+  if(!boss&&c.tab==='summary')c.tab='ledger';
+  var act=c.rows.filter(function(r){return!r.is_deleted;});
+  var bal=act.reduce(function(a,r){return a+_cbSigned(r);},0);
+  var before=act.filter(function(r){return r.entry_date<rg.from;}).reduce(function(a,r){return a+_cbSigned(r);},0);
+  var inP=act.filter(function(r){return r.entry_date>=rg.from&&r.entry_date<=rg.to;});
+  function sum(t){return inP.filter(function(r){return r.entry_type===t;}).reduce(function(a,r){return a+Number(r.amount);},0);}
+  var sIn=sum('in'),sOut=sum('out'),sWd=sum('withdraw'),sOp=sum('opening');
+  var pLabel={today:'Today',yesterday:'Yesterday',week:'This Week',month:'This Month',lastmonth:'Last Month',custom:'Custom',all:'All Time'}[c.period];
+  function chip(k,l){var on=c.period===k;return '<button onclick="_cbSetPeriod(\''+k+'\')" style="border:1px solid '+(on?'var(--primary)':'var(--border)')+';background:'+(on?'var(--primary)':'#fff')+';color:'+(on?'#fff':'var(--text)')+';border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">'+l+'</button>';}
+  function card(label,val,color,sub){return '<div style="background:#fff;border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);border-left:4px solid '+color+';"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;">'+label+'</div><div style="font-size:22px;font-weight:800;color:'+color+';margin-top:4px;">'+val+'</div>'+(sub?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+sub+'</div>':'')+'</div>';}
+  var h='';
+  // Big balance banner
+  h+='<div style="background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;border-radius:14px;padding:18px 22px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;">'
+    +'<div><div style="font-size:12px;opacity:.8;font-weight:700;letter-spacing:.5px;">💼 CASH IN BAG — CARRY FORWARD</div><div style="font-size:34px;font-weight:800;margin-top:2px;">'+_cbFmt(bal)+'</div></div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+    +'<button class="btn btn-success" onclick="_cbOpenEntry(\'in\')">➕ Cash In (Customer)</button>'
+    +'<button class="btn btn-danger" onclick="_cbOpenEntry(\'out\')">➖ Cash Out (Porter / Other)</button>'
+    +(boss?'<button class="btn btn-warning" onclick="_cbOpenWithdraw()">🏦 Collect Cash</button>':'')
+    +'</div></div>';
+  // Period filter
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px;">'
+    +chip('today','Today')+chip('yesterday','Yesterday')+chip('week','This Week')+chip('month','This Month')+chip('lastmonth','Last Month')+chip('all','All Time')
+    +'<span style="display:inline-flex;gap:4px;align-items:center;margin-left:6px;font-size:12px;color:var(--text-muted);">From <input type="date" id="cb-from" value="'+(c.period==='custom'?rg.from:'')+'" max="'+_cbToday()+'" style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;"> To <input type="date" id="cb-to" value="'+(c.period==='custom'?rg.to:'')+'" max="'+_cbToday()+'" style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;"> <button class="btn btn-sm btn-outline" onclick="_cbSetCustom()">Go</button></span></div>';
+  // Period cards
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
+    +card('Collected ('+pLabel+')','+'+_cbFmt(sIn),'#16a34a',inP.filter(function(r){return r.entry_type==='in';}).length+' entries')
+    +card('Paid Out ('+pLabel+')','−'+_cbFmt(sOut),'#dc2626',inP.filter(function(r){return r.entry_type==='out';}).length+' entries')
+    +card('Withdrawn ('+pLabel+')','−'+_cbFmt(sWd),'#d97706','taken by Admin / Manager')
+    +card('Net Change ('+pLabel+')',(sIn+sOp-sOut-sWd>=0?'+':'−')+_cbFmt(Math.abs(sIn+sOp-sOut-sWd)),'#1d4ed8','Opening: '+_cbFmt(before))
+    +'</div>';
+  // Tabs
+  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">'
+    +'<button class="btn btn-sm '+(c.tab==='ledger'?'btn-primary':'btn-outline')+'" onclick="_cbSetTab(\'ledger\')">📒 Ledger</button>'
+    +(boss?'<button class="btn btn-sm '+(c.tab==='summary'?'btn-primary':'btn-outline')+'" onclick="_cbSetTab(\'summary\')">📊 Day-wise Summary</button>':'')
+    +'<span style="flex:1"></span>'
+    +(boss?'<label style="font-size:12px;color:var(--text-muted);cursor:pointer;"><input type="checkbox" '+(c.showDel?'checked':'')+' onchange="_cbToggleDel(this)"> Show deleted</label>':'')
+    +(boss?'<button class="btn btn-sm btn-outline" onclick="_cbOpenOpening()">⚙️ Opening Balance</button>':'')
+    +'<button class="btn btn-sm btn-outline" onclick="_cbCsv()">⬇ CSV</button></div>';
+  h+='<div class="card" style="padding:0;overflow:hidden;">'+(c.tab==='summary'&&boss?_cbSummaryHTML(inP,before):_cbLedgerHTML(inP,before,rg))+'</div>';
+  pc.innerHTML=h;
+}
+
+function _cbCanEdit(r){
+  if(_cbIsBoss())return true;
+  return _cbIsCashWC()&&(r.entry_type==='in'||r.entry_type==='out');
+}
+function _cbTypeBadge(r){
+  var m={in:['#dcfce7','#15803d','Cash In'],out:['#fee2e2','#b91c1c',r.category==='porter'?'Porter':'Cash Out'],withdraw:['#ffedd5','#c2410c','Withdrawn'],opening:['#dbeafe','#1d4ed8','Opening']}[r.entry_type]||['#eee','#333',r.entry_type];
+  return '<span class="badge" style="background:'+m[0]+';color:'+m[1]+';">'+m[2]+'</span>';
+}
+function _cbLedgerHTML(inP,before,rg){
+  var c=window._cb;
+  var rows=c.showDel?c.rows.filter(function(r){return r.entry_date>=rg.from&&r.entry_date<=rg.to;}):inP;
+  if(!rows.length)return '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No entries for this period.</div>';
+  rows=rows.slice().sort(function(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;});
+  var run=before,lastD='',h='<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);text-align:left;">'
+    +'<th style="padding:9px 12px;">Time</th><th style="padding:9px 12px;">Type</th><th style="padding:9px 12px;">Name</th><th style="padding:9px 12px;">Note</th><th style="padding:9px 12px;">Entered by</th><th style="padding:9px 12px;text-align:right;">Amount</th><th style="padding:9px 12px;text-align:right;">Balance</th><th style="padding:9px 12px;"></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    if(r.entry_date!==lastD){
+      lastD=r.entry_date;
+      var dIn=0,dOut=0;rows.forEach(function(x){if(x.entry_date===lastD&&!x.is_deleted){var s=_cbSigned(x);if(s>0)dIn+=s;else dOut+=-s;}});
+      h+='<tr style="background:#f1f5f9;"><td colspan="8" style="padding:7px 12px;font-weight:700;font-size:12px;color:#334155;">📅 '+_cbNice(lastD)+' <span style="font-weight:600;color:#16a34a;margin-left:10px;">+'+_cbFmt(dIn)+'</span> <span style="font-weight:600;color:#dc2626;margin-left:6px;">−'+_cbFmt(dOut)+'</span></td></tr>';
+    }
+    var del=!!r.is_deleted,s=_cbSigned(r);
+    if(!del)run+=s;
+    var tm=r.created_at?new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
+    var edited=(r.edit_log&&r.edit_log.length&&!del)?' <span title="'+_cbE(r.edit_log.map(function(l){return (l.name||l.by)+' • '+new Date(l.at).toLocaleString('en-IN')+' • '+(l.action||'edited');}).join('\n'))+'" style="font-size:10px;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:0 5px;cursor:help;">edited</span>':'';
+    h+='<tr style="border-top:1px solid var(--border);'+(del?'opacity:.5;text-decoration:line-through;':'')+'">'
+      +'<td style="padding:8px 12px;white-space:nowrap;color:var(--text-muted);">'+tm+'</td>'
+      +'<td style="padding:8px 12px;">'+_cbTypeBadge(r)+'</td>'
+      +'<td style="padding:8px 12px;font-weight:600;">'+_cbE(r.party)+edited+'</td>'
+      +'<td style="padding:8px 12px;color:var(--text-muted);">'+_cbE(r.note)+'</td>'
+      +'<td style="padding:8px 12px;color:var(--text-muted);white-space:nowrap;">'+_cbE(r.created_by_name||r.created_by)+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;color:'+(s>=0?'#16a34a':'#dc2626')+';white-space:nowrap;">'+(s>=0?'+':'−')+_cbFmt(Math.abs(s))+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;white-space:nowrap;">'+(del?'—':_cbFmt(run))+'</td>'
+      +'<td style="padding:8px 12px;white-space:nowrap;text-align:right;">'
+      +(del?(_cbIsBoss()?'<button class="btn-icon" title="Restore" onclick="_cbRestore('+r.id+')">♻️</button>':'')
+          :(_cbCanEdit(r)?'<button class="btn-icon" title="Edit" onclick="_cbOpenEdit('+r.id+')">✏️</button><button class="btn-icon" title="Delete" onclick="_cbDelete('+r.id+')">🗑️</button>':''))
+      +'</td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function _cbDays(inP,before){
+  var byD={};inP.forEach(function(r){(byD[r.entry_date]=byD[r.entry_date]||[]).push(r);});
+  var run=before,out=[];
+  Object.keys(byD).sort().forEach(function(d){
+    var o={date:d,open:run,inn:0,out:0,wd:0,op:0,n:byD[d].length};
+    byD[d].forEach(function(r){var a=Number(r.amount);if(r.entry_type==='in')o.inn+=a;else if(r.entry_type==='out')o.out+=a;else if(r.entry_type==='withdraw')o.wd+=a;else o.op+=a;});
+    o.close=o.open+o.inn+o.op-o.out-o.wd;run=o.close;out.push(o);
+  });
+  return out;
+}
+function _cbSummaryHTML(inP,before){
+  var days=_cbDays(inP,before);
+  if(!days.length)return '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No entries for this period.</div>';
+  var tIn=0,tOut=0,tWd=0,maxIn=0,collDays=0;
+  days.forEach(function(d){tIn+=d.inn;tOut+=d.out;tWd+=d.wd;if(d.inn>maxIn)maxIn=d.inn;if(d.inn>0)collDays++;});
+  var h='<div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid var(--border);font-size:13px;display:flex;flex-wrap:wrap;gap:18px;">'
+    +'<span>Total collected: <b style="color:#16a34a;">'+_cbFmt(tIn)+'</b></span>'
+    +'<span>Avg / collection day: <b>'+_cbFmt(collDays?tIn/collDays:0)+'</b> <span style="color:var(--text-muted);">('+collDays+' days)</span></span>'
+    +'<span>Paid out: <b style="color:#dc2626;">'+_cbFmt(tOut)+'</b></span><span>Withdrawn: <b style="color:#d97706;">'+_cbFmt(tWd)+'</b></span></div>';
+  h+='<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);text-align:left;">'
+    +'<th style="padding:9px 12px;">Date</th><th style="padding:9px 12px;text-align:right;">Opening</th><th style="padding:9px 12px;text-align:right;">Collected (+)</th><th style="padding:9px 12px;min-width:120px;"></th><th style="padding:9px 12px;text-align:right;">Paid Out (−)</th><th style="padding:9px 12px;text-align:right;">Withdrawn (−)</th><th style="padding:9px 12px;text-align:right;">Closing</th><th style="padding:9px 12px;text-align:right;">Entries</th></tr></thead><tbody>';
+  days.slice().reverse().forEach(function(d){
+    var w=maxIn?Math.round(d.inn/maxIn*100):0;
+    h+='<tr style="border-top:1px solid var(--border);"><td style="padding:8px 12px;font-weight:600;white-space:nowrap;">'+_cbNice(d.date)+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;color:var(--text-muted);">'+_cbFmt(d.open)+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;color:#16a34a;">'+_cbFmt(d.inn)+(d.op?'<div style="font-size:10px;color:#1d4ed8;">+'+_cbFmt(d.op)+' opening</div>':'')+'</td>'
+      +'<td style="padding:8px 12px;"><div style="background:#e5e7eb;border-radius:4px;height:8px;"><div style="background:#16a34a;height:8px;border-radius:4px;width:'+w+'%;"></div></div></td>'
+      +'<td style="padding:8px 12px;text-align:right;color:#dc2626;">'+(d.out?_cbFmt(d.out):'—')+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;color:#d97706;">'+(d.wd?_cbFmt(d.wd):'—')+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;">'+_cbFmt(d.close)+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;color:var(--text-muted);">'+d.n+'</td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+
+// ---- modals ----
+function _cbModal(inner){_cbClose();var o=document.createElement('div');o.id='cb-modal';o.className='modal-overlay';o.innerHTML='<div class="modal" style="max-width:440px;padding:22px;">'+inner+'</div>';document.body.appendChild(o);}
+function _cbClose(){var o=document.getElementById('cb-modal');if(o)o.remove();}
+function _cbField(label,inner){return '<div class="form-group" style="margin-bottom:12px;"><label>'+label+'</label>'+inner+'</div>';}
+function _cbTypeChange(){
+  var t=document.getElementById('cb-type').value,lab=document.getElementById('cb-party-label'),cat=document.getElementById('cb-cat-wrap');
+  if(lab)lab.textContent=t==='in'?'Customer Name *':'Paid To (Porter / Person) *';
+  if(cat)cat.style.display=t==='out'?'':'none';
+}
+function _cbOpenEntry(type,id){
+  var r=id?window._cb.rows.find(function(x){return x.id===id;}):null;
+  if(r){type=r.entry_type;}
+  var isWd=type==='withdraw'||type==='opening';
+  var title=r?'✏️ Edit Entry':(type==='in'?'➕ Cash In — Customer':'➖ Cash Out — Porter / Other');
+  var h='<h3 style="margin:0 0 14px;font-size:17px;">'+title+'</h3>';
+  if(!isWd)h+=_cbField('Type','<select id="cb-type" onchange="_cbTypeChange()"><option value="in"'+(type==='in'?' selected':'')+'>Cash In (received from customer)</option><option value="out"'+(type==='out'?' selected':'')+'>Cash Out (paid to porter / other)</option></select>');
+  else h+='<input type="hidden" id="cb-type" value="'+type+'">';
+  h+=_cbField('<span id="cb-party-label">'+(type==='in'?'Customer Name *':type==='out'?'Paid To (Porter / Person) *':'Name')+'</span>','<input id="cb-party" value="'+_cbE(r?r.party:'')+'" placeholder="Name" autocomplete="off">');
+  h+='<div id="cb-cat-wrap" style="display:'+(type==='out'?'':'none')+';">'+_cbField('Category','<select id="cb-cat"><option value="porter"'+(r&&r.category==='porter'?' selected':'')+'>Porter</option><option value="other"'+(r&&r.category==='other'?' selected':'')+'>Other</option></select>')+'</div>';
+  h+=_cbField('Amount (₹) *','<input id="cb-amt" type="number" inputmode="decimal" min="0" step="0.01" value="'+(r?Number(r.amount):'')+'" placeholder="0">');
+  h+=_cbField('Note / Reason','<input id="cb-note" value="'+_cbE(r?r.note:'')+'" placeholder="Ticket no., work done, etc. (optional)">');
+  h+=_cbField('Date','<input id="cb-date" type="date" max="'+_cbToday()+'" value="'+(r?r.entry_date:_cbToday())+'">');
+  h+='<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-outline" onclick="_cbClose()">Cancel</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveEntry('+(id||'null')+')">'+(r?'Save Changes':'Submit')+'</button></div>';
+  _cbModal(h);
+  setTimeout(function(){var e=document.getElementById('cb-party');if(e&&!e.value)e.focus();},50);
+}
+function _cbOpenEdit(id){_cbOpenEntry(null,id);}
+function _cbReadForm(){
+  return {type:document.getElementById('cb-type').value,party:(document.getElementById('cb-party').value||'').trim(),
+    cat:(document.getElementById('cb-cat')||{}).value||'',amt:Math.round((parseFloat(document.getElementById('cb-amt').value)||0)*100)/100,
+    note:(document.getElementById('cb-note').value||'').trim(),date:document.getElementById('cb-date').value};
+}
+function _cbErr(m){var e=document.getElementById('cb-err');if(e)e.textContent=m;}
+async function _cbSaveEntry(id){
+  var f=_cbReadForm();
+  if(f.type!=='withdraw'&&f.type!=='opening'&&!f.party){_cbErr(f.type==='in'?'Enter customer name.':'Enter who was paid.');return;}
+  if(!(f.amt>0)){_cbErr('Enter a valid amount.');return;}
+  if(!f.date||f.date>_cbToday()){_cbErr('Date cannot be empty or in the future.');return;}
+  var btn=document.getElementById('cb-save');if(btn)btn.disabled=true;
+  try{
+    var cat=f.type==='out'?f.cat||'porter':null,now=new Date().toISOString();
+    if(id){
+      var old=window._cb.rows.find(function(x){return x.id===id;}),ch={};
+      if(old.entry_type!==f.type)ch.type=[old.entry_type,f.type];
+      if((old.party||'')!==f.party)ch.name=[old.party||'',f.party];
+      if(Number(old.amount)!==f.amt)ch.amount=[Number(old.amount),f.amt];
+      if((old.note||'')!==f.note)ch.note=[old.note||'',f.note];
+      if(old.entry_date!==f.date)ch.date=[old.entry_date,f.date];
+      if((old.category||null)!==cat)ch.category=[old.category||'',cat||''];
+      if(!Object.keys(ch).length){_cbClose();return;}
+      var log=(Array.isArray(old.edit_log)?old.edit_log:[]).concat([{at:now,by:currentUser.user_id,name:currentUser.name,action:'edited',changes:ch}]);
+      await sb('cash_book','PATCH',{entry_type:f.type,party:f.party,category:cat,amount:f.amt,note:f.note,entry_date:f.date,updated_by:currentUser.user_id,updated_by_name:currentUser.name,updated_at:now,edit_log:log},'?id=eq.'+id);
+      showToastWI('✅ Entry updated');
+    }else{
+      await sb('cash_book','POST',{entry_type:f.type,party:f.party,category:cat,amount:f.amt,note:f.note,entry_date:f.date,created_by:currentUser.user_id,created_by_name:currentUser.name});
+      showToastWI('✅ Entry added');
+    }
+    _cbClose();await _cbReload();
+  }catch(e){_cbErr('Save failed: '+(e.message||e));if(btn)btn.disabled=false;}
+}
+async function _cbDelete(id){
+  var r=window._cb.rows.find(function(x){return x.id===id;});if(!r||!_cbCanEdit(r))return;
+  if(!confirm('Delete this entry?\n\n'+(r.entry_type==='in'?'Cash In':'Cash Out')+' • '+(r.party||'')+' • '+_cbFmt(r.amount)+'\n\nIt will be removed from the balance.'))return;
+  try{
+    var now=new Date().toISOString(),log=(Array.isArray(r.edit_log)?r.edit_log:[]).concat([{at:now,by:currentUser.user_id,name:currentUser.name,action:'deleted'}]);
+    await sb('cash_book','PATCH',{is_deleted:true,deleted_by:currentUser.user_id,deleted_at:now,edit_log:log},'?id=eq.'+id);
+    showToastWI('🗑️ Entry deleted');await _cbReload();
+  }catch(e){alert('Delete failed: '+(e.message||e));}
+}
+async function _cbRestore(id){
+  var r=window._cb.rows.find(function(x){return x.id===id;});if(!r||!_cbIsBoss())return;
+  try{
+    var now=new Date().toISOString(),log=(Array.isArray(r.edit_log)?r.edit_log:[]).concat([{at:now,by:currentUser.user_id,name:currentUser.name,action:'restored'}]);
+    await sb('cash_book','PATCH',{is_deleted:false,deleted_by:null,deleted_at:null,edit_log:log},'?id=eq.'+id);
+    showToastWI('♻️ Entry restored');await _cbReload();
+  }catch(e){alert('Restore failed: '+(e.message||e));}
+}
+// Admin / Manager takes cash out of the bag — balance drops, carry forward = what's left
+function _cbBalance(){return window._cb.rows.filter(function(r){return!r.is_deleted;}).reduce(function(a,r){return a+_cbSigned(r);},0);}
+function _cbOpenWithdraw(){
+  if(!_cbIsBoss())return;
+  var bal=Math.round(_cbBalance()*100)/100;
+  var h='<h3 style="margin:0 0 6px;font-size:17px;">🏦 Collect Cash</h3>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Cash in bag right now: <b style="color:var(--text);font-size:15px;">'+_cbFmt(bal)+'</b></div>'
+    +_cbField('Amount to collect (₹) *','<input id="cb-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="_cbWdPreview()">')
+    +'<div style="margin:-6px 0 12px;"><button class="btn btn-sm btn-outline" type="button" onclick="document.getElementById(\'cb-amt\').value='+bal+';_cbWdPreview();">Collect all ('+_cbFmt(bal)+')</button></div>'
+    +'<div id="cb-wd-prev" style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;">Remaining carry forward: <b>'+_cbFmt(bal)+'</b></div>'
+    +_cbField('Collected by','<input id="cb-party" value="'+_cbE(currentUser.name)+'" readonly style="background:#f1f5f9;">')
+    +_cbField('Note','<input id="cb-note" placeholder="Optional">')
+    +'<input type="hidden" id="cb-type" value="withdraw"><input type="hidden" id="cb-date" value="'+_cbToday()+'">'
+    +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-outline" onclick="_cbClose()">Cancel</button><button class="btn btn-warning" id="cb-save" onclick="_cbSaveWithdraw()">Collect Cash</button></div>';
+  _cbModal(h);setTimeout(function(){var e=document.getElementById('cb-amt');if(e)e.focus();},50);
+}
+function _cbWdPreview(){
+  var bal=_cbBalance(),a=parseFloat(document.getElementById('cb-amt').value)||0,rem=Math.round((bal-a)*100)/100,p=document.getElementById('cb-wd-prev');
+  if(p)p.innerHTML='Remaining carry forward: <b style="color:'+(rem<0?'#dc2626':'#15803d')+';">'+_cbFmt(rem)+'</b>'+(rem<0?' <span style="color:#dc2626;">— more than cash in bag</span>':'');
+}
+async function _cbSaveWithdraw(){
+  var amt=Math.round((parseFloat(document.getElementById('cb-amt').value)||0)*100)/100,bal=Math.round(_cbBalance()*100)/100;
+  if(!(amt>0)){_cbErr('Enter a valid amount.');return;}
+  if(amt>bal){_cbErr('Amount is more than the cash in bag ('+_cbFmt(bal)+').');return;}
+  var btn=document.getElementById('cb-save');if(btn)btn.disabled=true;
+  try{
+    await sb('cash_book','POST',{entry_type:'withdraw',party:currentUser.name,note:(document.getElementById('cb-note').value||'').trim(),amount:amt,entry_date:_cbToday(),created_by:currentUser.user_id,created_by_name:currentUser.name});
+    _cbClose();showToastWI('✅ '+_cbFmt(amt)+' collected. Carry forward: '+_cbFmt(bal-amt));await _cbReload();
+  }catch(e){_cbErr('Save failed: '+(e.message||e));if(btn)btn.disabled=false;}
+}
+// Starting carry-forward (one-time): e.g. what is in the bag the day the module goes live
+function _cbOpenOpening(){
+  if(!_cbIsBoss())return;
+  var h='<h3 style="margin:0 0 6px;font-size:17px;">⚙️ Opening Balance</h3>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Adds this amount to the cash in bag (e.g. the carry forward from your notebook when starting). Current: <b style="color:var(--text);">'+_cbFmt(_cbBalance())+'</b></div>'
+    +_cbField('Opening amount (₹) *','<input id="cb-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">')
+    +_cbField('Date','<input id="cb-date" type="date" max="'+_cbToday()+'" value="'+_cbToday()+'">')
+    +_cbField('Note','<input id="cb-note" value="Opening balance (carry forward from notebook)">')
+    +'<input type="hidden" id="cb-type" value="opening"><input type="hidden" id="cb-party" value="Opening Balance">'
+    +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-outline" onclick="_cbClose()">Cancel</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveEntry(null)">Add Opening Balance</button></div>';
+  _cbModal(h);
+}
+function _cbCsv(){
+  var c=window._cb,rg=_cbRange(),act=c.rows.filter(function(r){return!r.is_deleted&&r.entry_date>=rg.from&&r.entry_date<=rg.to;});
+  var before=c.rows.filter(function(r){return!r.is_deleted&&r.entry_date<rg.from;}).reduce(function(a,r){return a+_cbSigned(r);},0);
+  function q(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';}
+  var lines;
+  if(c.tab==='summary'&&_cbIsBoss()){
+    lines=[['Date','Opening','Collected','Paid Out','Withdrawn','Closing','Entries'].join(',')];
+    _cbDays(act,before).forEach(function(d){lines.push([d.date,d.open,d.inn,d.out,d.wd,d.close,d.n].join(','));});
+  }else{
+    lines=[['Date','Type','Name','Category','Note','Entered by','Amount','Balance'].map(q).join(',')];
+    var run=before;act.slice().sort(function(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;}).forEach(function(r){run+=_cbSigned(r);lines.push([r.entry_date,r.entry_type,r.party,r.category,r.note,r.created_by_name||r.created_by,_cbSigned(r),run].map(q).join(','));});
+  }
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv'}));a.download='cash-book-'+rg.from+'_to_'+rg.to+'.csv';document.body.appendChild(a);a.click();a.remove();
+}
+// ===== END CASH BOOK =====
 
 // MASTER DATA
 async function loadMasterData(){
@@ -3224,9 +3530,9 @@ async function navigate(page){
   setupNav();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const el=document.getElementById('nav-'+page);if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','payment-collection':'💰 Payment Collection','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder','tat-report':'⏱️ TAT Compliance Report','followups':'📅 Follow-Ups'};
+  const titles={dashboard:'Dashboard',tickets:'All Tickets','my-calls':'My Calls','my-report':'📊 My Report','km-report':'🛣️ KM Tracking','eng-daily-report':'📅 Engineer Daily Report','work-log':'Work Log','work-log-report':'Work Log Report','walk-in':'Walk-in Entry','walk-in-report':'Walk-in Report','courier':'Courier Register','courier-report':'Courier Register',inventory:'Inventory','eng-parts':'🧰 Engineer Parts Stock',customers:'Customers',reports:'Reports',master:'Master Data',settings:'Settings','auto-inventory':'📦 Auto Inventory','auto-sites':'🏗️ Automation Sites','sw-survey':'🔌 Switchboard Survey','auto-visits-report':'📋 Site Visit Report','inquiries':'🔍 Inquiries','field-tasks':'🚚 Other Work / Field Tasks','site-visits':'🏗️ Site Visits','live-map':'📍 Live Map','attendance':'🗓️ Attendance Report','targets':'🎯 Targets','amc':'🔄 AMC Contracts','payment-collection':'💰 Payment Collection','followup':'📞 Follow-up Tracker','profit':'💰 Profit Dashboard','reorder':'📦 Parts Reorder Alert','weekly':'📊 Weekly Master Report','sales':'💼 Sales Module','route-planning':'🗺️ Route Planning','parts-catalog':'🔩 Parts Catalog','fault-finder':'🔍 Fault Finder','tat-report':'⏱️ TAT Compliance Report','followups':'📅 Follow-Ups','cash-book':'💵 Cash Book'};
   document.getElementById('page-title').textContent=titles[page]||page;
-  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'payment-collection':renderPaymentCollection,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder,'tat-report':renderTatReportPage,'followups':renderFollowUps}[page];
+  const renderFn={dashboard:renderDashboard,'peon-activity':renderPeonActivity,tickets:renderTickets,'my-calls':renderMyCalls,'my-report':renderMyReport,'km-report':renderKmReport,'eng-daily-report':renderEngDailyReport,'work-log':renderWorkLog,'work-log-report':renderWorkLogReport,'walk-in':renderWalkIn,'walk-in-report':renderWalkInReport,'courier':renderCourier,'courier-report':renderCourierReport,inventory:renderInventory,'eng-parts':renderEngParts,customers:renderCustomers,reports:renderReports,master:renderMaster,settings:renderSettings,'auto-inventory':renderAutoInventory,'auto-sites':renderAutoSites,'sw-survey':renderSwSurvey,'auto-visits-report':renderAutoVisitsReport,'inquiries':renderInquiries,'field-tasks':renderFieldTasks,'site-visits':renderSiteVisits,'live-map':renderLiveMap,'attendance':renderAttendanceReport,'targets':renderTargets,'amc':renderAMC,'payment-collection':renderPaymentCollection,'followup':renderFollowup,'profit':renderProfit,'reorder':renderReorder,'weekly':renderWeekly,'sales':renderSales,'pending-list':renderPendingList,'route-planning':renderRoutePlanning,'parts-catalog':renderPartsCatalog,'fault-finder':renderFaultFinder,'tat-report':renderTatReportPage,'followups':renderFollowUps,'cash-book':renderCashBook}[page];
   if(renderFn)await renderFn();
 }
 
