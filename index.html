@@ -2099,6 +2099,7 @@ document.addEventListener('keydown',function(e){
 
 // Try auto-login from saved session
 setTimeout(tryAutoLogin, 100);
+setTimeout(handleDeviceActionLink, 150);
 
 function saveCompanyInfo(){
   var ci={
@@ -2606,6 +2607,87 @@ async function autoFillFromMobile(mobile, fields){
   }catch(e){}
 }
 
+// ===== NEW-DEVICE LOGIN ALERT (email + Block) =====
+var DEVICE_FN=SB_URL+'/functions/v1/device-alert';
+var _devWatchTimer=null;
+function getDeviceId(){
+  try{var d=localStorage.getItem('bhavi_device_id');
+    if(!d){d='dev_'+(window.crypto&&crypto.randomUUID?crypto.randomUUID():(Math.random().toString(36).slice(2)+Date.now().toString(36)));localStorage.setItem('bhavi_device_id',d);}
+    return d;}catch(e){return 'dev_nostorage';}
+}
+function getDeviceLabel(){
+  var ua=navigator.userAgent||'',os='Unknown OS',br='Browser';
+  if(/Android/i.test(ua)){var m=ua.match(/Android [\d.]+;\s*([^)]+?)\)/);os='Android'+(m?' ('+m[1].replace(/ Build.*/,'')+')':'');}
+  else if(/iPad/i.test(ua))os='iPad';else if(/iPhone|iPod/i.test(ua))os='iPhone';
+  else if(/Windows/i.test(ua))os='Windows';else if(/Mac OS X/i.test(ua))os='Mac';else if(/CrOS/i.test(ua))os='ChromeOS';else if(/Linux/i.test(ua))os='Linux';
+  if(/Edg\//.test(ua))br='Edge';else if(/OPR\/|Opera/.test(ua))br='Opera';else if(/Firefox\/|FxiOS/.test(ua))br='Firefox';else if(/Chrome\/|CriOS/.test(ua))br='Chrome';else if(/Safari\//.test(ua))br='Safari';
+  return br+' on '+os;
+}
+// Fail-open: if the function is unreachable/not deployed, login still works (returns null).
+async function deviceCall(body,ms){
+  var ctl=new AbortController(),t=setTimeout(function(){ctl.abort();},ms||6000);
+  try{
+    var r=await fetch(DEVICE_FN,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY},body:JSON.stringify(body),signal:ctl.signal});
+    if(!r.ok)return null;return await r.json();
+  }catch(e){return null;}finally{clearTimeout(t);}
+}
+function forceDeviceBlockedLogout(){
+  clearInterval(_devWatchTimer);
+  try{localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');}catch(e){}
+  alert('🚫 Aa device block karvama aavyu chhe.\n\nJo aa tame j hata to Admin ne contact karo.');
+  location.reload();
+}
+async function _devWatchTick(){
+  if(!currentUser)return;
+  var r=await deviceCall({action:'status',user_id:currentUser.user_id,device_id:getDeviceId()});
+  if(r&&r.status==='blocked')forceDeviceBlockedLogout();
+}
+function startDeviceWatch(){
+  clearInterval(_devWatchTimer);
+  _devWatchTimer=setInterval(_devWatchTick,60000);
+  if(!window._devVisBound){window._devVisBound=true;document.addEventListener('visibilitychange',function(){if(!document.hidden)_devWatchTick();});}
+}
+// Confirmation page opened from the email link (?device_action=allow|block&t=TOKEN).
+// A button click (POST) is required, so mail-scanner link prefetch can't trigger it.
+function handleDeviceActionLink(){
+  var p=new URLSearchParams(location.search),act=p.get('device_action'),tok=p.get('t');
+  if(!act||!tok)return false;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:linear-gradient(135deg,#1e2a3a,#1d4ed8);display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit;';
+  ov.innerHTML='<div style="background:#fff;border-radius:20px;padding:30px;width:380px;max-width:100%;box-shadow:0 30px 80px rgba(0,0,0,.3);text-align:center">'
+    +'<div style="font-size:38px">🔐</div><div style="font-size:18px;font-weight:800;margin:6px 0 14px">New device login</div>'
+    +'<div id="dv-body" style="font-size:14px;color:#374151;line-height:1.7">Loading...</div>'
+    +'<div id="dv-btns" style="margin-top:18px;display:none">'
+    +'<button id="dv-allow" style="width:100%;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">✅ Ha, me j chhu — chalu rakho</button>'
+    +'<button id="dv-block" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">🚫 Aa device Block karo</button></div>'
+    +'<button id="dv-close" style="display:none;margin-top:14px;background:none;border:none;color:#1d4ed8;font-weight:700;cursor:pointer;font-size:14px">Open CRM →</button></div>';
+  document.body.appendChild(ov);
+  var body=ov.querySelector('#dv-body'),btns=ov.querySelector('#dv-btns'),cl=ov.querySelector('#dv-close');
+  cl.onclick=function(){ov.remove();};
+  (async function(){
+    var r=await deviceCall({action:'preview',token:tok},10000);
+    if(!r||r.error){body.textContent=(r&&r.error)||'Server ma problem — thodi var pachhi try karo.';cl.style.display='inline-block';return;}
+    body.innerHTML='';
+    var l1=document.createElement('div');l1.innerHTML='<b></b>';l1.firstChild.textContent=r.name;body.appendChild(l1);
+    var l2=document.createElement('div');l2.textContent='Device: '+(r.label||'Unknown')+'  |  IP: '+(r.ip||'-');body.appendChild(l2);
+    var l3=document.createElement('div');l3.style.cssText='color:#6b7280;font-size:12px';l3.textContent=new Date(r.when).toLocaleString('en-IN');body.appendChild(l3);
+    var st=document.createElement('div');st.style.cssText='margin-top:8px;font-weight:700';
+    st.textContent=r.status==='blocked'?'Current status: 🚫 Blocked':r.status==='trusted'?'Current status: ✅ Allowed':'Current status: ⏳ Awaiting your decision';
+    body.appendChild(st);btns.style.display='block';
+    async function decide(d){
+      btns.style.display='none';body.textContent='Please wait...';
+      var x=await deviceCall({action:'respond',token:tok,decision:d},10000);
+      body.textContent=(x&&x.status==='blocked')?'🚫 Device blocked — te turant logout thai jase.':(x&&x.status==='trusted')?'✅ Device allowed — te chalu rahese.':((x&&x.error)||'Failed — fari try karo.');
+      cl.style.display='inline-block';
+    }
+    ov.querySelector('#dv-allow').onclick=function(){decide('allow');};
+    ov.querySelector('#dv-block').onclick=function(){decide('block');};
+  })();
+  return true;
+}
+// ===== END NEW-DEVICE LOGIN ALERT =====
+
 // LOGIN
 let loginRole='admin';
 var _loginLookupTimer=null;
@@ -2660,6 +2742,9 @@ async function doLogin(){
         }
       }catch(_le){console.log('leave check:',_le);}
     }
+    // NEW-DEVICE ALERT: a device that was blocked via the email link cannot log in.
+    var _dvChk=await deviceCall({action:'status',user_id:user.user_id,device_id:getDeviceId()},5000);
+    if(_dvChk&&_dvChk.status==='blocked'){currentUser=null;showLoginError('🚫 Aa device block chhe. Admin ne contact karo.');return;}
     const _stok='bhv_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
     // Up to 2 concurrent device sessions per account (FIFO) — logging in on a
     // 3rd device kicks the OLDEST of the previous two out; the two most
@@ -2676,6 +2761,9 @@ async function doLogin(){
     }
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
+    // NEW-DEVICE ALERT: register this device; server emails Allow/Block links if it is new. Non-blocking.
+    deviceCall({action:'register',user_id:user.user_id,device_id:getDeviceId(),label:getDeviceLabel(),ua:navigator.userAgent,session_token:_stok,app_url:location.origin+location.pathname},10000);
+    startDeviceWatch();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
     const rl=currentUser.role==='peon'?'Office Boy':currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
@@ -2815,6 +2903,15 @@ async function tryAutoLogin(){
   }
   currentUser=null;
   currentUser=normalizeWCUser(users[0]);
+  // NEW-DEVICE ALERT: blocked device must not auto-login either.
+  var _dvAuto=await deviceCall({action:'status',user_id:currentUser.user_id,device_id:getDeviceId()},5000);
+  if(_dvAuto&&_dvAuto.status==='blocked'){
+    localStorage.removeItem('bhavi_session');localStorage.removeItem('bhavi_user');
+    currentUser=null;
+    alert('🚫 Aa device block karvama aavyu chhe. Admin ne contact karo.');
+    restoreLoginFormHTML();
+    return;
+  }
   // Valid = matches one of the up-to-2 currently allowed device sessions.
   // Falls back to the old single-token field if session_tokens isn't set
   // (e.g. column just added, or this account hasn't logged in since).
@@ -2833,6 +2930,7 @@ async function tryAutoLogin(){
     const rl=currentUser.role==='peon'?'Office Boy':currentUser.role==='engineer'?'Engineer':((currentUser.role_type==='work_controller'||currentUser.role==='work_controller')?'Work Controller':'Administrator');
     document.getElementById('sidebar-userrole').textContent=rl;
     var _tbu=document.getElementById('topbar-user');if(_tbu)_tbu.textContent=currentUser.name;
+    startDeviceWatch();
     setupNav();
     currentPage='';
     allTickets=[];
