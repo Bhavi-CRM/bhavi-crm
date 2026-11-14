@@ -3178,7 +3178,7 @@ function _cbIsAdmin(){return !!currentUser&&currentUser.role==='admin'&&currentU
 function _cbIsCashWC(){return _cbIds().some(function(i){return _CB_WC_IDS.indexOf(i)!==-1;});}
 function _cbCanView(){return !!currentUser&&(_cbIsAdmin()||_cbIsMgr()||_cbIsCashWC());}
 function _cbIsBoss(){return _cbIsAdmin()||_cbIsMgr();} // withdraw, summary, opening balance, edit withdrawals, restore
-window._cb=window._cb||{rows:[],period:'today',from:'',to:'',tab:'ledger',showDel:false};
+window._cb=window._cb||{rows:[],period:'today',from:'',to:'',tab:'ledger',showDel:false,q:'',qType:'all',scope:'all'};
 
 function _cbToday(){return new Date().toLocaleDateString('en-CA');}
 function _cbDStr(d){return d.toLocaleDateString('en-CA');}
@@ -3240,6 +3240,12 @@ function _cbDraw(){
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px;">'
     +chip('today','Today')+chip('yesterday','Yesterday')+chip('week','This Week')+chip('month','This Month')+chip('lastmonth','Last Month')+chip('all','All Time')
     +'<span style="display:inline-flex;gap:4px;align-items:center;margin-left:6px;font-size:12px;color:var(--text-muted);">From <input type="date" id="cb-from" value="'+(c.period==='custom'?rg.from:'')+'" max="'+_cbToday()+'" style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;"> To <input type="date" id="cb-to" value="'+(c.period==='custom'?rg.to:'')+'" max="'+_cbToday()+'" style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;"> <button class="btn btn-sm btn-outline" onclick="_cbSetCustom()">Go</button></span></div>';
+  // Search / type filter (search covers ALL dates by default, so past visits of a customer can be found)
+  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 12px;">'
+    +'<input id="cb-q" type="search" value="'+_cbE(c.q)+'" oninput="_cbSearch(this.value)" placeholder="🔍 Search name, note, amount, entered by..." autocomplete="off" style="flex:1;min-width:200px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">'
+    +'<select onchange="_cbSetType(this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"><option value="all"'+(c.qType==='all'?' selected':'')+'>All types</option><option value="in"'+(c.qType==='in'?' selected':'')+'>Cash In</option><option value="out"'+(c.qType==='out'?' selected':'')+'>Cash Out</option><option value="withdraw"'+(c.qType==='withdraw'?' selected':'')+'>Withdrawn</option></select>'
+    +'<select onchange="_cbSetScope(this.value)" title="Where to search" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"><option value="all"'+(c.scope==='all'?' selected':'')+'>Search: all dates</option><option value="period"'+(c.scope==='period'?' selected':'')+'>Search: selected period</option></select>'
+    +(c.q||c.qType!=='all'?'<button class="btn btn-sm btn-outline" onclick="_cbClearFilter()">✖ Clear</button>':'')+'</div>';
   // Period cards
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
     +card('Collected ('+pLabel+')','+'+_cbFmt(sIn),'#16a34a',inP.filter(function(r){return r.entry_type==='in';}).length+' entries')
@@ -3255,7 +3261,7 @@ function _cbDraw(){
     +(boss?'<label style="font-size:12px;color:var(--text-muted);cursor:pointer;"><input type="checkbox" '+(c.showDel?'checked':'')+' onchange="_cbToggleDel(this)"> Show deleted</label>':'')
     +(boss?'<button class="btn btn-sm btn-outline" onclick="_cbOpenOpening()">⚙️ Opening Balance</button>':'')
     +'<button class="btn btn-sm btn-outline" onclick="_cbCsv()">⬇ CSV</button></div>';
-  h+='<div class="card" style="padding:0;overflow:hidden;">'+(c.tab==='summary'&&boss?_cbSummaryHTML(inP,before):_cbLedgerHTML(inP,before,rg))+'</div>';
+  h+='<div id="cb-list-wrap">'+_cbListHTML()+'</div>';
   pc.innerHTML=h;
 }
 
@@ -3267,12 +3273,41 @@ function _cbTypeBadge(r){
   var m={in:['#dcfce7','#15803d','Cash In'],out:['#fee2e2','#b91c1c',r.category==='porter'?'Porter':'Cash Out'],withdraw:['#ffedd5','#c2410c','Withdrawn'],opening:['#dbeafe','#1d4ed8','Opening']}[r.entry_type]||['#eee','#333',r.entry_type];
   return '<span class="badge" style="background:'+m[0]+';color:'+m[1]+';">'+m[2]+'</span>';
 }
-function _cbLedgerHTML(inP,before,rg){
-  var c=window._cb;
-  var rows=c.showDel?c.rows.filter(function(r){return r.entry_date>=rg.from&&r.entry_date<=rg.to;}):inP;
-  if(!rows.length)return '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No entries for this period.</div>';
-  rows=rows.slice().sort(function(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;});
-  var run=before,lastD='',h='<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);text-align:left;">'
+function _cbChrono(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;}
+function _cbBalMap(){var run=0,m={};window._cb.rows.filter(function(r){return!r.is_deleted;}).sort(_cbChrono).forEach(function(r){run+=_cbSigned(r);m[r.id]=run;});return m;}
+function _cbFilterOn(){var c=window._cb;return !!(c.q||'').trim()||c.qType!=='all';}
+function _cbFiltered(){
+  var c=window._cb,rg=_cbRange(),q=(c.q||'').trim().toLowerCase(),useAll=!!q&&c.scope==='all';
+  return c.rows.filter(function(r){
+    if(r.is_deleted&&!(c.showDel&&_cbIsBoss()))return false;
+    if(!useAll&&(r.entry_date<rg.from||r.entry_date>rg.to))return false;
+    if(c.qType!=='all'&&r.entry_type!==c.qType)return false;
+    if(q&&[r.party,r.note,r.created_by_name,r.created_by,r.category,String(r.amount)].join(' ').toLowerCase().indexOf(q)===-1)return false;
+    return true;
+  }).sort(_cbChrono);
+}
+function _cbListHTML(){
+  var c=window._cb,boss=_cbIsBoss();
+  if(c.tab==='summary'&&boss){
+    var rg=_cbRange(),act=c.rows.filter(function(r){return!r.is_deleted;});
+    var before=act.filter(function(r){return r.entry_date<rg.from;}).reduce(function(a,r){return a+_cbSigned(r);},0);
+    var inP=act.filter(function(r){return r.entry_date>=rg.from&&r.entry_date<=rg.to;});
+    return '<div class="card" style="padding:0;overflow:hidden;">'+_cbSummaryHTML(inP,before)+'</div>';
+  }
+  var rows=_cbFiltered(),h='';
+  if(_cbFilterOn()){
+    var act2=rows.filter(function(r){return!r.is_deleted;}),tin=0,tout=0,days={};
+    act2.forEach(function(r){var s=_cbSigned(r);if(s>0)tin+=s;else tout+=-s;days[r.entry_date]=1;});
+    var q=(c.q||'').trim();
+    h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:9px 14px;margin-bottom:10px;font-size:13px;">'
+      +'🔍 <b>'+act2.length+'</b> entries'+(q?' for <b>"'+_cbE(q)+'"</b>':'')+' • <b>'+Object.keys(days).length+'</b> different days • In <b style="color:#16a34a;">'+_cbFmt(tin)+'</b> • Out <b style="color:#dc2626;">'+_cbFmt(tout)+'</b> '
+      +'<span style="opacity:.7;">('+(q&&c.scope==='all'?'all dates':'selected period')+')</span></div>';
+  }
+  return h+'<div class="card" style="padding:0;overflow:hidden;">'+_cbLedgerHTML(rows)+'</div>';
+}
+function _cbLedgerHTML(rows){
+  if(!rows.length)return '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No entries found.</div>';
+  var bm=_cbBalMap(),lastD='',h='<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);text-align:left;">'
     +'<th style="padding:9px 12px;">Time</th><th style="padding:9px 12px;">Type</th><th style="padding:9px 12px;">Name</th><th style="padding:9px 12px;">Note</th><th style="padding:9px 12px;">Entered by</th><th style="padding:9px 12px;text-align:right;">Amount</th><th style="padding:9px 12px;text-align:right;">Balance</th><th style="padding:9px 12px;"></th></tr></thead><tbody>';
   rows.forEach(function(r){
     if(r.entry_date!==lastD){
@@ -3281,7 +3316,6 @@ function _cbLedgerHTML(inP,before,rg){
       h+='<tr style="background:#f1f5f9;"><td colspan="8" style="padding:7px 12px;font-weight:700;font-size:12px;color:#334155;">📅 '+_cbNice(lastD)+' <span style="font-weight:600;color:#16a34a;margin-left:10px;">+'+_cbFmt(dIn)+'</span> <span style="font-weight:600;color:#dc2626;margin-left:6px;">−'+_cbFmt(dOut)+'</span></td></tr>';
     }
     var del=!!r.is_deleted,s=_cbSigned(r);
-    if(!del)run+=s;
     var tm=r.created_at?new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
     var edited=(r.edit_log&&r.edit_log.length&&!del)?' <span title="'+_cbE(r.edit_log.map(function(l){return (l.name||l.by)+' • '+new Date(l.at).toLocaleString('en-IN')+' • '+(l.action||'edited');}).join('\n'))+'" style="font-size:10px;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:0 5px;cursor:help;">edited</span>':'';
     h+='<tr style="border-top:1px solid var(--border);'+(del?'opacity:.5;text-decoration:line-through;':'')+'">'
@@ -3291,7 +3325,7 @@ function _cbLedgerHTML(inP,before,rg){
       +'<td style="padding:8px 12px;color:var(--text-muted);">'+_cbE(r.note)+'</td>'
       +'<td style="padding:8px 12px;color:var(--text-muted);white-space:nowrap;">'+_cbE(r.created_by_name||r.created_by)+'</td>'
       +'<td style="padding:8px 12px;text-align:right;font-weight:700;color:'+(s>=0?'#16a34a':'#dc2626')+';white-space:nowrap;">'+(s>=0?'+':'−')+_cbFmt(Math.abs(s))+'</td>'
-      +'<td style="padding:8px 12px;text-align:right;font-weight:700;white-space:nowrap;">'+(del?'—':_cbFmt(run))+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;white-space:nowrap;">'+(del?'—':_cbFmt(bm[r.id]))+'</td>'
       +'<td style="padding:8px 12px;white-space:nowrap;text-align:right;">'
       +(del?(_cbIsBoss()?'<button class="btn-icon" title="Restore" onclick="_cbRestore('+r.id+')">♻️</button>':'')
           :(_cbCanEdit(r)?'<button class="btn-icon" title="Edit" onclick="_cbOpenEdit('+r.id+')">✏️</button><button class="btn-icon" title="Delete" onclick="_cbDelete('+r.id+')">🗑️</button>':''))
@@ -3299,6 +3333,17 @@ function _cbLedgerHTML(inP,before,rg){
   });
   return h+'</tbody></table></div>';
 }
+// search / filter handlers — only the list is re-rendered, so typing never loses focus
+var _cbSearchT=null;
+function _cbRefreshList(){var w=document.getElementById('cb-list-wrap');if(w)w.innerHTML=_cbListHTML();}
+function _cbSearch(v){
+  var c=window._cb;c.q=v;
+  if(c.tab==='summary'){c.tab='ledger';_cbDraw();var e=document.getElementById('cb-q');if(e){e.focus();try{e.setSelectionRange(v.length,v.length);}catch(x){}}return;}
+  clearTimeout(_cbSearchT);_cbSearchT=setTimeout(_cbRefreshList,120);
+}
+function _cbSetType(v){window._cb.qType=v;_cbDraw();}
+function _cbSetScope(v){window._cb.scope=v;_cbRefreshList();}
+function _cbClearFilter(){window._cb.q='';window._cb.qType='all';_cbDraw();}
 function _cbDays(inP,before){
   var byD={};inP.forEach(function(r){(byD[r.entry_date]=byD[r.entry_date]||[]).push(r);});
   var run=before,out=[];
@@ -3466,11 +3511,12 @@ function _cbCsv(){
     _cbDays(act,before).forEach(function(d){lines.push([d.date,d.open,d.inn,d.out,d.wd,d.close,d.n].join(','));});
   }else{
     lines=[['Date','Type','Name','Category','Note','Entered by','Amount','Balance'].map(q).join(',')];
-    var run=before;act.slice().sort(function(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;}).forEach(function(r){run+=_cbSigned(r);lines.push([r.entry_date,r.entry_type,r.party,r.category,r.note,r.created_by_name||r.created_by,_cbSigned(r),run].map(q).join(','));});
+    var bm=_cbBalMap();_cbFiltered().filter(function(r){return!r.is_deleted;}).forEach(function(r){lines.push([r.entry_date,r.entry_type,r.party,r.category,r.note,r.created_by_name||r.created_by,_cbSigned(r),bm[r.id]].map(q).join(','));});
   }
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv'}));a.download='cash-book-'+rg.from+'_to_'+rg.to+'.csv';document.body.appendChild(a);a.click();a.remove();
 }
 // ===== END CASH BOOK =====
+
 
 // MASTER DATA
 async function loadMasterData(){
