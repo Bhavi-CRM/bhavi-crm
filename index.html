@@ -2762,7 +2762,7 @@ async function doLogin(){
     localStorage.setItem('bhavi_session',JSON.stringify({user_id:user.user_id,role:user.role,savedAt:Date.now(),session_token:_stok}));
     localStorage.setItem('bhavi_user',JSON.stringify(user));
     // NEW-DEVICE ALERT: register this device; server emails Allow/Block links if it is new. Non-blocking.
-    deviceCall({action:'register',user_id:user.user_id,device_id:getDeviceId(),label:getDeviceLabel(),ua:navigator.userAgent,session_token:_stok,app_url:location.origin+location.pathname},10000);
+    deviceCall({action:'register',user_id:user.user_id,device_id:getDeviceId(),label:getDeviceLabel(),ua:navigator.userAgent,session_token:_stok,app_url:location.origin+location.pathname},10000).then(function(r){console.log('device-alert register:',r);});
     startDeviceWatch();
     document.getElementById('login-screen').style.display='none';
     document.getElementById('sidebar-username').textContent=currentUser.name;
