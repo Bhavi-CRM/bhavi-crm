@@ -13771,10 +13771,19 @@ async function saveDirectWarrantyIssue(){
     // everything below. Same suffix-match rule used everywhere else this
     // tracking key is matched against a ticket's se_call_id.
     const matchTickets=await sb('tickets','GET',null,'?se_call_id=ilike.*'+encodeURIComponent(trackKey)+'*&select=id,cname,model,spares,se_call_id,timeline,status,service_type,assigned_name&limit=10').catch(()=>[]);
-    const exactMatches=(matchTickets||[]).filter(t=>{
+    let exactMatches=(matchTickets||[]).filter(t=>{
       const raw=(t.se_call_id||'').trim().toUpperCase();
       return raw===trackKey||raw.endsWith('/'+trackKey)||raw.endsWith(trackKey);
     });
+    // Two different calls can end in the same tracking digits (e.g. CSP/20260626/73283
+    // and ICP/20261106/73283). When the user typed the FULL SE Call ID, use it to
+    // pick the exact call — before, only the last segment was ever compared, so
+    // typing the full ID could never resolve the ambiguity.
+    if(exactMatches.length>1&&jobSheetRaw.indexOf('/')!==-1){
+      const _nzFull=function(x){return String(x||'').toUpperCase().replace(/\s+/g,'');};
+      const _fullHit=exactMatches.filter(function(t){return _nzFull(t.se_call_id)===_nzFull(jobSheetRaw);});
+      if(_fullHit.length===1)exactMatches=_fullHit;
+    }
     // A short/generic tracking key can match more than one call's SE Call
     // ID — silently taking the first result risked moving stock/status on
     // the WRONG ticket with no way to notice until much later. Ambiguous?
@@ -13864,6 +13873,7 @@ async function saveDirectWarrantyIssue(){
       from_owner:'COMPANY (Canon Warranty)',
       to_owner:goesToCompanyStock?'COMPANY STOCK':destEngineer,
       job_sheet:trackKey,
+      se_call_id_full:jobSheetRaw,
       warranty:true,
       warranty_status:'WITH_ENGINEER',
       notes:'Direct Canon dispatch'+(matchTkt?' for call '+matchTkt.id:' — no matching call found yet')+(notes?' | '+notes:''),
