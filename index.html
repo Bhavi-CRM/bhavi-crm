@@ -3552,23 +3552,25 @@ var _CB_DENOMS=[500,200,100,50,20,10,5,2,1];
 function _cbOpenCount(){
   if(!_cbIsBoss())return;
   var bal=Math.round(_cbBalance()*100)/100;
-  var h='<h3 style="margin:0 0 4px;font-size:17px;">🧮 Count Cash</h3>'
-    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Enter how many notes / coins of each kind are in the bag. Cash in bag as per Cash Book: <b style="color:var(--text);">'+_cbFmt(bal)+'</b></div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:10px;"><thead><tr style="color:var(--text-muted);font-size:11px;text-transform:uppercase;"><th style="text-align:left;padding:4px 6px;">Note / Coin</th><th style="padding:4px 6px;">Quantity</th><th style="text-align:right;padding:4px 6px;">Amount</th></tr></thead><tbody>';
+  // Compact grid layout (no <table>) so it fits a phone screen without sideways scrolling;
+  // total + buttons live in a sticky footer so they are always visible while typing.
+  var h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;"><h3 style="margin:0;font-size:16px;">🧮 Count Cash</h3><div style="font-size:12px;color:var(--text-muted);">Cash Book: <b style="color:var(--text);">'+_cbFmt(bal)+'</b></div></div>';
   _CB_DENOMS.forEach(function(d,i){
-    h+='<tr style="border-top:1px solid var(--border);"><td style="padding:5px 6px;font-weight:700;">₹'+d+(d<=10?' <span style="font-size:10px;color:var(--text-muted);font-weight:600;">'+(d===10?'note/coin':'coin')+'</span>':'')+'</td>'
-      +'<td style="padding:5px 6px;text-align:center;"><span style="color:var(--text-muted);">×</span> <input id="cb-d-'+d+'" data-i="'+i+'" type="number" inputmode="numeric" min="0" step="1" placeholder="0" oninput="_cbCountCalc()" onkeydown="_cbCountKey(event)" style="width:90px;text-align:center;border:1px solid var(--border);border-radius:8px;padding:7px 8px;font-size:15px;font-weight:700;"></td>'
-      +'<td id="cb-l-'+d+'" style="padding:5px 6px;text-align:right;font-weight:600;color:var(--text-muted);">—</td></tr>';
+    h+='<div style="display:grid;grid-template-columns:70px 1fr 84px;align-items:center;gap:6px;padding:3px 0;border-top:1px solid var(--border);">'
+      +'<div style="font-weight:800;font-size:15px;">₹'+d+(d<=5?'<span style="font-size:9px;color:var(--text-muted);font-weight:600;"> coin</span>':'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;min-width:0;"><span style="color:var(--text-muted);">×</span><input id="cb-d-'+d+'" data-i="'+i+'" type="number" inputmode="numeric" min="0" step="1" placeholder="0" oninput="_cbCountCalc()" onkeydown="_cbCountKey(event)" style="width:100%;max-width:100px;min-width:0;box-sizing:border-box;text-align:center;border:1px solid var(--border);border-radius:8px;padding:6px 4px;font-size:16px;font-weight:700;"></div>'
+      +'<div id="cb-l-'+d+'" style="text-align:right;font-weight:600;font-size:14px;color:var(--text-muted);">—</div></div>';
   });
-  h+='</tbody></table>'
-    +'<div style="background:#0f172a;color:#fff;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:11px;opacity:.7;font-weight:700;letter-spacing:.4px;">TOTAL COUNTED</div><div style="font-size:11px;opacity:.6;" id="cb-pieces">0 pieces</div></div><div id="cb-total" style="font-size:26px;font-weight:800;">₹0</div></div>'
-    +'<div id="cb-diff" style="margin:10px 0 8px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);"></div>'
-    +'<div id="cb-diff-actions" style="display:none;margin-bottom:12px;"></div>'
-    +_cbField('Note (optional)','<input id="cb-note" placeholder="e.g. after collecting ₹12,000">')
-    +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
-    +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;"><button class="btn btn-outline" onclick="_cbCountClear()">Clear</button><span style="display:flex;gap:8px;"><button class="btn btn-outline" onclick="_cbClose()">Close</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveCount()">💾 Save Count</button></span></div>';
+  h+='<div id="cb-diff-actions" style="display:none;margin-top:8px;"></div>'
+    +'<input id="cb-note" placeholder="Note / reason (optional)" style="width:100%;box-sizing:border-box;margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">'
+    +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:14px;margin:4px 0;"></div>'
+    // sticky footer
+    +'<div style="position:sticky;bottom:0;background:#fff;padding:8px 0 12px;border-top:1px solid var(--border);margin-top:4px;">'
+    +'<div style="background:#0f172a;color:#fff;border-radius:10px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;opacity:.7;font-weight:700;letter-spacing:.4px;">TOTAL COUNTED</div><div style="font-size:11px;opacity:.6;" id="cb-pieces">0 pieces</div></div><div id="cb-total" style="font-size:24px;font-weight:800;">₹0</div></div>'
+    +'<div id="cb-diff" style="margin:6px 0;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;background:#f8fafc;border:1px solid var(--border);"></div>'
+    +'<div style="display:flex;gap:6px;"><button class="btn btn-outline" onclick="_cbCountClear()">Clear</button><button class="btn btn-outline" onclick="_cbClose()">Close</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveCount()" style="flex:1;justify-content:center;">💾 Save Count</button></div></div>';
   _cbModal(h);
-  var m=document.querySelector('#cb-modal .modal');if(m){m.style.maxWidth='460px';}
+  var m=document.querySelector('#cb-modal .modal');if(m){m.style.maxWidth='440px';m.style.padding='14px 14px 0';m.style.maxHeight='96vh';}
   _cbCountCalc();
   setTimeout(function(){var e=document.getElementById('cb-d-500');if(e)e.focus();},50);
 }
@@ -3598,7 +3600,7 @@ function _cbCountActions(df,has){
   var a=document.getElementById('cb-diff-actions');if(!a)return;
   if(!has||df===0){a.style.display='none';a.innerHTML='';return;}
   a.style.display='block';
-  a.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Make Cash Book match the counted cash? (write a note first)</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'
+  a.innerHTML='<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Make Cash Book match? (write note first)</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'
     +(df>0?'<button class="btn btn-sm btn-outline" onclick="_cbCountApply(\'topup\')">💰 I added cash (Top-up)</button>':'')
     +'<button class="btn btn-sm btn-outline" onclick="_cbCountApply(\'adjust\')">⚖️ Counting difference (Adjustment '+(df>0?'+':'−')+')</button></div>';
 }
@@ -3638,6 +3640,7 @@ function _cbCountsHTML(){
   return h+'</tbody></table></div></div>';
 }
 // ===== END CASH BOOK =====
+
 
 
 
