@@ -9278,7 +9278,7 @@ async function saveEngUpdate(){
   const workDone=(document.getElementById('upd-work')?.value||'').trim();
   if(!workDone&&isFieldRequired('call_close','action_taken')){alert('❌ Action Taken is required.\nPlease describe what was done.');document.getElementById('upd-work')?.focus();return;}
   // Fault Code — enforced only if admin marked it compulsory.
-  if(isFieldRequired('call_close','fault_code')&&!(document.getElementById('upd-fault')?.value||'').trim()){alert('❌ Fault Code is required.');document.getElementById('upd-fault')?.focus();return;}
+  if(status!=='Call Cancel'&&isFieldRequired('call_close','fault_code')&&!(document.getElementById('upd-fault')?.value||'').trim()){alert('❌ Fault Code is required.');document.getElementById('upd-fault')?.focus();return;}
   // Validate status change for current role — skip if status is unchanged (just saving remarks/fields)
   const allowedEng=getAllowedStatuses(t.status,(currentUser?.role==='admin'||currentUser?.role_type==='work_controller')?'admin':(currentUser?.role||'engineer'),t.service_type,t.call_type,t.warranty_coverage);
   if(status!==t.status && !allowedEng.includes(status)){
@@ -9286,8 +9286,10 @@ async function saveEngUpdate(){
     return;
   }
   // Engineer must tap "Work Start" before changing status at all — except
-  // Resolved By Phone, which by definition has no visit/work session.
-  if(currentUser.role==='engineer'&&status!==t.status&&status!=='Resolved By Phone'){
+  // Resolved By Phone (no visit/work session by definition) and Call Cancel
+  // (a cancel REQUEST — e.g. customer not reachable — can be raised without
+  // starting travel/work; it still goes to Admin/Manager for approval below).
+  if(currentUser.role==='engineer'&&status!==t.status&&status!=='Resolved By Phone'&&status!=='Call Cancel'){
     var _wsTl=t.timeline;if(typeof _wsTl==='string'){try{_wsTl=JSON.parse(_wsTl);}catch(e){_wsTl=[];}}
     var _hasWorkStart=Array.isArray(_wsTl)&&_wsTl.some(function(e){return e&&e.action&&e.action.indexOf('Work Start')!==-1;});
     if(!_hasWorkStart){
@@ -9302,8 +9304,9 @@ async function saveEngUpdate(){
   // (status/engineer untouched) until Admin/Manager decides — see
   // approveCancelRequest/rejectCancelRequest.
   if(status==='Call Cancel'&&currentUser.role==='engineer'){
-    if(!workDone){alert('❌ Cancel Reason required — describe it in Action Taken.');document.getElementById('upd-work')?.focus();return;}
-    if(!confirm('Send this Cancel request for Admin/Manager approval?'))return;
+    if(t.pending_cancel){alert('⏳ Aa call no Cancel request pehla thi Admin/Manager approval ma chhe.');return;}
+    if(!workDone||workDone.length<10){alert('❌ Valid Cancel Reason required.\n\n"Action Taken" ma cancel nu sachu karan lakho (at least 10 characters), jemke: "Customer phone nathi uthavta / site par koi nathi / customer e call cancel karyo".');document.getElementById('upd-work')?.focus();return;}
+    if(!confirm('Send this Cancel request for Admin/Manager approval?\n\nReason: '+workDone+'\n\nCall tamari list ma j rahese jya sudhi approve/reject na thay.'))return;
     const pc={requested_by:currentUser.name,requested_by_role:'Engineer',reason:workDone,at:new Date().toISOString(),prev_status:t.status,prev_assigned_to:t.assigned_to||null,prev_assigned_name:t.assigned_name||null};
     const tl=[...(t.timeline||[]),{action:'Cancel Requested — Pending Approval',by:currentUser.name,at:new Date().toISOString(),note:'Reason: '+workDone}];
     try{
