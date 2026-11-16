@@ -3184,7 +3184,8 @@ function _cbToday(){return new Date().toLocaleDateString('en-CA');}
 function _cbDStr(d){return d.toLocaleDateString('en-CA');}
 function _cbFmt(n){n=Number(n)||0;return (n<0?'-':'')+'₹'+Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:2});}
 function _cbNice(ds){var p=ds.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
-function _cbSigned(r){var a=Number(r.amount)||0;return (r.entry_type==='in'||r.entry_type==='opening')?a:-a;}
+var _CB_PLUS=['in','opening','topup','adjust_plus'];
+function _cbSigned(r){var a=Number(r.amount)||0;return _CB_PLUS.indexOf(r.entry_type)!==-1?a:-a;}
 function _cbE(s){return escHtml(String(s==null?'':s));}
 function _cbRange(){
   var c=window._cb,t=new Date(),today=_cbToday(),f=today,to=today;
@@ -3223,7 +3224,7 @@ function _cbDraw(){
   var before=act.filter(function(r){return r.entry_date<rg.from;}).reduce(function(a,r){return a+_cbSigned(r);},0);
   var inP=act.filter(function(r){return r.entry_date>=rg.from&&r.entry_date<=rg.to;});
   function sum(t){return inP.filter(function(r){return r.entry_type===t;}).reduce(function(a,r){return a+Number(r.amount);},0);}
-  var sIn=sum('in'),sOut=sum('out'),sWd=sum('withdraw'),sOp=sum('opening');
+  var sIn=sum('in'),sOut=sum('out'),sWd=sum('withdraw'),sOp=sum('opening')+sum('topup')+sum('adjust_plus')-sum('adjust_minus');
   var pLabel={today:'Today',yesterday:'Yesterday',week:'This Week',month:'This Month',lastmonth:'Last Month',custom:'Custom',all:'All Time'}[c.period];
   function chip(k,l){var on=c.period===k;return '<button onclick="_cbSetPeriod(\''+k+'\')" style="border:1px solid '+(on?'var(--primary)':'var(--border)')+';background:'+(on?'var(--primary)':'#fff')+';color:'+(on?'#fff':'var(--text)')+';border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">'+l+'</button>';}
   function card(label,val,color,sub){return '<div style="background:#fff;border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);border-left:4px solid '+color+';"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;">'+label+'</div><div style="font-size:22px;font-weight:800;color:'+color+';margin-top:4px;">'+val+'</div>'+(sub?'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+sub+'</div>':'')+'</div>';}
@@ -3234,7 +3235,7 @@ function _cbDraw(){
     +'<div style="display:flex;flex-wrap:wrap;gap:8px;">'
     +'<button class="btn btn-success" onclick="_cbOpenEntry(\'in\')">➕ Cash In (Customer)</button>'
     +'<button class="btn btn-danger" onclick="_cbOpenEntry(\'out\')">➖ Cash Out (Porter / Other)</button>'
-    +(boss?'<button class="btn btn-warning" onclick="_cbOpenWithdraw()">🏦 Collect Cash</button><button class="btn btn-outline" onclick="_cbOpenCount()">🧮 Count Cash</button>':'')
+    +(boss?'<button class="btn btn-warning" onclick="_cbOpenWithdraw()">🏦 Collect Cash</button><button class="btn btn-outline" onclick="_cbOpenTopup()">💰 Add Cash to Bag</button><button class="btn btn-outline" onclick="_cbOpenCount()">🧮 Count Cash</button>':'')
     +'</div></div>';
   // Period filter
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px;">'
@@ -3243,7 +3244,7 @@ function _cbDraw(){
   // Search / type filter (search covers ALL dates by default, so past visits of a customer can be found)
   h+='<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 12px;">'
     +'<input id="cb-q" type="search" value="'+_cbE(c.q)+'" oninput="_cbSearch(this.value)" placeholder="🔍 Search name, note, amount, entered by..." autocomplete="off" style="flex:1;min-width:200px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">'
-    +'<select onchange="_cbSetType(this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"><option value="all"'+(c.qType==='all'?' selected':'')+'>All types</option><option value="in"'+(c.qType==='in'?' selected':'')+'>Cash In</option><option value="out"'+(c.qType==='out'?' selected':'')+'>Cash Out</option><option value="withdraw"'+(c.qType==='withdraw'?' selected':'')+'>Withdrawn</option></select>'
+    +'<select onchange="_cbSetType(this.value)" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"><option value="all"'+(c.qType==='all'?' selected':'')+'>All types</option><option value="in"'+(c.qType==='in'?' selected':'')+'>Cash In</option><option value="out"'+(c.qType==='out'?' selected':'')+'>Cash Out</option><option value="withdraw"'+(c.qType==='withdraw'?' selected':'')+'>Withdrawn</option><option value="other"'+(c.qType==='other'?' selected':'')+'>Top-up / Adjustment</option></select>'
     +'<select onchange="_cbSetScope(this.value)" title="Where to search" style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;"><option value="all"'+(c.scope==='all'?' selected':'')+'>Search: all dates</option><option value="period"'+(c.scope==='period'?' selected':'')+'>Search: selected period</option></select>'
     +(c.q||c.qType!=='all'?'<button class="btn btn-sm btn-outline" onclick="_cbClearFilter()">✖ Clear</button>':'')+'</div>';
   // Period cards
@@ -3270,7 +3271,7 @@ function _cbCanEdit(r){
   return _cbIsCashWC()&&(r.entry_type==='in'||r.entry_type==='out');
 }
 function _cbTypeBadge(r){
-  var m={in:['#dcfce7','#15803d','Cash In'],out:['#fee2e2','#b91c1c',r.category==='porter'?'Porter':'Cash Out'],withdraw:['#ffedd5','#c2410c','Withdrawn'],opening:['#dbeafe','#1d4ed8','Opening']}[r.entry_type]||['#eee','#333',r.entry_type];
+  var m={in:['#dcfce7','#15803d','Cash In'],out:['#fee2e2','#b91c1c',r.category==='porter'?'Porter':'Cash Out'],withdraw:['#ffedd5','#c2410c','Withdrawn'],opening:['#dbeafe','#1d4ed8','Opening'],topup:['#ede9fe','#6d28d9','Top-up'],adjust_plus:['#e0f2fe','#0369a1','Adjust +'],adjust_minus:['#fce7f3','#be185d','Adjust −']}[r.entry_type]||['#eee','#333',r.entry_type];
   return '<span class="badge" style="background:'+m[0]+';color:'+m[1]+';">'+m[2]+'</span>';
 }
 function _cbChrono(a,b){return a.entry_date<b.entry_date?-1:a.entry_date>b.entry_date?1:a.id-b.id;}
@@ -3281,7 +3282,8 @@ function _cbFiltered(){
   return c.rows.filter(function(r){
     if(r.is_deleted&&!(c.showDel&&_cbIsBoss()))return false;
     if(!useAll&&(r.entry_date<rg.from||r.entry_date>rg.to))return false;
-    if(c.qType!=='all'&&r.entry_type!==c.qType)return false;
+    if(c.qType==='other'){if(['opening','topup','adjust_plus','adjust_minus'].indexOf(r.entry_type)===-1)return false;}
+    else if(c.qType!=='all'&&r.entry_type!==c.qType)return false;
     if(q&&[r.party,r.note,r.created_by_name,r.created_by,r.category,String(r.amount)].join(' ').toLowerCase().indexOf(q)===-1)return false;
     return true;
   }).sort(_cbChrono);
@@ -3350,7 +3352,7 @@ function _cbDays(inP,before){
   var run=before,out=[];
   Object.keys(byD).sort().forEach(function(d){
     var o={date:d,open:run,inn:0,out:0,wd:0,op:0,n:byD[d].length};
-    byD[d].forEach(function(r){var a=Number(r.amount);if(r.entry_type==='in')o.inn+=a;else if(r.entry_type==='out')o.out+=a;else if(r.entry_type==='withdraw')o.wd+=a;else o.op+=a;});
+    byD[d].forEach(function(r){var a=Number(r.amount);if(r.entry_type==='in')o.inn+=a;else if(r.entry_type==='out')o.out+=a;else if(r.entry_type==='withdraw')o.wd+=a;else o.op+=_cbSigned(r);});
     o.close=o.open+o.inn+o.op-o.out-o.wd;run=o.close;out.push(o);
   });
   return out;
@@ -3370,7 +3372,7 @@ function _cbSummaryHTML(inP,before){
     var w=maxIn?Math.round(d.inn/maxIn*100):0;
     h+='<tr style="border-top:1px solid var(--border);"><td style="padding:8px 12px;font-weight:600;white-space:nowrap;">'+_cbNice(d.date)+'</td>'
       +'<td style="padding:8px 12px;text-align:right;color:var(--text-muted);">'+_cbFmt(d.open)+'</td>'
-      +'<td style="padding:8px 12px;text-align:right;font-weight:700;color:#16a34a;">'+_cbFmt(d.inn)+(d.op?'<div style="font-size:10px;color:#1d4ed8;">+'+_cbFmt(d.op)+' opening</div>':'')+'</td>'
+      +'<td style="padding:8px 12px;text-align:right;font-weight:700;color:#16a34a;">'+_cbFmt(d.inn)+(d.op?'<div style="font-size:10px;color:#1d4ed8;">'+(d.op>0?'+':'−')+_cbFmt(Math.abs(d.op))+' opening / top-up / adj.</div>':'')+'</td>'
       +'<td style="padding:8px 12px;"><div style="background:#e5e7eb;border-radius:4px;height:8px;"><div style="background:#16a34a;height:8px;border-radius:4px;width:'+w+'%;"></div></div></td>'
       +'<td style="padding:8px 12px;text-align:right;color:#dc2626;">'+(d.out?_cbFmt(d.out):'—')+'</td>'
       +'<td style="padding:8px 12px;text-align:right;color:#d97706;">'+(d.wd?_cbFmt(d.wd):'—')+'</td>'
@@ -3392,7 +3394,7 @@ function _cbTypeChange(){
 function _cbOpenEntry(type,id){
   var r=id?window._cb.rows.find(function(x){return x.id===id;}):null;
   if(r){type=r.entry_type;}
-  var isWd=type==='withdraw'||type==='opening';
+  var isWd=type!=='in'&&type!=='out';
   var title=r?'✏️ Edit Entry':(type==='in'?'➕ Cash In — Customer':'➖ Cash Out — Porter / Other');
   var h='<h3 style="margin:0 0 14px;font-size:17px;">'+title+'</h3>';
   if(!isWd)h+=_cbField('Type','<select id="cb-type" onchange="_cbTypeChange()"><option value="in"'+(type==='in'?' selected':'')+'>Cash In (received from customer)</option><option value="out"'+(type==='out'?' selected':'')+'>Cash Out (paid to porter / other)</option></select>');
@@ -3416,7 +3418,7 @@ function _cbReadForm(){
 function _cbErr(m){var e=document.getElementById('cb-err');if(e)e.textContent=m;}
 async function _cbSaveEntry(id){
   var f=_cbReadForm();
-  if(f.type!=='withdraw'&&f.type!=='opening'&&!f.party){_cbErr(f.type==='in'?'Enter customer name.':'Enter who was paid.');return;}
+  if((f.type==='in'||f.type==='out')&&!f.party){_cbErr(f.type==='in'?'Enter customer name.':'Enter who was paid.');return;}
   if(!(f.amt>0)){_cbErr('Enter a valid amount.');return;}
   if(!f.date||f.date>_cbToday()){_cbErr('Date cannot be empty or in the future.');return;}
   var btn=document.getElementById('cb-save');if(btn)btn.disabled=true;
@@ -3517,6 +3519,34 @@ function _cbCsv(){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv'}));a.download='cash-book-'+rg.from+'_to_'+rg.to+'.csv';document.body.appendChild(a);a.click();a.remove();
 }
 
+// ---- Add Cash to Bag (Top-up): admin/manager puts own money into the float. Counts in the balance but NOT as customer collection ----
+function _cbOpenTopup(){
+  if(!_cbIsBoss())return;
+  var h='<h3 style="margin:0 0 6px;font-size:17px;">💰 Add Cash to Bag</h3>'
+    +'<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Use this when you put your own cash into the bag (e.g. to keep the float amount). It increases the balance but is <b>not</b> counted as customer collection. Current: <b style="color:var(--text);">'+_cbFmt(_cbBalance())+'</b></div>'
+    +_cbField('Amount (₹) *','<input id="cb-amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">')
+    +_cbField('Added by','<input id="cb-party" value="'+_cbE(currentUser.name)+'" readonly style="background:#f1f5f9;">')
+    +_cbField('Note','<input id="cb-note" placeholder="e.g. Added to keep ₹5,000 float">')
+    +_cbField('Date','<input id="cb-date" type="date" max="'+_cbToday()+'" value="'+_cbToday()+'">')
+    +'<input type="hidden" id="cb-type" value="topup">'
+    +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-outline" onclick="_cbClose()">Cancel</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveEntry(null)">Add Cash</button></div>';
+  _cbModal(h);setTimeout(function(){var e=document.getElementById('cb-amt');if(e)e.focus();},50);
+}
+// From the Count dialog: turn the difference into a ledger entry so Cash Book matches the physical cash
+async function _cbCountApply(kind){
+  var r=_cbCountRead(),bal=Math.round(_cbBalance()*100)/100,df=Math.round((r.total-bal)*100)/100,note=(document.getElementById('cb-note').value||'').trim();
+  if(!r.pieces||df===0)return;
+  if(!note){_cbErr('Please write a note / reason first (e.g. "added my cash" or "counting difference").');var n=document.getElementById('cb-note');if(n)n.focus();return;}
+  var type=kind==='topup'?'topup':(df>0?'adjust_plus':'adjust_minus'),amt=Math.abs(df);
+  var label=type==='topup'?'Top-up (cash added)':(df>0?'Adjustment (excess)':'Adjustment (shortage)');
+  if(!confirm(label+' of '+_cbFmt(amt)+'\n\nCash Book will change from '+_cbFmt(bal)+' to '+_cbFmt(r.total)+'.\nReason: '+note+'\n\nProceed?'))return;
+  try{
+    try{await sb('cash_counts','POST',{count_date:_cbToday(),denoms:r.den,counted_total:r.total,system_balance:bal,difference:df,note:note,counted_by:currentUser.user_id,counted_by_name:currentUser.name});window._cb.counts=null;}catch(ce){console.log('count history not saved:',ce);}
+    await sb('cash_book','POST',{entry_type:type,party:type==='topup'?currentUser.name:'Count Adjustment',note:note+' (counted '+_cbFmt(r.total)+' vs book '+_cbFmt(bal)+')',amount:amt,entry_date:_cbToday(),created_by:currentUser.user_id,created_by_name:currentUser.name});
+    _cbClose();showToastWI('✅ Cash Book now matches: '+_cbFmt(r.total));await _cbReload();
+  }catch(e){_cbErr('Failed: '+(e.message||e)+(/entry_type|check/i.test(String(e.message||e))?' — run cash_book_v2.sql in Supabase first.':''));}
+}
 // ---- Cash Count (denomination counter) — Admin / Manager ----
 var _CB_DENOMS=[500,200,100,50,20,10,5,2,1];
 function _cbOpenCount(){
@@ -3532,7 +3562,8 @@ function _cbOpenCount(){
   });
   h+='</tbody></table>'
     +'<div style="background:#0f172a;color:#fff;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:11px;opacity:.7;font-weight:700;letter-spacing:.4px;">TOTAL COUNTED</div><div style="font-size:11px;opacity:.6;" id="cb-pieces">0 pieces</div></div><div id="cb-total" style="font-size:26px;font-weight:800;">₹0</div></div>'
-    +'<div id="cb-diff" style="margin:10px 0 12px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);"></div>'
+    +'<div id="cb-diff" style="margin:10px 0 8px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);"></div>'
+    +'<div id="cb-diff-actions" style="display:none;margin-bottom:12px;"></div>'
     +_cbField('Note (optional)','<input id="cb-note" placeholder="e.g. after collecting ₹12,000">')
     +'<div id="cb-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:6px;"></div>'
     +'<div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;"><button class="btn btn-outline" onclick="_cbCountClear()">Clear</button><span style="display:flex;gap:8px;"><button class="btn btn-outline" onclick="_cbClose()">Close</button><button class="btn btn-primary" id="cb-save" onclick="_cbSaveCount()">💾 Save Count</button></span></div>';
@@ -3555,12 +3586,21 @@ function _cbCountCalc(){
   var t=document.getElementById('cb-total');if(t)t.textContent=_cbFmt(r.total);
   var p=document.getElementById('cb-pieces');if(p)p.textContent=r.pieces+' pieces';
   var df=Math.round((r.total-bal)*100)/100,e=document.getElementById('cb-diff');
+  _cbCountActions(df,r.pieces>0);
   if(e){
     if(!r.pieces){e.style.background='#f8fafc';e.style.color='#475569';e.textContent='Cash Book balance: '+_cbFmt(bal);}
     else if(df===0){e.style.background='#f0fdf4';e.style.color='#15803d';e.textContent='✅ Matches Cash Book ('+_cbFmt(bal)+')';}
     else if(df<0){e.style.background='#fef2f2';e.style.color='#b91c1c';e.textContent='⚠️ Short by '+_cbFmt(-df)+' (Cash Book: '+_cbFmt(bal)+')';}
     else{e.style.background='#fff7ed';e.style.color='#c2410c';e.textContent='⚠️ Excess by '+_cbFmt(df)+' (Cash Book: '+_cbFmt(bal)+')';}
   }
+}
+function _cbCountActions(df,has){
+  var a=document.getElementById('cb-diff-actions');if(!a)return;
+  if(!has||df===0){a.style.display='none';a.innerHTML='';return;}
+  a.style.display='block';
+  a.innerHTML='<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Make Cash Book match the counted cash? (write a note first)</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'
+    +(df>0?'<button class="btn btn-sm btn-outline" onclick="_cbCountApply(\'topup\')">💰 I added cash (Top-up)</button>':'')
+    +'<button class="btn btn-sm btn-outline" onclick="_cbCountApply(\'adjust\')">⚖️ Counting difference (Adjustment '+(df>0?'+':'−')+')</button></div>';
 }
 function _cbCountClear(){_CB_DENOMS.forEach(function(d){var e=document.getElementById('cb-d-'+d);if(e)e.value='';});_cbCountCalc();var f=document.getElementById('cb-d-500');if(f)f.focus();}
 async function _cbSaveCount(){
@@ -3598,6 +3638,7 @@ function _cbCountsHTML(){
   return h+'</tbody></table></div></div>';
 }
 // ===== END CASH BOOK =====
+
 
 
 
