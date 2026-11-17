@@ -3169,6 +3169,9 @@ function setupNav(){
   }catch(e){console.error('setupNav:',e);}
 }
 
+// Fujifilm cameras/lenses have no page counter and no job sheet to compulsorily attach.
+function _isFujifilmTicket(t){return !!(t&&/fuji/i.test(String(t.brand_name||'')));}
+
 // ===== CASH BOOK (WC cash register: customer collections, porter payouts, manager withdrawals) =====
 // Balance (cash in bag / carry forward) = Σ(in + opening) − Σ(out + withdraw), deleted entries ignored.
 var _CB_WC_IDS=['WC001','WC002'];
@@ -8616,7 +8619,7 @@ async function openEngUpdate(id){
       <input type="text" id="upd-se-call-id" value="${escHtml(t.se_call_id||'')}" placeholder="e.g. CSP/20260618/123456" style="margin-top:4px;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;border-color:#f59e0b;">
       <div style="font-size:11px;color:#78716c;margin-top:3px;">Only the digits after the last / will be used for tracking (e.g. 123456)</div>
     </div>`:''}
-    ${t.wc_type==='CSP'?`<div class="form-group" style="margin-bottom:12px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;padding:10px 12px;">
+    ${(t.wc_type==='CSP'&&!_isFujifilmTicket(t))?`<div class="form-group" style="margin-bottom:12px;background:#f5f3ff;border:1.5px solid #c4b5fd;border-radius:8px;padding:10px 12px;">
       <label style="font-weight:700;color:#5b21b6;font-size:12px;">📄 Page Count <span style="color:#ef4444;">*</span> <span style="font-size:11px;font-weight:400;color:#6d28d9;">(CSP call — required to close)</span></label>
       <input type="number" id="upd-page-count" min="0" value="${t.page_count!=null?t.page_count:''}" placeholder="e.g. 1250" autocomplete="off" inputmode="numeric" style="margin-top:4px;border-color:#c4b5fd;">
       <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#6d28d9;cursor:pointer;">
@@ -8644,7 +8647,7 @@ async function openEngUpdate(id){
     <div id="estimate-total-bar" style="display:none;background:#f0fdf4;border:1.5px solid #16a34a;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;"></div>
     <hr class="divider">
     <div class="form-group" style="background:#f0f9ff;border:1.5px solid #7dd3fc;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments ${t.wc_type==='CSP'?'<span class="req">*</span>':''} <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo${t.wc_type==='CSP'?' farjiyat (Close mate, CSP call)':' (optional, ICP call)'}. Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
+      <label style="font-weight:700;color:#0369a1;font-size:13px;">📎 Attachments ${(t.wc_type==='CSP'&&!_isFujifilmTicket(t))?'<span class="req">*</span>':''} <span style="font-size:11px;font-weight:400;color:#64748b;">— Job Sheet photo${t.wc_type==='CSP'?' farjiyat (Close mate, CSP call)':' (optional, ICP call)'}. Bija printer report vagere optional (max 2). Camera ke gallery banne chale.</span></label>
       <button type="button" onclick="document.getElementById('js-gal-multi-input').value='';document.getElementById('js-gal-multi-input').click();" style="margin-top:8px;width:100%;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">📁 Select Multiple Photos at Once (Gallery)</button>
       <div id="js-attach-slots" style="margin-top:8px;"></div>
       <input type="file" id="js-cam-input" accept="image/*" capture="environment" style="display:none;" onchange="onJsPhotoPick(this)">
@@ -9494,7 +9497,7 @@ async function saveEngUpdate(){
   // status==='Closed'-only check here NEVER fires for Carry In at all (it
   // never literally reaches "Closed") — this requirement was effectively
   // dead for every Carry In call.
-  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
+  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'&&!_isFujifilmTicket(t)&&isFieldRequired('call_close','jobsheet_photo')&&!(_photos[0]&&_photos[0].url)){
     alert('📄 Job Sheet Photo is required to close a CSP call!\n\nUpar "Attachments" ma Job Sheet no photo (camera ke gallery) attach karo, pachhi Save karo.');
     return;
   }
@@ -9512,7 +9515,7 @@ async function saveEngUpdate(){
   var pageCountSkip=document.getElementById('upd-page-count-skip')?.checked;
   var pageCountReason=(document.getElementById('upd-page-count-skip-reason')?.value||'').trim();
   var pageCountVal=(document.getElementById('upd-page-count')?.value||'').trim();
-  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'){
+  if((status==='Closed'||origStatus==='Repaired')&&t.wc_type==='CSP'&&!_isFujifilmTicket(t)){
     if(pageCountSkip&&!pageCountReason){alert('📄 Page Count skip karvu hoy to reason lakhvo farjiyat chhe.');document.getElementById('upd-page-count-skip-reason')?.focus();return;}
     if(!pageCountSkip&&!pageCountVal){alert('📄 Page Count required chhe (CSP call) — ya to lakho, ya "Skip" tick kari ne reason aapo.');document.getElementById('upd-page-count')?.focus();return;}
     data.page_count=pageCountSkip?null:parseInt(pageCountVal,10);
