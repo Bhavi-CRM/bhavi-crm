@@ -3255,7 +3255,6 @@ function _cbDraw(){
     +card('Collected ('+pLabel+')','+'+_cbFmt(sIn),'#16a34a',inP.filter(function(r){return r.entry_type==='in';}).length+' entries')
     +card('Paid Out ('+pLabel+')','−'+_cbFmt(sOut),'#dc2626',inP.filter(function(r){return r.entry_type==='out';}).length+' entries')
     +card('Withdrawn ('+pLabel+')','−'+_cbFmt(sWd),'#d97706','taken by Admin / Manager')
-    +card('Net Change ('+pLabel+')',(sIn+sOp-sOut-sWd>=0?'+':'−')+_cbFmt(Math.abs(sIn+sOp-sOut-sWd)),'#1d4ed8','Opening: '+_cbFmt(before))
     +'</div>';
   // Tabs
   h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">'
@@ -3324,7 +3323,7 @@ function _cbLedgerHTML(rows){
     var del=!!r.is_deleted,s=_cbSigned(r);
     var tm=r.created_at?new Date(r.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}):'';
     var edited=(r.edit_log&&r.edit_log.length&&!del)?' <span title="'+_cbE(r.edit_log.map(function(l){return (l.name||l.by)+' • '+new Date(l.at).toLocaleString('en-IN')+' • '+(l.action||'edited');}).join('\n'))+'" style="font-size:10px;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:0 5px;cursor:help;">edited</span>':'';
-    h+='<tr style="border-top:1px solid var(--border);'+(del?'opacity:.5;text-decoration:line-through;':'')+'">'
+    h+='<tr style="border-top:1px solid var(--border);'+(del?'opacity:.5;text-decoration:line-through;':(r.entry_type==='withdraw'?'background:#fff3d6;box-shadow:inset 4px 0 0 #f59e0b;':''))+'">'
       +'<td style="padding:8px 12px;white-space:nowrap;color:var(--text-muted);">'+tm+'</td>'
       +'<td style="padding:8px 12px;">'+_cbTypeBadge(r)+'</td>'
       +'<td style="padding:8px 12px;font-weight:600;">'+_cbE(r.party)+edited+'</td>'
