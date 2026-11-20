@@ -29145,6 +29145,25 @@ async function loadKmReport(){
         (_ktk||[]).forEach(function(t){_kmAreaMap[t.id]={area:t.area||t.city||'',cname:t.cname||''};});
       }
     }catch(e){}
+    // Site visits (ticket_id = 'SV<visit id>'): show the site / client name
+    // instead of the bare SV code, so it's clear who the engineer visited.
+    var _kmSvMap={};
+    try{
+      var _svIds=Array.from(new Set(logs.map(function(l){var m=/^SV(\d+)$/.exec(String(l.ticket_id||''));return m?m[1]:null;}).filter(Boolean)));
+      if(_svIds.length){
+        var _svv=await sbAll('auto_site_visits','?id=in.('+_svIds.join(',')+')&select=id,site_id,adhoc_label,adhoc_client_name,adhoc_area');
+        var _stIds=Array.from(new Set((_svv||[]).map(function(v){return v.site_id;}).filter(Boolean)));
+        var _stMap={};
+        if(_stIds.length){
+          var _sts=await sbAll('auto_sites','?id=in.('+_stIds.join(',')+')&select=id,site_name,client_name').catch(function(){return[];});
+          (_sts||[]).forEach(function(x){_stMap[x.id]=x;});
+        }
+        (_svv||[]).forEach(function(v){
+          var st=v.site_id?_stMap[v.site_id]:null;
+          _kmSvMap['SV'+v.id]=st?{name:st.site_name||'',client:st.client_name||''}:{name:v.adhoc_label||'',client:v.adhoc_client_name||'',area:v.adhoc_area||''};
+        });
+      }
+    }catch(e){}
     // Group by engineer + date
     var groups={};
     logs.forEach(function(l){
@@ -29174,7 +29193,9 @@ async function loadKmReport(){
         var _kInfo=l.ticket_id&&_kmAreaMap[l.ticket_id]||null;
         var _kArea=_kInfo&&_kInfo.area?_kInfo.area:'';
         var _isFt=l.ticket_id&&String(l.ticket_id).indexOf('FT')===0;
-        var ticketCell=_isFt?'<span style="color:#7c3aed;font-weight:700;">🚚 Other Work</span>':(l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—');
+        var _svI=l.ticket_id&&_kmSvMap[l.ticket_id]||null;
+        if(_svI&&!_kArea)_kArea=_svI.area||'';
+        var ticketCell=_svI?('<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:700;">🏗️ '+escHtml(_svI.name||_svI.client||l.ticket_id)+'</a>'+((_svI.name&&_svI.client)?'<div style="font-size:11px;color:#0d9488;font-weight:700;">👤 '+escHtml(_svI.client)+'</div>':'')+'<div style="font-size:10px;color:#94a3b8;">'+l.ticket_id+'</div>'):_isFt?'<span style="color:#7c3aed;font-weight:700;">🚚 Other Work</span>':(l.ticket_id?'<a href="javascript:void(0)" onclick="viewTicket(\''+l.ticket_id+'\')" style="color:#1d4ed8;font-weight:600;">'+l.ticket_id+'</a>'+(_kArea?'<div style="font-size:11px;color:#0d9488;font-weight:700;">📍 '+escHtml(_kArea)+'</div>':''):'—');
         var photoCell=l.photo_url?'<button class="btn-icon" title="View odometer photo" onclick="showPhotoFull(\''+encodeURIComponent(l.photo_url)+'\')">👁️</button>':'—';
         // If there's a previous point in this day's trail, jump straight to
         // turn-by-turn directions FROM that point TO this one — no more
@@ -29192,8 +29213,8 @@ async function loadKmReport(){
           +'<td style="text-align:right;font-weight:700;">'+(isNaN(kmN)?'—':kmN)+_kmEdited+_kmEditBtn+'</td>'
           +'<td style="text-align:right;font-weight:700;color:#0d9488;">'+(seg===''?'—':('+'+seg+' km'))+'</td>'
           +'<td style="text-align:center;">'+photoCell+'</td><td style="text-align:center;">'+gpsCell+'</td></tr>';
-        excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':l.ticket_id||'','Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg,'Edit Remark':l.edit_remark||'','Edited By':l.corrected_by||'','Edited At':l.edited_at?new Date(l.edited_at).toLocaleString('en-IN'):''});
-        excelDayRows.push([tm,(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),_isFt?'Other Work':(l.ticket_id||''),_kArea,isNaN(kmN)?'':kmN,seg===''?'':seg,l.edit_remark||'',l.corrected_by||'']);
+        excelRows.push({'Engineer':g.eng_name,'Date':g.date,'Time':tm,'Type':(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),'Ticket':(_svI?((_svI.name||_svI.client||'')+(_svI.name&&_svI.client?' / '+_svI.client:'')+' ('+l.ticket_id+')'):(l.ticket_id||'')),'Area':_kArea,'Odometer':isNaN(kmN)?'':kmN,'Segment KM':seg===''?'':seg,'Edit Remark':l.edit_remark||'','Edited By':l.corrected_by||'','Edited At':l.edited_at?new Date(l.edited_at).toLocaleString('en-IN'):''});
+        excelDayRows.push([tm,(typeLabel[l.entry_type]||l.entry_type).replace(/^[^\s]+\s/,''),_isFt?'Other Work':(_svI?((_svI.name||_svI.client||'')+(_svI.name&&_svI.client?' / '+_svI.client:'')+' ('+l.ticket_id+')'):(l.ticket_id||'')),_kArea,isNaN(kmN)?'':kmN,seg===''?'':seg,l.edit_remark||'',l.corrected_by||'']);
         if(!isNaN(kmN))prev=kmN;
         if(l.lat&&l.lng)prevLoc={lat:l.lat,lng:l.lng};
       });
